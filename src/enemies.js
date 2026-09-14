@@ -521,9 +521,11 @@ export class Enemy {
      * `beam` is true while this body is half of a YOKE and the beam is
      * intact; the SURVIVOR clears it itself, which is build 310's rule --
      * `Enemy.destroy` is the one door every DAMAGE death comes through and
-     * NOT the one door every `dead = true` comes through (six places set it
-     * directly), so a partner taken by a fizzle, a boss teardown or the
-     * glitch dissolve would leave a beam nobody broke.
+     * NOT the one door every `dead = true` comes through (FIFTEEN sites write
+     * it on a body in `world.enemies` or `world.drops`, of forty-one in src/
+     * -- derived at build 326 by the one grep in the note at `promote`), so a
+     * partner taken by a fizzle, a boss teardown or the glitch dissolve would
+     * leave a beam nobody broke.
      *
      * `took` is what makes WHERE the damage lands matter: the pool is
      * shared, so both halves read the same health, and this is the only
@@ -1147,9 +1149,10 @@ export class Enemy {
    * A hook at the death site would have been the obvious place and would
    * have been wrong: `Enemy.destroy` is the one door every DAMAGE death
    * comes through and NOT the one door every `dead = true` comes through --
-   * six places set it directly, so a partner taken by a fizzle, a boss
-   * teardown, the glitch dissolve or `Game.sweep` would leave a beam nobody
-   * broke and a survivor that never got its speed. `solveTethers` clears the
+   * fifteen sites write it on a body, so a partner taken by a fizzle, a boss
+   * teardown or the glitch dissolve would leave a beam nobody broke and a
+   * survivor that never got its speed. (`Game.sweep` was named here and is
+   * not one of them: it READS the flag. See `promote`.) `solveTethers` clears the
    * tether records on its own; this is what clears the FLAG and pays the
    * survivor.
    *
@@ -1584,11 +1587,32 @@ export class Enemy {
    * A follower whose lead is gone becomes a head, and it finds that out
    * ITSELF on the next frame. Nothing is written at the death site, and that
    * is deliberate: `Enemy.destroy` is the one door every DAMAGE death comes
-   * through but NOT the one door every `dead = true` comes through -- six
-   * places set it directly (the seed's timer, a fizzle running out, a boss's
-   * teardown, the glitch dissolve, `Game.sweep`, the debug wipe). A hook in
-   * `destroy` would be missed by every one of them, and the bug would be a
-   * snake following a corpse.
+   * through but NOT the one door every `dead = true` comes through. A hook in
+   * `destroy` would be missed by every one of the others, and the bug would
+   * be a snake following a corpse.
+   *
+   * ---- AND THE LIST THIS NOTE USED TO CARRY WAS WRONG BOTH WAYS ----
+   *
+   * It read "six places set it directly (the seed's timer, a fizzle running
+   * out, a boss's teardown, the glitch dissolve, `Game.sweep`, the debug
+   * wipe)", and three other docstrings quoted the six. TWO of the six are
+   * not writers at all: `Game.sweep` READS `dead` and assigns it nowhere,
+   * and the debug wipe is `debugClearField`, which calls `e.destroy(w)` in a
+   * repeated pass and never touches the flag. And it omitted at least nine
+   * that are -- the graft boarding, a GLUT's meal, `absorb`, `takeField`,
+   * the evolution's act I, PARITY's mirror twin, DYNAMO's collapse,
+   * TERMINUS's frame cull and BOTH arrests.
+   *
+   * Derived at build 326 rather than recounted, because a number in a
+   * docstring that says how many of something there are is the shape this
+   * repo keeps paying for: `grep -rn '\.dead\s*=\s*true' src/` finds
+   * forty-one statements, of which FIFTEEN are on a body in `world.enemies`
+   * or `world.drops` (boss 231/703/1676, dynamo 632, enemies
+   * 1766/1804/2441/2616/3024/3025/6639, game 1035/1220, parity 446,
+   * terminus 701). The rest are mines, effects, projectiles, debris, the fx
+   * pool, the dummy's readout and `this.parked`, which boss.js:878 says in
+   * as many words is not in `world.enemies`. One grep re-derives it; the
+   * list above is the answer on the day it was run, not a thing to maintain.
    *
    * It tests `fizzle` as well as `dead`, because a dissolving bead is leaving
    * and `Game.physicsStep` skips `steer` for one while `integrate` goes on
@@ -3096,7 +3120,7 @@ export class Enemy {
      *
      * `destroy` is the right door and that is a decision, not a convenience.
      * Build 310 records that it is NOT the one door every death comes through
-     * -- six places write `dead = true` directly -- and for this object that
+     * -- fifteen sites write `dead = true` on a body -- and for this object that
      * is exactly what is wanted: a REMNANT taken by the glitch dissolve, by a
      * boss teardown or by `Game.sweep` must NOT come back, because nobody
      * shot it. `destroy`'s own `fizzle` guard on its first line covers the
@@ -3226,7 +3250,7 @@ export class Enemy {
      * radius is above `splits.floor`, so r 40 breaks into three at 24, each
      * of those into three at 14.4, and 14.4 stops -- nine bodies out of one,
      * with the recursion terminated by arithmetic rather than by a counter
-     * that every one of the six places that set `dead` would have to carry.
+     * that every one of the places that set `dead` would have to carry.
      *
      * The children's health, plate and speed come off the PARENT's, not off
      * the type's, for two reasons. `scaleToTier` has already multiplied the

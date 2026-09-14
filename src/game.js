@@ -3561,10 +3561,35 @@ export class Game {
      *
      * So the win notes the core HERE, one line before the clear that would
      * otherwise have granted it. It cannot live inside `clear`: `clear` is the
-     * door `withdrawBoss`, `reset()` and `openAperture`'s teardown all come
-     * through as well, and `endBoss` is the only one of the four that means
-     * the fight was finished. `codex.record` is idempotent, so noting a core
+     * door `Game.reset` and `Game.withdrawBoss` come through as well (and
+     * `Game.debugBoss`, through the second), and `endBoss` is the only one of
+     * the three that means the fight was finished. `codex.record` is idempotent, so noting a core
      * the outro already recorded costs nothing.
+     *
+     * ---- AND FOR ONE OF THE NINE IT IS THE ONLY RECORDER ----
+     *
+     * Build 326 measured which. Every boss dies the same way -- there is ONE
+     * death gate in boss.js and it is `if (this.core.dead) this.die(world)`,
+     * and `dead` is only ever written by `Enemy.destroy` -- so eight of the
+     * nine cores are a body on the field when they die and `Game.sweep`
+     * records them on that very frame, tens of seconds before the outro ends
+     * and this line runs. For those eight this call is a second, idempotent
+     * note.
+     *
+     * DYNAMO is not one of the eight. Its core is spliced out of
+     * `world.enemies` by its first update and stays out for the whole fight
+     * (measured: the only core off the list of nine), and it is put back by
+     * `Dynamo.clear` itself, under a docstring reading "on the way out it has
+     * to be back in the world, or the wreck is not shed" -- so on build 324
+     * the SWEEP recorded it, because `clear` wrote a bare `dead` one line
+     * after that push. Build 325's `offField` marks it `dissolved` in the
+     * same call, which would have taken DYNAMO's core out of the glossary on
+     * a WIN as well as on a withdrawal. Proved by revert: with this line
+     * removed a won DYNAMO leaves the codex holding `pylon` and nothing else
+     * and the title screen can never count it, while ORDINAL and TERMINUS
+     * still read their cores off the sweep. So the line is a belt for eight
+     * and the whole brace for one -- which is why `regress.mjs` wins one boss
+     * of each class rather than one boss.
      *
      * The STRUCTURE is unaffected on a win and that is not an accident:
      * `Boss.arrest` destroys each part as it snaps it off, during the outro

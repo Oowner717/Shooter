@@ -373,10 +373,19 @@ export class Axiom extends Boss {
    *
    * `hush` is the patience timeout's name for what it does, and the docstring
    * above said so -- but `Game.withdrawBoss` does not call it. It calls
-   * `clear`, and so does `reset()` and so does `openAperture`'s teardown. So
-   * a fight that timed out, a restart mid-fight, or opening a second aperture
-   * left five ability buttons dead FOR THE REST OF THE RUN, with the only
-   * thing that could ever release them gone from the field.
+   * `clear`, and so does `reset()`, and so does `Game.debugBoss` through
+   * `withdrawBoss`. So a fight that timed out, a restart mid-fight, or the
+   * debug panel taking a boss away left five ability buttons dead FOR THE
+   * REST OF THE RUN, with the only thing that could ever release them gone
+   * from the field.
+   *
+   * (This paragraph said "and so does `openAperture`'s teardown" until build
+   * 326, and three more docstrings copied it. `openAperture`'s second line is
+   * `if (world.boss) return false;` -- it has no boss teardown and cannot be
+   * a door. What it clears is LOOSE bodies, and it pays for them. The cost of
+   * the wrong name is that a reader auditing every door reads `openAperture`,
+   * finds nothing, and never looks at `debugBoss` -- which is the one of the
+   * real ones a player can reach, from SETTINGS, ungated.)
    *
    * The suite was green through all of it because its case drives
    * `boss.hush(w)` by hand -- the method, not the door. CLAUDE.md's rule

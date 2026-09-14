@@ -50,7 +50,7 @@ import { ring, ripple, spark, shake, flash, explode } from './fx.js';
 import { audio } from './audio.js';
 import { background } from './background.js';
 import { registerAnomaly, dressOf, BOSS_TONE } from './anomaly.js';
-import { Boss } from './boss.js';
+import { Boss, offField } from './boss.js';
 
 const X = () => CFG.terminus;
 
@@ -698,7 +698,29 @@ export class Terminus extends Boss {
           continue;
         }
         const p = alive[i];
-        p.dead = true;
+        /*
+         * THE BOSS DROPPED IT, SO IT GOES OFF THE FIELD RATHER THAN INTO THE
+         * GLOSSARY -- which is build 325's teardown fault, in a second file.
+         *
+         * This was a bare `p.dead = true` from the day the stage was
+         * written, and `Game.sweep` is `if (!e.dissolved) noteDestroyed(e)`:
+         * measured at build 326, driving a settled TERMINUS through stages II
+         * and III with the record wiped and nothing shot, the fourteen pieces
+         * it drops entered `bound` in the codex and raised a
+         * `hud.noteCodex` notification for it. The tally was never at risk
+         * -- `Boss.body` writes `counts = false`, and the same probe read 0
+         * kills -- so the leak is the OBJECTS tab's `known` mark and its
+         * section count, plus the notification.
+         *
+         * Build 325's own case could not see it: it withdraws every anomaly
+         * on the roster, and a withdrawal never reaches stage III. The arm
+         * that catches this one drives the stage.
+         *
+         * The explosion and the ring stay. A dropped piece is meant to be
+         * seen falling away, and `sweep`'s dissolved arm adds four sparks on
+         * top of them rather than replacing anything.
+         */
+        offField(p);
         explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.3);
         ring(p.x, p.y, 2, p.r * 4, 0.28, p.type.glow, 2);
       }

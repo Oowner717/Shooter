@@ -2594,8 +2594,8 @@ export class Hud {
      * ---- ...AND THAT LAST SENTENCE WAS FALSE UNTIL BUILD 325 -------------
      *
      * The core got into the codex from `Boss.clear`, which is the door
-     * `withdrawBoss`, `endBoss`, `reset()` and `openAperture`'s teardown all
-     * come through -- a bare `dead = true` with no `dissolved`, so
+     * `withdrawBoss`, `endBoss` and `reset()` all come through -- a bare
+     * `dead = true` with no `dissolved`, so
      * `Game.sweep`'s `if (!e.dissolved) noteDestroyed(e)` recorded it.
      * Measured either way in one container with the record wiped first: a
      * WITHDRAWAL left `world.reconciled` empty and the codex holding

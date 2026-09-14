@@ -5676,4 +5676,140 @@ came from before believing the other one covers it.
   writers and zero reads is a mechanical sweep over the same source the
   existing guard already reads.
 
+- **`p.hp = 0` IS NOT A DEATH, AND BUILD 325'S OWN NEW ARM WAS DRIVEN BY
+  ONE.** `hp <= 0` is converted into a death at exactly two sites, both
+  inside `Enemy.applyDamage`, and nothing else in the game does it -- there
+  is ONE boss death gate (`if (this.core.dead) this.die(world)`) and `dead`
+  is only ever written by `Enemy.destroy`. So an arm that zeroed a boss's
+  parts and core each frame was relying on something ELSE billing damage
+  into an already-empty core: a DIGIT clipping it, which depends on where a
+  burst happened to throw one. Measured, three runs each: **44.12 / 44.12 /
+  44.08 seconds writing the number against 35.67 / 35.67 / 35.67 through the
+  door**, and the door's figure is identical to the bit. The fix is one call
+  with the arguments a round passes, plus an assertion that the core was
+  ALIVE before it and DEAD after -- the door working, rather than the arm
+  writing the flag itself.
+- **`endBoss`'S CORE NOTE IS A BELT FOR EIGHT OF THE NINE AND THE WHOLE
+  BRACE FOR ONE, AND THE ARM THAT SHIPPED WITH IT COULD NOT SEE THE ONE.**
+  Every core dies through `destroy`, so for eight of them `Game.sweep`
+  records the core on the frame it dies, tens of seconds before the outro
+  ends -- build 325's line is a second idempotent note and its docstring's
+  claim that "the win's record cannot come from there any more" was wrong
+  about them. DYNAMO's core is the exception, measured as the only
+  `inEnemies: false` of nine: it is spliced out of `world.enemies` by its
+  first update and pushed back by `Dynamo.clear` itself, under a docstring
+  reading "on the way out it has to be back in the world, or the wreck is
+  not shed" -- so on build 324 the SWEEP recorded it and build 325's
+  `offField` marks it `dissolved` in that same call. Proved by revert: with
+  the line removed a won DYNAMO leaves the codex holding `pylon` and nothing
+  else, while ORDINAL and TERMINUS still read their cores off the sweep. So
+  the case wins ONE BOSS OF EACH CLASS, chosen off the roster reading rather
+  than by index. **A belt and a brace look identical until you measure which
+  one is holding.**
+- **...AND THE BLOW HAS TO LAND TWO SECONDS IN, WHICH IS THE DIFFERENCE
+  BETWEEN THAT ARM CATCHING THE FAULT AND NOT.** DYNAMO's core is spliced out
+  by its FIRST update, not by its constructor -- so a core killed on the
+  arrival frame is still on the list for all nine, the sweep records every
+  one of them, and the arm passes with the note deleted. Measured: blow at
+  f = 0, the reverted build is GREEN; blow at f = 120, a won DYNAMO leaves
+  `pylon` alone and it fails. The guard is `onListAtKill`, asserted to agree
+  with the class the roster sweep put that boss in -- or the arm is measuring
+  the other one. Same family as sampling the last frame a state held.
+- **THE TEARDOWN'S `dissolved` MARK BUYS A SPARK BURST, AND IT ARRIVED AS A
+  SIDE EFFECT OF A GLOSSARY FIX.** `sweep`'s dissolved arm is four sparks a
+  body. Measured either side in one container, every anomaly withdrawn:
+  build 324 emitted **ZERO on all nine**, build 325 emits **164 for
+  ORDINAL's 41 parts**, 132 for TERMINUS's 33, then 92 / 64 / 60 / 52 / 36 /
+  24 / 16 -- against `CFG.maxParticles` 620, so the worst is 26% of one
+  frame's budget at quality 1 and 59% at the governor's 0.45 floor. Bounded
+  by construction (`spark()` returns null once `fx.budgetLeft` is spent) and
+  one frame long. Kept, because the frame really is coming apart -- but a
+  visual event nobody chose is a visual event nobody documented, and the
+  right response is to decide it in the docstring rather than discover it.
+- **THE SAME FAULT HAD A SECOND DOOR IN A DIFFERENT FILE, AND IT IS LIVE.**
+  `Terminus.takeFrame` -- stage III, "it can only carry so much of itself,
+  and what it cannot it drops" -- dropped ten pieces with a bare
+  `p.dead = true`, so `Game.sweep` entered `bound` in the glossary and raised
+  a `hud.noteCodex` for structure the player never touched. The tally was
+  never at risk (`Boss.body` writes `counts = false`; measured 0 kills), so
+  the leak is the OBJECTS tab's `known` mark, its section count and the
+  notification. Build 325's own case could not see it: a withdrawal never
+  reaches stage III. Fixed with the `offField` idiom that build exported, and
+  revert-proved (0 of 10 marked and `bound` gained). **A fix is worth
+  grepping for its own shape** -- the arrests and PARITY's mirror twin are
+  the same three lines and are deliberately the other way, which nothing at
+  those sites said either.
+- **A CONTROL PLACED WHERE THE BOSS RESURRECTS ITS OWN STRUCTURE READS AN
+  EMPTY DELTA ON A WORKING BUILD.** At stage III TERMINUS is GATHERING the
+  boundary up: `takeFrame` calls `reform`, which raises dead pieces back to
+  `frameHp` of their health. Measured -- a survivor killed there read
+  `dead: true, hp: -2978` on the frame the damage landed and `dead: false,
+  hp: 182 of 260` after the very next `g.update`, still in `world.enemies`,
+  with nothing recorded: the boss revives it before `Game.sweep` ever walks
+  it. So the control is taken on the CLIMB, at stage I, where nothing
+  reforms. The first version put it after the drop and read `[]` for the one
+  it was supposed to prove.
+- **A DELTA AGAINST A DIRTY RECORD IS NOT A DELTA, and the first version of
+  that arm could not fail.** It destroys a few outer segments through the
+  damage door to bring the second ring -- and those are `bound` pieces too,
+  so `bound` was already in the codex by the time the drop ran and the delta
+  across the transition frame was empty whatever the drop did. The record is
+  cleared on every stage-II frame now, so the transition starts from nothing.
+  **Ask what is already in the accumulator before asserting that nothing was
+  added to it.**
+- **`Dynamo.collapse` OPENED WITH A LOOP THAT COULD NOT RUN, AND ITS
+  DOCSTRING NAMED A MEASURED RULE THE LOOP WAS SUPPOSED TO KEEP.**
+  `for (const p of this.live()) { p.dead = true; explode(...); ring(...); }`
+  -- and the only call is
+  `if (this.stage >= 4 && !this.triad && !this.live().length)
+  this.collapse(world)`, so `live()` is EMPTY by construction every time the
+  method is entered. Correct when the collapse fired at the stage boundary,
+  dead from the moment the gate went in, which is the `world.endless` shape.
+  What keeps the rule ("the legs have to actually go") is the GATE. Removing
+  it took `explode` out of that file's imports, which is the tell that the
+  branch really was the only one.
+- **`openAperture` WAS NAMED AS A BOSS TEARDOWN DOOR IN FIVE PLACES AND IS
+  NOT ONE.** Its second line is `if (world.boss) return false;` -- it has no
+  boss teardown at all; what it clears is LOOSE bodies, and it pays for them.
+  The real callers of `boss.clear` are exactly three (`reset`,
+  `withdrawBoss`, `endBoss`), plus `Game.debugBoss` through the second. The
+  claim started in one `clear` docstring and build 325 copied it into three
+  more and a case. What it costs is precise: a reader auditing every door
+  reads `openAperture`, finds nothing, and never looks at `debugBoss` --
+  which is the one door of the real three a player can reach, from SETTINGS,
+  ungated. And of the three, only TWO could ever have leaked the glossary:
+  `reset()` empties `world.enemies` twenty-four lines before it calls
+  `clear`, so its marks land on bodies nothing will ever sweep.
+- **"SIX PLACES SET `dead` DIRECTLY" WAS WRONG IN BOTH DIRECTIONS, in four
+  docstrings, with the list written out once.** `Game.sweep` was named and
+  READS the flag; "the debug wipe" is `debugClearField`, which calls
+  `e.destroy(w)` and never touches it. And the list omitted at least nine
+  real writers -- the graft boarding, a GLUT's meal, `absorb`, `takeField`,
+  the evolution's act I, PARITY's mirror twin, DYNAMO's collapse, TERMINUS's
+  frame cull and both arrests. Derived instead of recounted:
+  `grep -rn '\.dead\s*=\s*true' src/` finds forty-one statements, of which
+  FIFTEEN are on a body in `world.enemies` or `world.drops`. **A number in a
+  docstring saying how many of something there are is the shape this repo
+  keeps paying for** -- name the grep that re-derives it, and say the list is
+  the answer on the day it was run.
+- **A CONJUNCT THAT READS `w.enemies[0]` AND A STRING THAT CALLS IT "A REAL
+  PART".** The constructor pushes the core before `arriveStep` lands
+  anything, so index 0 is the CORE for eight of the nine and a half (also the
+  core) for PARITY -- the conjunct never once read a part, and
+  `offField(this.core)` sits one line above `offField(p)` in both `clear`
+  bodies, so it was very nearly vacuous. It reads all of `b.parts()` and the
+  core now and prints `marked/parted` per boss. Third time in this repo that
+  a detail string declared something the code was not measuring.
+- **AND THE FAN-OUT SCORED FOUR OF FOUR THIS TIME, ON A BUILD I HAD ALREADY
+  COMMITTED.** Four read-only lenses over build 325's own diff found the
+  non-door driver, the spark burst, the TERMINUS leak and the unreachable
+  DYNAMO loop -- all four real, none visible to 715 green cases, and two of
+  them faults in code I had written that afternoon. The standing rule held
+  anyway: its census figure for TERMINUS's part count disagreed with the
+  suite's own output (33, not 29), its `openAperture` finding needed
+  `reset()`'s ordering added to be complete, and every mechanism above was
+  re-measured here rather than taken. **A review of the build you just
+  shipped is the cheapest one there is**, because a red case then is
+  unambiguously the case's fault.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

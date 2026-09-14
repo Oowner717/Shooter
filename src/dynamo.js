@@ -30,7 +30,7 @@
 import { CFG, TYPE_BY_ID } from './config.js';
 import { clamp, rand, rgba, TAU, drawGlow, drawBolt } from './util.js';
 import { Enemy } from './enemies.js';
-import { ring, ripple, spark, shake, flash, explode } from './fx.js';
+import { ring, ripple, spark, shake, flash } from './fx.js';
 import { audio } from './audio.js';
 import { background } from './background.js';
 import { registerAnomaly, dressOf } from './anomaly.js';
@@ -626,13 +626,27 @@ export class Dynamo extends Boss {
    * The legs have to actually go. Left alive one kept the core at a leg's
    * worth of armour and the turret went on splitting its fire: measured, IV
    * was forty three percent of the fight for the last quarter of the bar.
+   *
+   * ---- AND WHAT KEEPS THAT RULE IS THE GATE, NOT A LOOP IN HERE ----
+   *
+   * This opened with `for (const p of this.live()) { p.dead = true;
+   * explode(...); ring(...); }` for as long as it has existed, and the loop
+   * could not run: the only call is
+   * `if (this.stage >= 4 && !this.triad && !this.live().length)
+   * this.collapse(world)`, so `live()` is EMPTY by construction every time
+   * the method is entered. It was correct when the collapse fired at the
+   * stage boundary -- the paragraph above records that move -- and became a
+   * branch with no reachable arm the moment the gate went in, which is the
+   * `world.endless` shape build 186 spent a pass removing. Gone at build 326.
+   *
+   * Nothing is lost with it: the legs are already dead when we arrive, by the
+   * gate's own test, so the three explosions and rings were painting bodies
+   * that had each already exploded on being destroyed. What the docstring's
+   * measurement is about is the GATE, and that is where it is enforced. It
+   * took `explode` out of this file's imports with it, which is the tell that
+   * the branch really was the only one.
    */
   collapse(world) {
-    for (const p of this.live()) {
-      p.dead = true;
-      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.6);
-      ring(p.x, p.y, 4, p.r * 6, 0.35, p.type.glow, 3);
-    }
     this.triad = true;
     this.bladeA = 0;
     this.y0 = this.y;

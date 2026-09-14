@@ -28045,8 +28045,9 @@ if (GUN_LINE) {
      *
      * The arm above drives `boss.hush(w)` BY HAND, and that is why this
      * shipped broken: `Game.withdrawBoss` -- what a patience timeout actually
-     * calls -- goes through `clear`, not `hush`. So did `reset()` and so did
-     * `openAperture`'s teardown. A fight that timed out left five ability
+     * calls -- goes through `clear`, not `hush`. So did `reset()`, and so
+     * does the debug panel's own boss control, through the same door. A
+     * fight that timed out left five ability
      * buttons dead for the rest of the run, with the only thing that could
      * ever release them gone from the field, and the suite was green because
      * it called the method instead of the door. CLAUDE.md's rule about
@@ -35824,11 +35825,14 @@ if (MINE_LINE) {
  * Build 325. `Game.sweep` is
  *     if (!e.dissolved) this.noteDestroyed(e);
  *     if (e.counts && !e.dissolved) this.registerKill(e);
- * and `Boss.clear` -- the door `withdrawBoss`, `endBoss`, `reset()` and
- * `openAperture`'s teardown ALL come through -- wrote a bare `dead = true` on
+ * and `Boss.clear` -- the door `withdrawBoss`, `endBoss` and `reset()` all
+ * come through, three callers and no more, plus `Game.debugBoss` through the
+ * first of them. Of the three only two could ever have leaked: `reset()`
+ * writes `w.enemies.length = 0` twenty-four lines before it calls `clear`, so
+ * its marks land on bodies nothing will ever sweep. It wrote a bare `dead = true` on
  * every part, the core and the parked garrison. Structure carries
  * `counts: false`, so the tally was never at risk (measured: a withdrawal
- * books 0 kills for ORDINAL's 41 parts and TERMINUS's 29). The GLOSSARY was:
+ * books 0 kills for ORDINAL's 41 parts and TERMINUS's 33). The GLOSSARY was:
  * measured either way in one container with the record wiped first, a
  * WITHDRAWAL left `world.reconciled` empty and the codex holding `ordinal` and
  * `tally`, and a WIN left `reconciled: [1]` and the codex holding the same
@@ -35904,10 +35908,31 @@ if (MINE_LINE) {
           b.settle(w);
           g.update(1 / 60);
           row.parts = w.enemies.length;
-          // the three marks `offField` owes a body, read on a real part
-          const p = w.enemies[0];
+          /*
+           * WHERE THE CORE LIVES, which is what arm 2 keys on rather than a
+           * literal `n`. Eight of the nine cores are a body on the field and
+           * are recorded by `Game.sweep` the frame they die; DYNAMO's is
+           * spliced out for the whole fight and put back by its own `clear`,
+           * so `endBoss`'s note is the only thing that can record it. Asked
+           * of the roster rather than restated, for build 313's reason.
+           */
+          row.coreInEnemies = w.enemies.includes(b.core);
+          /*
+           * THE THREE MARKS `offField` OWES, READ ON EVERY PART AND ON THE
+           * CORE -- not on `w.enemies[0]`, which is what this arm read until
+           * build 326 while its detail string said "a real part". The
+           * constructor pushes the core before `arriveStep` lands anything,
+           * so index 0 is the CORE for eight of the nine and a half (also
+           * the core) for PARITY: the conjunct never once read a part, and
+           * `offField(this.core)` sits one line above `offField(p)` in both
+           * `clear` bodies, so it was very nearly vacuous. A detail string
+           * is a declaration -- see the `kind: 'works'` and SHOAL notes.
+           */
+          const held = [...b.parts()];
           g.withdrawBoss();
-          row.marks = p ? { spent: !!p.spent, dissolved: !!p.dissolved, dead: !!p.dead } : null;
+          row.parted = held.length;
+          row.marked = held.filter((x) => x.spent && x.dissolved && x.dead).length;
+          row.coreMarked = !!(b.core && b.core.spent && b.core.dissolved && b.core.dead);
           g.update(1 / 60);
           row.swept = w.enemies.length;
           row.recon = w.reconciled.length;
@@ -35921,36 +35946,195 @@ if (MINE_LINE) {
     // ---- 2. ...and a WIN, which is the same door and must still record ----
     /*
      * `endBoss` calls the same `clear`, so the win's record cannot come from
-     * there any more: it notes the core itself, one line above. Driven through
-     * the real death rather than by writing `reconciled` -- the arrest snaps
-     * the frame off part by part and that is what records the STRUCTURE, so a
-     * short-cut would measure a different mechanism.
+     * there any more: it notes the core itself, one line above.
+     *
+     * ONE BOSS OF EACH CLASS, chosen off arm 1's reading rather than by
+     * index. For a core that is a body on the field, `Game.sweep` records it
+     * the frame it dies and `endBoss`'s note is a second idempotent one; for
+     * a core that is NOT (DYNAMO, measured one of nine), the note is the only
+     * recorder in the game and deleting it loses a won fight from the
+     * glossary. A case that won only the first kind would pass with the line
+     * removed.
+     *
+     * ---- AND THE DEATH IS DRIVEN THROUGH THE DAMAGE DOOR ----
+     *
+     * `p.hp = 0` is not a death: `hp <= 0` becomes one at exactly two sites,
+     * both inside `Enemy.applyDamage`, and nothing else in the game converts
+     * the one into the other. Written that way the arm relied on something
+     * else billing damage into an already-empty core -- a DIGIT clipping it,
+     * which depends on where a burst happened to throw one -- and it showed:
+     * 44.12 / 44.12 / 44.08 seconds over three runs against 35.67 / 35.67 /
+     * 35.67 through the door. So the core takes one hit of ten times its own
+     * health from `applyDamage` with `src: 'bolt'`, exactly as a round does,
+     * and the arm asserts it was alive before that call and dead after it --
+     * the door working, rather than the arm writing the flag itself.
+     *
+     * Everything after that hit is the game's own: the structure is recorded
+     * by `Boss.arrest` snapping it off part by part during the outro (21
+     * `tally` notes for ORDINAL, measured with a spy on `noteDestroyed`), not
+     * by this arm, which never touches a part.
      *
      * This arm is also arm 1's liveness proof: a zero from an instrument that
      * has never read a one means nothing, and this is the same instrument
-     * reading three.
+     * reading two ids twice over.
      */
     {
-      wipe();
-      bare();
-      w.apertures[1] = 1;
-      out.win = { opened: g.openBoss(1) };
-      if (out.win.opened) {
-        let f = 0;
-        for (; f < 60 * 240; f++) {
-          const b = w.boss;
-          if (!b) break;
-          for (const p of b.parts()) if (!p.dead) p.hp = 0;
-          if (b.core) b.core.hp = 0;
-          g.update(1 / 60);
-          if (!w.boss) break;
+      out.wins = [];
+      const sole = out.each.find((x) => x.opened && !x.coreInEnemies);
+      const onField = out.each.find((x) => x.opened && x.coreInEnemies);
+      out.soleCount = out.each.filter((x) => x.opened && !x.coreInEnemies).length;
+      for (const pick of [onField, sole]) {
+        if (!pick) continue;
+        wipe();
+        bare();
+        const n = pick.n;
+        w.apertures[n] = 1;
+        const id = ANOMALIES[n - 1].types[0];
+        const row = { n, id, sweptCore: !!pick.coreInEnemies, opened: g.openBoss(n) };
+        if (row.opened) {
+          const b0 = w.boss;
+          b0.arriving = 0;
+          b0.settle(w);
+          /*
+           * TWO SECONDS OF FIGHT BEFORE THE KILLING BLOW, and that is the
+           * difference between this arm catching the fault and not.
+           *
+           * DYNAMO's core is spliced out of `world.enemies` by its FIRST
+           * update, not by its constructor -- so a core killed on the
+           * arrival frame is still on the list for all nine, the sweep
+           * records every one of them, and the arm passes with `endBoss`'s
+           * note deleted. Measured: with the note removed and the blow
+           * landed at f = 0 the case was green; landed at f = 120 a won
+           * DYNAMO leaves the glossary holding `pylon` and nothing else.
+           * `onListAtKill` is the guard -- it has to agree with the class
+           * arm 1 put this boss in, or the arm is measuring the other one.
+           */
+          const KILL_AT = 120;
+          let f = 0;
+          for (; f < 60 * 240; f++) {
+            const b = w.boss;
+            if (!b) break;
+            const c = b.core;
+            if (c && !c.dead && f >= KILL_AT) {
+              row.onListAtKill = w.enemies.includes(c);
+              row.aliveBefore = true;
+              // the door, with the arguments a round passes
+              c.applyDamage(w, (c.maxHp || 1) * 10 + 1000, 0, 0, 0, 0, 0, false, 'bolt');
+              row.deadAfter = !!c.dead;
+            }
+            g.update(1 / 60);
+            if (!w.boss) break;
+          }
+          row.seconds = +(f / 60).toFixed(2);
+          row.recon = w.reconciled.slice();
+          row.seen = seenNow();
+          row.core = codex.has(id);
         }
-        out.win.seconds = +(f / 60).toFixed(1);
-        out.win.recon = w.reconciled.slice();
-        out.win.seen = seenNow();
-        out.win.core = codex.has(ANOMALIES[0].types[0]);
-        out.win.coreId = ANOMALIES[0].types[0];
+        out.wins.push(row);
       }
+    }
+
+    // ---- 3. A BOSS THAT DROPS ITS OWN STRUCTURE MID-FIGHT ----------------
+    /*
+     * The same fault in a second file, found at build 326 and live: TERMINUS
+     * stage III gathers what the boundary can carry and, per `takeFrame`'s own
+     * docstring, "what it cannot it drops" -- with a bare `p.dead = true`, so
+     * `Game.sweep` entered `bound` in the glossary and raised a
+     * `hud.noteCodex` for ten pieces the player never touched. Arm 1 cannot
+     * see it: a withdrawal never reaches stage III.
+     *
+     * Driven up the boss's OWN LADDER rather than by calling `takeFrame`: a
+     * few outer segments through `applyDamage` bring the second ring at
+     * `stageInner` 0.88, then the core is chipped -- also through
+     * `applyDamage` -- until the ladder fires ECLIPSE and enters III itself.
+     * Measured: 1->2 at frame 3 with 40 alive, and `takeFrame` at frame 215
+     * taking that 40 to `frameKeep` 30.
+     *
+     * THE RECORD IS CLEARED ON EVERY STAGE-II FRAME, and the first version of
+     * this arm did not do that and could not fail. The outer segments it
+     * destroys on the way up are `bound` pieces too, so `bound` was already
+     * in the codex by the time the drop ran and the delta across the
+     * transition was empty whatever the drop did -- an assertion satisfied by
+     * the broken build. Cleared each frame while the boss is at II, the
+     * transition frame starts from nothing. Nothing else can record in that
+     * window: the core is being chipped rather than killed and no minion is
+     * being shot at.
+     *
+     * The control is what makes the empty delta mean something: one frame
+     * piece taken through the same damage door DOES enter `bound`. And what
+     * the arm counts is the pieces that went on the transition frame -- the
+     * first version counted every dead part and read 10 of 14, the other four
+     * being its own kills from the climb.
+     *
+     * ---- AND THE CONTROL HAS TO BE TAKEN BEFORE STAGE III, NOT AFTER ----
+     *
+     * At III the boundary is being GATHERED UP: `takeFrame` calls `reform`,
+     * and `reform` raises dead pieces back to `frameHp` of their health.
+     * Measured -- a survivor killed at III read `dead: true, hp: -2978` on
+     * the frame the damage landed and `dead: false, hp: 182 of 260` after
+     * the very next `g.update`, still in `world.enemies`, with nothing
+     * recorded. So the boss revives it before `Game.sweep` ever walks it, and
+     * a control placed there reads an empty delta on a build where the
+     * glossary demonstrably works -- which is what the first version of this
+     * arm did. It is taken on the climb instead, where nothing reforms.
+     */
+    {
+      bare();
+      const n = ANOMALIES.findIndex((a) => a.types[0] === 'terminus') + 1;
+      w.apertures[n] = 1;
+      const row = { n, opened: n > 0 && g.openBoss(n) };
+      if (row.opened) {
+        const t = w.boss;
+        t.arriving = 0;
+        t.settle(w);
+        g.update(1 / 60);
+        const liveParts = () => t.parts().filter((x) => !x.dead);
+        const killsAt = w.kills;
+        // THE CONTROL, first: one piece of the boundary through the damage
+        // door, at stage I where nothing is being gathered up
+        {
+          codex.seen.clear();
+          const up = liveParts().filter((x) => !x.hidden && w.enemies.includes(x));
+          row.controlLive = up.length;
+          if (up.length) {
+            up[0].applyDamage(w, up[0].maxHp * 10 + 1000, 0, 0, 0, 0, 0, false, 'bolt');
+            g.update(1 / 60);
+            row.controlGained = seenNow().slice();
+          }
+        }
+        let f = 0;
+        for (; f < 60 * 90; f++) {
+          if (t.stage < 2) {
+            const up = liveParts().filter((x) => !x.hidden);
+            if (up.length) up[0].applyDamage(w, up[0].maxHp * 10 + 1000, 0, 0, 0, 0, 0, false, 'bolt');
+          } else if (!t.eclipsed) {
+            t.core.applyDamage(w, Math.max(1, t.core.maxHp * 0.004), 0, 0, 0, 0, 0, false, 'bolt');
+          }
+          const was = t.stage;
+          const aliveWas = liveParts().length;
+          const deadWas = new Set(t.parts().filter((x) => x.dead));
+          if (was >= 2) codex.seen.clear();
+          const seenWas = seenNow();
+          g.update(1 / 60);
+          if (was === 2 && t.stage >= 3) {
+            row.movedAt = f;
+            row.aliveWas = aliveWas;
+            row.aliveNow = liveParts().length;
+            row.dropped = aliveWas - row.aliveNow;
+            // every piece it dropped ON THIS FRAME carries all three marks --
+            // not every dead part, which includes the climb's own kills
+            const gone = t.parts().filter((x) => x.dead && !deadWas.has(x));
+            row.goneMarked = gone.filter((x) => x.spent && x.dissolved && x.dead).length;
+            row.gone = gone.length;
+            row.gained = seenNow().filter((id) => !seenWas.includes(id));
+            row.killsMoved = w.kills - killsAt;
+            break;
+          }
+          if (!w.boss || t.stage >= 4) break;
+        }
+        if (w.boss) { g.withdrawBoss(); w.boss = null; w.bossN = 0; }
+      }
+      out.drop = row;
     }
 
     // ...and the device record goes back exactly as it was found
@@ -35966,7 +36150,7 @@ if (MINE_LINE) {
   const each = r.each;
   const opened = each.filter((x) => x.opened);
   const withParts = opened.filter((x) => x.parts > 0);
-  const allMarked = opened.every((x) => x.marks && x.marks.spent && x.marks.dissolved && x.marks.dead);
+  const allMarked = opened.every((x) => x.parted > 0 && x.marked === x.parted && x.coreMarked);
   const allSwept = opened.every((x) => x.swept === 0);
   const noRecon = opened.every((x) => x.recon === 0);
   check('withdrawing an anomaly records nothing in the glossary, on every one of the roster',
@@ -35977,28 +36161,62 @@ if (MINE_LINE) {
     // THE CLAIM: the device record did not move for any of them
     && r.afterWithdrawals.length === 0
     // ...and the win arm below is what proves this instrument can read a one
-    && r.win.opened && r.win.seen.length > 0,
+    && r.wins.length === 2 && r.wins.every((x) => x.seen.length > 0),
     `${opened.length} of ${r.roster} anomalies opened and withdrawn, parts `
-    + `${opened.map((x) => x.parts).join('/')}, all three marks on a real part `
-    + `${allMarked}, swept to empty ${allSwept}, reconciled still 0 ${noRecon}; `
+    + `${opened.map((x) => x.parts).join('/')}, all three marks on every part `
+    + `and on the core ${allMarked} (${opened.map((x) => `${x.marked}/${x.parted}`).join(' ')}), `
+    + `swept to empty ${allSwept}, reconciled still 0 ${noRecon}; `
     + `the glossary gained [${r.afterWithdrawals.join(' ')}] against `
-    + `[${(r.win.seen || []).join(' ')}] for a win of the same anomaly. `
-    + `Device record restored: ${r.restored}`);
+    + `${r.wins.map((x) => `${x.id} [${x.seen.join(' ')}]`).join(' and ')} for `
+    + `wins of the same anomalies. Device record restored: ${r.restored}`);
 
-  const win = r.win;
+  const wins = r.wins;
+  const sole = wins.find((x) => !x.sweptCore);
   check('...and a fight that is finished still records the core, through endBoss and not the teardown',
-    win.opened
-    && win.recon.length === 1 && win.recon[0] === 1
-    // the core, which is what the title screen's RECONCILED tile keys on
-    && win.core === true
-    // ...and the structure, which the ARREST recorded by taking it apart
-    && win.seen.length >= 2
-    // the withdrawal of the same anomaly recorded neither
+    // one boss whose core the sweep can see and one whose core it cannot, and
+    // at least one of the second kind has to EXIST or this arm is about
+    // nothing -- reported as a count rather than pinned, because how many
+    // bosses splice their core out is a roster fact and not the claim
+    wins.length === 2 && !!sole && r.soleCount >= 1
+    && wins.every((x) => x.opened
+      // the death came out of the damage door rather than out of this arm
+      && x.aliveBefore === true && x.deadAfter === true
+      // ...and it died in the state arm 1 said it would be in
+      && x.onListAtKill === x.sweptCore
+      && x.recon.length === 1 && x.recon[0] === x.n
+      // the core, which is what the title screen's RECONCILED tile keys on
+      && x.core === true
+      // ...and the structure, which the ARREST recorded by taking it apart
+      && x.seen.length >= 2)
+    // the withdrawal of the same anomalies recorded neither
     && r.afterWithdrawals.length === 0,
-    `ORDINAL driven to its own death in ${win.seconds}s: reconciled `
-    + `[${win.recon.join()}], glossary [${win.seen.join(' ')}], core `
-    + `'${win.coreId}' recorded ${win.core} -- against a withdrawal of the same `
-    + `anomaly leaving [${r.afterWithdrawals.join(' ')}]`);
+    wins.map((x) => `${x.id} (core ${x.sweptCore ? 'on the field' : 'SPLICED OUT, so '
+      + 'endBoss is its only recorder'}) driven to its own death through applyDamage `
+      + `in ${x.seconds}s: reconciled [${x.recon.join()}], glossary `
+      + `[${x.seen.join(' ')}], core recorded ${x.core}`).join('; ')
+    + `; ${r.soleCount} of ${r.roster} cores are off the list. A withdrawal of `
+    + `the same anomalies left [${r.afterWithdrawals.join(' ')}]`);
+
+  const d = r.drop;
+  check('a boss that drops its own structure mid-fight records none of it either',
+    d.opened
+    // the ladder actually got there and the drop actually ran, or the empty
+    // delta below is an empty delta about nothing
+    && d.movedAt >= 0 && d.dropped > 0 && d.aliveWas > d.aliveNow
+    // the three marks on every piece it let go of
+    && d.gone > 0 && d.goneMarked === d.gone
+    // THE CLAIM: nothing the boss dropped reached the glossary
+    && d.gained.length === 0
+    && d.killsMoved === 0
+    // ...and the instrument is shown able to read a one, on the same door
+    && d.controlLive > 0 && d.controlGained.length === 1,
+    `TERMINUS reached stage III up its own ladder at frame ${d.movedAt}: `
+    + `${d.aliveWas} of the boundary standing, ${d.aliveNow} kept, `
+    + `${d.dropped} dropped, ${d.goneMarked}/${d.gone} of them marked spent + `
+    + `dissolved + dead. The glossary gained [${d.gained.join(' ')}] and the `
+    + `tally moved ${d.killsMoved} -- against [${(d.controlGained || []).join(' ')}] `
+    + `for one of the ${d.controlLive} standing pieces taken through the same `
+    + `damage door on the climb`);
 }
 
 // --- report -----------------------------------------------------------------

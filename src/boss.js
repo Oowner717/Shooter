@@ -203,6 +203,20 @@ class Remainder {
  * this function has not measured, and a flag borrowed for a side effect
  * brings the rest of its meaning with it.
  *
+ * ---- and `dissolved` buys a spark burst the teardown did not have ----
+ *
+ * `sweep`'s dissolved arm is four sparks a body, so a withdrawal now paints
+ * where it used to delete in silence. Measured either side in one container,
+ * every anomaly on the roster: build 324 emitted ZERO on all nine, build 325
+ * emits 164 for ORDINAL's 41 parts, 132 for TERMINUS's 33, 92, 64, 60, 52,
+ * 36, 24 and 16 for DYNAMO's 3 -- against `CFG.maxParticles` 620, so the
+ * worst of them is 26% of one frame's budget at quality 1 and 59% at the
+ * governor's 0.45 floor. `spark()` returns null once `fx.budgetLeft` is
+ * spent, so it is bounded by construction and costs one frame. Kept rather
+ * than suppressed: the frame really is coming apart, and four sparks a piece
+ * is already how this game draws a body that was eaten rather than
+ * destroyed.
+ *
  * Exported because five `clear` overrides exist (axiom, dynamo, parity,
  * terminus and ORDINAL's) and PARITY's halves are not in its own `parts()`
  * -- so the rule cannot live in the base class alone. What makes it one rule
@@ -775,7 +789,11 @@ export class Boss {
    * `if (e.counts && !e.dissolved) registerKill(e)`, so a bare `dead = true`
    * on a body still in `world.enemies` enters it in the GLOSSARY. Structure
    * carries `counts: false`, so the tally was never at risk -- measured, a
-   * withdrawal books 0 kills for ORDINAL's 41 parts and TERMINUS's 29 -- but
+   * withdrawal books 0 kills for ORDINAL's 41 parts and TERMINUS's 33, and it
+   * is a property of TWO LINES rather than of the teardown: every body any
+   * boss puts on the field comes out of `Boss.claim` or `Boss.body`, and both
+   * write `e.counts = false` with the same comment. So the zero holds for a
+   * tenth boss only as long as it goes through one of those two -- but
    * the glossary was: withdrawing ORDINAL recorded `ordinal` and `tally`,
    * and the title screen's RECONCILED tile reads `codex.has(a.types[0])`
    * under a docstring saying "having the core in the codex is having taken it
