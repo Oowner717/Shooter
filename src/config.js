@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '329';
+export const BUILD = '330';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '329';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b964f4e';
+export const REV = 'e3f8e1d';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1652,24 +1652,64 @@ export const CFG = {
    * figure: 4.19 rad/s, so a broadside comes round every 0.75s.
    */
   cartwheel: {
-    spin: 4.19,
     /*
-     * ---- THE BAR'S SHAPE IS ONE OWNER, AS RATIOS OF `r` ------------------
+     * ---- THE GAIT'S NUMBER, AND ONLY THE GAIT'S -------------------------
      *
-     * `docs/objects.html` gives SPINDLE a bar 96 long and 11 thick at r 30,
-     * which is 1.6r and 0.183r -- and those are the numbers here rather than
-     * the 96 and the 11, because THREE things read this shape: the hit test
-     * in `resolveSegment`, `hitReach` (which is what tells the sweep to look
-     * outside `r` at all), and the DRAWING. Written as absolutes on the type
-     * they would be a second source of truth for the picture, which is how
-     * `s.r * 2.4` came to be restated in three places as "how far the
-     * machine paints" and measured wrong in all of them.
+     * This block held the BAR'S SHAPE as well until build 330, as
+     * `long` / `thin` -- and it was right about everything except whose the
+     * shape is. The ratios-of-`r` argument stands and is now on the type
+     * (see SPINDLE's `bar` block): THREE things read a capsule's shape -- the
+     * hit test in `resolveSegment`, `hitReach` (which is what tells the sweep
+     * to look outside `r` at all), and the DRAWING -- so it has one owner,
+     * written as multiples of the radius rather than as units.
      *
-     * So the bar is 96 x 11 as a consequence of r 30, and check-build prints
-     * the units it works out to.
+     * What made the old home wrong is that a SECOND bar type reads it.
+     * VEIL's membrane is 104 x 12 at r 52, i.e. 1.0r and 0.115r; SPINDLE's
+     * is 1.6r and 0.183r. With the shape in the GAIT's block a veil would
+     * have been tested as a 166-unit spindle, silently, with no field to set
+     * and nothing to fail -- `plated` (319), `rides` (322), `respawn` (324)
+     * and `planted` (328) are the same shape, and `levels ?? 3` (224) is
+     * where the rule comes from. **A number about the GAIT is shared and a
+     * number about the BODY is the type's**, which is build 322's ring/rider
+     * split applied to a shape.
+     *
+     * So what is left here is the spin, which really is the gait's: it is
+     * how fast a cartwheeling body turns, and any type taking that gait
+     * turns at that rate.
      */
-    long: 1.6, // x r: half the bar's LENGTH
-    thin: 0.183, // x r: half its thickness
+    spin: 4.19,
+  },
+
+  /*
+   * ---- SPREAD: the gait of a thing that is covering ground ---------------
+   *
+   * `docs/objects.html`: "Goes wide before it comes down, taking the widest
+   * lane it can find. It is trying to cover ground, not reach you." Two
+   * numbers, and both are derived rather than chosen.
+   *
+   * `slant` is LATERAL PER UNIT OF DEPTH, off the guide's own path for this
+   * gait: it moves 0.34 of the width across while descending 0.2 of the
+   * depth, which at era 1 is 214 units sideways against 245 down -- 0.87,
+   * and NOT the 1.7 those two fractions read as, because the field is nearly
+   * twice as deep as it is wide. A fraction of a field is not a distance.
+   *
+   * `look` is the floor on how far ahead the aim point sits, and it is
+   * SHRIKE's finding (build 318) rather than a taste: a body steering at a
+   * point far down its own column has almost no lateral authority, because
+   * `dx / |d|` vanishes. So the aim point is `max(look, gap / slant)` below
+   * the body -- the slant while there is a gap to cross, and a point 150
+   * units down the column once there is not.
+   *
+   * `lanes` is ODD on purpose. The candidates are spread evenly across the
+   * band the body can actually stand in, so an odd count puts one exactly on
+   * the machine's own column -- which is the lane the first sheet takes,
+   * because a sheet nearer the middle covers more of the assist's cone. See
+   * `sheetLaneFor`.
+   */
+  spread: {
+    slant: 0.87, // lateral per unit of depth while crossing to its lane
+    look: 150, // ...and how far ahead it aims once it is on it
+    lanes: 7, // candidate columns, odd so the machine's own is one of them
   },
 
   /*
@@ -5092,12 +5132,22 @@ export const ENEMY_TYPES = [
     shape: 'bar',
     gait: 'cartwheel',
     /*
-     * The capability, not the shape: `bar` says a round is tested against a
-     * capsule and the numbers are in `CFG.cartwheel`. Deliberately separate
-     * from the gait, which is about how the body MOVES -- the same split as
-     * `spent` (what may be shot) against `staged` (what may be chosen).
+     * The capability AND its proportions, as multiples of `r`. Deliberately
+     * separate from the gait, which is about how the body MOVES -- the same
+     * split as `spent` (what may be shot) against `staged` (what may be
+     * chosen).
+     *
+     * `docs/objects.html` gives this bar 96 long and 11 thick at r 30, which
+     * is 1.6r and 0.183r -- and those are the numbers rather than the 96 and
+     * the 11, so the hit test, `hitReach` and the drawing read one owner and
+     * a grafted spindle takes its bar with it. check-build prints the units
+     * they work out to.
+     *
+     * They lived in `CFG.cartwheel` until build 330 and moved here when a
+     * second bar type arrived: a shape shared by gait is a shape the next
+     * type inherits in silence. See the note in that block.
      */
-    bar: true,
+    bar: { long: 1.6, thin: 0.183 },
     r: 30,
     hp: 180,
     density: 0.7, // a bar is mostly the space it sweeps
@@ -5673,6 +5723,153 @@ export const ENEMY_TYPES = [
     glow: '#2f6bd8',
     weight: 0, // authored into one wave, never rolled loose
     drops: 18,
+  },
+  /*
+   * ---- VEIL: THE FIRST BODY THAT CHANGES WHAT MAY BE CHOSEN --------------
+   *
+   * Build 330, phase 6p, the sixteenth of the twenty. A membrane 104 units
+   * across and twelve deep that goes wide before it comes down: nothing
+   * behind it can be picked by the assist, by GEOMETRY rather than by a mark.
+   *
+   * Every rule this game has for what may be shot at is a FLAG on the body --
+   * `staged` (shootable, not choosable), `spent` (drawn, not choosable, and
+   * rounds pass through), `dissolved`, `harmless`, `shielded` -- and all of
+   * them are properties of the thing being refused. This one is a property of
+   * something ELSE: a mote behind a sheet is an ordinary mote and becomes
+   * choosable again the moment the sheet is gone or has moved. So the object
+   * is not a mark at all; it is the assist declining a shot it cannot make,
+   * which is exactly the reading `shielded` already carries about the yard
+   * wall ("aiming at one is the turret claiming reach it does not have").
+   *
+   * THE CONSISTENCY IS THE POINT AND IT IS MEASURABLE: a round fired at a
+   * body behind the sheet really does stop on the sheet, because the sheet is
+   * a body with a capsule hit profile sitting in the line of fire. The
+   * chooser is agreeing with the physics rather than being told a rule.
+   *
+   * ---- AND IT CANNOT SILENCE THE GUN, WHICH IS A PROOF AND NOT A HOPE ----
+   *
+   * The hazard in an occlusion rule is a field where nothing is choosable:
+   * `autoTarget` returns null, the gun goes quiet, the build-291 release gate
+   * waits for a field that never thins, and the run cannot climb. It cannot
+   * happen here. Occlusion is defined as "a NEARER sheet crosses the ray", so
+   * it is a strict order by distance -- the nearest considered body has
+   * nothing in front of it to be hidden by, and is therefore always
+   * choosable. A sheet that has come all the way down to the mount occludes
+   * the entire field and is itself the nearest thing on it, which is the
+   * object's own sentence: shoot the sheet. It has 240 health and no armour.
+   *
+   * (The cone is convex -- half-angle about 80 degrees, under a right angle --
+   * so a sheet on the segment between the muzzle and an in-cone body is
+   * itself in the cone and inside the reach. The guarantee needs that.)
+   *
+   * ---- THE BAND AND THE WAVE ---------------------------------------------
+   *
+   * The guide gives it band 6, and bands 6 and 7 do not exist (`perBand` 7
+   * covers rungs 1-35 and the deeper rungs redraw 4 and 5), so it ships into
+   * band 5 the way ANVIL's band-7 entry did. `threatOf` derives 8.00 from its
+   * 240 health, and `veil x3 + lurcher x2` weighs 36.34 against band 5's own
+   * mean of 36.44 -- **-0.29%**, which is build 315's lever used on purpose.
+   *
+   * LURCHER is the partner for CHAFF's reason. The sheet costs you the
+   * ASSIST, so what has to be behind it is something that closes and GRIPS:
+   * the thing filling the glitch fuse is walking onto the mount while the gun
+   * is busy with a membrane. A wave of sheets alone is scenery with health.
+   *
+   * ---- THE COLOUR HAD ROOM, WHICH IS THE SECOND TIME -------------------
+   *
+   * The guide's `heavy` family hex is `#5d9cff`, which is BULWARK's body
+   * colour and ANVIL's -- dE 0.0 against a type shipped two builds ago and
+   * into the SAME band. Swept the blue band against all 116 tones in the
+   * roster: `#1f6bff` is **22.0** off the nearest LOOSE body's tone
+   * (LURCHER's and SCION's glow) and **36.6** off ANVIL's and BULWARK's body,
+   * inside the 15-23 this repo documents as working. Its nearest tone
+   * anywhere is DYNAMO's glow at 3.0, and that is a BOSS: an aperture clears
+   * the loose field on the way in, so the two are never on the screen
+   * together. The pure blues score better (`#0000ff` at 29.3) and are refused
+   * for build 322's reason -- relative luminance 0.072 against this 0.180, and
+   * a body reads almost entirely as its outline. A family is a region; ask
+   * whether it has room before accepting a collision.
+   */
+  {
+    id: 'veil',
+    // No energy gate, like all sixteen: the BAND is the gate. See ANVIL.
+    opens: 0,
+    name: 'VEIL',
+    shape: 'sheet',
+    gait: 'spread',
+    /*
+     * ---- THE CAPABILITY, AND THE ONE THING IT NEEDS ----------------------
+     *
+     * `sheet` says this body OCCLUDES: `Game.autoTarget` refuses anything
+     * whose ray from the machine crosses it. It is meaningless without `bar`,
+     * because what occludes is the capsule -- a disc of r 52 would hide a
+     * cone of the field rather than a membrane, and the picture would be the
+     * fiction. check-build holds the pairing.
+     *
+     * And unlike `plated` (319), `rides` (322), `respawn` (324) and `planted`
+     * (328), there is NO refusal of a second type declaring it, deliberately:
+     * every one of those four has readers that consult a SHARED block, so a
+     * second type inherited a design it never chose. A sheet's readers consult
+     * the BODY -- its own `bar` block, its own `angle`, its own position -- so
+     * a second membrane of another size is covered by existing. The guard goes
+     * on the flag when the flag's readers look somewhere else.
+     */
+    sheet: true,
+    /*
+     * 104 across and twelve deep at r 52, as multiples of `r` -- the guide's
+     * own figures. The proportions are the TYPE's from build 330; in
+     * `CFG.cartwheel`, where they used to live, this membrane would have been
+     * tested as a 166-unit spindle.
+     */
+    bar: { long: 1.0, thin: 0.115 },
+    /*
+     * A sheet hangs LEVEL, and from build 330 `upright` is what makes that
+     * true of the hit profile as well as of the picture: it pins `angle` and
+     * `av` every frame, so the capsule `barHalf` lays along that angle is the
+     * membrane that is drawn. Before that the flag meant only "the drawing
+     * ignores `angle`" while the constructor rolled a random one -- inert for
+     * the three bodies that had it and the fifth-door fault (build 315) for
+     * the first one whose shape read it.
+     */
+    upright: true,
+    r: 52,
+    hp: 240,
+    /*
+     * LIGHT for its size, which is the whole of "weak": mass is
+     * `density * r * r`, so this is 946 against a BLOOM's 1143 and an ANVIL's
+     * 10,662 -- the biggest body on the field and one of the easiest to shove.
+     * A membrane that took a shove like a wall would be a second ANVIL.
+     */
+    density: 0.35,
+    speed: 26,
+    accel: 90,
+    restitution: 0.25,
+    // Some sway, but it is crossing to a chosen column rather than wandering.
+    wobble: 0.4,
+    armor: 0,
+    color: '#1f6bff',
+    glow: '#0a3fd8',
+    /*
+     * ---- NEVER GROUPED, AND THE MEASUREMENT IS WHY ----------------------
+     *
+     * `solo` is read in `Director.load` and nowhere else (build 313): a wave
+     * entry at or above `formAt` becomes ONE formation job, and a formation
+     * is a SHAPE queued in the mouth at one x with its slots pitched at
+     * `r * 2 + 8`. For a body 104 units wide that pitch is 112, so a
+     * formation of sheets is an edge-to-edge wall arriving as a lattice --
+     * and the lane choice, which is the gait, never gets to happen.
+     *
+     * Measured either way at rung 32 on the era-2 field, 30 seconds: as a
+     * formation, 30 sheets were made and **ten came loose**, with thirty
+     * standing staged in the throat against a field cap of 57 -- a queue the
+     * assist cannot shoot at all, because `legal` refuses `staged`. With
+     * `solo`, all thirty came loose and all thirty chose a lane. SCION's own
+     * `solo` note is the same shape from the other end: a formation put five
+     * of it on the screen at once the first time it was measured.
+     */
+    solo: true,
+    weight: 0, // authored into one wave, never rolled loose
+    drops: 6,
   },
   {
     id: 'quarry',
@@ -6899,6 +7096,29 @@ export const WAVES = [
   { of: [['anvil', 1], ['mote', 3]], band: 5 },
 
   /*
+   * ...and the VEIL wave.
+   *
+   * Three sheets and two LURCHERs, 36.34 against band 5's own mean of 36.44
+   * (**-0.29%**) -- priced at the mean deliberately, so adding the sixteenth
+   * object does not lengthen every other wave in the band. ANVIL could not be
+   * priced that way (1400 health weighs 46.7 on its own) and paid +3.3%;
+   * QUARRY paid +9.3% in band 4 and SHOAL +5.1% in band 1.
+   *
+   * The counts are the wave's SHAPE and not its size: `Director.load` scales
+   * the whole thing to the band's budget, so at rung 32 this is about
+   * twenty-eight sheets and nineteen lurchers queued behind a field capped at
+   * 57. That is the object at scale rather than an accident -- a wall of
+   * membrane with things arriving through it -- and what keeps the screen
+   * from filling is `emit`, which HOLDS a release while the field is at
+   * `maxEnemies` rather than dropping it.
+   *
+   * LURCHER is the partner because the sheet costs the ASSIST, so the thing
+   * behind it has to be something that closes and grips -- CHAFF's reasoning
+   * and CHAFF's partner, for the same reason.
+   */
+  { of: [['veil', 3], ['lurcher', 2]], band: 5 },
+
+  /*
    * The bonus. Grey and nothing else: no hostiles, no risk, no cost to the
    * allotment, and about 220 ENERGY lying on the field if you take it.
    *
@@ -6951,6 +7171,7 @@ export const GAITS = {
   ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
   hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',
   creep: 'the straight line and nothing else: no lane, no wobble, and no impulse in the game turns it',
+  spread: 'goes wide before it comes down, taking the emptiest lane it can find -- it is covering ground, not coming for you',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

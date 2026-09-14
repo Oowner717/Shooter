@@ -6099,4 +6099,216 @@ came from before believing the other one covers it.
   and when. **A derived number quoted in prose is a copy, and copies go stale
   in silence -- when one moves, grep for who was quoting it.**
 
+- **VEIL IS IN FROM BUILD 330, AND THE RULE IT WAS BUILT FOR CHANGES
+  NOTHING.** Phase 6p, the sixteenth of the twenty, band 5. A membrane 104 x
+  12 that goes wide before it comes down; nothing behind it can be picked by
+  the assist. Four to go -- GYRE, LOOM, MIRE, KITE.
+- **THE OCCLUSION IS TRUE OF HALF THE FIELD AND DECIDES NONE OF IT, AND BOTH
+  HALVES OF THAT ARE THE FINDING.** Measured on the SAME field in two chooser
+  configurations on every frame -- `TYPE_BY_ID.veil.sheet` flipped between two
+  `autoTarget()` calls, so nothing diverges -- over 1,348 frames of the real
+  wave at rung 32 with a fully bought turret: **42.8% of candidates occluded
+  every frame** (2,698 of 6,305, mean 8.2 sheets up, worst 24 of 21.9) and
+  **the pick differed on ZERO of them**. The reason is arithmetic rather than
+  luck: `autoTarget` scores by distance, so the body it picks is the nearest
+  one, and the nearest body has nothing in front of it to be hidden by. The
+  guide's "exactly the decision it exists to force" is a decision the gun
+  already makes for you. So the object's cost was measured instead: **63% of
+  every point of damage the turret delivered went into membrane** (13,555 of
+  21,620 at rung 32, 62% at rung 35), because a round aimed at anything behind
+  a sheet stops in it. That is what shipped in the codex line, and the
+  occlusion is stated as a correctness rule -- the assist declining a shot it
+  cannot make -- rather than as the difficulty.
+- **...AND THE FIRST VERSION OF THAT RULE WAS VACUOUS FOR A DIFFERENT AND
+  WORSE REASON.** It skipped any sheet whose CENTRE was further from the
+  machine than the candidate, which reads as the conservative choice ("only
+  what is in front can hide it") and deletes the one case that could ever
+  bind: a nearer body can only be hidden by a sheet crossing the ray near one
+  of its ends, which is exactly a sheet whose centre is off to the side and
+  further away. Both configurations then read zero, which is how it was
+  caught. The test is `segSeg`'s own parameter along the ray -- within `barR`
+  AND at `t < 1` -- which is the geometric statement of "behind it" and the
+  one the ROUND already obeys. **When a guard and the mechanism it guards are
+  about the same quantity, check that the guard does not exclude the
+  mechanism.**
+- **THE INSTRUMENT HAD THE IDENTICAL FAULT, WRITTEN INDEPENDENTLY, WHICH IS
+  WHY THE FIRST READING LOOKED LIKE A CONFIRMATION.** The probe that asked
+  "was the assist ever aimed at something behind a sheet" carried its own
+  `dv >= de` centre-distance guard and its own sampling bug (it took the
+  minimum over `t` up to and including 1, i.e. at the body). So it read 0 with
+  the rule on and 0 with it off -- the right answer for the wrong reason,
+  agreeing with a broken mechanism. Suspect the instrument before the code,
+  and then suspect it AGAIN when it agrees with you: two independent
+  derivations of the same geometry made the same mistake because they were
+  written by the same reasoning.
+- **A THREE-WAY ARENA IS WHAT LETS AN OCCLUSION CLAIM BE SEEN AT ALL.** A
+  sheet is the nearest thing on the field, so it wins on distance and no
+  arrangement of one sheet and one body can show the rule working -- the first
+  probe's "past the end" arms both read "veil picked" and were measuring the
+  scoring. What discriminates is TWO bodies, both marked `attacking` so the
+  0.25 weight puts them ahead of the sheet, one nearer and hidden and one
+  further and clear: **a LURCHER at 260 is refused for one at 414**, and with
+  the sheet removed the nearer one wins. The boundary is the capsule's own
+  span (a ray 38 off the axis is hidden, one at 71 is not, against 58).
+- **`upright` MEANT "THE DRAWING IGNORES `angle`" AND NOW MEANS WHAT IT
+  SAYS.** One reader, in `Enemy.draw`, while the constructor went on rolling
+  `rand(0, TAU)` and build 211's impact spin went on writing `av` -- so an
+  upright body's angle drifted for ever and was simply unread. Inert for the
+  three that had the flag (EMBER, LANTERN, ANVIL) and NOT inert for the first
+  one whose SHAPE reads that angle: `barHalf` lays a capsule along it, so a
+  membrane would have hung at a random tilt under a picture drawn level, which
+  is build 315's fifth door with the disagreement pointing the other way. It
+  pins `angle` and `av` every frame now, for `Enemy.face`'s reason -- a
+  round's lever writes `av` on any frame -- and the ORDINAL hash is what says
+  the three existing bodies did not move.
+- **A SHAPE SHARED BY GAIT IS A SHAPE THE NEXT TYPE INHERITS IN SILENCE.**
+  `CFG.cartwheel.long` / `.thin` held the BAR's proportions, and its own
+  docstring was right about everything except whose the shape is: VEIL's
+  1.0r x 0.115r membrane would have been tested as a 166-unit spindle, with no
+  field to set and nothing to fail. The block is the type's now (`bar: { long,
+  thin }`) and `CFG.cartwheel` keeps the spin, which really is the gait's.
+  That is the fifth instance after `plated` (319), `rides` (322), `respawn`
+  (324) and `planted` (328), and the first where the shared block was found
+  BEFORE it did any damage -- because the new type was authored against it.
+  **A number about the GAIT is shared; a number about the BODY is the
+  type's.** Proved a no-op for SPINDLE: 96x11, reach 53.5, to the digit.
+- **...AND THIS ONE DELIBERATELY DOES NOT GET A SECOND-TYPE REFUSAL.** The
+  four guards above all refuse a second type declaring the flag, because their
+  readers consult a shared block. A `sheet`'s readers consult the BODY -- its
+  own `bar` block, its own `angle`, its own position -- so a second membrane
+  of another size is covered by existing. What check-build holds instead is
+  the two things `sheet` does not declare and cannot work without: `bar`
+  (without it `barHalf` is NaN, `occluded` compares `NaN <= 36` and the whole
+  mechanism is off with no error) and `upright`, which is what the no-silent-
+  gun argument rests on. **The guard goes on the flag when the flag's readers
+  look somewhere else.**
+- **THE GUARANTEE THAT AN OCCLUSION RULE CANNOT SILENCE THE GUN IS A DEPTH
+  ORDER, AND IT NEEDS THE SHEETS LEVEL.** Two horizontal capsules cannot each
+  cross the other's ray first -- one is nearer the machine -- so there is no
+  cycle in which two sheets hide each other, and the lowest sheet in the cone
+  is always choosable. A TILTED sheet can cross another in an X and leave
+  neither pickable, which is why `sheet` requires `upright` rather than it
+  being a drawing preference. Measured as well as argued: 0 null picks over 40
+  randomised fields of 3-6 sheets, and 0 frames where the rule took the last
+  thing the gun could have shot.
+- **...and the null count has to be measured AGAINST THE RULE-OFF FIELD, not
+  against "something is standing".** The first version of that arm read 99
+  nulls of 546 and every one was the era-2 YARD WALL: `shielded` makes a body
+  above the line unshootable, which is not this rule's business. Comparing the
+  two configurations is what makes the claim about the rule. (The same arm also
+  read 546 of 546 until the assist's REACH was raised -- the base 400 does not
+  span the era-2 field, so an unbought run has nothing in reach and every
+  frame is null, which reads exactly like an occlusion rule refusing
+  everything.)
+- **`spread` IS THE THIRTEENTH GAIT, AND "0.34 OF THE WIDTH OVER 0.2 OF THE
+  DEPTH" IS NOT A SLANT OF 1.7.** The field is nearly twice as deep as it is
+  wide, so the guide's own path for this gait is 214 units sideways against
+  245 down -- **0.87**, and reading the two fractions as a ratio would have
+  made the traverse twice as flat as the design. A fraction of a field is not
+  a distance. The aim point is `max(look, gap / slant)` below the body: the
+  slant while there is a gap to cross, and SHRIKE's `look` floor (build 318)
+  once there is not, because a body steering at a point far down its own
+  column has almost no lateral authority.
+- **A LANE RULE IS FARTHEST-POINT, AND THE MACHINE'S COLUMN IS OCCUPIED
+  GROUND.** Candidates are seven columns across the band `edgeEase` leaves
+  (`rollOn`'s derivation, so the gait and the wall rule agree rather than
+  argue), and the pick maximises the distance to the nearest occupied one --
+  where occupied is every other sheet's lane AND the machine's own column.
+  That last term is the whole of "it is trying to cover ground, not reach
+  you": the first sheet takes a wall, the second the other wall, the rest fill
+  between, and the middle is taken last. **The first version made the
+  machine's column the TIE-BREAK instead** -- on the sound argument that
+  occlusion is angular, so a sheet nearer the middle of the cone hides more --
+  and measured to read as the wrong object: bodies come through the mouth at
+  the machine's own x, so the first sheet's gap to its lane was **80 units of
+  a 968-wide field** and it walked straight down the middle. A gait called
+  `spread` whose first body does not move sideways is a gait that is not
+  there.
+- **...and a body still in the THROAT is not standing anywhere.** The lane
+  search first counted a sheet with no lane yet at its `x`, which seemed the
+  conservative reading: a formation queues its bodies at ONE x, so the first
+  sheet to come loose found the middle "occupied" by twenty-nine staged
+  siblings and was sent to the far wall -- lanes 426 and 481 of a 629-wide
+  field with nothing standing in the middle at all. The set is sheets that
+  have CHOSEN.
+- **A FORMATION OF SHEETS IS A LATTICE, AND THE COUNT IS WHY IT HAD TO BE
+  REFUSED.** `spawnFormation` pitches its slots at `r * 2 + 8`, which for a
+  body 104 units wide is 112 -- an edge-to-edge wall arriving as a shape, with
+  the lane choice never happening. Measured either way at rung 32 on the era-2
+  field over 30 seconds: as a formation, 30 sheets were made and **ten came
+  loose**, with thirty standing staged in the throat against a field cap of 57
+  -- a queue the assist cannot shoot at all, because `legal` refuses `staged`.
+  With `solo: true`, all thirty came loose and all thirty chose a lane.
+  `solo` is read in `Director.load` and nowhere else (build 313), which is
+  what keeps the COUNT while refusing the shape.
+- **A GAIT THAT REPLACES THE ROUTE STILL HAS TO ARRIVE, AND THE GUIDE'S OWN
+  PATH FOR THIS ONE DOES NOT.** Its illustrative path ends at 0.8 of the width
+  and 0.9 of the depth -- on the floor, out to one side -- which is build
+  312's `tumble` fault: a body there is outside `autoTarget`'s cone for ever
+  and, with the build-291 release gate, a run that can never climb. So the
+  chosen column folds onto the machine's across the last stretch, using the
+  identical `(d - 170k) / 210k` the route arm scales its lateral off by.
+  Measured: released at x 436 with a lane at 148, it closes a 288-unit gap to
+  19 and ends ON the machine.
+- **A TARGET SPEED IS NOT A SPEED, NINTH TIME, AND THIS ONE IS DELIBERATELY
+  NOT COMPENSATED.** `accel` 90 against `linearDamping` 0.55 delivers
+  `26 * 0.9 / 1.45` = **16.1 u/s, measured 16.2-16.8** -- 0.62 of the ask, and
+  an 85-second crossing of the era-2 column. Nothing in this object is a clock
+  or a ratio between two speeds (the guide gives it no crossing time), so the
+  rule is LATCH's and REMNANT's: know which number you are delivering rather
+  than grossing it up. A membrane that hangs about is in character; the figure
+  is recorded so the next reader does not have to re-derive it.
+- **ITS SILHOUETTE IS SPINDLE'S, WHICH IS THE SHARED-HUE PROBLEM INVERTED.**
+  104 x 12 against 96 x 11 -- 8% longer, 9% thicker, an aspect ratio of 8.67
+  against 8.73. Two builds' worth of notes say that when a HUE is shared the
+  silhouette carries the distinction; here the silhouette is shared and the
+  distinction is carried by the other two registers: **dE 166.6** between the
+  two body colours (about as far apart as this palette goes) and the MOTION --
+  SPINDLE cartwheels at two thirds of a revolution a second and a sheet is
+  pinned level. Recorded rather than fixed: the guide's 104 x 12 is the design
+  and the alternative is inventing a different body.
+- **AND THE COLOUR HAD ROOM, SECOND TIME.** The guide's `heavy` family hex is
+  `#5d9cff` -- BULWARK's body colour and ANVIL's, dE 0.0, and ANVIL shipped
+  two builds ago into the SAME band. Swept the blue band against all 116 tones
+  in the roster: `#1f6bff` is **22.0** off the nearest loose body's tone and
+  **36.6** off ANVIL's and BULWARK's, inside the 15-23 this repo documents as
+  working. Its nearest tone anywhere is DYNAMO's GLOW at 3.0, and that is a
+  boss -- an aperture clears the loose field on the way in, so the two are
+  never on the screen together. The pure blues score better (`#0000ff` at
+  29.3) and are refused for build 322's reason: relative luminance 0.072
+  against this 0.180, and a body reads almost entirely as its outline.
+- **A PRESS THROWS A MEMBRANE, WHICH IS ANVIL'S REFUSAL INVERTED AND THE
+  CODEX LINE'S COUNTER.** Same 3,000-impulse hit carrying `throwOff` that
+  build 328 measured: **VEIL 528.32 u/s and 365 units**, against a LURCHER's
+  643, a BULWARK's 91.45 and an ANVIL's **0.00** -- mass 946 against 10,662,
+  the lightest thing on the field for its size and the heaviest, both band 5,
+  both in the same blue family. A blast takes it whole (119.6 of 120).
+- **...and a peak velocity sampled over a SECOND is the body's own walking.**
+  The first reading of that table gave the anvil 27.87 u/s, which contradicts
+  build 328's measured zero -- because `creep` overwrites `this.cruise` every
+  frame, so an anvil with its cruise zeroed re-arms itself and walks. The
+  shove is the velocity the impulse left, read BEFORE anything steps; with
+  that it reproduces 0.00 exactly.
+- **AND THE NEW WAVE RE-ROLLED THE SUITE'S RANDOMS, WHICH TOOK OUT A
+  SINGLE-DRAW MARGIN IN BUILD 322'S LATCH CASE.** 727 of 728 on the first
+  run, and the one red arm was the salvage control: a MOTE's mote closed
+  **91.2** units on the turret against a floor of 100, on a build that cannot
+  touch a rider. `w.drops[0]` is ONE body and a drop is born with an outward
+  velocity it has to shed first, so the distance it closes in a 2.5-second
+  window is a random roll -- build 323's ORDINAL salvage arm paid for exactly
+  this, on exactly this quantity, and the fix is the same: every mote the body
+  shed, and the MEAN. The floor came down to 20 as well, because the controls'
+  job in that arm is VACUITY (an instrument that can see a mote going to the
+  gun) and the discriminating claim is `aboard`, which reverting the guard
+  reads as 1 -- a distance floor set near a control's own distribution is
+  build 319's fault wearing a control's clothes. Build 315's rule again:
+  **adding a wave is a re-roll of the whole suite's randoms, so expect the
+  arms with tight margins to be the ones that fail.**
+- **THE CLEAR IS COMFORTABLE, which is the arm most worth having.** The wave,
+  fully bought, era 2: **42.1s at rung 29, 58.4s at 32, 77.3s at 35** against
+  a 120-second cap, with everything asked for delivered and the field never
+  stuck. Sheets die in about a twentieth of a second to a bought turret, so
+  the wall is a tempo cost rather than a stall -- and `emit`'s hold, not the
+  gait, is what keeps thirty of them off the screen at once.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

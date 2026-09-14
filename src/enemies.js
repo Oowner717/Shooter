@@ -4,7 +4,7 @@
 
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf, kB } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
-import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep, segClosest } from './util.js';
+import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep, segClosest, segSeg } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
@@ -184,7 +184,8 @@ export function drawSpecimen(ctx, id, r) {
     case 'bell': drawBell(ctx, r, 0, 0); break;
     case 'quarry': drawQuarry(ctx, r, 0, 0); break;
     case 'dart': drawDart(ctx, r, 0, 0); break;
-    case 'bar': drawBar(ctx, r, 0, 0); break;
+    case 'bar': drawBar(ctx, r, 0, 0, t.bar); break;
+    case 'sheet': drawVeil(ctx, r, 0, 0, t.bar); break;
     case 'yoke': drawYoke(ctx, r, 0, 0, true); break;
     /*
      * NOSE DOWN in the glossary, which is a different frame from the field.
@@ -578,6 +579,16 @@ export class Enemy {
     this.diveSide = 0;
     this.baseCruise = 0;
     /*
+     * The column a `spread` body has chosen. NULL rather than zero, because
+     * zero is a legal column and "not picked yet" has to be distinguishable
+     * from "picked the left wall" -- `sheetLaneFor` is a search over the
+     * field and re-running it every frame would let a sheet chase the gaps
+     * other sheets leave as they die. Declared here for the reason
+     * `rollSide`, `divePhase`, `fan` and `placed` are, and grepped against
+     * the boss modules first, per build 298.
+     */
+    this.sheetLane = null;
+    /*
      * A lateral held back until the body is loose. DRIFT is the only thing
      * that uses it: at era 2 it is laid inside the throat, and it used to be
      * given its sideways drift at the moment it appeared -- so it fanned out
@@ -645,18 +656,24 @@ export class Enemy {
   /**
    * Half the bar's LENGTH, for the one type whose hit profile is a capsule.
    *
-   * Derived from `r` and `CFG.cartwheel` rather than stored, so a body whose
-   * radius moves (a graft grows one) takes its bar with it -- and so that the
-   * DRAWING, the hit test and `hitReach` are reading one owner. See the note
-   * at CFG.cartwheel.
+   * Derived from `r` and the TYPE's own `bar` block rather than stored, so a
+   * body whose radius moves (a graft grows one) takes its bar with it -- and
+   * so that the DRAWING, the hit test and `hitReach` are reading one owner.
+   *
+   * The block is the type's and not the gait's from build 330, which is the
+   * whole reason a second capsule type was possible: SPINDLE is 1.6r x 0.183r
+   * and VEIL's membrane is 1.0r x 0.115r. Read straight off the type rather
+   * than through `barOf`, because this getter is on the projectile sweep's
+   * hot path and `barOf` validates and allocates; the validation happens once,
+   * at the table, in check-build.
    */
   get barHalf() {
-    return this.r * CFG.cartwheel.long;
+    return this.r * this.type.bar.long;
   }
 
   /** ...and half its thickness, which is the capsule's radius. */
   get barR() {
-    return this.r * CFG.cartwheel.thin;
+    return this.r * this.type.bar.thin;
   }
 
   /**
@@ -1060,6 +1077,62 @@ export class Enemy {
      * which is what makes the wall tests and the spin above read as written.
      */
     return this.rollSide * Math.max(0, ty - this.y) * R.slant * slow;
+  }
+
+  /**
+   * SPREAD: cross to a column of its own, then come down it.
+   *
+   * Called from `drive` in the ROUTE's place, the same way `rollOn` and
+   * `diveOn` are and for the same reason -- the whole gait is WHERE the body
+   * is going, and a route's lateral would pull it back off its lane. Returns
+   * the point to steer at, in world units.
+   *
+   * ---- WIDE BEFORE IT COMES DOWN, AND THAT IS ONE EXPRESSION ------------
+   *
+   * The aim point sits on the wanted column, `max(look, gap / slant)` below
+   * the body. Both halves of that maximum are load-bearing and neither is a
+   * taste:
+   *
+   *   - While there IS a gap to cross, the depth is the gap over `slant`, so
+   *     the heading is the guide's own slant for this gait (0.87 of lateral
+   *     per unit of depth) whatever the size of the gap. That is the "goes
+   *     wide before it comes down" -- a body released 300 units off its lane
+   *     crosses those 300 while descending 345.
+   *   - Once the gap is gone, `gap / slant` is zero and an aim point at the
+   *     body's own depth is an aim point with no descent in it at all. The
+   *     floor is SHRIKE's finding (build 318): a body steering at a point far
+   *     down its own column has almost no lateral authority, because
+   *     `dx / |d|` vanishes -- so 150 units ahead rather than at the floor
+   *     line, and the column is held instead of drifted off.
+   *
+   * ---- ...AND IT STILL CLOSES, WHICH IS BUILD 312's RULE ----------------
+   *
+   * The guide's illustrative path for this gait ends at 0.8 of the width and
+   * 0.9 of the depth -- on the floor, out to one side -- and that is the
+   * `tumble` fault: a body at floor level to one side is outside
+   * `autoTarget`'s 78-degree cone for ever, which with the build-291 release
+   * gate is a run that can never climb again. So the COLUMN folds onto the
+   * machine's own across the last stretch, using the identical
+   * `(d - 170k) / 210k` the route arm scales its lateral off by -- "an arc is
+   * how a thing arrives; it is not how it spends the endgame", and a lane is
+   * an arc's cousin. By the time the fold bites the sheet is close enough to
+   * be occluding the whole cone anyway.
+   *
+   * @param {object} world
+   * @param {number} ty the y it is steering at, which is the machine's
+   * @param {number} d distance to what it is steering at, for the fold
+   * @returns {[number, number]} the point to steer at
+   */
+  spreadOn(world, ty, d) {
+    const S = CFG.spread;
+    const mx = world.shooter.x;
+    // Picked ONCE, on the first loose frame, and held -- see `sheetLaneFor`.
+    if (this.sheetLane === null) this.sheetLane = sheetLaneFor(world, this);
+    const k = CFG.scale;
+    const fold = clamp((d - 170 * k) / (210 * k), 0, 1);
+    const want = mx + (this.sheetLane - mx) * fold;
+    const look = Math.max(S.look * k, Math.abs(want - this.x) / S.slant);
+    return [want, Math.min(ty, this.y + look)];
   }
 
   /**
@@ -2349,6 +2422,30 @@ export class Enemy {
       const nd = Math.hypot(dx, dy) || 1;
       dx /= nd;
       dy /= nd;
+    } else if (!this.staged && this.type.gait === 'spread' && !this.isDrop) {
+      /*
+       * ---- SPREAD owns the steering, for `roll`'s and `dive`'s reason ----
+       *
+       * The whole gait is WHERE the body is going, so a route's lateral would
+       * pull it off the lane it just chose -- measured on `dive`, an offset
+       * of 40 is eaten down to 35.3 by the steering. The arithmetic is in
+       * `spreadOn`; this arm only hands it the aim point and the depth.
+       *
+       * `!this.staged` is the march in, which every hostile shares: a sheet
+       * comes down through the mouth like anything else and starts crossing
+       * on the frame it comes loose, so the lane is picked with the field as
+       * it actually is. `!this.isDrop` is the LATCH guard (build 322) -- a
+       * mote is built from the type it fell off, so a mote off a veil carries
+       * `gait: 'spread'` and would go looking for a column to cover.
+       */
+      const [px, py] = this.spreadOn(world, ty, d);
+      tx = px;
+      ty = py;
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
     } else if (!this.staged && this.type.gait === 'flock' && !this.isDrop) {
       /*
        * FLOCK, in the route's place for `roll`'s reason -- see `flockOn`. A
@@ -2551,6 +2648,33 @@ export class Enemy {
         this.angle = Math.atan2(this.vy, this.vx);
         this.av = 0;
       }
+    }
+    /*
+     * ---- ...AND `upright` IS THE OTHER HALF OF THAT CLAIM ----------------
+     *
+     * Build 330. `upright` meant "the DRAWING ignores `angle`" -- one reader,
+     * in `Enemy.draw` -- while the constructor went on rolling `rand(0, TAU)`
+     * and build 211's impact spin went on writing `av`, so an upright body's
+     * angle drifted for ever and was simply unread. Inert for the three that
+     * had the flag (EMBER, LANTERN, ANVIL), and NOT inert the moment an
+     * upright body's shape reads that angle: `barHalf` lays a capsule along
+     * it, so VEIL's membrane would have hung at a random tilt under a picture
+     * drawn level -- the fifth-door fault (build 315) with the disagreement
+     * in the other direction.
+     *
+     * So the flag means what it says: the body is oriented to the world. Held
+     * every frame rather than written once, for `Enemy.face`'s reason -- a
+     * round's lever writes `av` on any frame -- and outside the staged guard,
+     * because a picture is level on the way in too.
+     *
+     * Behaviourally inert for the three: nothing reads a non-bar body's
+     * angle except its own drawing, and an off-centre impulse does not
+     * reduce the linear shove (build 211), so the ORDINAL hash is what says
+     * this moved nothing.
+     */
+    if (this.type.upright) {
+      this.angle = 0;
+      this.av = 0;
     }
     /*
      * MENDING: it closes unless you keep hitting it.
@@ -3752,7 +3876,8 @@ export class Enemy {
       case 'bell': drawBell(ctx, this.r, this.phase, world.time); break;
       case 'quarry': drawQuarry(ctx, this.r, this.phase, world.time); break;
       case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
-      case 'bar': drawBar(ctx, this.r, this.phase, world.time); break;
+      case 'bar': drawBar(ctx, this.r, this.phase, world.time, this.type.bar); break;
+      case 'sheet': drawVeil(ctx, this.r, this.phase, world.time, this.type.bar); break;
       case 'yoke': drawYoke(ctx, this.r, this.phase, world.time, this.beam); break;
       case 'flint': drawFlint(ctx, this.r, this.phase, world.time); break;
       case 'shrike': drawShrike(ctx, this.r, this.phase, world.time,
@@ -5228,10 +5353,9 @@ function drawHusk(ctx, r, phase, time) {
  * cartwheel gait spins -- so the picture turns with the profile by
  * construction rather than by agreement.
  */
-function drawBar(ctx, r, phase, time) {
-  const C = CFG.cartwheel;
-  const half = r * C.long;
-  const th = r * C.thin;
+function drawBar(ctx, r, phase, time, bar) {
+  const half = r * bar.long;
+  const th = r * bar.thin;
   ctx.beginPath();
   ctx.arc(-half, 0, th, Math.PI / 2, -Math.PI / 2);
   ctx.lineTo(half, -th);
@@ -5253,6 +5377,68 @@ function drawBar(ctx, r, phase, time) {
     ctx.lineTo(cx - th * 0.85, th * 0.92);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+  }
+}
+
+/**
+ * A MEMBRANE: the capsule a round is tested against, woven, with slack
+ * travelling along it.
+ *
+ * ---- THE SILHOUETTE IS THE CAPSULE, WHICH COST THE GUIDE'S PICTURE ------
+ *
+ * `docs/objects.html` draws this as two bezier curves bulging to `0.3R`
+ * above and `0.26R` below the axis, plus thirteen threads hanging `0.2R`
+ * under it. At r 52 that is a picture **+-15.6 units** thick with a fringe 10
+ * units below it, against a hit profile of **+-6** -- so two thirds of the
+ * drawn body would be somewhere a round visibly passes through, on a body
+ * whose whole job is to be the thing you shoot instead of what is behind it.
+ * That is build 315's `drawBar` finding verbatim ("the weights are inside the
+ * tube instead, so the silhouette IS the capsule") and the answer is the
+ * same: nothing is drawn outside the capsule, and the weave that makes it
+ * read as fabric rather than as a girder lives inside the twelve units.
+ *
+ * The slack travels along the sheet instead of sagging out of it, which is
+ * the same information -- it is cloth, it is under tension, it is holding --
+ * without claiming geometry the hit test does not have.
+ *
+ * Drawn along local +x like every other capsule, and the type declares
+ * `upright`, which from build 330 pins `angle` and `av`: a membrane hangs
+ * level, and the profile the hit test lays along that angle is the picture.
+ */
+function drawVeil(ctx, r, phase, time, bar) {
+  const half = r * bar.long;
+  const th = r * bar.thin;
+  ctx.beginPath();
+  ctx.arc(-half, 0, th, Math.PI / 2, -Math.PI / 2);
+  ctx.lineTo(half, -th);
+  ctx.arc(half, 0, th, -Math.PI / 2, Math.PI / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  /*
+   * The weave, and the alpha is MULTIPLIED IN AND PUT BACK -- build 210's
+   * rule. A bare `= 1` on the way out throws away whatever the caller set,
+   * which is how a whole dissolve fade came to not exist.
+   */
+  ctx.save();
+  ctx.globalAlpha *= 0.65;
+  ctx.beginPath();
+  const n = 11;
+  for (let i = 0; i < n; i++) {
+    const f = (i / (n - 1)) * 2 - 1;
+    const x = f * half * 0.88;
+    const slack = Math.sin(time * 1.4 + phase + f * 2.4) * th * 0.4;
+    ctx.moveTo(x, -th * 0.68 + slack);
+    ctx.lineTo(x, th * 0.68 + slack);
+  }
+  ctx.stroke();
+  ctx.restore();
+  // The two spars it is strung between: what a sheet has instead of a spine.
+  for (const sgn of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(sgn * half * 0.97, -th * 0.9);
+    ctx.lineTo(sgn * half * 0.97, th * 0.9);
     ctx.stroke();
   }
 }
@@ -6471,12 +6657,177 @@ function spawnTow(world, x, y, opts = {}) {
  */
 export function barOf(type, r) {
   if (!type || !type.bar) throw new Error(`${type && type.id}: has no bar`);
-  const C = CFG.cartwheel;
+  const C = type.bar;
   if (!(C.long > 0 && C.thin > 0 && C.long > C.thin)) {
-    throw new Error(`cartwheel.long ${C.long} / thin ${C.thin}: a bar is longer than it is thick`);
+    throw new Error(`${type.id}: bar.long ${C.long} / thin ${C.thin} -- a bar is longer than it is thick`);
   }
   const rad = r ?? type.r;
   return { half: rad * C.long, thick: rad * C.thin, reach: rad * (C.long + C.thin) };
+}
+
+/*
+ * ---- THE MEMBRANES ON THE FIELD, AND WHAT THEY HIDE ---------------------
+ *
+ * Build 330. `occluders` collects the live sheets once per `autoTarget` call
+ * and `occluded` asks, per candidate, whether a NEARER one crosses the ray
+ * from the machine. Two functions rather than one because the collection is
+ * per frame and the question is per candidate: `legal` is called once for
+ * every body, every ghost and again for the held lock, and walking the field
+ * inside it would be O(N^2) for a list that cannot change between those
+ * calls.
+ *
+ * ---- "IN FRONT" IS WHERE THE RAY IS CROSSED, NOT WHERE THE CENTRE IS ---
+ *
+ * The first version compared the sheet's CENTRE distance against the
+ * candidate's and skipped any sheet that was further, which reads as the
+ * conservative choice and **deleted the mechanism**. `autoTarget` scores by
+ * distance, so the body it picks is (bar the `attacking` weight and the
+ * hysteresis) the nearest one -- and a nearer body can only be hidden by a
+ * sheet whose centre is off to one side and further away, crossing the ray
+ * near one of its ends. Measured over 1,800 frames of the real wave at rung
+ * 32 with a fully bought turret: **zero** frames aimed at an occluded body
+ * with the rule on, and zero with it OFF. A mechanism whose control reads the
+ * same as the mechanism is not there.
+ *
+ * So the test is `segSeg`'s own parameter along the ray: the sheet blocks it
+ * if the closest approach is within `barR` AND sits at `t < 1`, i.e. between
+ * the machine and the body. That is the geometric statement of "behind it",
+ * and it is the statement the ROUND already obeys -- `resolveSegment` stops
+ * on the first capsule it meets along the step, wherever that capsule's
+ * centre happens to be. The chooser and the physics agree by construction: a
+ * round aimed at an occluded body really does land on the sheet.
+ *
+ * ---- WHY THIS CANNOT LEAVE THE GUN WITH NOTHING TO SHOOT --------------
+ *
+ * The hazard in any occlusion rule is a field where nothing is choosable:
+ * `autoTarget` returns null, the gun goes quiet, the build-291 release gate
+ * waits for a field that never thins, and the run cannot climb. Three things
+ * rule it out, and the third is the measurement.
+ *
+ *   1. A SHEET IS LEVEL, which check-build holds (`sheet` requires
+ *      `upright`, and from build 330 `upright` pins `angle`). Two horizontal
+ *      capsules cannot each cross the other's ray first: one of them is lower
+ *      -- nearer the machine -- and the relation is a strict order by depth.
+ *      So there is no cycle in which two sheets hide each other.
+ *   2. The lowest sheet in the cone is therefore never occluded, and it is
+ *      inside the reach whenever the body it hides is: `consider` measures
+ *      reach to a body's EDGE, and a sheet crossing a ray has its centre
+ *      within `barHalf + barR` of the crossing point.
+ *   3. Measured: 0 null picks over 40 randomised fields of 3-6 sheets and 4
+ *      lurchers, and 0 frames of a silent gun over the real wave at rung 32.
+ *
+ * A sheet resting on the mount occludes the whole field and is the nearest
+ * thing on it, which is the object's own sentence: shoot the sheet. It has
+ * 240 health and no armour.
+ *
+ * The geometry is the body's OWN capsule -- `barHalf` along `angle`, within
+ * `barR` of the ray -- which is why a second sheet type of another size needs
+ * nothing here.
+ */
+export function occluders(world) {
+  let out = null;
+  for (const e of world.enemies) {
+    if (!e.type.sheet || e.isDrop || e.dead || e.staged || e.spent) continue;
+    if (!out) out = [];
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Is `e` behind one of them, from (sx, sy)?
+ *
+ * @param {Array|null} sheets from `occluders`, or null for none
+ * @param {number} sx the machine's x
+ * @param {number} sy ...and y
+ * @param {object} e the candidate
+ */
+export function occluded(sheets, sx, sy, e) {
+  if (!sheets) return false;
+  for (const v of sheets) {
+    if (v === e) continue;
+    const half = v.barHalf;
+    const ux = Math.cos(v.angle) * half;
+    const uy = Math.sin(v.angle) * half;
+    const hit = segSeg(sx, sy, e.x, e.y, v.x - ux, v.y - uy, v.x + ux, v.y + uy);
+    // Within the capsule, and crossed BEFORE the body rather than at it.
+    if (hit.d2 <= v.barR * v.barR && hit.t < 1) return true;
+  }
+  return false;
+}
+
+/**
+ * The column a `spread` body crosses to, picked once on its first loose frame.
+ *
+ * ---- FARTHEST-POINT, AND THE MACHINE'S COLUMN IS OCCUPIED GROUND -------
+ *
+ * Candidates are `CFG.spread.lanes` columns spread evenly across the band the
+ * body can actually stand in, and the pick is the one whose nearest OCCUPIED
+ * column is furthest away. What is occupied is every other sheet's lane AND
+ * THE MACHINE'S OWN COLUMN, which is the whole of "it is trying to cover
+ * ground, not reach you": the first sheet takes a wall, the second the other
+ * wall, the rest fill the gaps between, and the middle is taken last.
+ *
+ * The first version made the machine's column the TIE-BREAK instead -- on the
+ * argument that occlusion is angular, so a sheet nearer the middle of the
+ * cone hides more -- and it was measured to read as the wrong object: bodies
+ * come through the mouth at the machine's own x, so the first sheet's gap to
+ * its lane was **80 units of a 968-wide field** and it simply walked straight
+ * down the middle. A gait called `spread` whose first body does not move
+ * sideways is a gait that is not there. The guide's own illustrative path
+ * ends at 0.8 of the width, and its note says "not reach you" -- two readings
+ * saying go wide, against one piece of arithmetic saying the middle covers
+ * more. At the counts this wave actually sends (about thirty sheets over
+ * seven lanes at rung 32) the middle is covered anyway.
+ *
+ * Ties break toward the body's own x, so a sheet that came down the left of
+ * the mouth takes the left wall rather than crossing the whole field for a
+ * column that is no better.
+ *
+ * The band is `edgeEase` plus the body's radius in from each wall, which is
+ * `rollOn`'s derivation and for its reason: `CFG.physics.edgeEase` pushes
+ * anything within 96 units of a side back toward the middle, so a lane
+ * outside that band is a lane the body can never hold. The two rules agree
+ * instead of arguing. `lanes` is odd, so the midpoint of a symmetric band is
+ * a candidate and the machine's column really is available.
+ *
+ * ---- ONLY A SHEET THAT HAS CHOSEN COUNTS AS OCCUPYING ANYTHING --------
+ *
+ * The first version read a sheet with no lane yet at its `x`, which seemed
+ * like the conservative reading and was measured to be the wrong one: a
+ * formation queues its bodies in the mouth at ONE x, so the first sheet to
+ * come loose found the machine's column "occupied" by twenty-nine staged
+ * siblings and was sent to the far wall -- measured, lanes 426 and 481 of a
+ * 629-wide field with nothing standing in the middle at all. A body still in
+ * the throat is not standing anywhere. So the set is sheets that have a lane,
+ * which is also what makes the rule read as written: each sheet spreads
+ * against the sheets that are already covering ground.
+ */
+export function sheetLaneFor(world, e) {
+  const mx = world.shooter.x;
+  const pad = e.r + CFG.physics.edgeEase;
+  const lo = Math.min(pad, world.width / 2);
+  const hi = Math.max(world.width - pad, world.width / 2);
+  const n = Math.max(1, CFG.spread.lanes);
+  let best = mx;
+  let bestGap = -1;
+  let bestPull = Infinity;
+  for (let i = 0; i < n; i++) {
+    const x = n > 1 ? lo + (hi - lo) * (i / (n - 1)) : mx;
+    let gap = Math.abs(x - mx);
+    for (const o of world.enemies) {
+      if (o === e || !o.type.sheet || o.isDrop || o.dead) continue;
+      if (o.sheetLane === null) continue;
+      gap = Math.min(gap, Math.abs(x - o.sheetLane));
+    }
+    const pull = Math.abs(x - e.x);
+    if (gap > bestGap || (gap === bestGap && pull < bestPull)) {
+      best = x;
+      bestGap = gap;
+      bestPull = pull;
+    }
+  }
+  return best;
 }
 
 /**

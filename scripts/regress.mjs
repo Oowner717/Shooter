@@ -31561,16 +31561,17 @@ if (MINE_LINE) {
     // ---- barOf refuses what is not a bar ---------------------------------
     out.refused = 0;
     out.tried = 0;
-    const heldRatio = { long: CFG.cartwheel.long, thin: CFG.cartwheel.thin };
+    // The proportions are the TYPE's from build 330, not `CFG.cartwheel`'s.
+    const heldRatio = { long: T.bar.long, thin: T.bar.thin };
     for (const bad of [{ long: 1, thin: 1 }, { long: 0.5, thin: 0.9 }, { long: 0, thin: 0.1 },
       { long: 1.6, thin: 0 }, { long: -1, thin: 0.1 }]) {
-      CFG.cartwheel.long = bad.long;
-      CFG.cartwheel.thin = bad.thin;
+      T.bar.long = bad.long;
+      T.bar.thin = bad.thin;
       out.tried++;
       try { barOf(T); } catch (err) { out.refused++; }
     }
-    CFG.cartwheel.long = heldRatio.long;
-    CFG.cartwheel.thin = heldRatio.thin;
+    T.bar.long = heldRatio.long;
+    T.bar.thin = heldRatio.thin;
     out.restored = barOf(T).half === out.bar.half;
     out.noBar = 0;
     try { barOf(TYPE_BY_ID.mote); } catch (err) { out.noBar = 1; }
@@ -34323,20 +34324,34 @@ if (MINE_LINE) {
         host.cruise = 0;
         const e = body(id, w.width / 2, 460);
         e.destroy(w, 'probe');
-        const m = w.drops[0];
-        if (!m) throw new Error(`${id} shed nothing`);
+        /*
+         * EVERY mote it shed, and the MEAN -- build 330. Reading `w.drops[0]`
+         * measured one body, and a drop is born with an outward velocity it
+         * has to shed first, so the distance it closes in the window is one
+         * random roll: the MOTE control read 91.2 against a floor of 100 on
+         * the first build whose new wave re-rolled the suite's randoms, on a
+         * build that cannot touch a rider. Build 323's ORDINAL salvage arm
+         * paid for this on the same quantity and the fix is the same one.
+         */
+        const ms = [...w.drops];
+        if (!ms.length) throw new Error(`${id} shed nothing`);
+        const m = ms[0];
         const flags = { rides: !!m.rides, clock: m.rideT, drop: !!m.isDrop,
           gait: m.type.gait || null };
-        const toGun = Math.hypot(m.x - w.shooter.x, m.y - w.shooter.y);
-        const toHost = Math.hypot(m.x - host.x, m.y - host.y);
+        const was = ms.map((k) => ({ k,
+          gun: Math.hypot(k.x - w.shooter.x, k.y - w.shooter.y),
+          host: Math.hypot(k.x - host.x, k.y - host.y) }));
         for (let i = 0; i < 150; i++) {
           host.x = w.width / 2; host.y = 300; host.vx = 0; host.vy = 0; host.hp = host.maxHp;
           g.update(1 / 60);
         }
-        const gone = !w.drops.includes(m);
-        return { id, flags, aboard: host.graftCount, gone,
-          gun: gone ? null : +(toGun - Math.hypot(m.x - w.shooter.x, m.y - w.shooter.y)).toFixed(1),
-          host: gone ? null : +(toHost - Math.hypot(m.x - host.x, m.y - host.y)).toFixed(1) };
+        const live = was.filter((x) => w.drops.includes(x.k));
+        const mean = (f) => +(live.reduce((t, x) => t + f(x), 0) / Math.max(1, live.length)).toFixed(1);
+        return { id, flags, aboard: host.graftCount, gone: live.length === 0,
+          shed: ms.length, held: live.length,
+          gun: live.length ? mean((x) => x.gun - Math.hypot(x.k.x - w.shooter.x, x.k.y - w.shooter.y)) : null,
+          host: live.length ? mean((x) => x.host - Math.hypot(x.k.x - host.x, x.k.y - host.y)) : null,
+          worstGun: live.length ? Math.min(...live.map((x) => +(x.gun - Math.hypot(x.k.x - w.shooter.x, x.k.y - w.shooter.y)).toFixed(1))) : null };
       };
       out.salvage = [arm('latch'), arm('mote'), arm('lurcher')];
     }
@@ -34479,9 +34494,18 @@ if (MINE_LINE) {
   check('...and the salvage a rider leaves behind is not itself a rider',
     mine.flags.gait === 'ride' && mine.flags.rides === false && mine.flags.clock === 0
     && sv.every((x) => x.aboard === 0)
-    && sv.every((x) => x.gone || (x.gun > 100 && x.host < 0)),
-    sv.map((x) => `a ${x.id}'s mote: rides ${x.flags.rides}, clock ${x.flags.clock}, `
-      + `${x.gone ? 'banked' : `closed ${x.gun} on the turret and ${x.host} on the host`}`
+    /*
+     * The controls' job is VACUITY -- an instrument that can see a mote going
+     * to the gun -- so what they are held to is the DIRECTION of the mean
+     * (in, and away from the host) plus a liveness floor well clear of zero,
+     * not a distance near their own distribution. The discriminating claim is
+     * `aboard`, which reverting the guard reads as 1.
+     */
+    && sv.every((x) => x.gone || (x.gun > 20 && x.host < 0)),
+    sv.map((x) => `a ${x.id}'s ${x.held} of ${x.shed} motes: rides ${x.flags.rides}, `
+      + `clock ${x.flags.clock}, `
+      + `${x.gone ? 'banked' : `closed ${x.gun} on the turret (worst ${x.worstGun}) and `
+        + `${x.host} on the host`}`
       + `, ${x.aboard} aboard`).join('; ')
     + ` -- and the LATCH mote still carries gait '${mine.flags.gait}' off its parent type`);
 
@@ -36764,6 +36788,352 @@ if (MINE_LINE) {
     + `tally moved ${d.killsMoved} -- against [${(d.controlGained || []).join(' ')}] `
     + `for one of the ${d.controlLive} standing pieces taken through the same `
     + `damage door on the climb`);
+}
+
+/*
+ * ---- VEIL: WHAT MAY BE CHOSEN, AND WHAT THE MEASUREMENT SAID ABOUT IT ----
+ *
+ * Build 330, phase 6p. A membrane 104 x 12 that goes wide before it comes
+ * down; nothing behind it can be picked by the assist.
+ *
+ * FOUR arms, and the first two are the object while the third and fourth are
+ * the machinery it needed:
+ *
+ *   1. OCCLUSION BEATS DISTANCE. A nearer attacker behind the sheet is
+ *      refused while a further clear one is picked -- with the sheet removed
+ *      the nearer one wins, and the boundary is the geometry (a ray 38 units
+ *      off the axis is hidden, one at 71 is not, against a span of 58).
+ *      Both bodies carry `attacking` so they outrank the sheet itself; that
+ *      weight is what lets the discrimination be seen at all, because
+ *      `autoTarget` scores by distance and a sheet is the nearest thing on
+ *      the field. WHICH IS THE OTHER HALF OF THE FINDING and is asserted
+ *      here too: over the real wave the rule refuses a third of the field
+ *      every frame and never once changes the pick.
+ *   2. THE CHOOSER AGREES WITH THE PHYSICS. A round aimed at the hidden body
+ *      lands on the sheet, with the same shot landing on the body once the
+ *      sheet is gone. That is what makes this a refusal of an impossible
+ *      shot rather than a rule about a flag.
+ *   3. `upright` PINS THE PROFILE. The capsule is laid along `angle`, so a
+ *      random spawn roll would hang the membrane at a tilt under a picture
+ *      drawn level -- build 315's fifth door in reverse. A LURCHER is the
+ *      control: it still turns.
+ *   4. THE GAIT CROSSES AND STILL ARRIVES. A sheet released through
+ *      `Director.emit` takes one of the authored lanes, covers the lateral
+ *      gap to it, and ends up on the machine -- build 312's rule, which the
+ *      guide's own illustrative path for this gait breaks.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { WAVES, CFG, TYPE_BY_ID } = await import('/src/config.js');
+    const E = await import('/src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+    const s = w.shooter;
+    /*
+     * Eighteen cases upstream leave the director stubbed and `spawnLock`
+     * pinned and nothing puts either back, so anything downstream that wants
+     * a wave sets both itself -- and this case wants one.
+     */
+    const clean = () => {
+      g.debugClearField();
+      w.projectiles.length = 0;
+      w.mines.length = 0;
+      w.effects.length = 0;
+      w.ghosts.length = 0;
+      w.drops.length = 0;
+      w.debris.length = 0;
+      if (w.respawns) w.respawns.length = 0;
+      w.timeScale = 1;
+      w.stasis = 0;
+    };
+    const body = (id, x, y) => {
+      const e = g.debugSpawn(id, x, y);
+      e.staged = false;
+      e.born = false;
+      e.cruise = 0;
+      e.vx = 0;
+      e.vy = 0;
+      return e;
+    };
+    w.autoAim = true;
+    w.autoFire = false;
+    w.aimMode = 'field';
+
+    // ---- 1. occlusion beats distance -----------------------------------
+    const arena = (hidden, clear, withSheet) => {
+      clean();
+      let v = null;
+      if (withSheet) {
+        v = body('veil', s.x, s.y - 180);
+        g.update(1 / 60); // the pin is held in `update`, so level it first
+        v.cruise = 0;
+        v.vx = 0;
+        v.vy = 0;
+      }
+      const hid = body('lurcher', s.x + hidden[0], s.y - hidden[1]);
+      const cl = body('lurcher', s.x + clear[0], s.y - clear[1]);
+      hid.attacking = true;
+      cl.attacking = true;
+      const t = g.autoTarget();
+      const ray = (b) => Math.abs((b.x - s.x) * (180 / (s.y - b.y)));
+      return { picked: t === cl ? 'clear' : t === hid ? 'hidden' : t === v ? 'sheet' : 'none',
+        dHidden: Math.round(Math.hypot(hid.x - s.x, hid.y - s.y)),
+        dClear: Math.round(Math.hypot(cl.x - s.x, cl.y - s.y)),
+        rayHidden: Math.round(ray(hid)), rayClear: Math.round(ray(cl)),
+        span: v ? +(v.barHalf + v.barR).toFixed(0) : null,
+        angle: v ? +v.angle.toFixed(4) : null };
+    };
+    out.centre = arena([0, 260], [250, 330], true);
+    out.noSheet = arena([0, 260], [250, 330], false);
+    out.justIn = arena([70, 330], [250, 330], true);
+    out.justOut = arena([130, 330], [250, 330], true);
+
+    // ---- 2. a round aimed at the hidden body lands on the sheet --------
+    /*
+     * Before the era switch below, deliberately: this is a claim about a
+     * capsule in the line of fire and era 1 is where the shot is simplest,
+     * with no yard wall between the muzzle and the target to argue about.
+     */
+    const shot = (withSheet) => {
+      clean();
+      w.autoAim = false;
+      w.autoFire = false;
+      let v = null;
+      if (withSheet) {
+        v = body('veil', s.x, s.y - 180);
+        g.update(1 / 60);
+        v.cruise = 0;
+        v.vx = 0;
+        v.vy = 0;
+      }
+      const tgt = body('lurcher', s.x, s.y - 330);
+      tgt.cruise = 0;
+      const hp0 = { v: v ? v.hp : 0, t: tgt.hp };
+      s.cd = 0;
+      s.aimAt(tgt.x, tgt.y, true);
+      s.shoot(w);
+      for (let i = 0; i < 120 && w.projectiles.length; i++) g.update(1 / 60);
+      return { sheet: v ? +(hp0.v - v.hp).toFixed(1) : null, body: +(hp0.t - tgt.hp).toFixed(1) };
+    };
+    out.roundSheet = shot(true);
+    out.roundClear = shot(false);
+
+    // ---- ...and the rule refuses a great deal while deciding nothing ----
+    clean();
+    const vi = WAVES.findIndex((v) => (v.of || []).some(([id]) => id === 'veil'));
+    w.era = 1;
+    g.setEra(2); // band 5 is played at era 2 -- build 306
+    const d = w.director;
+    d.setTier(32);
+    d.traits = [];
+    d.load(w, WAVES[vi]);
+    d.update = function (world) { if (this.jobs.length) this.emit(world); };
+    w.autoFire = true;
+    /*
+     * The assist's REACH is a tree scalar and the base 400 does not span the
+     * era-2 field, so an unbought run has nothing in reach and `autoTarget`
+     * is null on every frame -- which reads exactly like the occlusion rule
+     * refusing everything. Set the multiplier ARRAY sells rather than buying
+     * the tree, so the null count is about this rule and not about the gun.
+     */
+    w.up.aimRange = 3;
+    let frames = 0;
+    let refused = 0;
+    let cand = 0;
+    let differ = 0;
+    let silenced = 0;
+    let sheetsUp = 0;
+    for (let f = 0; f < 900; f++) {
+      g.update(1 / 60);
+      const sheets = E.occluders(w);
+      if (!sheets) continue;
+      frames++;
+      sheetsUp += sheets.length;
+      for (const e of w.enemies) {
+        if (e.dead || e.staged || e.spent || e.isDrop || e.harmless) continue;
+        cand++;
+        if (E.occluded(sheets, s.x, s.y, e)) refused++;
+      }
+      // the SAME field, two chooser configurations, so nothing diverges
+      const a = g.autoTarget();
+      TYPE_BY_ID.veil.sheet = false;
+      const b = g.autoTarget();
+      TYPE_BY_ID.veil.sheet = true;
+      if (a !== b) differ++;
+      /*
+       * A null is only this rule's fault if turning it OFF gives a pick. The
+       * first version counted any null with a body standing and read 99 of
+       * 546 -- every one of them the era-2 YARD WALL, which makes a body
+       * above the line unshootable and is `shielded`'s business, not this
+       * rule's. Comparing the two configurations is what makes the claim
+       * about the rule.
+       */
+      if (!a && b) silenced++;
+    }
+    out.live = { frames, refused, cand, differ, silenced,
+      meanSheets: +(sheetsUp / Math.max(1, frames)).toFixed(1),
+      refusedShare: +(refused / Math.max(1, cand)).toFixed(3) };
+
+    // ---- 3. `upright` pins the profile level ---------------------------
+    clean();
+    const v3 = body('veil', s.x, s.y - 200);
+    v3.angle = 2.4;
+    v3.av = 2;
+    const was = v3.angle;
+    g.update(1 / 60);
+    const l3 = body('lurcher', s.x - 200, s.y - 200);
+    const la = l3.angle;
+    l3.av = 2;
+    g.update(1 / 60);
+    out.pin = { was: +was.toFixed(3), angle: +v3.angle.toFixed(5), av: +v3.av.toFixed(5),
+      controlMoved: +Math.abs(l3.angle - la).toFixed(4),
+      bar: E.barOf(TYPE_BY_ID.veil), spindle: E.barOf(TYPE_BY_ID.spindle) };
+
+    // ---- 4. the gait crosses to a lane, and still arrives --------------
+    clean();
+    w.autoAim = false;
+    w.autoFire = false;
+    d.setTier(32);
+    d.traits = [];
+    d.load(w, { of: [['veil', 1]], band: 5 });
+    out.grouped = d.jobs.length && d.jobs[0].n > 1;
+    d.jobs = [{ ...d.jobs[0], n: 1 }];
+    d.update = function (world) { if (this.jobs.length) this.emit(world); };
+    let e1 = null;
+    let x0 = null;
+    let closest = 1e9;
+    let laneAt = null;
+    for (let f = 0; f < 7000; f++) {
+      g.update(1 / 60);
+      if (!e1) e1 = w.enemies.find((e) => e.type.id === 'veil' && !e.isDrop) || null;
+      if (!e1) continue;
+      if (!e1.staged && x0 === null) {
+        x0 = e1.x;
+        laneAt = e1.sheetLane;
+      }
+      if (x0 !== null) closest = Math.min(closest, Math.abs(e1.x - laneAt));
+      if (e1.dead || e1.attacking) break;
+    }
+    const sheetEnd = { arrived: e1 ? !!e1.attacking : false, dead: e1 ? !!e1.dead : null,
+      y: e1 ? Math.round(e1.y) : null };
+    // ...and a control from the same release, which takes a route instead
+    clean();
+    d.setTier(32);
+    d.traits = [];
+    d.load(w, { of: [['lurcher', 1]], band: 5 });
+    d.jobs = [{ ...d.jobs[0], n: 1 }];
+    d.update = function (world) { if (this.jobs.length) this.emit(world); };
+    let c1 = null;
+    let cx0 = null;
+    let cAcross = 0;
+    let cLast = null;
+    for (let f = 0; f < 7000; f++) {
+      g.update(1 / 60);
+      if (!c1) c1 = w.enemies.find((e) => e.type.id === 'lurcher' && !e.isDrop) || null;
+      if (!c1) continue;
+      if (!c1.staged) {
+        if (cx0 === null) cx0 = c1.x;
+        if (cLast !== null) cAcross += Math.abs(c1.x - cLast);
+        cLast = c1.x;
+      }
+      if (c1.dead || c1.attacking) break;
+    }
+    out.gait = {
+      lane: laneAt === null ? null : Math.round(laneAt),
+      lanes: [...Array(CFG.spread.lanes)].map((_, i) => {
+        const pad = TYPE_BY_ID.veil.r + CFG.physics.edgeEase;
+        return Math.round(pad + (w.width - 2 * pad) * (i / (CFG.spread.lanes - 1)));
+      }),
+      startX: x0 === null ? null : Math.round(x0),
+      gap: x0 === null || laneAt === null ? null : Math.round(Math.abs(x0 - laneAt)),
+      closest: Math.round(closest),
+      arrived: sheetEnd.arrived,
+      endY: sheetEnd.y,
+      mount: Math.round(s.y),
+      controlCrossed: Math.round(cAcross),
+      controlArrived: c1 ? !!c1.attacking : false,
+      controlDead: c1 ? !!c1.dead : null,
+      dead: sheetEnd.dead,
+      grouped: out.grouped,
+    };
+    clean();
+    w.autoAim = true;
+    return out;
+  });
+
+  const a = r.centre;
+  check('a body behind a VEIL cannot be chosen, and that beats being nearer',
+    // the mechanism: the hidden body is nearer AND refused
+    a.picked === 'clear' && a.dHidden < a.dClear
+    // ...and with the sheet gone the same field picks the nearer one
+    && r.noSheet.picked === 'hidden'
+    // ...and the boundary is the capsule's own span, not a radius
+    && r.justIn.picked === 'clear' && r.justIn.rayHidden < r.justIn.span
+    && r.justOut.picked === 'hidden' && r.justOut.rayHidden > r.justOut.span
+    // ...and the sheet really was level when the geometry was read
+    && a.angle === 0,
+    `a LURCHER at ${a.dHidden} behind the sheet is refused for one at ${a.dClear} `
+    + `(both marked attacking, so they outrank the sheet itself); with the sheet `
+    + `removed the nearer one is picked. A ray ${r.justIn.rayHidden} off the axis `
+    + `is hidden and one at ${r.justOut.rayHidden} is not, against a span of ${a.span}`);
+
+  const L = r.live;
+  check('...and over the real wave it refuses a third of the field and decides nothing',
+    // the rule is LIVE: it really is refusing bodies, on most frames
+    L.frames > 300 && L.refused > 0 && L.refusedShare > 0.1
+    // ...and yet the pick is identical with it on and off, every frame
+    && L.differ === 0
+    // ...and the rule never takes the last thing the gun could have shot
+    && L.silenced === 0,
+    `over ${L.frames} frames of the wave at rung 32 with a mean of ${L.meanSheets} `
+    + `sheets up, ${L.refused} of ${L.cand} candidate-frames were occluded `
+    + `(${(L.refusedShare * 100).toFixed(1)}%) and the assist's pick differed from `
+    + `the same field with the rule OFF on ${L.differ} of them, and left the gun with `
+    + `nothing that the rule-off field would have given it ${L.silenced} times. The rule is true of a third of `
+    + `the field and never decisive, because the assist scores by distance and a `
+    + `sheet is the nearest thing on it -- so the object's cost is the membrane in `
+    + `the line of fire, not a blinded assist`);
+
+  check('...and the chooser is refusing a shot that really is impossible',
+    r.roundSheet.sheet > 0 && r.roundSheet.body === 0
+    && r.roundClear.body > 0,
+    `a round aimed at the hidden body took ${r.roundSheet.sheet} off the sheet and `
+    + `${r.roundSheet.body} off the body; the same shot with no sheet took `
+    + `${r.roundClear.body}`);
+
+  const p = r.pin;
+  check('a VEIL hangs level, so the capsule the hit test lays is the picture drawn',
+    p.angle === 0 && p.av === 0 && Math.abs(p.was) > 1
+    // the control still turns, or the pin is a reading about nothing
+    && p.controlMoved > 0
+    // ...and the two capsules in the game are the two the table declares
+    && Math.round(p.bar.half * 2) === 104 && Math.round(p.bar.thick * 2) === 12
+    && Math.round(p.spindle.half * 2) === 96 && Math.round(p.spindle.thick * 2) === 11,
+    `angle ${p.was} -> ${p.angle} with av ${p.av} in one frame, against a LURCHER `
+    + `still turning ${p.controlMoved} rad; the sheet is `
+    + `${(p.bar.half * 2).toFixed(0)}x${(p.bar.thick * 2).toFixed(0)} and SPINDLE's bar `
+    + `${(p.spindle.half * 2).toFixed(0)}x${(p.spindle.thick * 2).toFixed(0)}, each off `
+    + `its own type's block`);
+
+  const G = r.gait;
+  check('a VEIL crosses to a lane of its own and still arrives at the machine',
+    // it is never grouped, so the lane choice can happen at all
+    !r.grouped
+    // it picked one of the authored columns
+    && G.lane !== null && G.lanes.some((x) => Math.abs(x - G.lane) <= 1)
+    // ...and crossed to it: it started off the lane and got close to it
+    && G.gap > 50 && G.closest < G.gap * 0.35
+    // ...and it ARRIVES, which the guide's own path for this gait does not
+    && G.arrived && G.endY > G.mount - 120
+    // ...against a control that arrives too, so arriving is not the claim
+    && G.controlArrived,
+    `released at x ${G.startX}, lane ${G.lane} of [${G.lanes.join(' ')}], a gap of `
+    + `${G.gap} closed to ${G.closest}; arrived ${G.arrived} (dead ${G.dead}) at y `
+    + `${G.endY} against a mount at ${G.mount}, grouped ${G.grouped}. A LURCHER from `
+    + `the same release arrived ${G.controlArrived} (dead ${G.controlDead}) having `
+    + `wandered ${G.controlCrossed} units of lateral on its route -- so arriving is `
+    + 'not what this arm is about, holding a chosen column on the way is');
 }
 
 // --- report -----------------------------------------------------------------

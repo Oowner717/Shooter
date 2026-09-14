@@ -20,7 +20,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts, drawRespawns } from './enemies.js';
+import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts, drawRespawns, occluders, occluded } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
 import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -2499,7 +2499,25 @@ export class Game {
      * anyway, so aiming at one is the turret claiming reach it does not have.
      * False at era 1, where there is no wall, at the cost of one property read.
      */
-    const legal = (e) => !e.dead && !e.staged && !e.spent && !shielded(w, e);
+    /*
+     * ...and `occluded` is the wall's rule applied to a body instead of to a
+     * line. Build 330: a VEIL's membrane is a capsule in the line of fire, so
+     * anything a NEARER one crosses cannot be hit from here -- a round aimed
+     * at it lands on the sheet, which is measurable and is the whole of the
+     * object. It is the first entry in this predicate that is a property of
+     * something ELSE: `dead`, `staged`, `spent` and `shielded` are all facts
+     * about the candidate, and this one is a fact about the field. Collected
+     * ONCE per call rather than per candidate -- `legal` runs for every body,
+     * every ghost and the held lock, and the list cannot change between them.
+     *
+     * "Nearer" is what makes this impossible to turn into a silent gun: the
+     * nearest considered body has nothing in front of it, so something is
+     * always choosable. See `occluders` in enemies.js for the proof and for
+     * why it needs the cone to be convex.
+     */
+    const sheets = occluders(w);
+    const legal = (e) => !e.dead && !e.staged && !e.spent && !shielded(w, e)
+      && !occluded(sheets, s.x, s.y, e);
     /*
      * ...and the scoring is a FUNCTION, for the reason the note above gives
      * about the predicate: from build 323 there are two lists to score and

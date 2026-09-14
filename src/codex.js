@@ -488,6 +488,37 @@ export const CODEX = [
     name: 'ANVIL',
     line: 'The heaviest thing that has ever walked down this field, and the only one that cannot be moved. It takes no lane and no evasive arc -- it simply comes, straight, slower than anything else on the field. Every shove in the game is refused: PULSE, PILE, HEAVE, a hurled MASS, the knockback of your own rounds. Nothing pushes it off the mount because nothing pushes it at all. What is left is the gun and the time it has to spend crossing, which is longer than any other body spends -- so it is a problem you answer early or answer with everything, and the things arriving beside it are what make that a choice.',
   },
+  /*
+   * MEASURED BEFORE IT WAS WRITTEN, which is build 319's correction applied
+   * in advance -- and here it was the measurement that changed the line.
+   *
+   * The object guide's counter is "shoot the sheet, not what is behind it --
+   * which is exactly the decision it exists to force", on the strength of the
+   * assist being blinded by it. Measured over 1,348 frames of the real wave
+   * at rung 32 with a fully bought turret, the assist's PICK is identical
+   * with the occlusion rule on and off: it scores by distance, and a sheet
+   * across the field is the nearest thing on it. So the decision is not
+   * forced, the gun makes it for you, and a line promising otherwise would be
+   * FLINT's fault again -- naming a counter nobody can use.
+   *
+   * What IS measured is what the sheet costs: **63% of every point of damage
+   * the turret delivered went into membrane** (13,555 of 21,620 at rung 32,
+   * 62% at rung 35), and a round aimed at anything behind one lands on it.
+   * That is the sentence.
+   *
+   * And the counter named is the one that works and that this object is the
+   * only body in the game to invert: it is the LIGHTEST thing on the field
+   * for its size -- mass 946 against an ANVIL's 10,662 -- so the same press
+   * that cannot move an anvil at all throws a sheet **528 u/s and 365 units**,
+   * measured with the same 3000-impulse hit that read 0.00 on an anvil,
+   * 91.45 on a BULWARK and 643 on a LURCHER. A blast takes it whole: 119.6 of
+   * 120 landed.
+   */
+  {
+    id: 'veil',
+    name: 'VEIL',
+    line: 'A membrane that goes wide before it comes down, and then simply hangs there across the field. It is not coming for you and it does not have to: every round aimed at anything behind it stops in it instead, and a sheet is a hundred units wide. Most of what your gun does while one stands is spent on cloth. It is the lightest thing out there for its size, though -- the one body a press throws right off the field, where an ANVIL will not move an inch -- so the answer is rarely the gun.',
+  },
   {
     id: 'quarry',
     name: 'QUARRY',

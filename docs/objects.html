@@ -859,7 +859,7 @@
     { name: 'VEIL', band: 6, levels: '36–42', threat: 9, fam: 'heavy', r: 52, hp: 240, speed: 26, accel: 90, armor: 0, drops: 6,
       gait: 'spread', count: 'one or two',
       what: 'A membrane <span class="num">104</span> units across and twelve deep that goes wide before it comes down. Nothing behind it can be chosen by the assist: it occludes, the way a boss\'s structure does, but by geometry rather than by a mark. Weak, and it changes the whole field while it stands.',
-      counter: 'It has <span class="num">240</span> health and no armour. Shoot the sheet, not what is behind it — which is exactly the decision it exists to force.',
+      counter: 'It has <span class="num">240</span> health and no armour. Shoot the sheet, not what is behind it — which is exactly the decision it exists to force. <b>Shipped at build 330 into band 5, and the decision is NOT forced:</b> measured over 1,348 frames of its own wave at rung 32 with a fully bought turret, the assist\'s pick is identical with the occlusion rule on and off, because <code>autoTarget</code> scores by distance and a sheet across the field is the nearest thing on it. The rule refuses 43&ndash;46% of the candidates every frame and decides none of them. What the sheet costs is measured instead: <b>63% of every point of damage the turret delivered went into membrane</b> (13,555 of 21,620 at rung 32), because a round aimed at anything behind one stops in it. And the counter that works is the one this object inverts &mdash; mass 946 against an ANVIL\'s 10,662, so the same 3,000-impulse press that moves an anvil 0.00 u/s throws a sheet at <b>528 u/s and 365 units</b>.',
       view: 66,
       draw: function (c, R, t, act) {
         if (act) {

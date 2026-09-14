@@ -681,9 +681,87 @@ if (overReach.length) {
   for (const line of overReach) console.error(`bar: ${line}`);
   process.exit(1);
 }
+/*
+ * ...and each one declares its OWN proportions, from build 330.
+ *
+ * They were `CFG.cartwheel.long` / `.thin` -- the GAIT's block -- until a
+ * second capsule type arrived, at which point VEIL's membrane would have been
+ * tested as a 166-unit spindle with no field to set and nothing to fail.
+ * `barOf` throws for a missing or malformed block, which is what the map above
+ * exercises; this asserts the other half, that no two bars are the same shape
+ * by accident, and prints each one so a proportion that drifts is visible.
+ */
+const barShapes = new Map();
+for (const b of bars) {
+  const t = ENEMY_TYPES.find((x) => x.id === b.id);
+  const key = `${t.bar.long}x${t.bar.thin}`;
+  if (barShapes.has(key)) {
+    console.error(`bar: ${b.id} and ${barShapes.get(key)} declare the same proportions (${key}) -- `
+      + 'a shape shared between two types is a shape one of them inherited rather than chose. '
+      + 'If they really are the same body, say so here.');
+    process.exit(1);
+  }
+  barShapes.set(key, b.id);
+}
+/*
+ * ---- ...AND A SHEET NEEDS A CAPSULE, AND HAS TO HANG LEVEL -------------
+ *
+ * Build 330. `sheet` says the body OCCLUDES -- `Game.autoTarget` refuses
+ * anything whose ray from the machine crosses it -- and two things it does
+ * not declare itself are load-bearing:
+ *
+ *   - `bar`, because what occludes is the CAPSULE. Without one `barHalf` is
+ *     `NaN`, `occluded` compares `NaN <= 36` and silently refuses nothing at
+ *     all: a whole mechanism switched off with no error and no fail.
+ *   - `upright`, because the proof that occlusion cannot leave the gun with
+ *     nothing to shoot is that two LEVEL capsules cannot each cross the
+ *     other's ray first -- one of them is nearer the machine, so the relation
+ *     is a strict order by depth and has no cycle. A tilted sheet can cross
+ *     another tilted sheet in an X, and then neither is choosable.
+ *
+ * Unlike `plated` (319), `rides` (322), `respawn` (324) and `planted` (328)
+ * there is deliberately NO refusal of a second type declaring `sheet`: those
+ * four have readers that consult a shared block, and a sheet's readers
+ * consult the body's own `bar`, `angle` and position. The guard goes on the
+ * flag when the flag's readers look somewhere else.
+ */
+const sheetTypes = ENEMY_TYPES.filter((t) => t.sheet);
+for (const t of sheetTypes) {
+  if (!t.bar) {
+    console.error(`sheet: ${t.id} occludes but declares no bar -- what occludes is the capsule, and `
+      + 'without one `barHalf` is NaN and `occluded` refuses nothing at all, silently');
+    process.exit(1);
+  }
+  if (!t.upright) {
+    console.error(`sheet: ${t.id} occludes but is not upright -- the guarantee that something is `
+      + 'always choosable rests on two LEVEL capsules being unable to hide each other, which is a '
+      + 'strict order by depth. A tilted sheet can cross another in an X and leave neither pickable.');
+    process.exit(1);
+  }
+}
+const SP = CFG.spread;
+if (!(SP.lanes >= 3 && SP.lanes % 2 === 1)) {
+  console.error(`spread.lanes ${SP.lanes}: at least three, and ODD -- the candidates are spread evenly `
+    + "across a symmetric band, so an odd count is what puts one on the machine's own column. "
+    + 'That column is the one the spread treats as already occupied, and with an even count there is '
+    + 'nothing standing at the middle for the rule to spread away from.');
+  process.exit(1);
+}
+if (!(SP.slant > 0 && SP.look > 0)) {
+  console.error(`spread.slant ${SP.slant} / look ${SP.look}: both positive. At slant 0 the aim point is `
+    + 'infinitely far below and the body never crosses; at look 0 a body already on its lane aims at '
+    + 'its own depth and stops descending.');
+  process.exit(1);
+}
+if (sheetTypes.length) {
+  console.log(`sheet: ${sheetTypes.length} type(s) occlude (`
+    + `${sheetTypes.map((t) => `${t.id} spans ${(2 * barOf(t).half).toFixed(0)} and hides within `
+      + `${barOf(t).thick.toFixed(1)} of the ray`).join('; ')}), crossing to one of ${SP.lanes} lanes `
+    + `at ${SP.slant} of lateral per unit of depth`);
+}
 console.log(`bar: ${bars.length} type(s) are tested as a capsule (`
   + `${bars.map((b) => `${b.id} ${(b.half * 2).toFixed(0)}x${(b.thick * 2).toFixed(0)}, reach `
-    + `${b.reach.toFixed(1)} of ${MAX_BODY_R}`).join('; ') || 'none'}) at `
+    + `${b.reach.toFixed(1)} of ${MAX_BODY_R}`).join('; ') || 'none'}); the cartwheel spins at `
   + `${(CFG.cartwheel.spin / (2 * Math.PI)).toFixed(3)} rev/s`);
 
 
