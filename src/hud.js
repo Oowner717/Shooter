@@ -2590,6 +2590,25 @@ export class Hud {
      * first stage, read as one anomaly RECONCILED on the title screen of a
      * device that had never finished a fight. `types[0]` is the core, and
      * having the core in the codex is having taken it apart.
+     *
+     * ---- ...AND THAT LAST SENTENCE WAS FALSE UNTIL BUILD 325 -------------
+     *
+     * The core got into the codex from `Boss.clear`, which is the door
+     * `withdrawBoss`, `endBoss`, `reset()` and `openAperture`'s teardown all
+     * come through -- a bare `dead = true` with no `dissolved`, so
+     * `Game.sweep`'s `if (!e.dissolved) noteDestroyed(e)` recorded it.
+     * Measured either way in one container with the record wiped first: a
+     * WITHDRAWAL left `world.reconciled` empty and the codex holding
+     * `ordinal`; a WIN left `reconciled: [1]` and the codex holding the same
+     * core. Indistinguishable -- so this tile read 1 on a device that had
+     * abandoned one fight, which is the sentence three paragraphs up,
+     * arriving again one door along. Withdrawing all nine put NINETEEN ids in
+     * the glossary (every core and every piece of structure on the roster)
+     * and would have read 9 RECONCILED here.
+     *
+     * Fixed at the source rather than here: `Boss.offField` marks a body a
+     * teardown takes, and `Game.endBoss` notes the core itself. This tile is
+     * unchanged, and its claim is true for the first time.
      */
     const seen = ANOMALIES.filter((a) => codex.has(a.types[0])).length;
     if (seen) bits.push(tile(seen, 'RECONCILED'));

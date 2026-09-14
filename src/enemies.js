@@ -413,6 +413,19 @@ export class Enemy {
      */
     this.rides = type.gait === 'ride' && !this.isDrop;
     this.rideT = this.rides ? ridesOf(type).life : 0;
+    /*
+     * Which body this rider is standing on, and it has NO reader in `src/`:
+     * `hunt` re-picks `best` from scratch every frame and writes this for the
+     * record, and the only things that read it are two arms of `regress.mjs`
+     * (a SEED must not graft onto ORDINAL's frame; a held SEED keeps the host
+     * it was given). Kept for the suite, which is a real and stated reason --
+     * stated HERE, because a field with no reader and no note is the shape
+     * this repo has now removed six times.
+     *
+     * Note FRACTAL's mites carry their own `t.host` and read it in eight
+     * places; that is a different object family and a genuine collision of
+     * names, which is why this note says `src/` rather than "nothing".
+     */
     this.host = null;
     /*
      * The hop's three pieces of state, declared here rather than sprung into
@@ -558,7 +571,6 @@ export class Enemy {
      */
     this.divePhase = '';
     this.diveX = 0;
-    this.diveT = 0;
     this.diveHeld = 0;
     this.diveSide = 0;
     this.baseCruise = 0;
@@ -589,11 +601,6 @@ export class Enemy {
      */
     this.born = false;
     this.bornFor = 99;
-    // Debris used to expire after 22-30s. It does not any more: a fragment
-    // carries salvage, and salvage that rots is a clock the player is losing
-    // to. The floor drains by being collected instead — pulled into the
-    // intake, shot, or blasted.
-    this.ttl = 0;
     // Set when it is made, from the parent's mass. Banked whichever way it
     // goes: reaching the turret, or being destroyed.
     this.bytes = opts.bytes || 0;
@@ -1447,7 +1454,6 @@ export class Enemy {
     if (!(this.baseCruise > 0)) this.baseCruise = this.cruise;
     if (!this.diveSide) this.diveSide = this.x < s.x ? -1 : 1;
     if (!this.divePhase) this.divePhase = 'hold';
-    this.diveT += dt;
     const holdY = entryLine(world, ENTRY_Y) + S.hold;
     const lane = diveLane(world, this);
     /*
@@ -1484,6 +1490,12 @@ export class Enemy {
        * Measured on the shipped build: 4.84 and 4.94 at the commit frame.
        * `diveHeld` counts time INSIDE the lane instead, which is the thing
        * `dwell` claims to be, so the line really is shown before it is used.
+       *
+       * And `diveT` itself is GONE from build 325: 318 added the replacement
+       * and left the old accumulator running -- one `+= dt` on the hot path
+       * and three resets, four maintained writes with no reader anywhere in
+       * the tree. A field that is only written is dead code that looks like
+       * state, and this is the sixth of that shape in this repo.
        */
       /*
        * ...and it BLEEDS rather than resets. The gate is two units wide and
@@ -1509,7 +1521,6 @@ export class Enemy {
       if (inLane && this.diveHeld > S.dwell && !laneBusy(world, this)) {
         this.divePhase = 'dive';
         this.diveX = lane;
-        this.diveT = 0;
         this.diveHeld = 0;
       }
       return [lane, holdY];
@@ -1519,7 +1530,6 @@ export class Enemy {
       // Past the machine and on to the floor, which is the overshoot.
       if (this.y > world.floorY - this.r * 2) {
         this.divePhase = 'climb';
-        this.diveT = 0;
       }
       // A point AHEAD on the lane, not the far floor: see `CFG.shrike.look`.
       return [this.diveX, Math.min(world.floorY + this.r, this.y + S.look)];
@@ -1531,7 +1541,6 @@ export class Enemy {
     this.cruise = S.climb * gross;
     if (this.y < holdY + this.r) {
       this.divePhase = 'hold';
-      this.diveT = 0;
     }
     // The same wall margin `diveLane` uses; one gait, one number.
     const out = clamp(this.diveX + this.diveSide * S.swing,
@@ -2531,14 +2540,6 @@ export class Enemy {
     if (this.shards) {
       const spin = this.frozen(world) ? 0.12 : 1;
       for (const s of this.shards) s.a += this.shardSpin * dt * spin;
-    }
-
-    if (this.ttl > 0) {
-      this.ttl -= dt;
-      if (this.ttl <= 0) {
-        this.dead = true;
-        this.dissolved = true;
-      }
     }
 
     if (this.type.ward) this.wardNearby(world, dt);

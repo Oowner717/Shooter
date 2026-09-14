@@ -186,6 +186,37 @@ class Remainder {
  * fight that does not exist yet, is how you break the one that works. A boss
  * written against this class gets the whole of it.
  */
+/**
+ * A body a teardown is taking off the field, rather than one the player
+ * destroyed.
+ *
+ * THREE marks and each is load-bearing. `dead` is what `Game.sweep` splices
+ * on. `dissolved` is the one thing `sweep` reads to tell the two deaths
+ * apart -- it is the mark for "eaten, not destroyed", and without it the
+ * glossary records a boss core the player walked away from. `spent` is what
+ * keeps a round and the assist off it for the frame between this call and
+ * the sweep, which is the same reason `Game.takeField` and
+ * `Director.glitchOut` set it: a body on its way out must not be shootable.
+ *
+ * It does NOT touch `counts`. Structure already carries `counts: false` and
+ * the tally was never the fault here; writing it would be a second claim
+ * this function has not measured, and a flag borrowed for a side effect
+ * brings the rest of its meaning with it.
+ *
+ * Exported because five `clear` overrides exist (axiom, dynamo, parity,
+ * terminus and ORDINAL's) and PARITY's halves are not in its own `parts()`
+ * -- so the rule cannot live in the base class alone. What makes it one rule
+ * rather than five hopes is the case in `regress.mjs` that withdraws every
+ * anomaly on the roster and asserts the glossary did not move: a sixth
+ * override that forgets is caught by existing.
+ */
+export function offField(e) {
+  if (!e) return;
+  e.spent = true;
+  e.dissolved = true;
+  e.dead = true;
+}
+
 export class Boss {
   constructor(world, n) {
     this.n = n; // which of the seven. See anomaly.js.
@@ -735,11 +766,39 @@ export class Boss {
     }
   }
 
-  /** Take everything of this boss's off the field. */
+  /**
+   * Take everything of this boss's off the field.
+   *
+   * ---- AND TAKING A BODY OFF THE FIELD IS NOT DESTROYING IT ---------------
+   *
+   * `Game.sweep` is `if (!e.dissolved) noteDestroyed(e)` followed by
+   * `if (e.counts && !e.dissolved) registerKill(e)`, so a bare `dead = true`
+   * on a body still in `world.enemies` enters it in the GLOSSARY. Structure
+   * carries `counts: false`, so the tally was never at risk -- measured, a
+   * withdrawal books 0 kills for ORDINAL's 41 parts and TERMINUS's 29 -- but
+   * the glossary was: withdrawing ORDINAL recorded `ordinal` and `tally`,
+   * and the title screen's RECONCILED tile reads `codex.has(a.types[0])`
+   * under a docstring saying "having the core in the codex is having taken it
+   * apart". Measured either way in one container, glossary wiped first: a
+   * WITHDRAWAL left `reconciled` empty and the codex holding **ordinal**; a
+   * WIN left `reconciled: [1]` and the codex holding the same core. The two
+   * were indistinguishable, so the tile said 1 RECONCILED on a device that
+   * had never finished a fight -- which is verbatim the sentence build 299
+   * wrote that tile's own docstring to stop.
+   *
+   * `offField` is the fix and it follows an idiom this file did not have and
+   * the rest of the game did: `Game.takeField` marks every body `spent` and
+   * `dissolved` "so none of them pays, counts or can be shot on the way out",
+   * and `Director.glitchOut` does the same. A boss teardown was the one
+   * removal in the game that did neither.
+   *
+   * The WIN keeps its record because `Game.endBoss` notes the core itself,
+   * one line before it calls this -- see there for why it cannot live here.
+   */
   clear(world) {
-    for (const p of this.parts()) p.dead = true;
-    this.core.dead = true;
-    for (const d of this.parked) d.dead = true;
+    for (const p of this.parts()) offField(p);
+    offField(this.core);
+    for (const d of this.parked) offField(d);
     this.parked.length = 0;
     background.setDread(0, 0);
     background.setFocus(null, null);
@@ -1704,11 +1763,19 @@ export class Ordinal extends Boss {
     }
   }
 
-  /** Take everything of ORDINAL's off the field. */
+  /**
+   * Take everything of ORDINAL's off the field.
+   *
+   * The ONE override of five that does not call `super.clear` -- axiom,
+   * dynamo, parity and terminus all do -- so it needs `offField` written out
+   * here as well. CLAUDE.md says "two bosses keep private copies of" the
+   * death sequence; there are five `clear` overrides and this is the only
+   * private copy of THIS part of it, which is the number being corrected.
+   */
   clear(world) {
-    for (const ring of this.rings) for (const p of ring.panels) p.dead = true;
-    this.core.dead = true;
-    for (const d of this.parked) d.dead = true;
+    for (const ring of this.rings) for (const p of ring.panels) offField(p);
+    offField(this.core);
+    for (const d of this.parked) offField(d);
     this.parked.length = 0;
     background.setDread(0, 0);
     background.setFocus(null, null);

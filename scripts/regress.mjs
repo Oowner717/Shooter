@@ -35818,6 +35818,189 @@ if (MINE_LINE) {
     + `Two draws of one frame differ by ${mk.control ? 0 : 'MORE THAN 0'}`);
 }
 
+/*
+ * ---- A TEARDOWN IS NOT A DESTRUCTION, AND THE GLOSSARY IS WHERE IT SHOWED --
+ *
+ * Build 325. `Game.sweep` is
+ *     if (!e.dissolved) this.noteDestroyed(e);
+ *     if (e.counts && !e.dissolved) this.registerKill(e);
+ * and `Boss.clear` -- the door `withdrawBoss`, `endBoss`, `reset()` and
+ * `openAperture`'s teardown ALL come through -- wrote a bare `dead = true` on
+ * every part, the core and the parked garrison. Structure carries
+ * `counts: false`, so the tally was never at risk (measured: a withdrawal
+ * books 0 kills for ORDINAL's 41 parts and TERMINUS's 29). The GLOSSARY was:
+ * measured either way in one container with the record wiped first, a
+ * WITHDRAWAL left `world.reconciled` empty and the codex holding `ordinal` and
+ * `tally`, and a WIN left `reconciled: [1]` and the codex holding the same
+ * core. The two were indistinguishable.
+ *
+ * That matters because of one reader: the title screen's RECONCILED tile is
+ * `ANOMALIES.filter((a) => codex.has(a.types[0])).length`, under a docstring
+ * saying "having the core in the codex is having taken it apart". So the tile
+ * said 1 RECONCILED on a device that had never finished a fight -- which is
+ * verbatim the sentence build 299 wrote that docstring to stop. 299 moved the
+ * tile from any-anomaly-body to the CORE; the core had the same fault one door
+ * along.
+ *
+ * The NEW FORM gate was never affected and that is worth saying: it reads
+ * `w.reconciled.length` (menu.js), which is honest run state.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { codex, CODEX } = await import('../src/codex.js');
+    const { ANOMALIES } = await import('../src/anomaly.js');
+    const out = {};
+
+    // The glossary is a DEVICE record in localStorage, so it is put back at
+    // the end of this case exactly as it was found. Nothing downstream should
+    // be able to tell this case ran.
+    const held = [...codex.seen];
+    const wipe = () => { codex.seen.clear(); codex.save(); };
+    const seenNow = () => [...codex.seen];
+
+    const bare = () => {
+      g.restart();
+      w.phase = 'staging';
+      delete w.director.update;
+      w.spawnLock = 0;
+      g.debugClearField();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
+        if (w[k]) w[k].length = 0;
+      }
+      w.director.timer = 1e9;
+      w.director.driftTimer = 1e9;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.timeScale = 1;
+      w.reconciled.length = 0;
+      w.boss = null;
+      w.bossN = 0;
+    };
+
+    // ---- 1. EVERY anomaly on the roster, withdrawn -----------------------
+    /*
+     * The bound is `ANOMALIES.length` and not a literal, for build 313's
+     * reason -- and the whole roster rather than one boss because there are
+     * FIVE `clear` overrides (axiom, dynamo, parity, terminus, and ORDINAL's,
+     * which is the one that does not call super). A sixth that forgets the
+     * mark is caught by existing.
+     */
+    {
+      wipe();
+      out.roster = ANOMALIES.length;
+      out.each = [];
+      for (let n = 1; n <= ANOMALIES.length; n++) {
+        bare();
+        w.apertures[n] = 1;
+        const opened = g.openBoss(n);
+        const row = { n, opened };
+        if (opened) {
+          const b = w.boss;
+          b.arriving = 0;
+          b.settle(w);
+          g.update(1 / 60);
+          row.parts = w.enemies.length;
+          // the three marks `offField` owes a body, read on a real part
+          const p = w.enemies[0];
+          g.withdrawBoss();
+          row.marks = p ? { spent: !!p.spent, dissolved: !!p.dissolved, dead: !!p.dead } : null;
+          g.update(1 / 60);
+          row.swept = w.enemies.length;
+          row.recon = w.reconciled.length;
+          if (w.boss) { w.boss = null; w.bossN = 0; }
+        }
+        out.each.push(row);
+      }
+      out.afterWithdrawals = seenNow();
+    }
+
+    // ---- 2. ...and a WIN, which is the same door and must still record ----
+    /*
+     * `endBoss` calls the same `clear`, so the win's record cannot come from
+     * there any more: it notes the core itself, one line above. Driven through
+     * the real death rather than by writing `reconciled` -- the arrest snaps
+     * the frame off part by part and that is what records the STRUCTURE, so a
+     * short-cut would measure a different mechanism.
+     *
+     * This arm is also arm 1's liveness proof: a zero from an instrument that
+     * has never read a one means nothing, and this is the same instrument
+     * reading three.
+     */
+    {
+      wipe();
+      bare();
+      w.apertures[1] = 1;
+      out.win = { opened: g.openBoss(1) };
+      if (out.win.opened) {
+        let f = 0;
+        for (; f < 60 * 240; f++) {
+          const b = w.boss;
+          if (!b) break;
+          for (const p of b.parts()) if (!p.dead) p.hp = 0;
+          if (b.core) b.core.hp = 0;
+          g.update(1 / 60);
+          if (!w.boss) break;
+        }
+        out.win.seconds = +(f / 60).toFixed(1);
+        out.win.recon = w.reconciled.slice();
+        out.win.seen = seenNow();
+        out.win.core = codex.has(ANOMALIES[0].types[0]);
+        out.win.coreId = ANOMALIES[0].types[0];
+      }
+    }
+
+    // ...and the device record goes back exactly as it was found
+    codex.seen.clear();
+    for (const id of held) codex.seen.add(id);
+    codex.save();
+    out.restored = [...codex.seen].sort().join() === held.slice().sort().join();
+    bare();
+    w.director.update = () => {};
+    return out;
+  });
+
+  const each = r.each;
+  const opened = each.filter((x) => x.opened);
+  const withParts = opened.filter((x) => x.parts > 0);
+  const allMarked = opened.every((x) => x.marks && x.marks.spent && x.marks.dissolved && x.marks.dead);
+  const allSwept = opened.every((x) => x.swept === 0);
+  const noRecon = opened.every((x) => x.recon === 0);
+  check('withdrawing an anomaly records nothing in the glossary, on every one of the roster',
+    // every anomaly on the roster opened and put structure on the field, or
+    // the zero below is a zero about nothing
+    opened.length === r.roster && withParts.length === r.roster
+    && allMarked && allSwept && noRecon
+    // THE CLAIM: the device record did not move for any of them
+    && r.afterWithdrawals.length === 0
+    // ...and the win arm below is what proves this instrument can read a one
+    && r.win.opened && r.win.seen.length > 0,
+    `${opened.length} of ${r.roster} anomalies opened and withdrawn, parts `
+    + `${opened.map((x) => x.parts).join('/')}, all three marks on a real part `
+    + `${allMarked}, swept to empty ${allSwept}, reconciled still 0 ${noRecon}; `
+    + `the glossary gained [${r.afterWithdrawals.join(' ')}] against `
+    + `[${(r.win.seen || []).join(' ')}] for a win of the same anomaly. `
+    + `Device record restored: ${r.restored}`);
+
+  const win = r.win;
+  check('...and a fight that is finished still records the core, through endBoss and not the teardown',
+    win.opened
+    && win.recon.length === 1 && win.recon[0] === 1
+    // the core, which is what the title screen's RECONCILED tile keys on
+    && win.core === true
+    // ...and the structure, which the ARREST recorded by taking it apart
+    && win.seen.length >= 2
+    // the withdrawal of the same anomaly recorded neither
+    && r.afterWithdrawals.length === 0,
+    `ORDINAL driven to its own death in ${win.seconds}s: reconciled `
+    + `[${win.recon.join()}], glossary [${win.seen.join(' ')}], core `
+    + `'${win.coreId}' recorded ${win.core} -- against a withdrawal of the same `
+    + `anomaly leaving [${r.afterWithdrawals.join(' ')}]`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

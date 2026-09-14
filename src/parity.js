@@ -50,7 +50,7 @@ import { ring, ripple, spark, shake, flash, explode } from './fx.js';
 import { audio } from './audio.js';
 import { background } from './background.js';
 import { registerAnomaly, dressOf } from './anomaly.js';
-import { Boss } from './boss.js';
+import { Boss, offField } from './boss.js';
 
 const P = () => CFG.parity;
 
@@ -118,7 +118,15 @@ export class Parity extends Boss {
       for (let k = 0; k < C.panes; k++) {
         const q = this.body('pane', this.hub.x, this.hub.y);
         q.at = (k / (C.panes - 1) - 0.5) * C.paneArc;
-        q.host = h;
+        /*
+         * `q.host = h` stood here and was a DEAD WRITE onto somebody else's
+         * field. `host` is `Enemy`'s -- the body a rider is standing on,
+         * written by `hunt` -- and `Boss.body` makes a pane with `new Enemy`,
+         * so this was build 298's collision shape (a boss module writing its
+         * own meaning onto a field the class already owns) with nothing
+         * reading it back: every one of the nine places PARITY needs a pane's
+         * half reaches it through `h.panes` instead.
+         */
         q.twinIndex = k;
         h.panes.push(q);
       }
@@ -690,7 +698,15 @@ export class Parity extends Boss {
     for (const h of this.halves) {
       h.retired = true;
       if (!world.enemies.includes(h)) world.enemies.push(h);
-      h.dead = true;
+      /*
+       * `offField` and not a bare `dead`, for the reason `Boss.clear` sets
+       * out: the halves are NOT in `Parity.parts()` (that returns the panes
+       * only), so `super.clear` below never reaches them and a teardown was
+       * entering both halves in the glossary. The push above is what puts
+       * them back in `world.enemies` for the sweep to find, which is exactly
+       * what makes the mark necessary here.
+       */
+      offField(h);
     }
     super.clear(world);
   }

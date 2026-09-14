@@ -5547,4 +5547,133 @@ came from before believing the other one covers it.
   of the living is the same fault; a detail string is a DECLARATION and it has
   to be derived like any other.
 
+- **A BOSS TEARDOWN ENTERED THE BOSS IN THE GLOSSARY, AND THE TITLE SCREEN
+  CALLED THAT A RECONCILIATION.** Build 325. `Game.sweep` is
+  `if (!e.dissolved) noteDestroyed(e)` then
+  `if (e.counts && !e.dissolved) registerKill(e)`, and `Boss.clear` -- the
+  door `withdrawBoss`, `endBoss`, `reset()` and `openAperture`'s teardown ALL
+  come through -- wrote a bare `dead = true` on every part, the core and the
+  parked garrison. The TALLY was never at risk and that half is worth
+  recording: structure carries `counts: false`, measured at **0 kills booked**
+  for ORDINAL's 41 parts and TERMINUS's 29, so the hypothesis I opened with was
+  refuted by the first probe. The GLOSSARY was the fault. Measured either way
+  in one container with the record wiped first: a WITHDRAWAL left
+  `world.reconciled` **empty** and the codex holding `ordinal` and `tally`; a
+  WIN left `reconciled: [1]` and the codex holding the same core.
+  Indistinguishable.
+  **One reader made it player-visible.** The title screen's RECONCILED tile is
+  `ANOMALIES.filter((a) => codex.has(a.types[0])).length`, under a docstring
+  reading "having the core in the codex is having taken it apart" -- so it said
+  1 RECONCILED on a device that had abandoned one fight, which is VERBATIM the
+  sentence build 299 wrote that same docstring to stop. 299 moved the tile off
+  any-anomaly-body onto the core; the core had the identical fault one door
+  along. Revert-proved, and the revert is the real scale of it: withdrawing all
+  nine anomalies recorded **NINETEEN ids** -- every core and every piece of
+  structure on the roster, `terminus` included -- and would have read **9
+  RECONCILED**.
+  **The NEW FORM gate was never affected, and checking that first is what kept
+  this a tile fix rather than a panic.** `menu.js` reads
+  `w.reconciled.length`, which is honest run state; `game.js`'s own docstring
+  had already recorded that the run-state answer and the device-level one
+  "is a different number".
+- **THE FIX IS AN IDIOM THIS FILE DID NOT HAVE AND THE REST OF THE GAME DID.**
+  `Game.takeField` marks every body `spent` and `dissolved` "so none of them
+  pays, counts or can be shot on the way out", and `Director.glitchOut` does
+  the same. A boss teardown was the one removal in the game that did neither.
+  `Boss.offField(e)` is that idiom named: `spent` (nothing may shoot it in the
+  frame before the sweep), `dissolved` (the ONE flag `sweep` reads to tell the
+  two deaths apart), `dead`. It deliberately does NOT touch `counts` -- that
+  was never the fault and writing it would be a second claim, which is build
+  234's rule about borrowing a flag for a side effect.
+- **AND THE WIN GOES THROUGH THE SAME `clear`, so the record had to move to
+  `endBoss`.** `endBoss`'s first statement was `w.boss.clear(w)`, so on a win
+  the core's glossary entry came from the teardown too -- marking `dissolved`
+  there and stopping would have taken the win's record away with the
+  withdrawal's. `Game.endBoss` notes the core itself, one line above the
+  clear, because it is the only one of the four callers that means the fight
+  was finished. Measured after: withdrawal records **nothing**, win records
+  `tally`, `digit`, `ordinal` -- identical to before the fix, to the id.
+  The STRUCTURE needed nothing: `Boss.arrest` destroys each part as it snaps
+  it off during the outro, well before `endBoss`, so `tally` is recorded by
+  having been taken apart.
+- **FIVE `clear` OVERRIDES, NOT TWO, AND ONLY ONE OF THEM IS A PRIVATE COPY.**
+  CLAUDE.md said "a death sequence two bosses keep private copies of". Derived
+  instead of restated: `axiom.js`, `dynamo.js`, `parity.js` and `terminus.js`
+  all override `clear` and all four call `super.clear(world)`; **`Ordinal.clear`
+  is the one that reimplements it**, so the mark is written out in exactly two
+  places. And `Parity.parts()` returns the PANES only, so its two halves --
+  which its own `clear` pushes back into `world.enemies` specifically so the
+  sweep will find them -- are not reached by `super.clear` and needed the mark
+  at their own site. A hand-counted number in this log was wrong again; the fix
+  is the same as always, ask the structure.
+- **WHAT MAKES IT ONE RULE RATHER THAN FIVE HOPES IS THE CASE, AND IT SWEEPS
+  THE WHOLE ROSTER.** `regress.mjs` opens and withdraws all `ANOMALIES.length`
+  anomalies and asserts the glossary did not move -- 9 of 9 opened with parts
+  41/23/13/15/3/8/33/6/16 on the field, all three marks read back off a real
+  part, swept to empty, `reconciled` still 0, glossary `[]`. A sixth override
+  that forgets is caught by existing. **The win arm is the zero's liveness
+  proof**: a zero from an instrument that has never read a one means nothing,
+  and that is the same instrument reading three ids on a real 44-second
+  ORDINAL death.
+- **A NEW DEATH-TIME MARK COSTS SPARKS, AND THE ONLY WAY TO KNOW IS TO LOOK.**
+  `sweep`'s `dissolved` branch throws four sparks a body, so a withdrawal now
+  makes **164 particles in one frame** for ORDINAL's 41 parts (measured off
+  `fx.particles.active`, and the pool grew to exactly 164 with nothing
+  evicted). Rendered and looked at: it reads as the frame scattering as the
+  boss is pulled back into its hole, which is what the beat already says --
+  before the fix the frames simply vanished. An improvement rather than a
+  regression, but it was a real change to the picture and the note is here
+  because the next mark of this kind will have the same cost.
+- **`this.ttl` WAS DEAD FOR YEARS UNDER A COMMENT ANNOUNCING IT.** `Enemy`
+  declared `this.ttl = 0` beside "Debris used to expire after 22-30s. **It does
+  not any more**", and the only other reference was its own expiry branch in
+  `Enemy.update` -- the hottest per-body function in the game. Swept the whole
+  tree for a property write, an options key, a quoted string and a destructured
+  name: no writer anywhere, including the boss modules, the debug panel and the
+  suite. Both are gone. **That is the fifth instance of this shape** after
+  `kind: 'works'` (eighteen builds), `large: true` (fifteen types), nine
+  anomaly `cost` fields (fifty-six builds) and CHAFF's four copy fields -- and
+  the first one whose comment states, in as many words, that the mechanism was
+  removed. Build 313's dead-field sweep cannot see it: that sweep walks keys
+  any `ENEMY_TYPE` declares, and this was declared in the CONSTRUCTOR.
+- **...AND `diveT` WAS WORSE THAN `ttl`, BECAUSE IT WAS YOUNGER AND STILL
+  BEING MAINTAINED.** Build 318 found that SHRIKE's dwell clock counted time
+  in the PHASE rather than time in the LANE, wrote `diveHeld` to replace it,
+  and **left the old accumulator running**: one `this.diveT += dt` on
+  `diveOn`'s hot path and three resets at the phase transitions, four
+  maintained writes with **zero readers anywhere in the tree** -- src/,
+  scripts/, index.html, sw.js. Build 318's own comment explaining why the
+  clock was wrong sat eleven lines below it, in the past tense, about a field
+  that was still there. **A field that is only written is dead code wearing
+  state's clothes**, and the tell is the same as always: a name with writers
+  and no supplier on the other side.
+- **A THIRD SHAPE IN THE SAME SWEEP: a boss module writing its own meaning
+  onto a field the class already owns.** `parity.js` did `q.host = h` on every
+  pane it built -- and `host` is `Enemy`'s, the body a rider is standing on,
+  written by `hunt`. `Boss.body` makes a pane with `new Enemy`, so this is
+  build 298's collision shape exactly (`p.loose` on GNOMON's arc pieces, which
+  threw). It was harmless because nothing read a pane's `host` back: all nine
+  places PARITY needs a pane's half reach it through `h.panes`. Deleted, with
+  the reason left at the site. **The rule build 298 stated -- grep a new field
+  name against the boss modules -- runs the other way too**: a boss module
+  owes the same grep against `Enemy`'s own constructor.
+- **`Enemy.host` HAS NO READER IN `src/` AND NOW SAYS SO.** `hunt` re-picks
+  its target from scratch every frame and writes `host` for the record; the
+  only readers in the tree are two arms of `regress.mjs`. Keeping a field for
+  the suite is a real and stated reason -- CLAUDE.md has said so since build
+  220 -- and the correction is that it has to be STATED, at the declaration,
+  or the next dead-field sweep deletes a field the suite needs. Left in place
+  with the note.
+- **THE DEAD-FIELD SWEEP HAS A DOMAIN, AND IT IS THE CONFIG AND NOT THE
+  CLASS.** Build 313's guard walks `Object.keys(t)` over `ENEMY_TYPES` and
+  greps each against `src/` outside config.js -- so it can only ever see a
+  field the CONFIG declares about a body. `ttl`, `diveT` and `host` are
+  declared in the `Enemy` CONSTRUCTOR and are outside its candidate set
+  entirely; the guard was never going to find them and its passing said
+  nothing about them. Two of the three had no reader and one had no reader in
+  `src/`. **Ask what a guard's domain is before reading its green as
+  coverage** -- and the cheap half of the gap is derivable: a field with
+  writers and zero reads is a mechanical sweep over the same source the
+  existing guard already reads.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

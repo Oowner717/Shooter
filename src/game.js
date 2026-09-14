@@ -3545,6 +3545,33 @@ export class Game {
   endBoss() {
     const w = this.world;
     const n = w.bossN || 1;
+    /*
+     * ---- THE WIN RECORDS THE CORE, AND THE TEARDOWN NO LONGER DOES --------
+     *
+     * `Boss.clear` marks everything it takes `offField` now -- `spent`,
+     * `dissolved`, `dead` -- so `Game.sweep` stops entering a boss's own
+     * structure in the glossary. That is right for a WITHDRAWAL and wrong for
+     * a win, and the two go through the same `clear`: measured either way in
+     * one container with the glossary wiped first, a withdrawal left
+     * `reconciled` empty and the codex holding `ordinal`, a win left
+     * `reconciled: [1]` and the codex holding the same core. Indistinguishable
+     * -- which is why the title screen's RECONCILED tile, keyed on
+     * `codex.has(a.types[0])`, read 1 on a device that had never finished a
+     * fight.
+     *
+     * So the win notes the core HERE, one line before the clear that would
+     * otherwise have granted it. It cannot live inside `clear`: `clear` is the
+     * door `withdrawBoss`, `reset()` and `openAperture`'s teardown all come
+     * through as well, and `endBoss` is the only one of the four that means
+     * the fight was finished. `codex.record` is idempotent, so noting a core
+     * the outro already recorded costs nothing.
+     *
+     * The STRUCTURE is unaffected on a win and that is not an accident:
+     * `Boss.arrest` destroys each part as it snaps it off, during the outro
+     * and well before this line, so `tally` is recorded by having been taken
+     * apart rather than by the teardown.
+     */
+    this.noteDestroyed(w.boss.core);
     w.boss.clear(w);
     w.boss = null;
     w.bossStage = 0;
