@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '328';
+export const BUILD = '329';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '328';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '26af230';
+export const REV = 'b964f4e';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -5082,7 +5082,8 @@ export const ENEMY_TYPES = [
      *
      * The bar reaches 1.6r + 0.183r = 53.5 units from the centre, past `r` --
      * so a round can legitimately connect outside the body's own radius, and
-     * `hitReach` is what tells the sweep to look. It is inside MAX_BODY_R 72
+     * `hitReach` is what tells the sweep to look. It is inside `MAX_BODY_R`
+     * -- 72 when this was written, 89.6 since ANVIL took it at build 328 --
      * and inside half the broadphase cell, which check-build asserts.
      */
     id: 'spindle',
@@ -5630,6 +5631,28 @@ export const ENEMY_TYPES = [
      * `plated` guard and 322's `rides` guard applied to a third flag.
      */
     planted: true,
+    /*
+     * FIFTY-SIX IS THE WIDEST BODY IN THE GAME, AND IT MOVED THE GRID.
+     *
+     * Written down at build 329, one build late, because authoring this
+     * number had a consequence nobody looked for. `MAX_BODY_R` takes the
+     * largest `r` over this whole table and, for anything not `fixed`,
+     * multiplies it by what graft can add -- so this 56 counts as
+     * `56 * (1 + MAX_GRAFT_GROW * graft.stack)` = **89.6**, past a fully
+     * grafted BULWARK's 72. `GRID_CELL` is derived from that, so the
+     * broadphase cell went **144 -> 180** for every object in the game.
+     *
+     * Two measured consequences: the ORDINAL hash moved
+     * `1213474222 -> -1334607133` (bisected to this type's presence in
+     * `ENEMY_TYPES` -- 328's code against 327's config hashes identically,
+     * and removing only the wave does not move it back), and a full 57-body
+     * field costs **0.268 -> 0.387 ms an update**, best of five runs of 300.
+     *
+     * The widening is correct and stays -- a grafted anvil really is 89.6, so
+     * a 144 cell would leave real pairs untested. It is the silence that was
+     * wrong, and `check-build` now pins the cell at 180 against this id so
+     * the next radius that moves it has to say so.
+     */
     r: 56,
     hp: 1400,
     /*
@@ -6595,6 +6618,13 @@ export const MAX_BODY_R = Math.max(
    * grid, more pairs tested per body, for every object in the game, on a
    * phone. It also silently changed every fight that was already tuned,
    * which is how it was caught.
+   *
+   * Those two figures are the state of the table when this was written, and
+   * they have since moved by exactly the mechanism they warn about: ANVIL's
+   * r 56 counts at 89.6 and took the cell to 180 at build 328, silently
+   * again, which is why check-build now PINS the cell rather than printing
+   * it. Read 72/144 as history; the live numbers are in `check-build.mjs`
+   * beside the pin, with the hash delta and the timing it cost.
    *
    * A fixed body still has to fit the guarantee, so it counts at its own
    * size -- the cell must be at least twice the largest thing on the field

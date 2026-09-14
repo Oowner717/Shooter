@@ -46,10 +46,15 @@
  * ---- the radius ----
  *
  * 68, against a BULWARK's 45, and no drawn geometry may pass 1.14R. The hard
- * ceiling on the body is 72 -- `GRID_CELL` is twice the largest body in the
- * game and `check-build.mjs` asserts the broadphase covers it -- and the
- * 1.14R footprint is what lets the rig stand in the 169-unit band a 320x568
- * screen leaves between the readout and the machine.
+ * ceiling on the body is HALF THE BROADPHASE CELL, because the rig is an
+ * enemy in `w.enemies` and the grid's guarantee is that a cell holds twice
+ * the largest body -- but the rig's radius is `DUMMY.r` and not a roster
+ * entry, so `MAX_BODY_R` cannot see it and nothing derives the cell from it.
+ * That ceiling was **72** when this was written and is **90** since ANVIL
+ * took the cell 144 -> 180 at build 328; 68 clears both, which is the only
+ * reason this note did not become a bug. The 1.14R footprint is what lets
+ * the rig stand in the 169-unit band a 320x568 screen leaves between the
+ * readout and the machine.
  */
 
 import { CFG } from './config.js';

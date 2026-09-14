@@ -6022,4 +6022,81 @@ came from before believing the other one covers it.
   `.keep` copy is not a backup -- it is in the same container as the thing it
   is backing up.
 
+- **BUILD 329 SHIPS NO GAMEPLAY: IT IS THE READING BUILD 328 OWED.** 328's
+  commit message said no hash reading was needed because the build touched no
+  physics. That was wrong, and the correction belongs here rather than in a
+  footnote: **the ORDINAL hash moved `1213474222` -> `-1334607133`** at 328,
+  and the cause was a radius. 329 attributes it, prices it, judges it and pins
+  it, and moves nothing itself -- re-read at `-1334607133`, to the bit, after
+  the pin and the notes went in, which is the only claim a comments-and-guard
+  build is entitled to make.
+- **`r: 56` IS A GLOBAL EDIT WEARING A LOCAL ONE'S CLOTHES.** `MAX_BODY_R` is
+  the largest `r` in `ENEMY_TYPES`, multiplied for anything not `fixed` by
+  what graft can add, and `GRID_CELL` is `max(96, ceil(2 * MAX_BODY_R))`. So
+  ANVIL's 56 counts as **89.6**, past a fully grafted BULWARK's 72, and the
+  broadphase cell went **144 -> 180 for every object in the game**. Nothing in
+  the diff said "grid"; the widest radius in the table is a load-bearing
+  number and authoring it is not a local decision. `MAX_BODY_R`'s own
+  docstring had already written the warning -- "it also silently changed every
+  fight that was already tuned, which is how it was caught" -- about a
+  previous time.
+- **THE CHANNEL WAS BISECTED, NOT GUESSED, AND THE OBVIOUS SUSPECT WAS
+  INNOCENT.** Two candidate causes, both plausible: 328's edits to
+  `resolvePair` and `drive`, or the config. Served a 327 worktree on :8098
+  beside the live tree on :8099 and swapped files: 328's `physics.js` and
+  `enemies.js` against **327's config gives `1213474222` to the bit**, so the
+  `planted` arithmetic is an identity for every non-planted body -- which is
+  what the code claimed and is now measured. 328's config with **the wave
+  removed still gives `-1334607133`**, so it is the type's presence in
+  `ENEMY_TYPES`, not the roster it joins. Then `MAX_BODY_R` by reading. Three
+  readings settle what any amount of staring at a diff would not.
+  (Bisect-worktree trap, third time: **match the BUILD literal in both
+  `src/config.js` and `index.html` in the served copy**, or the updater
+  reloads the page mid-run and Playwright reports "Execution context was
+  destroyed".)
+- **A WIDER CELL COSTS EVERY OBJECT IN THE GAME, AND THE PRICE IS SMALL BUT
+  WORTH KNOWING.** A full 57-body field: **0.268 -> 0.387 ms an update**, best
+  of five runs of 300 updates each. 1.44x the update cost for 1.56x the cell
+  area, about 2.3% of a 60Hz frame. Measured because "it moved the hash" says
+  nothing about whether it hurt; the answer happens to be no, and the next
+  radius that widens the cell will be judged against this number rather than
+  against a shrug.
+- **THE WIDENING IS CORRECT AND STAYS -- THE SILENCE WAS THE FAULT.** A
+  grafted anvil really does reach 89.6, so a 144 cell would leave real pairs
+  untested, which is a hole in the guarantee the narrow-cell guard exists to
+  make. Nothing about the body is wrong. What was missing is anything that
+  made somebody LOOK, and the distinction matters: the fix for a silent
+  correct change is a pin, not a revert.
+- **A `console.log` IN A GUARD SCRIPT IS NOT A GUARD.** `check-build` printed
+  the cell on every run, 144 for dozens of builds and 180 since 328, in a
+  block of thirty lines of other true statements. A number that only ever
+  gets printed is only ever read by somebody already looking for it.
+  `check-build` now carries `CELL_PIN = 180` and `CELL_BY = 'anvil'` and exits
+  1 on any move, naming the widest body, quoting the hash delta and the
+  0.268 -> 0.387, and telling the author to take the hash either side and move
+  the pin in the same commit. The existing guard refuses a cell too NARROW
+  (`2 * (MAX_BODY_R + STATIC_R)` must fit); it cannot refuse one that is
+  legitimately wider, because wider is arithmetic. **Both halves of a derived
+  global need saying: not too small is correctness, not silently different is
+  everything else.**
+- **THE PIN IS WRITTEN AGAINST THE BODY THAT SETS IT, and that is the part
+  that survives.** `CELL_BY = 'anvil'` and a note on ANVIL's own `r: 56`
+  pointing back at it, so the next person to author a radius past 56, or to
+  delete this type, meets the consequence at both ends instead of reading a
+  bare number. The `plated`/`rides`/`respawn`/`planted` guards all put the
+  refusal on the flag; this puts the price on the field.
+- **AND THE OLD NUMBER WAS STILL WRITTEN DOWN IN THREE PLACES AS THOUGH IT
+  WERE CURRENT, which is the same silence one step further out.** Grepping for
+  what claimed to know the largest body found: `src/dummy.js` stating the
+  practice rig's hard ceiling is **72** (the rig is an enemy in `w.enemies`
+  whose radius is `DUMMY.r` and NOT a roster entry, so `MAX_BODY_R` cannot see
+  it and nothing derives the cell from it -- the ceiling is half the cell, 72
+  when written and **90** now, and `DUMMY.r` 68 clears both, which is the only
+  reason that note did not become a bug); SPINDLE's `hitReach` note quoting
+  "inside MAX_BODY_R 72", where the claim holds and the figure does not; and
+  `MAX_BODY_R`'s own docstring recording FRACTAL's 72 -> 102 and 144 -> 205 in
+  a way that now reads as the live state. All three marked with what they were
+  and when. **A derived number quoted in prose is a copy, and copies go stale
+  in silence -- when one moves, grep for who was quoting it.**
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

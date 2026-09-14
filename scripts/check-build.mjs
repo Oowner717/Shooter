@@ -605,8 +605,59 @@ if (!readFileSync(new URL('../src/game.js', import.meta.url), 'utf8').includes('
   console.error('src/game.js no longer uses GRID_CELL — the grid is sized by something unguarded');
   process.exit(1);
 }
+/*
+ * ---- ...AND THE CELL ITSELF IS PINNED, BECAUSE WIDENING IT IS GLOBAL ----
+ *
+ * Build 329. The guard above refuses a cell that is too NARROW, which is the
+ * correctness half -- and it cannot refuse one that is legitimately wider,
+ * because `GRID_CELL` is derived from `MAX_BODY_R` and a bigger body makes a
+ * bigger cell by arithmetic. So a new type widens the grid for the whole
+ * game, silently, and the only thing that reported it was a `console.log`
+ * nobody was reading.
+ *
+ * That happened at build 328. ANVIL is r 56 and not `fixed`, so it counts at
+ * `56 * (1 + MAX_GRAFT_GROW * graft.stack)` = **89.6** -- the largest body in
+ * the game, against a fully grafted BULWARK's 72 -- and the cell went
+ * **144 -> 180**. Two measured consequences, neither of them intended by that
+ * build:
+ *
+ *   - The ORDINAL hash MOVED, `1213474222` -> `-1334607133`. Bisected rather
+ *     than guessed: 328's physics.js and enemies.js against 327's config.js
+ *     give 1213474222 to the bit, and 328's config.js with the WAVE removed
+ *     still gives -1334607133, so the channel is the type's presence in
+ *     `ENEMY_TYPES` and not the wave (which is what build 318's note already
+ *     said about the wave table). A wider cell tests different pairs in a
+ *     different order, which is what `MAX_BODY_R`'s own docstring warns
+ *     about: "It also silently changed every fight that was already tuned,
+ *     which is how it was caught."
+ *   - A full 57-body field costs **0.268 -> 0.387 ms an update**, best of
+ *     five runs of 300 updates each. That is 1.44x the update cost for 1.56x
+ *     the cell area, and about 2.3% of a 60Hz frame -- small in absolute
+ *     terms and worth knowing before it is paid again.
+ *
+ * The widening is CORRECT and stays: a grafted anvil really can be 89.6, so a
+ * 144 cell would be a hole in the guarantee above. What was missing is
+ * anything that made somebody look. This pin is that: the number is written
+ * down with the body that sets it, so moving it is a deliberate edit with a
+ * reason rather than a side effect of authoring a radius.
+ */
+const CELL_PIN = 180;
+const CELL_BY = 'anvil';
+if (GRID_CELL !== CELL_PIN) {
+  const widest = CFGMOD.ENEMY_TYPES
+    .map((t) => ({ id: t.id, at: t.fixed ? t.r : t.r * (1 + CFGMOD.MAX_GRAFT_GROW * BCFG.graft.stack) }))
+    .sort((a, b) => b.at - a.at)[0];
+  console.error(`broadphase cell is ${GRID_CELL}, pinned at ${CELL_PIN} (set by ${CELL_BY}). `
+    + `The widest body is now ${widest.id} at ${widest.at.toFixed(1)}. A cell change is a `
+    + 'change to which pairs the broadphase tests, so it moves the ORDINAL hash and costs '
+    + 'every object in the game broadphase time -- measured 0.268 -> 0.387 ms an update on a '
+    + 'full field for 144 -> 180. Take the hash before and after, record the delta and its '
+    + 'cause, and move this pin in the same commit.');
+  process.exit(1);
+}
 console.log(`broadphase cell ${GRID_CELL} covers the largest body (${MAX_BODY_R}) and `
-  + `the largest static one (${STATIC_R}); worst pair ${MAX_BODY_R + STATIC_R}, needs ${NEED}`);
+  + `the largest static one (${STATIC_R}); worst pair ${MAX_BODY_R + STATIC_R}, needs ${NEED} `
+  + `-- pinned at ${CELL_PIN}, set by ${CELL_BY}`);
 
 /*
  * ---- A BAR IS A HIT PROFILE, SO ITS REACH HAS TO BE DECLARED ------------
