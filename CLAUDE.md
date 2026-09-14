@@ -5304,5 +5304,22 @@ came from before believing the other one covers it.
   going further than the three that actually failed is a margin-hardening pass
   rather than this build's business -- recorded so the next audit starts from
   the dumps rather than from a blind re-run.
+- **THE PLAN SAID CHAFF "EARNS DEEP ARRAY AND OPEN SIEVE" AND IT IS FALSE, ONE
+  OF THEM BACKWARDS.** Measured after build 323 shipped, three trials each, 3
+  chaff and 3 LURCHERs over 330 frames -- the share of the assist's locked
+  frames spent on a copy: stock 0.305 / 0.322 / 0.333; **DEEP ARRAY** (two
+  levels, reach 400 -> 841) **0.358 / 0.397 / 0.367**, separated with no
+  overlap and in the WRONG direction, because `aimRange` IS the `reach` in
+  `consider`, so doubling it admits more copies along with more bodies;
+  **OPEN SIEVE** 0.269 / 0.322 / 0.273, overlapping stock, because it lifts
+  the `harmless` filter and a copy is not harmless. The ROUND share separates
+  for neither at three trials, so only the frame share is claimed.
+  Two things worth carrying. **A plan row that names a mechanism as
+  load-bearing is a claim, not a design** -- this one says "three of them are
+  load-bearing for other parts of this plan and should not be moved", and the
+  linkage had never been measured. And the two upgrades DO exist, which an
+  earlier note of mine had wrong: they are the level-2 TIER NAMES on
+  `aimrange` (ARRAY) and `driftaim` (SIEVE), not ids -- `grep` for the id and
+  you find nothing, which is how the wrong note got written.
 
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
