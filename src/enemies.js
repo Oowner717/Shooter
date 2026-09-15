@@ -11,7 +11,16 @@ import { shed } from './debris.js';
 import { contactAt } from './physics.js';
 import { ledger } from './ledger.js';
 import { drawDummy, dummyHit } from './dummy.js';
-import { shielded } from './yard.js';
+/*
+ * `wallLine` is for `standHeight` alone: a standing body has to stand BELOW
+ * the yard wall or it is `shielded` and unshootable for ever (build 318's
+ * recorded SHRIKE fault, on a body that does not move). It returns null at
+ * era 1, which is the whole of the era handling. One import statement rather
+ * than a second one beside it, because `bundle.mjs` transforms imports with
+ * one regex per form it has been taught and two imports of the same module
+ * is a form nothing in the tree has ever made it read.
+ */
+import { shielded, wallLine } from './yard.js';
 import { throughMouth, mouthSlots, entryLine, portalBirth, portalDepth, rimUnder } from './portal.js';
 import { ARSENAL } from './arsenal.js';
 
@@ -228,6 +237,7 @@ export function drawSpecimen(ctx, id, r) {
     case 'chaff': drawChaff(ctx, r, 0, 0); break;
     // the glossary shows the FIRST one: a remnant nobody has killed yet
     case 'anvil': drawAnvil(ctx, r, 0, 0); break;
+    case 'kite': drawKite(ctx, r, 0, 0); break;
     case 'remnant': drawRemnant(ctx, r, 0, 0, false); break;
     default: drawShard(ctx, r);
   }
@@ -595,6 +605,18 @@ export class Enemy {
      * the boss modules first, per build 298.
      */
     this.sheetLane = null;
+    /*
+     * Which slot in the standing wall a `standoff` body has claimed -- a
+     * column and a rank, see `standSlotFor`. MINUS ONE rather than zero,
+     * because zero is a legal slot and "has not chosen yet" has to be
+     * distinguishable from "chose the front-left corner", which is
+     * `sheetLane`'s `null` for the same reason. Declared here for the reason
+     * `rollSide`, `sheetLane`, `divePhase` and `fan` are, and grepped
+     * against the boss modules first (build 298's `p.loose` collision, which
+     * took a whole suite run down with no case output at all):
+     * `.standSlot` has no other reader in the tree.
+     */
+    this.standSlot = -1;
     /*
      * A lateral held back until the body is loose. DRIFT is the only thing
      * that uses it: at era 2 it is laid inside the throat, and it used to be
@@ -1140,6 +1162,132 @@ export class Enemy {
     const want = mx + (this.sheetLane - mx) * fold;
     const look = Math.max(S.look * k, Math.abs(want - this.x) / S.slant);
     return [want, Math.min(ty, this.y + look)];
+  }
+
+  /**
+   * STANDOFF: close to a station derived from the machine's own reach, and
+   * hold it, sliding sideways.
+   *
+   * Called from `drive` in the ROUTE's place, the same way `rollOn`,
+   * `diveOn`, `creep` and `spreadOn` are and for the same reason: the whole
+   * gait is WHERE the body is going, and a route's lateral would pull it off
+   * a station whose entire claim is that it is exactly at the edge of what
+   * the assist can reach. Returns the point to steer at, in world units, and
+   * writes `this.cruise` -- which is the half of it that makes it a HOLD
+   * rather than an arrival.
+   *
+   * ---- THE STATION IS DERIVED; SEE `standHeight` -------------------------
+   *
+   * The height is not this method's business and not the type's: it is
+   * `standHeight`, bounded by the portal rim, the yard wall and the grab
+   * band, because the design document's own 420 is 0.326 to 1.366 of the
+   * column depending on the screen and fails four separate ways. What is
+   * here is the slide and the approach.
+   *
+   * ---- AND A WALL, BECAUSE ONE LINE CANNOT HOLD A SWELLED COUNT ----------
+   *
+   * Every body of the type derives the SAME station, and build 301 made a
+   * wave's counts a budget -- so an authored three is 17 bodies at rung 20
+   * and 43 to 57 at rung 35, on a line that holds six and eleven. The
+   * packing rule and what it was and was not measured to fix are in
+   * `CFG.ranks`; the single-body control is in this method's own case and
+   * reads 0.002 units of error, which is what says the controller was never
+   * the question.
+   *
+   * So a body claims a SLOT (a column and a rank) once and holds it, and the
+   * whole wall drifts on ONE phase so no two bodies are ever sent to the
+   * same place. `sway` is then the share of its own cruise the body spends
+   * drifting and the rate is derived from the amplitude, which is the tenth
+   * time this repo has met "a target speed is not a speed" -- from the other
+   * side, because here the number that would have been authored is the one
+   * the body cannot deliver.
+   *
+   * ---- AND THE CRUISE IS THE GAP, WHICH IS WHAT STOPS IT OVERSHOOTING ----
+   *
+   * `drive` blends the velocity toward `dir * cruise`, so a body aimed at a
+   * station at full speed flies through it and oscillates. The cruise is
+   * `max(slide, gap x ease)` capped at the type's own speed: far out the gap
+   * term saturates the cap and the approach is the authored speed, and as
+   * the gap closes the term falls away until the slide is the floor. So it
+   * eases onto the line instead of stopping dead on it, and the floor is
+   * what keeps it sliding once it is there. Both are compensated for
+   * `drive`'s blend against `integrate`'s damping -- "a target speed is not
+   * a speed", now the tenth time in this repo -- because "it holds the edge
+   * of your reach and drifts" is a claim about delivered numbers.
+   *
+   * @param {object} world
+   * @returns {[number, number]} the point to steer at
+   */
+  standOn(world) {
+    const L = lobOf(this.type);
+    const s = world.shooter;
+    /*
+     * ---- THE WALL is `standWall`'s, and it is the only owner -------------
+     *
+     * The drift takes `slide` of the half of what is usable and the columns
+     * take whatever is left, so on a narrow screen the wall gets narrower
+     * rather than the drift getting cut -- a standoff that did not visibly
+     * slide would not be this gait. The ranks stop short of the grab band,
+     * which is the whole of "it never comes closer" once there is more than
+     * one of them.
+     */
+    const { base, pitch, cols, rows, amp, wall } = standWall(world, this);
+    if (this.standSlot < 0) this.standSlot = standSlotFor(world, this, cols * rows);
+    /*
+     * Columns fill CENTRE-OUT rather than left to right, so a wall that is
+     * not full is still centred on the machine. Rendered both ways: filling
+     * from the left, nine bodies of an eleven-column rank sit visibly off to
+     * one side under a machine they are supposed to be standing off from,
+     * which reads as an array being filled rather than as a formation.
+     */
+    const col = midOut(this.standSlot % cols, cols);
+    const row = Math.min(rows - 1, Math.floor(this.standSlot / cols));
+    /*
+     * ---- THE DRIFT IS ONE PHASE FOR THE WHOLE WALL ----------------------
+     *
+     * `world.time` and not a per-body phase, deliberately: every standing
+     * body moves the same way at the same moment, so the wall is rigid and
+     * two bodies can never be told to occupy one place. Given per-body
+     * phases they cross, and a sinusoid spends most of its time near its
+     * turning points, so they would bunch there and the solver would spend
+     * the gait pushing them out of each other.
+     *
+     * And the RATE is derived from the amplitude and the body's own speed
+     * rather than authored -- `sway` is the share of its cruise it spends
+     * drifting, so `omega = sway * speed / amp` makes the peak of the
+     * drift's own speed exactly that share BY CONSTRUCTION. Authored as a
+     * frequency it is the trap this repo has met nine times from the other
+     * side: at 0.55 rad/s over an amplitude of 203 the target point moves
+     * at 72.6 u/s against a body delivering 25.9, so the "slide" would have
+     * been a lag and the amplitude would have been unreachable.
+     */
+    const omega = (this.type.speed * L.sway) / Math.max(1, amp);
+    const home = s.x - wall * 0.5 + col * pitch;
+    const hold = base + row * pitch;
+    const want = home + amp * Math.sin((world.time || 0) * omega);
+    /*
+     * ---- AND THE CRUISE IS THE GAP, WHICH IS WHAT MAKES IT A HOLD -------
+     *
+     * `drive` blends the velocity toward `dir * cruise`, so a body aimed at
+     * a station at full speed flies through it and oscillates. The cruise is
+     * `max(drift, gap x ease)` capped at the type's own speed: far out the
+     * gap term saturates the cap and the approach is the authored speed, and
+     * as the gap closes the term falls away until the drift is the floor. So
+     * it eases onto the line instead of stopping dead on it, and the floor
+     * is what keeps it drifting once it is there.
+     *
+     * Compensated for `drive`'s blend against `integrate`'s damping -- "a
+     * target speed is not a speed", the tenth time in this repo -- because
+     * "it stands at the edge of your reach and drifts" is a claim about
+     * delivered numbers. Measured: 35.2 to 37.2 delivered against an
+     * authored 36, where the uncompensated arithmetic gives 25.9.
+     */
+    const k = Math.max(0.01, this.accel / 100);
+    const comp = (k + CFG.physics.linearDamping) / k;
+    const gap = Math.hypot(want - this.x, hold - this.y);
+    const go = Math.min(this.type.speed, Math.max(this.type.speed * L.sway, gap * L.ease));
+    this.cruise = go * comp;
+    return [want, hold];
   }
 
   /**
@@ -2528,6 +2676,38 @@ export class Enemy {
        * `gait: 'spread'` and would go looking for a column to cover.
        */
       const [px, py] = this.spreadOn(world, ty, d);
+      tx = px;
+      ty = py;
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
+    } else if (!this.staged && this.type.gait === 'standoff' && !this.isDrop) {
+      /*
+       * ---- STANDOFF owns the steering AND the cruise ----------------------
+       *
+       * The arithmetic is in `standOn`; this arm hands over the aim point.
+       * It owns the steering for `dive`'s and `creep`'s reason -- the whole
+       * gait is where the body is going, and a route's fold-in pulls the aim
+       * back onto the machine, which for this object would walk it straight
+       * through the station it exists to hold.
+       *
+       * `!this.staged` is the march in, which every hostile shares. It is
+       * load-bearing here rather than tidy: the station is BELOW the portal
+       * rim by construction, so a body that took the gait inside the throat
+       * would be told to drive DOWN to a place it is already above and would
+       * arrive with no march at all.
+       *
+       * `!this.isDrop` is build 307's and 322's guard. `shed` builds every
+       * mote with `new Enemy(t, ...)` off the parent's type, so a mote off a
+       * kite carries `gait: 'standoff'` -- and a mote is never `staged`, so
+       * without this it would climb to the station and hold it instead of
+       * coming to the machine, which is salvage you can see and cannot have.
+       * Measured as the identity: with the guard, a mote's `standSlot` is
+       * never claimed.
+       */
+      const [px, py] = this.standOn(world);
       tx = px;
       ty = py;
       dx = tx - this.x;
@@ -3993,6 +4173,7 @@ export class Enemy {
       case 'latch': drawLatch(ctx, this.r, this.phase, world.time); break;
       case 'chaff': drawChaff(ctx, this.r, this.phase, world.time); break;
       case 'anvil': drawAnvil(ctx, this.r, this.phase, world.time); break;
+      case 'kite': drawKite(ctx, this.r, this.phase, world.time); break;
       case 'remnant': drawRemnant(ctx, this.r, this.phase, world.time, this.cameBack); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
@@ -6234,6 +6415,73 @@ function drawAnvil(ctx, r, phase, time) {
   }
 }
 
+/**
+ * KITE: a tall diamond on a tether of ticks, rocking on its own line.
+ *
+ * The rock is INTERNAL rather than a world rotation, which is the whole
+ * reason the type carries `upright`: a body that hangs at a station has to
+ * hang the same way up at every moment, and `Enemy.draw` otherwise turns the
+ * picture by `angle` -- `rand(0, TAU)` at spawn with build 211's impact spin
+ * written into `av` on every hit. EMBER's trail and LANTERN's bail were both
+ * shipped pointing wherever the spawn roll left them for four builds (307 to
+ * 310) for exactly that reason.
+ *
+ * The three ticks below it are the tail, and they are what makes the
+ * silhouette this body's own: a diamond alone at r 20 is a chip, and the
+ * roster's other tall narrow bodies (SLIVER's shard, LATCH's hook) are read
+ * off their outline rather than their colour, because a body is mostly its
+ * outline (build 199). They trail on a travelling phase so the thing is
+ * alive on the screen while it does nothing but hold a line -- ANVIL's
+ * rivets, for the same reason and the same two arguments.
+ */
+function drawKite(ctx, r, phase, time) {
+  const lw = ctx.lineWidth;
+  const rock = Math.sin(time * 0.8 + phase) * 0.12;
+  ctx.save();
+  ctx.rotate(rock);
+  // the sail: taller than it is wide, so it reads as hanging
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 1.15);
+  ctx.lineTo(r * 0.78, 0);
+  ctx.lineTo(0, r * 1.15);
+  ctx.lineTo(-r * 0.78, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // the spars
+  ctx.lineWidth = lw * 0.8;
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 1.15);
+  ctx.lineTo(0, r * 1.15);
+  ctx.moveTo(-r * 0.78, 0);
+  ctx.lineTo(r * 0.78, 0);
+  ctx.stroke();
+  ctx.lineWidth = lw;
+  // the hub
+  ctx.beginPath();
+  ctx.arc(0, 0, Math.max(1, r * 0.2), 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  /*
+   * ...and the tail. The alpha is MULTIPLIED IN and PUT BACK rather than
+   * assigned and reset to 1, which is build 210's trap: four separate places
+   * forced it back to 1 on the way out and every body dissolved at full
+   * opacity with the fade written and unread.
+   */
+  const a0 = ctx.globalAlpha;
+  for (let i = 1; i <= 3; i++) {
+    const y = r * (1.15 + i * 0.36);
+    const x = Math.sin(time * 3 - i * 0.8 + phase) * r * 0.3;
+    ctx.globalAlpha = a0 * (1 - i * 0.24);
+    ctx.beginPath();
+    ctx.moveTo(x * 0.5, y - r * 0.36);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = a0;
+  ctx.restore();
+}
+
 function drawRemnant(ctx, r, phase, time, back) {
   const seg = 5;
   const gone = back ? 2 : 0;
@@ -7089,6 +7337,202 @@ export function ownsLink(e) {
  * which is also what makes the rule read as written: each sheet spreads
  * against the sheets that are already covering ground.
  */
+/**
+ * A `standoff` type's own numbers. Mandatory and no default, the rule
+ * `levelsOf`, `bandOf`, `climbOf`, `beadsOf`, `schoolOf`, `barOf`, `ridesOf`,
+ * `respawnOf` and `pairOf` all carry -- and the reason is the live instance of
+ * one fault: `CFG.shrike.hold`/`dwell`/`gate` are read by `diveOn` with no
+ * type indirection, so a second `dive` type wears SHRIKE's numbers in
+ * silence, with no field to set and nothing to fail. A number about the
+ * STATION is derived from world constants and belongs to the gait; the slide
+ * and the throw are this body's character and belong to the type.
+ *
+ * ---- AND THE BLOCK IS NOT CALLED `standoff`, WHICH IS THE POINT ---------
+ *
+ * It was, for one afternoon. `standoff` appears 43 times in `src/` outside
+ * config.js -- `Sandbox.standoff`, `CFG.ordinal.standoff` and a `C.standoff`
+ * in five boss modules -- so build 313's dead-field sweep, which asks whether
+ * a key any type declares appears as `.key` or as a quoted string anywhere in
+ * `src/`, would have passed it whatever read it. That is build 324's `reform`
+ * trap exactly: a field named for something that already exists elsewhere is
+ * a field the one guard against dead fields cannot see. `lob` has zero other
+ * hits in the tree and is the guide's own noun for what this body does.
+ */
+export function lobOf(type) {
+  const S = type && type.lob;
+  const id = type && type.id;
+  if (!S || typeof S !== 'object') throw new Error(`${id}: a standoff type needs a lob block`);
+  // Under a HALF, because the drift and the wall share the usable width: at
+  // a half there is nothing left for the wall and the whole formation is one
+  // column, which is a different object.
+  if (!(S.slide > 0 && S.slide < 0.5)) throw new Error(`${id}: lob.slide ${S.slide} must be a share of the usable width under 0.5`);
+  // Under ONE, because it is a share of the body's own cruise: at one the
+  // body would spend every unit of its speed drifting and have none left to
+  // hold the station with.
+  if (!(S.sway > 0 && S.sway < 1)) throw new Error(`${id}: lob.sway ${S.sway} must be a share of the cruise under 1`);
+  if (!(S.ease > 0)) throw new Error(`${id}: lob.ease ${S.ease} must be positive`);
+  return S;
+}
+
+/**
+ * The whole geometry of a standing wall, derived rather than authored: the
+ * front rank's height, the slot pitch, how many columns and ranks there are,
+ * and the drift's amplitude. ONE owner, because every one of those numbers is
+ * a function of the others -- the height depends on how far out the outermost
+ * column drifts, the rank count depends on the height, and a second
+ * derivation anywhere would be a second source of truth for the same place.
+ *
+ * The design document says "holds 420 units". It cannot: measured across the
+ * three supported viewports and both eras that one number is anything from
+ * 0.326 to 1.366 of the rim-to-mount column, and it fails four separate ways
+ * (above the portal rim at era 1 / 320x568; exactly zero margin against the
+ * unbought assist's reach, because `420 - r` IS `CFG.shooter.aimRange` to the
+ * digit; behind the yard wall at era 2 / 320x568; and, held as a radius, 22%
+ * of era 2's standing room outside `autoTarget`'s cone). The table is in
+ * `CFG`'s own entry for the type.
+ *
+ * That third failure is also the READING: 400 is the stock reach, so the
+ * guide's 420 is "the far edge of what the assist can reach, plus the body's
+ * radius" -- the derivation already, evaluated at era 1 and written down as a
+ * distance. So that is what this returns, bounded by the three rules that
+ * already say where a body may not stand:
+ *
+ *   want  = on the circle of radius (stock reach - r) about the machine, at
+ *           the lateral offset the outermost body actually reaches
+ *   floor = the rim, and the yard wall at era 2, each plus a radius and a pad
+ *   ceil  = clear of the grab band, so it can never take hold of the machine
+ *
+ * The reach is `CFG.shooter.aimRange` and NOT `world.up.aimRange` on purpose
+ * -- the station is a property of the field, not of what this run happens to
+ * have bought, or the object would move every time ARRAY was bought. And a
+ * station taken on the reach CIRCLE is cone-safe by construction, because the
+ * cone's own limit is an angle and the circle is inside it at every offset
+ * the wall reaches: measured, the worst cell leaves the outermost body 5.4x
+ * inside the cone's half width.
+ */
+export function standWall(world, e) {
+  const s = world.shooter;
+  const L = lobOf(e.type);
+  const pad = 6;
+  const rim = entryLine(world, ENTRY_Y);
+  const reach = CFG.shooter.aimRange;
+  const wallY = wallLine(world);
+  const pitch = 2 * e.r + CFG.ranks.clear;
+  const side = e.r + CFG.physics.edgeEase;
+  const usable = Math.max(pitch, world.width - 2 * side);
+  /*
+   * ---- AND THE WALL MAY NOT SUBTEND MORE THAN 45 DEGREES ---------------
+   *
+   * `spanMax` bounds how far off the machine's column the outermost body may
+   * drift, at `(reach - r) / sqrt(2)`. Without it a wide enough field makes
+   * `dxMax` exceed the reach radius outright, `span` goes to zero, and the
+   * station collapses onto the CEILING -- one rank sitting on the grab band,
+   * which is the object inverted and would fail in total silence. Bounded, a
+   * wide field narrows the WALL instead, which is the failure mode you want.
+   *
+   * It cannot bite on any supported viewport: `dxMax` measures 108 to 363
+   * against a `spanMax` of 269 (era 1) and 421 (era 2), so all six cells are
+   * unchanged to the digit. It bites past a field of about 1471 world units,
+   * which is roughly a 592-point screen at era 2 -- wider than any phone and
+   * well inside what a tablet would hand over. 45 degrees also keeps every
+   * body inside `autoTarget`'s +-80.2, by half again.
+   */
+  const spanMax = (reach - e.r) * Math.SQRT1_2;
+  const amp = Math.min(L.slide * usable * 0.5, spanMax);
+  const room = Math.max(pitch, Math.min(usable - 2 * amp, 2 * (spanMax - amp) + pitch));
+  const cols = Math.max(1, Math.floor(room / pitch));
+  const wall = (cols - 1) * pitch;
+  /*
+   * `dxMax` is how far off the machine's column the OUTERMOST body gets at
+   * the extreme of the drift, and the height is taken on the circle of
+   * radius `reach - r` about the machine at exactly that offset -- so every
+   * body of the wall is inside the stock reach at every moment of the drift,
+   * rather than only the one directly above the mount.
+   *
+   * That was the fault in the first version, which took the height straight
+   * down the machine's own column: measured at era 2 with a single body, the
+   * reach margin at the station read **4.8 units** instead of the 40 the
+   * derivation promises, because the body had drifted 92 units sideways and
+   * `autoTarget` measures a RANGE. At the wall's outer column it would have
+   * been outside the stock reach altogether. The guide's own words for this
+   * gait are "closes to its own RANGE and holds it".
+   */
+  const dxMax = wall * 0.5 + amp;
+  const span = Math.max(0, (reach - e.r) * (reach - e.r) - dxMax * dxMax);
+  const want = s.y - Math.sqrt(span);
+  let floor = rim + e.r + pad;
+  if (wallY !== null && wallY !== undefined) floor = Math.max(floor, wallY + e.r + pad);
+  const grab = e.r + s.r + CFG.shooter.grabPad;
+  const ceil = s.y - (grab + pad);
+  const base = Math.max(floor, Math.min(ceil, want));
+  const rows = Math.max(1, Math.floor((s.y - base - grab) / pitch));
+  return { base, pitch, cols, rows, amp, wall, usable, rim, floor, ceil, want, dxMax, spanMax };
+}
+
+/**
+ * The front rank's height alone, which is what every claim about the station
+ * is stated against.
+ *
+ * ITS ONLY READERS ARE IN `regress.mjs`, and that is a stated reason rather
+ * than an accident -- CLAUDE.md has held since build 220 that exporting for
+ * the suite is legitimate and that it has to be SAID, or the next dead-code
+ * sweep deletes a symbol the cases need. Nothing in `src/` calls it: the
+ * gait and the guards both want the whole geometry and take `standWall`,
+ * which has ONE owner for exactly that reason.
+ */
+export function standHeight(world, e) {
+  return standWall(world, e).base;
+}
+
+/**
+ * The lowest free slot in the standing wall, claimed once and held.
+ *
+ * `sheetLaneFor`'s shape -- a search over the bodies that have already
+ * chosen, run on the first loose frame and never again -- and for its
+ * reasons: re-running it every frame would let a body chase the holes its
+ * dying siblings leave, and a body still in the throat has not chosen
+ * anything, so it is not standing anywhere and is not counted.
+ *
+ * Only bodies of the SAME TYPE are counted. Two standoff types would want
+ * different pitches and different stations, so one wall of each is the
+ * honest reading; a shared wall would pack a 20-unit body against a
+ * 56-unit one's pitch.
+ *
+ * Holes are left where they fall. A body that dies out of the middle of the
+ * wall leaves its slot free and the next arrival takes it, which is the only
+ * behaviour that needs no roster -- the rule FILAMENT's promotion and SHOAL's
+ * serial both turn on, because nothing owns the wall and nothing has to prune
+ * it (build 310; tessera.js's 53 entries for 15 berths is why it matters).
+ */
+/**
+ * The nth column of a rank counted outward from the middle: 0 is the centre,
+ * then alternately left and right. A permutation of `0..n-1`, so every
+ * column is still reachable and no two indices share one.
+ */
+function midOut(i, n) {
+  const mid = (n - 1) / 2;
+  const k = Math.floor((i + 1) / 2);
+  return Math.round(mid + (i % 2 ? -k : k));
+}
+
+// Not exported: its only caller is `standOn`, in this file. A redundant
+// export hides dead code from the sweep that would find it -- thirteen
+// symbols in build 220 were exported with no consumer and one of them had no
+// caller at all.
+function standSlotFor(world, e, slots) {
+  const taken = new Set();
+  for (const o of world.enemies) {
+    if (o === e || o.dead || o.isDrop) continue;
+    if (o.type !== e.type || o.standSlot < 0) continue;
+    taken.add(o.standSlot);
+  }
+  const n = Math.max(1, slots);
+  for (let i = 0; i < n; i++) if (!taken.has(i)) return i;
+  // More bodies than the wall has room for: stack on the back rank rather
+  // than refusing, so the count the budget asked for still arrives.
+  return n - 1;
+}
+
 export function sheetLaneFor(world, e) {
   const mx = world.shooter.x;
   const pad = e.r + CFG.physics.edgeEase;
@@ -9698,12 +10142,18 @@ const FACES_TRAVEL = new Set(['flock', 'dive']);
  * clock a spawn roll. It overwrites `cruise` from the type rather than
  * scaling what the constructor rolled, for the same reason.
  *
+ * `standoff` is the third, and it is the worst of them to leave in: it
+ * writes `this.cruise` every frame from `max(slide, gap x ease)`, so a
+ * dawdle would scale BOTH the approach and the delivered slide -- an object
+ * whose whole claim is that it stands at a derived distance and drifts,
+ * drifting at 0.55 of that on the one body in ten that rolls a `loiter`.
+ *
  * `roll` and `flock` also replace the route's STEERING and still inherit its
  * dawdle. That is left alone deliberately -- neither authors a speed, so for
  * them the modifier is just a slower approach, and changing it is a balance
  * decision rather than a correctness one.
  */
-const OWN_SPEED = new Set(['dive', 'creep']);
+const OWN_SPEED = new Set(['dive', 'creep', 'standoff']);
 
 /**
  * How many bodies a chain is, and there is no default.

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '334';
+export const BUILD = '335';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '334';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '969693c';
+export const REV = '3c568fc';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1739,6 +1739,64 @@ export const CFG = {
     slant: 0.87, // lateral per unit of depth while crossing to its lane
     look: 150, // ...and how far ahead it aims once it is on it
     lanes: 7, // candidate columns, odd so the machine's own is one of them
+  },
+
+  /*
+   * ---- STANDOFF: the RANKS, which is the gait's and not any type's -------
+   *
+   * The station's HEIGHT is `standHeight` and is derived from the machine's
+   * own reach; the slide and the throw are the type's (`lob`). What is left
+   * is how a standing crowd is PACKED, and that is neither -- it is one rule
+   * for any type that holds a line, so it lives here.
+   *
+   * ---- ONE LINE CANNOT HOLD A SWELLED COUNT ------------------------------
+   *
+   * Build 301 made a wave's counts a BUDGET, so an authored three is 17
+   * bodies at rung 20 and 43 to 57 at rung 35 -- and every body of a type
+   * derives the SAME station. A line 264 units wide holds six 40-wide
+   * bodies. So a standing body takes a SLOT -- a column and a RANK --
+   * claimed once on its first loose frame and held. Rank 0 is the derived
+   * station and each rank behind it stands `2r + clear` closer, which is
+   * `chainGap`'s form and `mouthSlots`' pitch (the same shape, deliberately
+   * not the same constant -- build 310). The front rank holds the edge of
+   * what the assist can reach and the ranks behind it stand closer, so they
+   * are easier, which gives the player an order to clear them in.
+   *
+   * ---- AND THE MOTIVATION IN THIS DOCSTRING WAS MEASURED AGAINST A
+   * ---- STATION THAT NO LONGER EXISTS, WHICH IS WORTH RECORDING -----------
+   *
+   * It said, with a table, that without ranks the excess piles DOWN onto the
+   * machine: `|y - station|` 97 to 181 mean and the worst body PAST the
+   * mount at era 1. That was true, and it was measured against the FIRST
+   * station, which ran straight down the machine's own column. Correcting
+   * the station onto the reach CIRCLE (see `standWall`) moved it 102 units
+   * further out -- and re-measured with ranks against one rank, same field,
+   * same count, rungs 29/32/35:
+   *
+   *   ranks     grip 0  deepest 202-358 clear of the grab band
+   *   one rank  grip 0  deepest 290-327 clear
+   *
+   * **Neither piles onto the machine any more.** So the ranks are NOT what
+   * keeps this object's promise at the rungs its wave is played on; the
+   * station is, and `standWall`'s own bound on the rank count is the belt.
+   * What the ranks still do is real and smaller: the allocator needs a slot
+   * space wider than one rank, or every body past the eleventh is sent to a
+   * place another body already holds; and the crowd comes out wider and
+   * shallower (y spread 148-219 against 182-259, overlaps per body 0.94-1.77
+   * against 1.82-2.22), so it reads as a line rather than a knot. Rendered
+   * both ways at thirty bodies, the difference is visible and modest.
+   *
+   * Recorded rather than quietly rewritten, because the fix for the fault
+   * this docstring described is the one that made the docstring wrong, and
+   * that is exactly the shape this repo keeps paying for.
+   *
+   * `clear` is the gap between two standing bodies' surfaces. It has to
+   * exceed nothing in particular -- `resolvePair` parks two touching bodies
+   * at `2r - slop` -- but a rank packed at exactly `2r` is a rank the solver
+   * is always correcting, and the drift would then read as a shuffle.
+   */
+  ranks: {
+    clear: 8, // gap between two standing bodies, on both axes
   },
 
   /*
@@ -5338,6 +5396,174 @@ export const ENEMY_TYPES = [
   },
   {
     /*
+     * ---- KITE: it will not come to you ---------------------------------
+     *
+     * Phase 6r, band 5, the eighteenth object to ship. It closes to a station
+     * and holds it, sliding sideways, and never comes closer. The bolt it
+     * throws from there is build 336; what this build is, is the STATION --
+     * because the design document's own number for it does not survive
+     * contact with the field, and the derivation that replaces it is the
+     * whole of why the object is fair.
+     *
+     * ---- THE AUTHORED 420 IS NOT A DISTANCE, IT IS ONE ERA'S ANSWER ------
+     *
+     * `docs/objects.html` says "holds 420 units and never comes closer".
+     * Measured across the three supported viewports and both eras -- mount,
+     * rim and column read off the running game rather than derived on paper:
+     *
+     *   era vp        mount    rim    col   wall  stock  y@420  420/col
+     *   1   320x568   567.4    260  307.4      -    400  147.4   1.366
+     *   2   320x568     873    400    473  561.5  615.4    453   0.888
+     *   1   390x844  1012.6    260  752.6      -    400  592.6   0.558
+     *   2   390x844  1557.8    400 1157.8  561.5  615.4 1137.8   0.363
+     *   1   414x896  1096.5    260  836.5      -    400  676.5   0.502
+     *   2   414x896  1686.8    400 1286.8  561.5  615.4 1266.8   0.326
+     *
+     * One number, and it means anything from a third of the column to 1.37
+     * OF IT -- a 4.2x spread, with four independent failure modes:
+     *
+     *  - era 1 at 320x568 the station is **112.6 units above the portal
+     *    rim** (rim 260 against a station at 147.4), so the body would drive
+     *    back up toward a place it cannot
+     *    legally stand and nothing would remove it: the only gone-above-the-
+     *    rim path in the game is `rise`'s, and it is gait-specific.
+     *  - `420 - r` is **400.00, which is `CFG.shooter.aimRange` exactly**, so
+     *    at era 1 the margin against the unbought assist's reach is ZERO on
+     *    every viewport, to the digit. Any outward slide puts it out of reach
+     *    for ever.
+     *  - era 2 at 320x568 it is **behind the yard wall** -- centre 88.5
+     *    above the line and LEADING EDGE 68.5, and the edge is the figure
+     *    that matters because `shielded` tests `e.y + e.r` -- where
+     *    `shielded` refuses every damage path the player owns -- build 318's
+     *    recorded SHRIKE fault, on a body that stands still.
+     *  - and held as a RADIUS rather than a HEIGHT, 22% of era 2's standing
+     *    room is permanently outside `autoTarget`'s cone. A height is
+     *    cone-safe by a factor of 5.8 at every viewport, because the cone
+     *    admits `|dx| <= h * tan(80.2 deg)`.
+     *
+     * **That third figure is also the reading of the whole number.** 400 is
+     * the stock reach, so the guide's 420 IS "the far edge of what the assist
+     * can reach, plus the body's own radius" -- the derivation already,
+     * evaluated at era 1 and written down as a distance. So the station is
+     * derived from the reach (see `standHeight`), which makes the object's
+     * fairness a theorem rather than a tuning: it stands exactly as far out
+     * as an UNBOUGHT assist can still see it, at every viewport and both
+     * eras, and never above the rim, never behind the wall and never inside
+     * the grab band. Same idiom as `roll` taking its turn from `edgeEase`,
+     * `dive` its lane from `grabPad` and `spread` its band from `edgeEase`:
+     * before adding a rule about where a body may stand, use the ones that
+     * already say where it may not.
+     */
+    id: 'kite',
+    opens: 0,
+    name: 'KITE',
+    shape: 'kite',
+    gait: 'standoff',
+    r: 20,
+    hp: 130,
+    density: 0.55,
+    speed: 36,
+    accel: 140,
+    restitution: 0.4,
+    /*
+     * Nearly none. `wobble` is the clumsy heading wander `drive` adds around
+     * the true bearing, and this body's whole claim is that it HOLDS a line
+     * -- a station that wanders is a station whose distance is a spawn roll,
+     * which is what SHRIKE's corridor paid for at build 318.
+     */
+    wobble: 0.05,
+    armor: 0,
+    /*
+     * The picture is oriented to the WORLD, not to the body's own travel: a
+     * thing that hangs at a station hangs the same way up whichever way it
+     * happens to be drifting, and the rock is internal to `drawKite`. Note
+     * `upright` means exactly "the drawing ignores `angle`" and, from build
+     * 330, also pins `angle` and `av` -- so build 211's impact spin cannot
+     * quietly accumulate on a body whose picture never shows it.
+     */
+    upright: true,
+    /*
+     * ---- AND THE NUMBERS THAT ARE THE BODY'S, NOT THE GAIT'S -------------
+     *
+     * The station itself is derived from world constants and so belongs to
+     * the gait; the SLIDE is this body's character and belongs here. That
+     * split is the sixth instance of a fault this repo has recorded five
+     * times (`plated` reading CFG.flint, `ride` CFG.graft, `respawn`,
+     * `planted`, `bar` CFG.cartwheel, `bond` CFG.yoke) -- and the live one
+     * is `CFG.shrike.hold`/`dwell`/`gate`, which `diveOn` reads with no type
+     * indirection, so a second `dive` type would wear SHRIKE's numbers in
+     * silence. `standoffOf` throws for a type that declares none.
+     *
+     *   slide -- the drift's amplitude, as a share of HALF the width the
+     *            field leaves between `edgeEase`'s two bands, so it is the
+     *            same share of the screen at every viewport and both eras
+     *            (the field measures 516 to 668 wide at era 1 and 794 to
+     *            1027 at era 2). The COLUMNS take what is left, which is why
+     *            `lobOf` refuses a half or more: at a half there is no wall.
+     *            Measured at 0.25, the drift is 36 to 99 units and the wall
+     *            is 4 to 12 columns.
+     *   sway  -- the share of its own cruise it spends drifting. A SHARE and
+     *            not a frequency, and that is the only form that cannot
+     *            outrun the body: authored as radians a second of a sinusoid
+     *            the body chases, the target point's own peak speed is
+     *            `slide * halfUsable * sway`, which at the first draft's
+     *            0.42 and 0.55 is **72.6 u/s against a delivered 25.9** --
+     *            so the station would have been permanently somewhere the
+     *            body could not get to and the "drift" would have read as a
+     *            lag. `standOn` derives the rate from the amplitude instead.
+     *   ease  -- how hard it holds the station: the share of the gap it
+     *            closes a second, so the approach reads as arriving rather
+     *            than as stopping dead. `check-build` asserts the settling
+     *            distance it implies (`speed * sway / ease`, 7.6 units) is
+     *            well inside the body, or the thing parks off its own slot
+     *
+     * And the block is NOT called `standoff`: see `lobOf`, which explains why
+     * -- 43 hits of that word in `src/` outside this file make it a field the
+     * dead-field sweep cannot see.
+     */
+    lob: { slide: 0.25, sway: 0.34, ease: 1.6 },
+    /*
+     * ---- THE GUIDE'S FAMILY HEX IS BLOOM'S, AT dE 0.00 ------------------
+     *
+     * `docs/objects.html` gives the volatile family `#ff5d8f`, and for one
+     * afternoon this type wore it under a comment saying "this is the first
+     * body to wear it, so there is no collision to answer yet". That comment
+     * was FALSE, and the mistake in it is worth more than the colour: it
+     * checked the GUIDE's family roster (MIRE, KITE) instead of the LIVE
+     * one. `#ff5d8f` is BLOOM's body colour and `#ff2d6f` is BLOOM's glow,
+     * byte-identical, and BLOOM is a loose hostile in five waves -- four in
+     * band 3 and one in band 4. `bandsFor` returns `[hi - 1, hi]`, so every
+     * rung from 29 up draws bands 4 and 5 together and the two would be on
+     * the field at once. It is also the AMMUNITION branch root in the tree
+     * and BLOOM BLAST's own row in the ledger, so the hue is spoken for
+     * three times over. Nothing in `check-build` tests uniqueness -- the
+     * colour guard is grey-means-harmless plus a chroma floor, and 0.635
+     * passes it -- so this would have shipped in silence.
+     *
+     * Swept the rose band against all 120 roster tones and all 556 distinct
+     * hex literals in the tree, on a dE76 instrument validated first against
+     * five figures recorded in CLAUDE.md (0.62 against 0.6, 29.12 against
+     * 29.1, 11.76 against 11.8, 14.82 against 14.8, 36.60 against 36.6).
+     * `#fa003a` is **40.4 from BLOOM's body**, 26.6 from its glow, and has
+     * NOTHING within 12 of it anywhere in the tree. Its nearest tone of any
+     * kind is TERMINUS's glow at 16.0, and that is a boss -- an aperture
+     * clears the loose field on the way in, so the two are never on the
+     * screen together, which is VEIL's own precedent (DYNAMO's glow at 3.0).
+     * Luminance 0.206, between VEIL's 0.180 and LATCH's 0.265, because a
+     * body reads almost entirely as its outline (build 199) and the
+     * better-separated pure reds are too dark to draw a 20-unit one in.
+     * Body-to-glow is 19.6, mid-range for the roster's 10 to 25.
+     *
+     * Build 322's rule, applied rather than quoted: before accepting a
+     * dE-0.00 collision, ask whether the family has room. Here it does.
+     */
+    color: '#fa003a',
+    glow: '#c4002e',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 4, // energy it leaves when it comes apart
+  },
+  {
+    /*
      * SPINDLE: the only body in this game that is not a circle to a round.
      *
      * A bar 96 long and 11 thick, turning end over end at two thirds of a
@@ -7260,6 +7486,35 @@ export const WAVES = [
   { of: [['loom', 3], ['lurcher', 2]], band: 5 },
 
   /*
+   * ...and the KITE wave.
+   *
+   * The partner is a BULWARK and the third body is a MOTE, and all three are
+   * doing different jobs. The BULWARK is the combination: 676 of health
+   * behind 0.4 of armour is fifteen seconds of barrel at close range, and
+   * the whole of KITE is that it will not come and be shot while you are
+   * busy. The MOTE is there so the difference is on the screen at once --
+   * one round and it is gone, because it came to you.
+   *
+   * Three kites, a BULWARK and a MOTE weighs 36.567 against band 5's own
+   * mean of 36.2857, a ratio of 1.0077 -- the closest to a band's mean any
+   * of the nineteen has been authored at, and it re-prices the band by
+   * **+0.052%**. Build 315's lever: a wave at its band's mean adds a problem
+   * without lengthening every other wave in that band. The counts were
+   * chosen by measuring the alternatives rather than by eye -- four kites
+   * and a BULWARK is 1.0987 and moves the band +0.66%, three and two
+   * LURCHERs is 0.6982 and moves it -2.01%.
+   *
+   * And `threatOf` prices a kite at 4.333 -- its 130 of health over
+   * `threatPerHp` and nothing else. It cannot see that the body stands where
+   * an unbought assist can only just reach it, which is the same blind spot
+   * it has for FLINT's armour, for what a LATCH gives its host, for what
+   * CHAFF costs the assist and for what LOOM's thread costs a round. Five
+   * instances now; weighting threat by anything but health re-prices every
+   * band in the game and belongs in a pacing pass.
+   */
+  { of: [['kite', 3], ['bulwark', 1], ['mote', 1]], band: 5 },
+
+  /*
    * ...and the LATCH wave, which closes band 3.
    *
    * Three latches and two BLOOMs weighs 20.47 against band 3's own mean of
@@ -7431,6 +7686,7 @@ export const GAITS = {
   hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',
   creep: 'the straight line and nothing else: no lane, no wobble, and no impulse in the game turns it',
   spread: 'goes wide before it comes down, taking the emptiest lane it can find -- it is covering ground, not coming for you',
+  standoff: 'closes to the far edge of what the assist can reach and holds it, sliding sideways -- it will not come to you',
 };
 
 export const TYPE_BY_ID = Object.fromEntries(ENEMY_TYPES.map((t) => [t.id, t]));

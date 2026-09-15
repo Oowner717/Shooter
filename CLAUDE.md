@@ -6957,3 +6957,220 @@ came from before believing the other one covers it.
   `burn === 'crowd' ? ON_CROWD : ON_GLITCH`, a two-way ternary, so **a third
   cause would silently be captioned "clear the turret"** -- which is exactly
   the fault build 293 wrote `burnFrom` to fix.
+
+- **KITE IS IN FROM BUILD 335, AND WHAT SHIPS IS THE STATION: THE BOLT IS
+  336.** Phase 6r, band 5, the eighteenth object of the nineteen. It closes
+  to a station derived from the machine's own reach and holds it, drifting
+  sideways in ranks, and never comes closer. One to go -- MIRE, which
+  `docs/objects.html` itself says wants a re-spec before it is built.
+- **THE GUIDE'S 420 IS NOT A DISTANCE, IT IS ONE ERA'S ANSWER TO A
+  DERIVATION, AND IT FAILS FOUR WAYS.** "Holds 420 units and never comes
+  closer" is 0.326 to 1.366 of the rim-to-mount column depending on the
+  screen and the era -- a 4.2x spread in what one sentence means. Measured
+  off the running game at all six cells: at 320x568 era 1 the station is
+  **112.6 units ABOVE the portal rim**, so the body drives back up to a place
+  it cannot legally stand and nothing removes it (`rise`'s gone-above check
+  is gait-specific); at 320x568 era 2 its leading edge is **68.5 units behind
+  the yard wall**, where `shielded` refuses every damage path the player owns
+  -- build 318's recorded SHRIKE fault on a body that does not move; and
+  **`420 - r` is 400.00, which is `CFG.shooter.aimRange` to the digit**, so at
+  era 1 the margin against an unbought assist's reach is ZERO on every
+  viewport. That last one is also the READING of the whole number: 420 is
+  "the far edge of what the assist can reach, plus the body's radius" -- the
+  derivation already, evaluated at era 1 and written down as a distance. So
+  the station is derived (`standWall`), and the object's fairness is then a
+  theorem rather than a tuning: measured, the reach margin is exactly **two
+  radii** in the four cells where the reach binds, and the floor binds in the
+  other two.
+- **...AND A CLAIM ABOUT A RANGE CANNOT BE DERIVED AS A HEIGHT.** The first
+  version took the station straight down the machine's own column, which is
+  right for one body directly above the mount and wrong for every other
+  moment: `autoTarget` measures `hypot(dx, dy) - r`, and the body DRIFTS.
+  Measured with a single body at era 2, the reach margin at the station read
+  **4.8 units** instead of the 40 the derivation promises, and at the wall's
+  outer column it would have been outside the stock reach altogether. It is
+  taken on the CIRCLE of radius `reach - r` at `dxMax` -- the lateral offset
+  the outermost body actually reaches at the extreme of the drift -- so every
+  body is inside the stock reach at every moment. The guide's own words for
+  the gait are "closes to its own RANGE and holds it"; the noun was the
+  specification. **Proved by revert: restoring the straight-down version
+  fails two of the case's five arms.**
+- **A SINUSOID THE BODY CHASES IS A STATION THE BODY CANNOT REACH.** The
+  slide was first authored as `sway` radians a second across an amplitude of
+  `slide * halfWidth`: 0.42 x 314 x 0.55 is a target point moving at **72.6
+  u/s against a body delivering 25.9**, so the "slide" would have been a lag
+  and the amplitude unreachable. `sway` is a SHARE OF THE BODY'S OWN CRUISE
+  now and the rate is derived from the amplitude (`omega = sway * speed /
+  amp`), which makes the peak of the drift's own speed exactly that share by
+  construction. That is "a target speed is not a speed" from the other side:
+  ten times this repo has grossed up a number the body under-delivers, and
+  this is the first time the authored number was one the body could not
+  deliver at all. The approach itself IS compensated and measured **35.2 to
+  37.2 delivered against an authored 36**, where the uncompensated arithmetic
+  gives 25.9 -- the rule being already in the file is why that was right on
+  the first run.
+- **THE RANKS WERE JUSTIFIED AGAINST A STATION THAT NO LONGER EXISTS, AND
+  THAT IS THE MOST GENERAL THING THIS BUILD FOUND.** Every body of a type
+  derives the same station and build 301 made a wave's counts a budget, so an
+  authored three is 17 bodies at rung 20 and 43 to 57 at rung 35 on a line
+  that holds six. Measured, the excess went where `resolvePair` could put it
+  -- DOWN, onto the machine, `|y - station|` 97 to 181 mean and the worst body
+  PAST the mount -- so a standing body takes a SLOT, a column and a rank, and
+  `CFG.ranks` was written with that table in its docstring. Then correcting
+  the station onto the reach circle moved it 102 units further out, and
+  **re-measured, ranks against one rank at rungs 29/32/35, neither piles onto
+  the machine any more**: grip 0 either way, deepest 202-358 clear against
+  290-327. The ranks are still worth having for smaller and different reasons
+  (the allocator needs a slot space wider than one rank, or every body past
+  the eleventh is sent to a place another body holds; and the crowd comes out
+  wider and shallower, y spread 148-219 against 182-259) and they are NOT
+  what keeps the promise. **The fix for the fault a docstring describes can
+  be the thing that makes the docstring wrong**, and the docstring then reads
+  as current. Corrected in place with both measurements rather than rewritten.
+- **THE CASE'S ZERO IS ABOUT THE GAIT AND THE CONTROL IS A BULWARK.** With
+  kites alone on the field, over four cells of era and rung: **zero grip
+  frames**, 181 to 358 units of clearance and zero shared slots. With the
+  whole wave: 172 to 11,332 grip frames and the deepest kite past the grab
+  line -- all of it the BULWARK ploughing through the line, which costs the
+  kite (contact bills `impactDamage` both ways) and is physics rather than
+  the gait. A zero from an instrument that has never read a one means
+  nothing; that second arm is what makes the first one a fact.
+- **ONE PRESS CLEARS THE WHOLE STANDING LINE, and it is the counter the codex
+  line names.** KITE is the lightest body in the game (mass 1, tied with a
+  MOTE at half its radius), so a 3000-impulse press leaves it at **713 u/s
+  against a `thrownSpeed` cap of 720** -- the fastest anything can be thrown
+  -- displacing the line 434 units and buying **14 to 16 seconds**, with all
+  six surviving. Time bought, not a kill. The control is an ANVIL at 0.00.
+  PULSE is `essential`, so no purchase and no anomaly can take it.
+- **THE GUIDE'S COUNTER IS STRUCK, for the reason FLINT's was.** "Close the
+  distance: it has no answer to something already inside its range" -- there
+  is no such move. The turret is static with `invMass` 0 and no `hp`, and
+  `CFG.gun.inPlay` has been false since build 289, so the player cannot push
+  up-field at all. What the line names instead is the gun and the REACH (it
+  stands at 90% of what an unbought assist can see, so this is the one body
+  worth buying ARRAY for -- the complement of build 323's finding that DEEP
+  ARRAY makes CHAFF *worse*), the press, and the shove.
+- **THE FAMILY HEX IN THE GUIDE IS BLOOM'S AT dE 0.00, AND MY OWN COMMENT
+  CLAIMING OTHERWISE CHECKED THE WRONG ROSTER.** `docs/objects.html` gives
+  the volatile family `#ff5d8f`; that is BLOOM's body colour and `#ff2d6f` is
+  BLOOM's glow, byte-identical, and BLOOM is a loose hostile in five waves --
+  four band 3, one band 4 -- while `bandsFor` returns `[hi - 1, hi]`, so every
+  rung from 29 up draws bands 4 and 5 together. It is also the AMMUNITION
+  branch root in the tree and BLOOM BLAST's row in the ledger. The type
+  shipped for one afternoon under a comment reading "this is the first body
+  to wear it, so there is no collision to answer yet" -- **false, and the
+  mistake in it is worth more than the colour: it checked the GUIDE's family
+  roster (MIRE, KITE) instead of the LIVE one.** Nothing in `check-build`
+  tests uniqueness (the colour guard is grey-means-harmless plus a chroma
+  floor, and 0.635 passes), so it would have shipped in silence. Swept the
+  rose band against all 120 roster tones and all 556 distinct hex literals in
+  the tree on a dE76 instrument validated first against five figures recorded
+  above: `#fa003a` is **40.4 from BLOOM's body**, 26.6 from its glow, and has
+  nothing within 12 of it anywhere. Build 322's rule applied rather than
+  quoted: before accepting a dE-0.00 collision, ask whether the family has
+  room.
+- **THE TYPE'S BLOCK IS NOT CALLED `standoff`, AND THAT IS BUILD 324's TRAP
+  ONE FIELD ALONG.** It was, for an afternoon. `standoff` appears **43 times
+  in `src/` outside config.js** -- `Sandbox.standoff`, `CFG.ordinal.standoff`
+  and a `C.standoff` in five boss modules -- so build 313's dead-field sweep,
+  which asks whether a key any type declares appears as `.key` or as a quoted
+  string anywhere in `src/`, would have passed it whatever read it. Exactly
+  `reform` colliding with `Boss.reform`. `lob` has zero other hits and is the
+  guide's own noun. That sweep errs toward PASSING by design, so **the shape
+  to avoid is a field name that is also a name anywhere in the tree** -- grep
+  the candidate before declaring it.
+- **THE WALL MAY NOT SUBTEND MORE THAN 45 DEGREES, AND THAT BOUND CANNOT BITE
+  ON A PHONE.** Without it a wide enough field takes `dxMax` past the reach
+  radius, `span` goes to zero and the station collapses onto the CEILING --
+  one rank sitting on the grab band, the object inverted, in total silence.
+  Bounded, a wide field narrows the WALL instead. It bites past a field of
+  about 1471 world units, roughly a 592-point screen at era 2 -- wider than
+  any phone and inside what a tablet hands over -- and all six supported
+  cells are unchanged to the digit (`dxMax` 108 to 363 against a bound of 269
+  and 421). Build 198's rule from the safe side: a threshold no supported
+  device can reach is still worth writing when the device that CAN reach it
+  exists.
+- **THE WAVE IS THE CLOSEST TO A BAND'S OWN MEAN ANY OF THE NINETEEN HAS
+  BEEN.** `[kite 3, bulwark 1, mote 1]` weighs 36.567 against band 5's mean
+  of 36.2857, a ratio of **1.0077**, re-pricing the band by **+0.052%** --
+  build 315's lever, and the counts were chosen by measuring the alternatives
+  (four kites and a BULWARK is 1.0987 and +0.66%; three and two LURCHERs is
+  0.6982 and -2.01%). The BULWARK is the combination -- 676 of health behind
+  0.4 of armour is fifteen seconds of barrel at close range, and the whole of
+  KITE is that it will not come and be shot while you are busy -- and the
+  MOTE is there so the difference is on the screen at once. And `threatOf`
+  prices a kite at 4.333, its health over `threatPerHp` and nothing else: it
+  cannot see that the body stands at the edge of the reach, which is the
+  FIFTH instance of that blind spot after FLINT's armour, LATCH's host,
+  CHAFF's assist and LOOM's thread.
+- **THE CLEAR IS THE LONGEST IN BAND 5 AND STRADDLES THE 120-SECOND CAP.**
+  Fully bought, era 2: 44.8s at rung 29, 40.6s at 32, and **116 to 128s at
+  rung 35** against siblings at 55.7, 61.1 and 88.8 on the same rung. Same
+  shape as REMNANT's wave and for the same reason -- the body's own transit,
+  and `Director.standing` counts a kite until it dies, so the tempo cost is
+  real with nothing being thrown. Band 5 already misses that cap at four of
+  seven rungs on the era-2 field (build 306), so this is a marginal worsening
+  of a documented plateau: **recorded, not tuned**, which is build 304's rule.
+- **`applyDamage` TAKES POSITIONAL ARGUMENTS, AND AN OPTIONS OBJECT BECOMES
+  THE IMPULSE.** `e.applyDamage(w, 1, 0, 0, { impulse: 3000, throwOff: true })`
+  is legal JavaScript: the object lands in `impulse`, the velocity goes NaN,
+  the body is lost for the run and nothing throws. The signature is
+  `(world, dmg, nx, ny, impulse, shred, lever, throwOff, src)`. The tell was
+  a column of `null` in a JSON dump where every other cell had a number --
+  and the one type that read 0.00 was the ANVIL, which is `planted` and skips
+  the impulse block, so the ONE correct cell was the one measuring nothing.
+- **A PROBE THAT RELEASES BODIES ABOVE THE PORTAL SURFACE GETS `entrySpeed`
+  IN FULL AND THEY KILL EACH OTHER.** Six kites laid at `40 - i * 90`, i.e.
+  down to y -410, are all above the surface where `portalDepth <= 0`, so the
+  march multiplier applies whole: they arrived at 2.6x cruise, piled, and
+  **6 of 6 were dead at 50 seconds** -- which reads exactly like the gait
+  being broken. Released at one y, spread in x, the same code stands 6 of 6.
+  The same family as build 192's body spawned 240 units above the floor.
+- **THE READ-ONLY FAN-OUT FOUND BOTH SILENT COLLISIONS AND WAS REVIEWING THE
+  WRONG TREE.** Six lenses plus an adjudicator over committed HEAD, while the
+  type sat uncommitted in the working tree -- so every lens reviewed build 334
+  and the adjudicator had to say so in its first paragraph. It still scored
+  the two things that would have shipped in silence (BLOOM's colour, the
+  `standoff` name) and independently reproduced the station's four failure
+  modes to the decimal. The standing rule held as well: its wall-clearance
+  figure for era 2 at 320x568 was right and one lens's was stale, its
+  candidate-wave threats were computed with an injected `hp` because
+  `threatOf` returns 0 for an unknown id, and its recommended rank
+  justification is the one this build then measured away. **A fan-out's
+  finding is a pointer to the right file; the mechanism is still yours to
+  measure** -- and if the tree it reviewed is not the tree you are shipping,
+  say which is which.
+- **AND A STALE DERIVED FIGURE FOUND ON THE WAY PAST: `yard.js`'s docstring
+  says "the wall stands at 561.5 and the turret at 848.1, so the open field
+  between them is 287 units".** Measured live, the turret is at **873** and
+  the open field is **311.5**: 848.1 is the pre-build-292 figure at
+  `--bar-h: 74`, which is 64 now. The claim the paragraph makes still holds
+  (the boss standoffs are 340-380 and do not fit), so this is a copy going
+  stale rather than a rule breaking -- build 329's rule, and the grep it asks
+  for.
+
+- **`pkill -f` MATCHED ITS OWN SHELL AGAIN, AND THIS TIME THE PATTERN CAME
+  FROM A HEREDOC.** CLAUDE.md has recorded the read-only half (`pgrep -f`
+  matching its own shell) and the destructive half (exit 144) twice. The new
+  way in: the command wrote a probe file with `cat > f <<EOF` whose CONTENT
+  contained the browser's path, so the shell's own `args` contained the
+  pattern -- and the `pkill -9 -f "pw-browsers/chromium"` at the front of the
+  same command killed that shell before the `cat` ran. Exit 1, no output, and
+  the probe file simply did not exist, which reads as the heredoc failing.
+  The same self-match makes `pgrep -cf regress.mjs` answer **1 on a clear
+  machine**. What is safe is a listing that excludes the wrapper:
+  `ps -eo pid,args --no-headers | grep -E PAT | grep -v "bash -c"`, or a
+  pattern that cannot appear in the invoking command.
+- **A NODE RUNNER DRIVING A BROWSER USES ALMOST NO CPU OF ITS OWN, SO `ps`
+  CPU TIME IS NOT A LIVENESS SIGNAL FOR `regress.mjs`.** The work is in the
+  chromium RENDERER; the node process spends the run awaiting CDP round
+  trips. Measured: **0:03 of CPU after eighteen minutes of wall clock on a
+  healthy run**, which I read as a stall and killed -- and the stack it then
+  printed (`page.evaluate: Target page, context or browser has been closed`)
+  was my own kill, not the fault I thought I was diagnosing. It cost a full
+  thirteen-minute re-run. Two signals that are real: the chromium renderer's
+  own CPU, and patience -- the suite writes NOTHING until the end because
+  stdout to a file is block-buffered, so an empty log is the expected state
+  for the whole run. On a loaded box (other probes running alongside) the run
+  stretches well past thirteen minutes, so elapsed time is not a signal
+  either.

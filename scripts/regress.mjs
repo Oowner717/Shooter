@@ -38128,6 +38128,310 @@ if (MINE_LINE) {
     + '50 into the load (was -128 -- shooting the MASS healed the head from 126 to 254)');
 }
 
+/*
+ * ---- KITE: THE STATION IS DERIVED, AND THE DERIVATION IS THE OBJECT -----
+ *
+ * `check-build` holds the arithmetic that needs no world (`lobOf` in both
+ * directions, the settling distance, room for a column inside the
+ * 45-degree bound). What needs a world is the STATION itself, and it is the
+ * whole of why this body is fair: it stands exactly as far out as an
+ * UNBOUGHT assist can still reach it, at every supported viewport and both
+ * eras, never above the portal rim, never behind the yard wall, and never
+ * inside the grab band. The design document's own 420 fails two of those
+ * six cells and has zero margin against the reach in the other four.
+ *
+ * Five arms, and the two controls are what make the absolutes mean
+ * something: the authored 420 measured through the same instrument, and the
+ * same field with a heavy body walking through the wall.
+ */
+{
+  const held = page.viewportSize();
+  const cells = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }, { width: 414, height: 896 }]) {
+    await page.setViewportSize(size);
+    cells.push(...await page.evaluate(async (vp) => {
+      const g = window.__sim;
+      const w = g.world;
+      const E = await import('/src/enemies.js');
+      const { CFG, TYPE_BY_ID } = await import('/src/config.js');
+      const t = TYPE_BY_ID.kite;
+      const rows = [];
+      for (const n of [1, 2]) {
+        // `setEra` refuses the era it is already in and `reset()` writes 1,
+        // so the opposite has to be written first or the switch is a no-op
+        // (build 306).
+        g.restart();
+        w.era = n === 1 ? 2 : 1;
+        g.setEra(n);
+        const G = E.standWall(w, { r: t.r, type: t });
+        const s = w.shooter;
+        const grab = t.r + s.r + CFG.shooter.grabPad;
+        const back = G.base + (G.rows - 1) * G.pitch;
+        const wallY = w.yard ? w.yard.wallY : null;
+        const authored = s.y - (420 - t.r);
+        rows.push({
+          vp, era: w.era, width: +w.width.toFixed(0), base: +G.base.toFixed(0),
+          cols: G.cols, rows: G.rows, amp: +G.amp.toFixed(0), dxMax: +G.dxMax.toFixed(0),
+          // in reach at the WORST lateral offset the wall ever reaches
+          reachMargin: +(CFG.shooter.aimRange - (Math.hypot(G.dxMax, s.y - G.base) - t.r)).toFixed(1),
+          aboveRim: +(G.base - t.r - G.rim).toFixed(1),
+          belowWall: wallY === null ? null : +((G.base + t.r) - wallY).toFixed(1),
+          grabClear: +(s.y - grab - back).toFixed(1),
+          sideClear: +((s.x - G.dxMax) - (t.r + CFG.physics.edgeEase)).toFixed(1),
+          inCone: +(Math.tan(CFG.shooter.aimClamp + 0.04) * (s.y - G.base) / G.dxMax).toFixed(2),
+          // ...and the CONTROL: the authored 420 through the same rules
+          a420: {
+            reach: +(CFG.shooter.aimRange - (Math.hypot(G.dxMax, s.y - authored) - t.r)).toFixed(1),
+            rim: +(authored - t.r - G.rim).toFixed(1),
+            wall: wallY === null ? null : +((authored + t.r) - wallY).toFixed(1),
+          },
+        });
+      }
+      return rows;
+    }, `${size.width}x${size.height}`));
+  }
+  await page.setViewportSize(held);
+
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const E = await import('/src/enemies.js');
+    const { CFG, WAVES, TYPE_BY_ID } = await import('/src/config.js');
+    const t = TYPE_BY_ID.kite;
+    const out = {};
+
+    // `setEra` refuses the era it is already in and `reset()` writes 1, so
+    // the opposite has to be written first or the switch is a no-op (build
+    // 306). Every arm below goes through this.
+    const era = (n) => { g.restart(); w.era = n === 1 ? 2 : 1; g.setEra(n); };
+    const bare = () => {
+      w.director.update = () => {};
+      w.director.traits = [];
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts']) {
+        if (w[k]) w[k].length = 0;
+      }
+      if (w.respawns) w.respawns.length = 0;
+      if (w.attackers) { for (const e of w.attackers) e.attacking = false; w.attackers.clear(); }
+    };
+
+    // ---- 2. one body holds it, and the drift delivers its amplitude ------
+    era(2);
+    bare();
+    {
+      const b = E.release(w, t, w.width * 0.5, 40);
+      const e = Array.isArray(b) ? b[0] : b;
+      let n = 0, sum = 0, worst = 0, peak = 0;
+      const xs = [];
+      for (let f = 0; f < 60 * 150; f++) {
+        g.update(1 / 60);
+        if (e.dead) break;
+        if (!e.staged) {
+          const sp = Math.hypot(e.vx, e.vy);
+          if (f > 60 * 8 && f < 60 * 20) peak = Math.max(peak, sp);
+          if (f > 60 * 40) {
+            const dy = Math.abs(e.y - E.standHeight(w, e));
+            sum += dy; n++; worst = Math.max(worst, dy); xs.push(e.x);
+          }
+        }
+      }
+      const G = E.standWall(w, e);
+      const k = e.accel / 100;
+      out.one = {
+        err: +(sum / Math.max(1, n)).toFixed(3), worst: +worst.toFixed(3),
+        drift: xs.length ? +(Math.max(...xs) - Math.min(...xs)).toFixed(0) : 0,
+        want: +(2 * G.amp).toFixed(0),
+        peak: +peak.toFixed(1), authored: t.speed,
+        naive: +(t.speed * k / (k + CFG.physics.linearDamping)).toFixed(1),
+        slot: e.standSlot, y: +e.y.toFixed(0), base: +G.base.toFixed(0),
+      };
+    }
+
+    // ---- 3. it never closes -- and the control is a body walking through -
+    const at = WAVES.findIndex((x) => (x.of || []).some(([id]) => id === 'kite'));
+    const play = (kitesOnly) => {
+      era(2);
+      const d = w.director;
+      d.setTier(32);
+      d.traits = [];
+      d.update = function (ww) { if (this.jobs.length) this.emit(ww); };
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      if (w.attackers) { for (const e of w.attackers) e.attacking = false; w.attackers.clear(); }
+      d.load(w, WAVES[at]);
+      if (kitesOnly) d.jobs = d.jobs.filter((j) => j.type && j.type.id === 'kite');
+      const s = w.shooter;
+      const grab = t.r + s.r + CFG.shooter.grabPad;
+      let grip = 0, deepest = 0, stood = 0, dupes = 0;
+      for (let f = 0; f < 60 * 100; f++) {
+        g.update(1 / 60);
+        const k = w.enemies.filter((e) => e.type.id === 'kite' && !e.isDrop && !e.dead && !e.staged);
+        stood = Math.max(stood, k.length);
+        for (const e of k) if (w.attackers.has(e)) grip++;
+        if (f > 60 * 40) {
+          const seen = new Set();
+          for (const e of k) {
+            deepest = Math.max(deepest, e.y);
+            if (seen.has(e.standSlot)) dupes++; else seen.add(e.standSlot);
+          }
+        }
+      }
+      return { grip, stood, dupes, clear: +(s.y - grab - deepest).toFixed(0) };
+    };
+    out.alone = play(true);
+    out.crowd = play(false);
+
+    // ---- 4. a mote off a kite comes to you, and a staged one waits -------
+    era(2);
+    bare();
+    {
+      const b = E.release(w, t, w.width * 0.5, 40);
+      const e = Array.isArray(b) ? b[0] : b;
+      out.stagedSlot = e.standSlot;
+      let stagedEver = -1;
+      for (let f = 0; f < 60 * 8; f++) {
+        g.update(1 / 60);
+        if (!e.staged) break;
+        stagedEver = Math.max(stagedEver, e.standSlot);
+      }
+      out.stagedHeld = stagedEver;
+      // ...and its salvage
+      e.y = w.shooter.y - 300;
+      e.destroy(w);
+      for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+      const motes = w.drops.filter((dd) => dd.type.id === 'kite');
+      out.drop = {
+        n: motes.length,
+        claimed: motes.filter((dd) => dd.standSlot >= 0).length,
+        closing: motes.length
+          ? motes.every((dd) => dd.vy > 0 || Math.hypot(dd.x - w.shooter.x, dd.y - w.shooter.y) < 300)
+          : null,
+      };
+    }
+
+    // ---- 5. a press clears the whole line, and an ANVIL is the control ---
+    era(2);
+    bare();
+    {
+      const made = [];
+      for (let i = 0; i < 6; i++) {
+        const b = E.release(w, t, w.width * (0.3 + 0.4 * (i / 5)), 40);
+        made.push(Array.isArray(b) ? b[0] : b);
+      }
+      for (let f = 0; f < 60 * 45; f++) g.update(1 / 60);
+      const live = made.filter((e) => !e.dead && !e.staged);
+      for (const e of live) e.applyDamage(w, 1, 0, -1, 3000, 0, 0, true, 'pulse');
+      g.update(1 / 60);
+      const left = live.map((e) => Math.hypot(e.vx, e.vy));
+      let far = 0, backAt = null;
+      for (let f = 0; f < 60 * 80; f++) {
+        g.update(1 / 60);
+        const on = live.filter((e) => !e.dead);
+        if (!on.length) break;
+        const errs = on.map((e) => Math.abs(e.y - E.standHeight(w, e)));
+        far = Math.max(far, ...errs);
+        if (far > 100 && backAt === null && Math.max(...errs) < 30) backAt = +(f / 60).toFixed(1);
+      }
+      out.press = {
+        n: live.length, speed: +Math.min(...left).toFixed(0), cap: CFG.physics.thrownSpeed,
+        thrown: +far.toFixed(0), back: backAt, alive: live.filter((e) => !e.dead).length,
+      };
+      // the control: the one body in the game that refuses every shove
+      bare();
+      const ab = E.release(w, TYPE_BY_ID.anvil, w.width * 0.5, w.shooter.y - 300);
+      const anvil = Array.isArray(ab) ? ab[0] : ab;
+      anvil.staged = false;
+      anvil.applyDamage(w, 1, 0, -1, 3000, 0, 0, true, 'pulse');
+      out.press.anvil = +Math.hypot(anvil.vx, anvil.vy).toFixed(2);
+    }
+    /*
+     * PUT THE DIRECTOR BACK. `reset()` keeps the same Director object, so a
+     * stub outlives every restart after it and starves every later case of
+     * waves -- CLAUDE.md's rule, and the eighteen damage-bench cases that
+     * do not follow it are why any case downstream of them has to clear
+     * `spawnLock` itself. This one is currently last in the file; that is
+     * not a reason to leave it dirty.
+     */
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.autoAim = true;
+    w.autoFire = true;
+    if (w.attackers) { for (const e of w.attackers) e.attacking = false; w.attackers.clear(); }
+    for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+      if (w[k]) w[k].length = 0;
+    }
+    return out;
+  });
+
+  const holds = (c) => c.reachMargin > 0 && c.aboveRim > 0 && (c.belowWall === null || c.belowWall > 0)
+    && c.grabClear > 0 && c.sideClear > 0 && c.inCone > 1;
+  const good = cells.filter(holds).length;
+  const a420bad = cells.filter((c) => c.a420.reach <= 0 || c.a420.rim <= 0
+    || (c.a420.wall !== null && c.a420.wall <= 0)).length;
+  check('a KITE stands where an unbought assist can only just reach it, on every screen',
+    good === cells.length && cells.length === 6
+    // the four cells where the reach binds land on the derivation to the
+    // digit -- two radii of margin, by construction and not by tuning
+    && cells.filter((c) => Math.abs(c.reachMargin - 2 * 20) < 0.01).length === 4
+    // ...and the CONTROL: the authored 420 does NOT hold, or the derivation
+    // is answering a question nobody asked
+    && a420bad >= 2,
+    `${good}/${cells.length} cells hold all five rules; the authored 420 breaks one in ${a420bad}. `
+    + cells.map((c) => `${c.vp} e${c.era} base ${c.base} (${c.cols}x${c.rows}, dxMax ${c.dxMax}) `
+      + `reach+${c.reachMargin} rim+${c.aboveRim} wall+${c.belowWall} grab+${c.grabClear} `
+      + `side+${c.sideClear} cone x${c.inCone}`).join(' | '));
+
+  check('...and one of them holds that station to a unit, drifting its full width',
+    r.one.err < 1 && r.one.worst < 6 && r.one.slot === 0
+    // the drift delivers the amplitude the geometry asks for
+    && r.one.drift > 2 * r.one.want / 2.2 && r.one.drift <= r.one.want + 4
+    // the approach is the authored speed, which is what says the blend
+    // against `linearDamping` is compensated -- the uncompensated
+    // arithmetic is `naive` and is 28% under
+    && Math.abs(r.one.peak - r.one.authored) < r.one.authored * 0.12
+    && Math.abs(r.one.peak - r.one.naive) > r.one.authored * 0.2,
+    `error ${r.one.err} mean / ${r.one.worst} worst against a station at ${r.one.base}; `
+    + `drifts ${r.one.drift} of ${r.one.want}; closes at ${r.one.peak} against an authored `
+    + `${r.one.authored} (uncompensated would be ${r.one.naive})`);
+
+  check('a wall of them never takes hold of the machine, and a BULWARK is what does',
+    // the absolute: kites alone, nothing grips and nothing reaches the band
+    r.alone.grip === 0 && r.alone.clear > 60 && r.alone.stood > 8 && r.alone.dupes === 0
+    // ...and the instrument is shown able to read a one: the same field with
+    // the wave's heavy body in it does grip, so the zero above is a fact
+    // about the gait rather than about the counter
+    && r.crowd.grip > 0 && r.crowd.stood > 4,
+    `kites alone: ${r.alone.grip} grip frames with ${r.alone.stood} standing, deepest `
+    + `${r.alone.clear} clear of the grab band, ${r.alone.dupes} shared slots. `
+    + `The whole wave: ${r.crowd.grip} grip frames with ${r.crowd.stood} standing, `
+    + `deepest ${r.crowd.clear} (negative is past the band) -- all of it the BULWARK `
+    + 'ploughing through the line, which costs the kite and is not the gait. '
+    + 'What this arm proves is the STATION and not the ranks: reverting the reach-circle '
+    + 'derivation fails it, and pinning every body onto one rank does not (measured '
+    + '290-327 clear either way at rungs 29/32/35) -- see CFG.ranks');
+
+  check('a mote off a KITE comes to you rather than holding its parent\'s station',
+    r.drop.n > 0 && r.drop.claimed === 0 && r.drop.closing === true
+    // ...and a body still in the throat has not claimed a slot either
+    && r.stagedSlot === -1 && r.stagedHeld === -1,
+    `${r.drop.n} motes, ${r.drop.claimed} of them holding a slot, closing ${r.drop.closing}; `
+    + `a staged kite's slot stayed ${r.stagedHeld} (build 322's guard: \`shed\` builds every `
+    + 'mote off the parent TYPE, so without it a mote carries gait standoff)');
+
+  check('one press throws the whole standing line off it',
+    r.press.n >= 4 && r.press.speed > r.press.cap * 0.95 && r.press.speed <= r.press.cap
+    && r.press.thrown > 200 && r.press.back > 6 && r.press.alive === r.press.n
+    // the control: the one body that refuses every shove does not move
+    && r.press.anvil === 0,
+    `${r.press.n} standing, a 3000-impulse press leaves them at ${r.press.speed} of a `
+    + `thrownSpeed cap of ${r.press.cap} (it is the lightest body in the game), displacing `
+    + `the line ${r.press.thrown} units and buying ${r.press.back}s -- ${r.press.alive} of `
+    + `${r.press.n} survived, so it is time and not a kill. An ANVIL takes ${r.press.anvil}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

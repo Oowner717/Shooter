@@ -487,7 +487,7 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, o
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
-const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
+const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, lobOf, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
 
 /*
  * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------
@@ -920,6 +920,81 @@ if (divers.length) {
       + `${t.r + sr}-${t.r + sr + pad}`).join('; ')}), `
     + `${D.dive} down against ${D.climb} back up (x${(D.dive / D.climb).toFixed(1)}), `
     + `swinging ${D.swing} clear to climb; a DECOY reaches ${CFG.decoy.r} of ${sr + pad / 2}`);
+}
+
+
+/*
+ * ---- A STANDOFF'S STATION IS DERIVED, SO WHAT IS CHECKED IS THE DERIVATION
+ *
+ * `standWall` needs a live world -- `shooter`, `width`, the portal rim and
+ * the yard wall -- so the six-cell table of the station against its five
+ * rules is a suite case and not this. What is here is the arithmetic that
+ * does NOT need a world, and every line of it is a way the gait fails in
+ * silence rather than loudly:
+ *
+ *  - `lobOf` in both directions. It throws for a `standoff` type with no
+ *    block, and a block on a type that does not stand is `kind: 'works'`
+ *    all over again (a field declaring a rule nothing reads, eighteen
+ *    builds). Build 313's dead-field sweep cannot see the second one,
+ *    because it asks only whether the KEY is read anywhere.
+ *  - THE SETTLING DISTANCE. The cruise is `max(speed x sway, gap x ease)`,
+ *    so the body stops closing once the drift floor beats the gap term --
+ *    at `speed x sway / ease` units out. Authored badly that is a body
+ *    parked a radius off its own slot with nothing failing; it has to be
+ *    well inside the body.
+ *  - ROOM FOR ONE COLUMN inside the 45-degree bound, or `cols` is 1 on
+ *    every screen and the wall is a queue.
+ *  - AND THE STATION HAS TO BE REACHABLE AT ALL: if `reach - r` is not
+ *    clear of the grab band then `ceil` always wins, the station is on the
+ *    mount at every viewport, and the one thing this object promises is
+ *    false everywhere. That is the shape build 198 calls a threshold no
+ *    device can produce.
+ */
+const standers = ENEMY_TYPES.filter((t) => t.gait === 'standoff');
+const lobbers = ENEMY_TYPES.filter((t) => t.lob);
+{
+  const bad = [];
+  for (const t of lobbers) {
+    if (t.gait !== 'standoff') bad.push(`${t.id} declares a lob block and does not stand (gait ${t.gait})`);
+  }
+  const sr = CFG.shooter.r;
+  const pad = CFG.shooter.grabPad;
+  const rows = [];
+  for (const t of standers) {
+    let L;
+    try { L = lobOf(t); } catch (e) { bad.push(e.message); continue; }
+    const pitch = 2 * t.r + CFG.ranks.clear;
+    const settle = (t.speed * L.sway) / L.ease;
+    if (!(settle < t.r * 0.5)) {
+      bad.push(`${t.id} settles ${settle.toFixed(1)} units off its slot `
+        + `(speed ${t.speed} x sway ${L.sway} / ease ${L.ease}), which is not well inside r ${t.r}`);
+    }
+    // `ZOOMS` is indexed BY ERA with a dead slot at 0, and `aimRange` is in
+    // `SCALED` so the module-load value is era 1's -- an era's reach is that
+    // scaled by how much wider its field is.
+    for (const [era, z] of CFG.ZOOMS.map((v, i) => [i, v]).filter(([i, v]) => i > 0 && v)) {
+      const reach = CFG.shooter.aimRange * (CFG.ZOOMS[1] / z);
+      const spanMax = (reach - t.r) * Math.SQRT1_2;
+      if (!(spanMax > pitch)) {
+        bad.push(`${t.id} at era ${era}: the 45-degree bound ${spanMax.toFixed(0)} `
+          + `holds no column of ${pitch}`);
+      }
+      if (!(reach - t.r > t.r + sr + pad + 6)) {
+        bad.push(`${t.id} at era ${era}: a station at ${(reach - t.r).toFixed(0)} is not clear of `
+          + `the grab band ${(t.r + sr + pad + 6).toFixed(0)}, so it stands on the mount everywhere`);
+      }
+      rows.push(`${t.id} era ${era} out to ${(reach - t.r).toFixed(0)}, drift <= ${spanMax.toFixed(0)}`);
+    }
+  }
+  if (bad.length) {
+    for (const line of bad) console.error(`standoff: ${line}`);
+    process.exit(1);
+  }
+  if (standers.length) {
+    console.log(`standoff: ${standers.length} type(s) hold a derived station (${rows.join('; ')}), `
+      + `packed at 2r + ${CFG.ranks.clear} on both axes, settling `
+      + `${standers.map((t) => ((t.speed * t.lob.sway) / t.lob.ease).toFixed(1)).join('/')} off the slot`);
+  }
 }
 
 

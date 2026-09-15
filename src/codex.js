@@ -555,6 +555,55 @@ export const CODEX = [
     name: 'LOOM',
     line: 'Two spools that come down together and then walk apart, paying out a bright thread between them as they go. The thread is not aimed at you and it does not have to be: a round that meets it simply stops, whatever was behind it, and the longer the pair lives the more of the field it covers. Shoot it early, while the gap is still narrower than the bodies making it. After that, either spool drops the whole thing -- the thread never quite reaches them -- or put a blast underneath it, which reaches what your rounds cannot.',
   },
+  /*
+   * ---- MEASURED BEFORE IT WAS WRITTEN, and the guide's counter is struck --
+   *
+   * `docs/objects.html` offers "close the distance: it has no answer to
+   * something already inside its range". There is no such move: the turret is
+   * static (`invMass` 0, no `hp`, no `applyDamage`) and `CFG.gun.inPlay` has
+   * been false since build 289, so the player cannot push up-field at all.
+   * That is FLINT's fault again -- a counter named in prose that nobody can
+   * use -- and it is the second half of the same sentence whose FIRST half
+   * (the bolt) is build 336's.
+   *
+   * What IS measured, and what this line rests on:
+   *
+   *   - IT NEVER CLOSES. With kites alone on the field, over four cells of
+   *     era and rung: **zero grip frames** and the deepest body 181 to 297
+   *     units clear of the grab band. The wall's rank count is derived from
+   *     exactly that bound (`standWall`).
+   *   - ...BUT SOMETHING HEAVY WALKING THROUGH IT WILL PUSH ONE IN. The same
+   *     four cells with the whole wave: 914 to 11,332 grip frames and the
+   *     deepest kite 72 to 188 units PAST the grab line, all of it the
+   *     BULWARK ploughing through the line. That is physics rather than the
+   *     gait, it costs the kite (contact bills `impactDamage` both ways), and
+   *     the line says it rather than promising it cannot happen.
+   *   - IT STANDS AT 90% OF WHAT AN UNBOUGHT ASSIST CAN REACH: 360 of 400,
+   *     a margin of exactly two radii, held at every viewport and both eras
+   *     by construction. With ARRAY bought the margin is 481 -- so this is
+   *     the one body that makes reach worth buying, which is the complement
+   *     of build 323's finding that DEEP ARRAY makes CHAFF *worse*.
+   *   - A PRESS CLEARS THE WHOLE LINE. It is the lightest body in the game
+   *     (mass 1, tied with a MOTE at half its radius), so one PULSE leaves it
+   *     at **713 u/s against a `thrownSpeed` cap of 720** -- the fastest
+   *     anything can be thrown -- displacing the wall 434 units and buying
+   *     **14.3 seconds** before it is back on station. All six survived, so
+   *     it is time bought and not a kill. PULSE is `essential`: no purchase,
+   *     and no anomaly can hold it.
+   *   - AND THE WAVE CANNOT END WHILE ONE STANDS. `Director.standing` counts
+   *     a kite like any hostile, so the tempo cost is real without anything
+   *     being thrown: measured, the wave is the longest in band 5 at rung 35
+   *     (116-128s against siblings at 55.7, 61.1 and 88.8) and straddles the
+   *     120-second cap -- the same shape REMNANT's wave has, and for the same
+   *     reason, the body's own transit. Recorded rather than tuned; band 5
+   *     already misses that cap at four of seven rungs on the era-2 field
+   *     (build 306).
+   */
+  {
+    id: 'kite',
+    name: 'KITE',
+    line: 'The first hostile down this field that will not come to you. It closes to the far edge of what your gun can see -- ninety per cent of the way out, and no further -- and then simply hangs there, drifting along the line, with more of them in ranks behind the first. They are not coming for the mount and they do not need to: a wave does not end while one is still up there, so every second they hold is a second the next wave is not arriving in. The gun is the answer and the reach is the question -- this is the one body worth buying ARRAY for. Or press PULSE, which does reach them: there is nothing lighter on the field, so one press throws the whole line four hundred units up-field and buys fourteen seconds. And let something heavy through and it will shove one of them onto you, which is the only way they ever arrive.',
+  },
   {
     id: 'quarry',
     name: 'QUARRY',
