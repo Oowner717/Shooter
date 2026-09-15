@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '335';
+export const BUILD = '336';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '335';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '3c568fc';
+export const REV = '341704b';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1781,7 +1781,10 @@ export const CFG = {
    * station is, and `standWall`'s own bound on the rank count is the belt.
    * What the ranks still do is real and smaller: the allocator needs a slot
    * space wider than one rank, or every body past the eleventh is sent to a
-   * place another body already holds; and the crowd comes out wider and
+   * place another body already holds -- which build 336 made a SPREAD rather
+   * than a pile (`standSlotFor` takes the least-occupied slot now), so with
+   * one rank the same 57 bodies sit five to seven deep where the ranks put
+   * them one or two; and the crowd comes out wider and
    * shallower (y spread 148-219 against 182-259, overlaps per body 0.94-1.77
    * against 1.82-2.22), so it reads as a line rather than a knot. Rendered
    * both ways at thirty bodies, the difference is visible and modest.
@@ -3119,7 +3122,16 @@ export const CFG = {
     // No collection radius. Build 59 took it out: wreckage drifts the whole
     // way in and lands on the turret, and banking it means destroying it --
     // unless INTAKE has been taken, which collects anything that touches.
-    pull: 26, // units per second a fragment drifts turret-ward on its own
+    /*
+     * How hard a loose fragment is drawn turret-ward on its own. It is an
+     * ACCELERATION and not a speed -- its one reader is `collectData`'s
+     * `e.vx += (dx / d) * S.pull * dt` (enemies.js), i.e. u/s^2 -- and this
+     * comment said "units per second" until build 336. `CFG.snare`'s own
+     * `pull` beside it IS a target speed, which is how the wrong unit read
+     * as plausible. It is in `SCALED`, so the era-2 field pulls harder in
+     * proportion to its own depth.
+     */
+    pull: 26,
     // Attached objects sit on the intake. Five is as bad as it gets.
     tax: 0.78, // multiplier per attached object
     taxFloor: 0.3,
@@ -5399,11 +5411,136 @@ export const ENEMY_TYPES = [
      * ---- KITE: it will not come to you ---------------------------------
      *
      * Phase 6r, band 5, the eighteenth object to ship. It closes to a station
-     * and holds it, sliding sideways, and never comes closer. The bolt it
-     * throws from there is build 336; what this build is, is the STATION --
-     * because the design document's own number for it does not survive
-     * contact with the field, and the derivation that replaces it is the
-     * whole of why the object is fair.
+     * and holds it, sliding sideways, and never comes closer. What the object
+     * IS, is the station -- because the design document's own number for it
+     * does not survive contact with the field, and the derivation that
+     * replaces it is the whole of why the object is fair.
+     *
+     * ---- AND THE BOLT IS WITHDRAWN, MEASURED, AT BUILD 336 --------------
+     *
+     * This paragraph said "the bolt it throws from there is build 336".
+     * Build 336 measured it instead and did not ship it, the way GYRE was
+     * withdrawn at 331. Four clauses of the guide's spec, every one of them
+     * empty:
+     *
+     * 1. THERE IS NOTHING AT RANGE TO ATTACK. The `Shooter` declares no
+     *    `hp` and no `applyDamage`, and `game.js`'s pair solver bills
+     *    `impactDamage` behind `if (a.applyDamage)`, which is false for it.
+     *    So a bolt cannot do damage, whatever it hits.
+     * 2. THE ONE EXISTING RANGED PAYLOAD IS COSMETIC AND SATURATES.
+     *    `world.shock` is written at eleven sites -- TEN BOSS SITES (nine
+     *    attacks; GNOMON's shadow writes it at two ranges) plus a hurled
+     *    MASS landing (game.js:3318, `tow.hurl.shock` 0.62, the largest in
+     *    the game against 0.30-0.50 for every boss) -- and every one of
+     *    them is `Math.max`, so it does not accumulate. A twelfth
+     *    `Math.max` at game.js:3864 is the decay and it is CONSTANT rather
+     *    than proportional -- `shock -= dtRaw / shockFor`, i.e. 0.556
+     *    shock-units a second -- so a write of V drains in `V * shockFor`
+     *    and the channel is pinned once `every / N <= V * shockFor`, i.e.
+     *    `N >= every / (V * shockFor)`. At the TOW's 0.62 that is 1.116s
+     *    and THREE kites. The formula and not the three is the durable
+     *    form, because a bolt's own V was never authored: whatever it were
+     *    set to, the count that pins the channel is a small integer and the
+     *    delivered count is 16 to 57.
+     * 3. THE GUIDE'S COUNTER IS ARITHMETICALLY UNAVAILABLE. A fully bought
+     *    turret fires `1 / (holdFireInterval * up.rate)` = 3.885 rounds a
+     *    second. Band 5 is drawn at every rung from 29 to the ceiling and
+     *    the budget swells this wave's authored three kites to -- measured,
+     *    SWARM divided out, which is build 314's rule -- **16 at rung 29,
+     *    29 at 32, 43 at 35, 67 at 42 and 104 at 49**, held at the
+     *    `maxEnemies` 57 from about rung 38. At 3.2s a body that is 5.0 to
+     *    17.8 bolts a second. Shooting them down, one round one kill, with
+     *    the gun doing nothing else and no slew at all, is short by
+     *    **1.29x at the LIGHTEST rung the wave is played on** and 4.58x at
+     *    the cap -- and SWARM, which the wave rolls about half the time,
+     *    doubles it.
+     * 4. AND A SHOOTABLE BOLT TAKES THE GUN FOR ITS WHOLE FLIGHT. Measured
+     *    on a live field over 300s at rungs 29/32/35, fully bought, nothing
+     *    stubbed: the assist's best score has a median of 630-876 units and
+     *    something is gripping only 0-4% of the time, so a synthetic bolt
+     *    scored into the same `consider` wins 80-100% of frames at 445,
+     *    346, 247, 148, 74 and 25 units out. A bolt is strictly nearer the
+     *    machine than the kite that fired it and it closes -- the exact
+     *    inverse of build 323's CHAFF finding, where a copy was nearer than
+     *    its own owner ZERO times. CHAFF needed an explicit line to give a
+     *    ghost the lock; a bolt would need an explicit refusal, and with
+     *    build 291's release gate waiting for the field to thin, 15 to 57
+     *    permanently-nearest targets is a run that cannot climb.
+     *
+     * ---- TWO CHANNELS ARE LIVE, AND THE FUSE'S BRACKET IS EMPTY ---------
+     *
+     * The glitch fuse is the reachable payload that is not cosmetic: it is
+     * visible, it is clamped, and `Director.burnFrom` (build 293) is the
+     * FIELD a third cause would be named by. **Its two readers are not**,
+     * and that matters to anyone building the re-spec below:
+     * `game.js:3352` is `burn === 'crowd' ? ON_CROWD : ON_GLITCH` and
+     * `enemies.js:8832` is `cause === 'crowd' ? 'THE FIELD OVERRAN' :
+     * 'THE FEED GAVE OUT'` -- two-way ternaries whose else arm is the
+     * CONTACT answer, so a third cause is captioned "clear the turret" and
+     * posted as the feed giving out. Worse, `sayOnce` opens
+     * `if (lineSeen(l.id)) continue` and `markLine` persists per device, so
+     * a one-element array whose line has already been read says NOTHING,
+     * EVER -- a third cause is silent on any device that has met contact
+     * and spends the wrong line on a fresh one. Build 293 fixed the value
+     * and left the shape: a third cause is a TWO-SITE edit, and the form
+     * that cannot regress is one `{ contact, crowd, ... } ->
+     * { line, reason }` table rather than a third ternary.
+     *
+     * The fuse fails on arithmetic anyway, in both directions at once.
+     *
+     * SALVAGE DENIAL is the other one and it was measured first, because a
+     * GLUT eating `world.drops` is a shipped precedent with a codex line.
+     * It has no middle: near the machine the salvage is already gone (stock,
+     * the ground inside the mount is empty on 76-99% of samples at rungs
+     * 29/35, so eating on impact is invisible), while a patch that LINGERS
+     * takes 1.25-1.46 drops a second worth **66-69% of everything banked**,
+     * which is a wave ending rather than an attack. Income is also not
+     * reproducible run to run -- 2-7x swings at one rung -- so nothing in
+     * between could have been tuned against a measurement. `waves.glitch.fuse` is 14 seconds, contact fills
+     * at rate 1 (7.14% a second) and recovery drains at 0.6 (4.29%).
+     *
+     * Measured: kites reach their stations spread over 154 to 190 seconds
+     * with a mean gap of 3.5 to 5.3s and a worst three-second burst of 4 to
+     * 10 arrivals (rungs 29/32/35, era 2, through the real director).
+     *
+     *   - ONE-SHOT, the TOW's idiom and the only precedent in the game for
+     *     a swelled-count body with a ranged action: at a mean gap of ~4s
+     *     the fuse drains 17% between bolts, so a bolt worth less than that
+     *     can never accumulate and is invisible; a bolt worth that much
+     *     puts a burst of ten at 170% of the fuse and discharges it
+     *     instantly, repeatedly.
+     *   - REPEATING, at the guide's 3.2s: ONE kite lobbing has to be worth
+     *     `recover / fuse * every` = 13.7% of the fuse just to outrun the
+     *     drain, which is legible. FORTY-THREE of them lobbing need
+     *     13.7 / 43 = 0.32% each to do exactly the same thing -- and 0.32%
+     *     of a 14-second fuse is 45 MILLISECONDS of contact, a
+     *     thirty-third of what one gripping body does during its arming
+     *     delay alone.
+     *
+     * So the per-bolt value that survives the crowd is 1/43 of the value
+     * that makes one bolt legible, and the factor between them is EXACTLY
+     * the delivered count -- which is the budget's and not the author's. A
+     * per-body cadence is the wrong parameterisation of the design, and
+     * that is not something a number can be tuned to.
+     *
+     * ---- WHY THE COUNT CANNOT BE TUNED EITHER ---------------------------
+     *
+     * `swell = budgetAt(tier, band) / threatOfWave(wave)`, so taking kites
+     * out makes the wave lighter and the swell bigger: cutting the authored
+     * count by two thirds cuts the delivered count by 58%, and at one kite
+     * the wave sits 22% under its band's mean -- outside build 315's +-10%
+     * lever -- while still delivering 18 of them. Adding ballast re-prices
+     * band 5 upward by 4-8%, which is build 328's fault by name: ANVIL's
+     * wave took that band's mean up and turned REMNANT's arm red for a
+     * reason having nothing to do with REMNANT. Band 5 already misses the
+     * 120-second cap at four of seven rungs on the era-2 field.
+     *
+     * If it ever comes back it needs a re-spec and not a number: a payload
+     * that is not the shader, and a bound that is not per body -- the TOW's
+     * budget of throws, or `laneBusy`'s exclusion generalised to "at most k
+     * in flight for the whole type", derived from `maxEnemies` the way
+     * `leaveGhost`'s cap is. Both halves together or not at all, which is
+     * GYRE's ruling.
      *
      * ---- THE AUTHORED 420 IS NOT A DISTANCE, IT IS ONE ERA'S ANSWER ------
      *
@@ -5492,7 +5629,10 @@ export const ENEMY_TYPES = [
      * `planted`, `bar` CFG.cartwheel, `bond` CFG.yoke) -- and the live one
      * is `CFG.shrike.hold`/`dwell`/`gate`, which `diveOn` reads with no type
      * indirection, so a second `dive` type would wear SHRIKE's numbers in
-     * silence. `standoffOf` throws for a type that declares none.
+     * silence. `lobOf` throws for a type that declares none. (That sentence
+     * said `standoffOf` from build 335 to 336 and there is no such function
+     * anywhere in the tree -- a docstring naming a helper that is not there,
+     * four lines above the paragraph that names the real one.)
      *
      *   slide -- the drift's amplitude, as a share of HALF the width the
      *            field leaves between `edgeEase`'s two bands, so it is the
@@ -5520,6 +5660,12 @@ export const ENEMY_TYPES = [
      * And the block is NOT called `standoff`: see `lobOf`, which explains why
      * -- 43 hits of that word in `src/` outside this file make it a field the
      * dead-field sweep cannot see.
+     *
+     * The NAME is the guide's noun for the bolt, which build 336 withdrew, so
+     * there is nothing lobbed and these three are the STATION's numbers. Left
+     * as it is on purpose: `lob` still has no other hit in the tree, which is
+     * the whole property the name was chosen for, and renaming a field for
+     * tidiness is how a reader gets missed. Read it as "the standoff block".
      */
     lob: { slide: 0.25, sway: 0.34, ease: 1.6 },
     /*

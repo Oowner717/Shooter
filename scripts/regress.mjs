@@ -38279,10 +38279,51 @@ if (MINE_LINE) {
           }
         }
       }
-      return { grip, stood, dupes, clear: +(s.y - grab - deepest).toFixed(0) };
+      const G = E.standWall(w, { r: t.r, type: t });
+      return {
+        grip, stood, dupes, slots: G.cols * G.rows,
+        clear: +(s.y - grab - deepest).toFixed(0),
+      };
     };
     out.alone = play(true);
     out.crowd = play(false);
+    /*
+     * ---- AND THE LIVENESS IS A PLACED BODY, NOT A PLAYED WAVE -----------
+     *
+     * The zero above means nothing unless this counter has been shown to
+     * read a one, and build 335 proved that with `play(false)` -- the whole
+     * wave, on the argument that its BULWARKs shove a kite over the band.
+     * They do, and INTERMITTENTLY: measured over five draws the crowd run
+     * reads 182, 1084, 161, 700 grip frames and ZERO, the zero being a run
+     * whose deepest kite finished 33 units short of the band. Three
+     * seed-dependent things are chained into that conjunct -- the job
+     * shuffle, `emit`'s release gate and the wave's trait roll (the same
+     * run reads 29 standing or 57 depending on SWARM) -- so it is a coin
+     * toss about one run in five, and it turned red on a build that cannot
+     * reach it. One BULWARK laid deliberately does not reproduce it either:
+     * measured, it walks between the kites and moves the deepest one 40
+     * units, grip 0 in three of three. It takes the wave's ten to twenty.
+     *
+     * So the mechanism is REPORTED and the instrument is proved directly:
+     * a kite put four units inside the band is counted (25 frames of 30),
+     * and the same kite put 120 units clear of it is not (0). Nothing
+     * seed-dependent, and it is the counter that the absolute rests on.
+     */
+    {
+      const s = w.shooter;
+      const grab = t.r + s.r + CFG.shooter.grabPad;
+      const lone = (off) => {
+        era(2);
+        bare();
+        const b = E.release(w, t, s.x, s.y - grab + off);
+        const e = Array.isArray(b) ? b[0] : b;
+        e.staged = false; e.born = true; e.bornFor = 9;
+        let grip = 0;
+        for (let f = 0; f < 30; f++) { e.hp = e.maxHp; g.update(1 / 60); if (w.attackers.has(e)) grip++; }
+        return grip;
+      };
+      out.counter = { inside: lone(4), clear: lone(-120) };
+    }
 
     // ---- 4. a mote off a kite comes to you, and a staged one waits -------
     era(2);
@@ -38347,6 +38388,66 @@ if (MINE_LINE) {
       anvil.applyDamage(w, 1, 0, -1, 3000, 0, 0, true, 'pulse');
       out.press.anvil = +Math.hypot(anvil.vx, anvil.vy).toFixed(2);
     }
+
+    // ---- 6. the wall overflows its slots, and that is the COMMON case ----
+    /*
+     * The slot count is `cols * rows` off the FIELD and the kite count is
+     * the BUDGET's, so the two have nothing to do with each other: measured
+     * at 320x568 era 2 the wall has 32 slots (8 x 4) and rung 35 stands 57
+     * kites in it. Build 335's fallback was `return n - 1` under a comment
+     * calling that "more bodies than the wall has room for", i.e. an
+     * overflow guard for an unlikely case -- and 26 of the 57 shared one
+     * point. It cost no health (measured 0.355 of the pool worst either
+     * way, which is the settling and not the doubling); it cost the
+     * PICTURE, which is the object.
+     *
+     * Both halves are asserted and each fails a different way:
+     *
+     *  - the NO-OP, laid one short of the slot count: every body has its
+     *    own slot, exactly as the `Set` version returned. A fallback that
+     *    started stacking early would fail here.
+     *  - the SPREAD, laid 25 over: no slot holds more than `ceil(n/slots)`.
+     *    The old fallback gives `n - slots + 1` = 26 against 2, so this is
+     *    a revert proof by arithmetic as well as by measurement.
+     */
+    era(2);
+    bare();
+    {
+      const wall = E.standWall(w, { r: t.r, type: t });
+      const slots = wall.cols * wall.rows;
+      /*
+       * Laid on a GRID at the wall's own pitch and read after half a second.
+       * Both halves of that are load-bearing and the first version had
+       * neither: `x = 60 + (i * 53) % (width - 120)` wraps, so bodies
+       * shared a column, and ninety seconds of settling then killed eight
+       * to twelve of them -- `distinct === alive` went soft and a died-out
+       * slot freed itself, which is correct behaviour reading as a failure.
+       * A slot is claimed on the body's FIRST loose frame and never again,
+       * so the question needs no settling at all.
+       */
+      const lay = (n) => {
+        bare();
+        const per = Math.max(1, Math.floor((w.width - 2 * t.r) / wall.pitch));
+        for (let i = 0; i < n; i++) {
+          const x = Math.min(t.r + (i % per) * wall.pitch + wall.pitch * 0.5, w.width - t.r);
+          const b = E.release(w, t, x, wall.rim - 60 - Math.floor(i / per) * wall.pitch);
+          const e = Array.isArray(b) ? b[0] : b;
+          if (e) { e.staged = false; e.born = true; e.bornFor = 9; }
+        }
+        for (let f = 0; f < 30; f++) g.update(1 / 60);
+        const ks = w.enemies.filter((e) => e.type === t && !e.dead && !e.isDrop);
+        const held = new Map();
+        for (const e of ks) held.set(e.standSlot, (held.get(e.standSlot) || 0) + 1);
+        return {
+          n, alive: ks.length, distinct: held.size,
+          worst: Math.max(0, ...held.values()),
+          unset: ks.filter((e) => e.standSlot < 0).length,
+        };
+      };
+      const room = lay(Math.max(1, slots - 1));
+      const over = lay(slots + 6);
+      out.slots = { slots, room, over, cap: Math.ceil(over.n / slots) };
+    }
     /*
      * PUT THE DIRECTOR BACK. `reset()` keeps the same Director object, so a
      * stub outlives every restart after it and starves every later case of
@@ -38397,18 +38498,26 @@ if (MINE_LINE) {
     + `drifts ${r.one.drift} of ${r.one.want}; closes at ${r.one.peak} against an authored `
     + `${r.one.authored} (uncompensated would be ${r.one.naive})`);
 
-  check('a wall of them never takes hold of the machine, and a BULWARK is what does',
+  check('a wall of them never takes hold of the machine, and the counter can see one',
     // the absolute: kites alone, nothing grips and nothing reaches the band
-    r.alone.grip === 0 && r.alone.clear > 60 && r.alone.stood > 8 && r.alone.dupes === 0
-    // ...and the instrument is shown able to read a one: the same field with
-    // the wave's heavy body in it does grip, so the zero above is a fact
-    // about the gait rather than about the counter
-    && r.crowd.grip > 0 && r.crowd.stood > 4,
-    `kites alone: ${r.alone.grip} grip frames with ${r.alone.stood} standing, deepest `
-    + `${r.alone.clear} clear of the grab band, ${r.alone.dupes} shared slots. `
-    + `The whole wave: ${r.crowd.grip} grip frames with ${r.crowd.stood} standing, `
-    + `deepest ${r.crowd.clear} (negative is past the band) -- all of it the BULWARK `
-    + 'ploughing through the line, which costs the kite and is not the gait. '
+    r.alone.grip === 0 && r.alone.clear > 60 && r.alone.stood > 8
+    // no slot is shared while the wall has room for every body standing in
+    // it -- sharing past that is build 336's spread and is arm 6's claim
+    && (r.alone.dupes === 0 || r.alone.stood > r.alone.slots)
+    // ...and the counter is shown able to read a one, DIRECTLY: a kite put
+    // inside the band is counted and the same kite put clear of it is not.
+    // Build 335 asked the whole wave for this and it is a coin toss -- see
+    // the note at `out.counter`
+    && r.counter.inside > 0 && r.counter.clear === 0
+    && r.crowd.stood > 4,
+    `kites alone: ${r.alone.grip} grip frames with ${r.alone.stood} standing in `
+    + `${r.alone.slots} slots, deepest ${r.alone.clear} clear of the grab band, `
+    + `${r.alone.dupes} shared. The counter reads ${r.counter.inside} of 30 frames for a `
+    + `kite four units INSIDE the band and ${r.counter.clear} for one 120 clear of it. `
+    + `REPORTED, not asserted: the whole wave gives ${r.crowd.grip} grip frames with `
+    + `${r.crowd.stood} standing and a deepest of ${r.crowd.clear} (negative is past the `
+    + 'band) -- heavies ploughing through the line do shove one in, measured 182/1084/'
+    + '161/700/0 over five draws, which is physics and not the gait. '
     + 'What this arm proves is the STATION and not the ranks: reverting the reach-circle '
     + 'derivation fails it, and pinning every body onto one rank does not (measured '
     + '290-327 clear either way at rungs 29/32/35) -- see CFG.ranks');
@@ -38430,6 +38539,26 @@ if (MINE_LINE) {
     + `thrownSpeed cap of ${r.press.cap} (it is the lightest body in the game), displacing `
     + `the line ${r.press.thrown} units and buying ${r.press.back}s -- ${r.press.alive} of `
     + `${r.press.n} survived, so it is time and not a kill. An ANVIL takes ${r.press.anvil}`);
+
+  check('more of them than the wall has room for spread across it rather than piling up',
+    // the no-op: while there is room, one slot each -- unchanged to the digit
+    r.slots.room.distinct === r.slots.room.alive && r.slots.room.worst === 1
+    // the spread: past that, no slot holds more than its share
+    && r.slots.over.worst <= r.slots.cap && r.slots.over.distinct === r.slots.slots
+    // and the overflow branch really ran, or the arm is the no-op twice
+    && r.slots.over.alive > r.slots.slots
+    // ...with every body it laid alive and holding a slot, or a death freed
+    // one and the two counts above are measuring the instrument
+    && r.slots.room.alive === r.slots.room.n && r.slots.over.alive === r.slots.over.n
+    && r.slots.room.unset === 0 && r.slots.over.unset === 0,
+    `the wall has ${r.slots.slots} slots here. ${r.slots.room.alive} bodies: `
+    + `${r.slots.room.distinct} distinct slots, worst ${r.slots.room.worst}. `
+    + `${r.slots.over.alive} bodies: ${r.slots.over.distinct} distinct, worst `
+    + `${r.slots.over.worst} against a share of ${r.slots.cap} -- build 335's `
+    + `\`return n - 1\` gives ${r.slots.over.n - r.slots.slots + 1} here by arithmetic, `
+    + 'and measured 26 of 57 on one point at 320x568 era 2, which is that wall '
+    + '(8x4) against rung 35 exactly. It cost no health either way (0.355 of the '
+    + 'pool worst, which is the settling); it cost the picture');
 }
 
 // --- report -----------------------------------------------------------------

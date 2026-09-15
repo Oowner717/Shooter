@@ -240,10 +240,13 @@ export function shielded(world, e) {
  * ---- why an anomaly suspends it
  *
  * A boss does not fit behind it. Measured at 320x568 era 2: the wall stands at
- * 561.5 and the turret at 848.1, so the open field between them is 287 units,
+ * 561.5 and the turret at 873, so the open field between them is 311.5 units,
  * while the boss standoffs are 340-380 UNSCALED -- ORDINAL, GNOMON, FRACTAL and
  * TERMINUS all place their core above the line (ORDINAL 53.4 units clear of it,
- * TERMINUS 118.5), and TERMINUS's ring alone is 500 across. Under the build-256
+ * TERMINUS 118.5), and TERMINUS's ring alone is 500 across. (Those two figures
+ * read 848.1 and 287 until build 336, which is the pre-292 mount at
+ * `--bar-h: 74`; the bar is 64 now. The claim was unaffected and the copy went
+ * stale in silence, which is build 329's rule and the grep it asks for.) Under the build-256
  * guard those four are untargetable and unkillable: `autoTarget` returns null
  * and every round is swallowed at the line.
  *

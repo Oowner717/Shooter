@@ -7520,17 +7520,42 @@ function midOut(i, n) {
 // symbols in build 220 were exported with no consumer and one of them had no
 // caller at all.
 function standSlotFor(world, e, slots) {
-  const taken = new Set();
+  const n = Math.max(1, slots);
+  const held = new Uint16Array(n);
   for (const o of world.enemies) {
     if (o === e || o.dead || o.isDrop) continue;
     if (o.type !== e.type || o.standSlot < 0) continue;
-    taken.add(o.standSlot);
+    if (o.standSlot < n) held[o.standSlot] += 1;
   }
-  const n = Math.max(1, slots);
-  for (let i = 0; i < n; i++) if (!taken.has(i)) return i;
-  // More bodies than the wall has room for: stack on the back rank rather
-  // than refusing, so the count the budget asked for still arrives.
-  return n - 1;
+  /*
+   * ---- AND THE OVERFLOW IS THE COMMON CASE, NOT AN EDGE ----------------
+   *
+   * The first empty slot, exactly as the `Set` version returned -- so while
+   * there is room this is unchanged to the digit, which is the claim the
+   * case asserts rather than argues.
+   *
+   * Past that it takes the LEAST-OCCUPIED slot rather than piling on the
+   * back-rank corner. Build 335 wrote that fallback as `return n - 1` under
+   * a comment calling it "more bodies than the wall has room for", i.e. as
+   * an overflow guard for an unlikely case. It is not unlikely: the wall's
+   * slot count is `cols * rows` off the FIELD, and the kite count is the
+   * BUDGET's -- measured at 320x568 era 2 the wall has 32 slots (8 x 4) and
+   * rung 35 stands 57 kites in it, so TWENTY-SIX of them shared one point.
+   * Spread, the same 57 sit one or two deep across all 32 and the wall is
+   * still a wall.
+   *
+   * Least-occupied rather than `i % n` because the count is the same read
+   * the first pass already does, so a body that dies out of a doubled slot
+   * gives its place back to the next arrival -- the hole-where-it-falls rule
+   * above, one level up. And it needs no roster and no ordering: nothing
+   * owns the wall (build 310).
+   */
+  let best = 0;
+  for (let i = 0; i < n; i++) {
+    if (held[i] === 0) return i;
+    if (held[i] < held[best]) best = i;
+  }
+  return best;
 }
 
 export function sheetLaneFor(world, e) {

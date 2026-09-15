@@ -143,7 +143,10 @@ export const ON_CONTACT = [
  * was spent, once per device and for ever, at the only moment in the run when
  * there is no ring to look at.
  *
- * It is keyed off the fuse instead. See Game.watchGlitch.
+ * It is keyed off the fuse instead. See `Game.checkContact`, where the two
+ * lines are chosen off `Director.burnFrom` (game.js, the `sayOnce` beside
+ * the contact line). This said `Game.watchGlitch` until build 336 and there
+ * is no such method anywhere in the tree.
  */
 export const ON_GLITCH = (() => {
   const text = 'GLITCH. The ring is the simulation losing its grip.\nClear the turret before it closes, or it steps back.';

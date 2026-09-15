@@ -7174,3 +7174,283 @@ came from before believing the other one covers it.
   for the whole run. On a loaded box (other probes running alongside) the run
   stretches well past thirteen minutes, so elapsed time is not a signal
   either.
+
+- **KITE'S BOLT IS WITHDRAWN AT BUILD 336, AND EVERY CLAUSE OF IT WAS
+  MEASURED EMPTY RATHER THAN ARGUED AWAY.** Build 335 shipped the station and
+  its own docstring promised "the bolt it throws from there is build 336".
+  This is GYRE's ruling (331) a second time, and a stronger case than GYRE's
+  because four independent clauses fail, not three:
+  - **THERE IS NOTHING AT RANGE TO ATTACK.** The `Shooter` declares no `hp`
+    and no `applyDamage`, and the pair solver bills `impactDamage` behind
+    `if (a.applyDamage)`, which is false for it. A ranged attack in this game
+    cannot do damage, whatever it hits. Build 334's note already recorded the
+    consequence -- every ranged attack in the game is cosmetic -- and the
+    thing to take from it is that **the object was specified against a
+    mechanic the engine does not have**.
+  - **`world.shock` IS THE SHADER AND IT SATURATES AT THREE BODIES.** Eleven
+    writers -- **ten boss sites** (nine attacks; GNOMON's shadow writes it at
+    two ranges) plus a hurled MASS landing (`game.js:3318`,
+    `tow.hurl.shock` **0.62**, the largest in the game against 0.30-0.50 for
+    every boss) -- and **every one of them is `Math.max`**, so the channel
+    does not accumulate. A twelfth `Math.max` at `game.js:3864` is the decay
+    and it is **constant rather than proportional** -- `shock -= dtRaw /
+    shockFor`, 0.556 shock-units a second -- so a write of V drains in
+    `V * shockFor` and the channel is pinned once
+    **`N >= every / (V * shockFor)`**, which at the TOW's 0.62 is 1.116s and
+    **three kites**. The formula and not the three is the durable form,
+    because a bolt's own V was never authored: whatever it were set to, the
+    count that pins the channel is a small integer against a delivered count
+    of 16 to 57. **My first derivation said 0.56/s and got the right answer
+    for the wrong reason** -- 0.556 is the DECAY rate in units a second, not
+    a rate of landings, and the landing rate needed is 1/1.116 = 0.896/s.
+    At the guide's `every: 3.2` that is **three kites**. The TOW is also the
+    precedent for the shape: it is the only swelled-count body in the game
+    with a ranged action and its answer to the crowd is to have no cadence at
+    all (`this.hurled = true; // spent: it never gets another one`).
+  - **THE GUIDE'S COUNTER IS ARITHMETICALLY UNAVAILABLE AT EVERY RUNG.** A
+    fully bought turret fires `1 / (holdFireInterval * up.rate)` =
+    **3.885 rounds a second**. `bandsFor` returns `[hi - 1, hi]`, so band 5
+    is drawn at every rung from 29 to the ceiling, and the budget swells the
+    authored three kites to **16 at rung 29, 29 at 32, 43 at 35, 67 at 42 and
+    104 at 49** -- measured, SWARM divided out -- held at `maxEnemies` **57**
+    from about rung 38. So the field lobs **5.0 to 17.8 bolts a second**, and
+    shooting them down (one round one kill, gun doing nothing else, no slew at
+    all) is short by **1.29x at the lightest rung** and 4.58x at the cap, with
+    SWARM doubling it about half the time.
+    **My first figure was 32 at rung 29 and it was 16 x SWARM**, which is
+    build 314's rule verbatim -- `asked` includes SWARM, which is a TRAIT and
+    not a slope, so divide it out and say so. The corrected number is the
+    weaker margin at the lightest rung and the stronger SENTENCE: with no
+    trait at all, at the very first rung band 5 is played on, the field
+    already out-lobs the best gun the tree sells.
+  - **AND A SHOOTABLE BOLT TAKES THE GUN FOR ITS WHOLE FLIGHT.** Measured on
+    a live field over 300s at rungs 29/32/35, fully bought, nothing stubbed:
+    the assist's best score has a median of **630-876 units** and something
+    is gripping only **0-4%** of the time, so a synthetic bolt scored into
+    the same `consider` wins **80-100% of frames** at 445, 346, 247, 148, 74
+    and 25 units out. A bolt is strictly nearer the machine than the kite
+    that fired it and it closes -- **the exact inverse of build 323's CHAFF
+    finding**, where a copy was nearer than its own owner ZERO times, closest
+    ratio 1.005. CHAFF needed an explicit line to give a ghost the lock; a
+    bolt needs an explicit refusal, and with build 291's release gate waiting
+    for the field to thin, 15 to 57 permanently-nearest targets is a run that
+    cannot climb.
+- **TWO CHANNELS ARE LIVE, AND THE FUSE'S BRACKET IS EMPTY, WHICH IS THE
+  FINDING WORTH KEEPING.** Salvage denial is the other one -- a GLUT eating
+  `world.drops` is a shipped precedent with a codex line -- and it has no
+  middle: near the machine the salvage is already gone (the ground inside the
+  mount is empty on **76-99% of samples** at rungs 29/35, so eating on impact
+  is invisible), while a patch that LINGERS takes 1.25-1.46 drops a second
+  worth **66-69% of everything banked**, which is a wave ending rather than an
+  attack; and income is not reproducible run to run (2-7x swings at one rung),
+  so nothing between the two could have been tuned against a measurement.
+  The glitch fuse is the other reachable payload that is not cosmetic:
+  visible, clamped at 1, and `Director.burnFrom` (build 293)
+  exists precisely so a third cause can be NAMED rather than silently
+  captioned "clear the turret". It fails on arithmetic in both directions at
+  once. `waves.glitch.fuse` is 14s, contact fills at rate 1 (7.14%/s) and
+  recovery drains at 0.6 (**4.29%/s**). Measured through the real director at
+  rungs 29/32/35, era 2: kites reach their stations spread over **154 to 190
+  seconds** with a mean gap of **3.5 to 5.3s** and a worst three-second burst
+  of **4 to 10** arrivals.
+  - ONE-SHOT (the TOW's idiom): at a ~4s mean gap the fuse drains **17%**
+    between bolts, so a bolt worth less than that can never accumulate and is
+    invisible; a bolt worth that much puts a burst of ten at **170% of the
+    fuse** and discharges it instantly, repeatedly.
+  - REPEATING at 3.2s: ONE kite lobbing has to be worth
+    `recover / fuse * every` = **13.7% of the fuse** just to outrun the drain,
+    which is legible. FORTY-THREE of them need **13.7 / 43 = 0.32%** each to
+    do exactly the same thing -- and 0.32% of a 14-second fuse is **45
+    milliseconds** of contact, a thirty-third of what one gripping body does
+    during its arming delay alone.
+  **So the per-bolt value that survives the crowd is 1/43 of the value that
+  makes one bolt legible, and the factor between them is EXACTLY the delivered
+  count -- which is the budget's and not the author's.** A per-body cadence is the
+  wrong parameterisation of the design, and that is not something a number
+  can be tuned to. The general rule: **before authoring a per-body rate, ask
+  what the budget does to the count** -- build 301 made a wave's counts a
+  budget, so "two or three" in a design document is 32 to 57 in play, and any
+  payload whose aggregate is linear in that count has to be bounded at the
+  TYPE and not at the body.
+- **...AND THE COUNT CANNOT BE TUNED EITHER, BECAUSE THE BUDGET IS
+  SELF-CORRECTING.** `swell = budgetAt(tier, band) / threatOfWave(wave)`, so
+  taking kites out makes the wave lighter and the swell bigger: cutting the
+  authored count by two thirds cuts the delivered count by **58%**, and at
+  one kite the wave sits 22% under its band's mean -- outside build 315's
+  +-10% lever -- while still delivering 18 of them. Adding ballast re-prices
+  band 5 **upward by 4-8%**, which is build 328's fault by name (ANVIL's wave
+  took that band's mean up and turned REMNANT's `|moved| < 0.05%` arm red for
+  a reason having nothing to do with REMNANT), on the band build 306 already
+  measured missing the 120s cap at four of seven rungs. Removing the wave
+  entirely moves band 5 by **-0.05%**, which is the floor of the option space
+  and worth knowing.
+  If it ever comes back it needs a re-spec and not a number: a payload that
+  is not the shader, and a bound that is not per body -- the TOW's budget of
+  throws, or `laneBusy`'s exclusion generalised to "at most k in flight for
+  the whole type", derived from `maxEnemies` the way `leaveGhost`'s cap is.
+  Both halves together or not at all, which is GYRE's ruling.
+- **THE WALL OVERFLOWS ITS SLOTS ON A SMALL SCREEN, AND THE OVERFLOW IS THE
+  COMMON CASE RATHER THAN AN EDGE.** `standSlotFor`'s fallback was
+  `return n - 1` under a comment reading "more bodies than the wall has room
+  for", i.e. an overflow guard for an unlikely case. It is not unlikely: the
+  slot count is `cols * rows` off the FIELD and the kite count is the
+  BUDGET's, so the two have nothing to do with each other. Measured at
+  **320x568 era 2 the wall has 32 slots (8 x 4) and rung 35 stands 57 kites
+  in it**, so **26 of them shared one point** -- and the same 57 at 390x844
+  have 99 slots and fit. Clean A/B over the same controlled lay: worst slot
+  **26 before, 2 after**, top five `[26,1,1,1,1]` against `[2,2,2,2,2]`, and
+  the 390x844 cell identical either way, which is the no-op claim. It cost no
+  HEALTH (0.306-0.385 of the pool worst, at both viewports and both ways --
+  the settling, not the doubling); it cost the PICTURE, which is the object.
+  Least-occupied rather than `i % n`, because the count is the same read the
+  first pass already does, so a body that dies out of a doubled slot gives
+  its place back -- the hole-where-it-falls rule one level up, and it needs
+  no roster and no ordering.
+- **A CASE THAT LAYS BODIES ON A WRAPPING MODULO LAYS THEM ON TOP OF EACH
+  OTHER.** The first version of that arm used
+  `x = 60 + (i * 53) % (width - 120)`, which wraps, so bodies shared a
+  column; ninety seconds of settling then killed **eight to twelve of them**,
+  a died-out slot freed itself, and `distinct === alive` went soft -- correct
+  behaviour reading as a failure. Two fixes and both are the same rule: lay
+  on a GRID at the wall's own pitch, and read after **half a second**,
+  because a slot is claimed on the body's first loose frame and never again,
+  so the question needs no settling at all. The arm asserts every body it
+  laid is alive and holding a slot, or the two counts it cares about are
+  measuring the instrument.
+- **A PROBE THAT PINS `runSeed` PINS THE TRAITS IT ROLLS, INCLUDING SWARM.**
+  `restart()` re-rolls `world.runSeed` and `traitsFor` is seeded off it, so
+  the first census read 43 kites asked and the pinned re-run read 86 --
+  exactly 2x, which is SWARM halving health and doubling the count. Build
+  333's note says to pin the seed for reproducibility and this is the other
+  half of it: **pinning a seed is choosing a trait roll**, so a probe that
+  pins one owes the reader the traits it drew. 20260824 rolls SWARM+MENDING.
+- **AND A WAVE CENSUS THAT RELEASES EVERY JOB MEASURES THE JOB ORDER.**
+  `load` shuffles the job list and `emit` refuses to release while
+  `hostileCount >= maxEnemies`, so which jobs get out before the cap is hit
+  is seed-dependent: the same wave read `arrived: 1` on one seed and 29 on
+  another, for the type under test, with nothing about it changed. A question
+  about ONE type's bodies wants those bodies laid, not a wave played --
+  which is also what makes the A/B above clean.
+- **TWO STALE COPIES FOUND ON THE WAY PAST, AND BOTH ARE BUILD 329'S RULE.**
+  `CFG.energy.pull`'s inline comment said "units per second" and it is an
+  ACCELERATION: its one reader is `collectData`'s
+  `e.vx += (dx / d) * S.pull * dt`, i.e. u/s^2. `CFG.snare`'s own `pull`
+  beside it IS a target speed, which is how the wrong unit read as plausible
+  -- **the same field name meaning two different quantities in two blocks**.
+  And `yard.js`'s docstring said "the wall stands at 561.5 and the turret at
+  848.1, so the open field between them is 287 units"; measured live it is
+  **873 and 311.5**, the 848.1 being the pre-292 mount at `--bar-h: 74`
+  against 64 now. The claim it supports still holds, so this is a copy going
+  stale rather than a rule breaking -- which is exactly why nothing could
+  fail for it.
+- **A SCOUT FAN-OUT DIED WITH TWO LENSES IN FLIGHT AND ONE OF THEM PAID FOR
+  THE WHOLE RUN.** The workflow was killed by a context compaction with 2 of
+  6 agents started and no result written; its journal and per-agent
+  transcripts survive under `subagents/workflows/<runId>/`, and the cadence
+  lens's last message held the `Math.max` saturation, the TOW precedent, the
+  bolts-a-second table and the self-correcting-budget table -- none of which
+  I had. **Read the transcripts of a fan-out that died before re-running
+  it**: `journal.jsonl` says which agents started, and the final assistant
+  text block of each `agent-*.jsonl` is the work. The standing rule held
+  anyway -- its census of the shock writers said eleven where I verified
+  eleven, and its two proposed bounds are recorded above as a re-spec rather
+  than taken as a design.
+- **AND BUILD 335'S OWN KITE ARM PROVED ITS LIVENESS BY PLAYING A WHOLE WAVE
+  AND HOPING, WHICH IS A COIN TOSS ABOUT ONE RUN IN FIVE.** The absolute is
+  that kites alone never grip the machine, and a zero means nothing unless
+  the counter has been shown to read a one -- so the arm proved that with
+  `play(false)`, the same wave WITH its BULWARKs, on the argument that a
+  heavy body ploughing through the line shoves a kite over the grab band. It
+  does, and **intermittently**: measured over five draws the crowd run reads
+  **182, 1084, 161, 700 and ZERO** grip frames, the zero being a run whose
+  deepest kite finished **33 units short** of the band. THREE seed-dependent
+  things are chained into that one conjunct -- the job shuffle, `emit`'s
+  release gate, and the wave's trait roll (the same run stands 29 kites or
+  57 depending on SWARM) -- and it turned red on build 336, whose content is
+  a withdrawal, a comment sweep and a KITE-only allocator that cannot reach
+  it.
+  **And the obvious deliberate form does not reproduce it**, which is why
+  this is a restructure rather than a re-site: ONE BULWARK laid at the centre
+  and walked down the line moves the deepest kite about 40 units and grips
+  nothing, 3 of 3. It takes the wave's ten to twenty of them, which is the
+  crowd the release gate and the trait roll decide.
+  What replaced it is the counter tested DIRECTLY: a kite put four units
+  inside the band is counted (**25 frames of 30**) and the same kite put 120
+  clear of it is not (**0**). No wave, no shuffle, no roll. The mechanism is
+  REPORTED with its five-draw spread beside it and asserted by nothing.
+  **A liveness conjunct is an assertion like any other, and "the scenario
+  usually produces one" is not a proof that the instrument can see one** --
+  test the instrument, and report the scenario.
+- **A CONJUNCT CAN BE MADE FALSE BY A FIX ELSEWHERE IN THE SAME BUILD.** That
+  same arm asserted `r.alone.dupes === 0` -- no two kites sharing a slot --
+  which was an absolute while the overflow piled every excess body on slot
+  `n - 1` and 335's own arm never reached the overflow at the suite's
+  viewport. With the spread it is only true while the wall has ROOM, so it is
+  `dupes === 0 || stood > slots` now and the sharing claim belongs to the new
+  arm. The tell was in the fix rather than in the failure: **when a change
+  makes a previously-impossible state legal, grep the suite for arms that
+  assert it is impossible** -- the suite's green would otherwise have been
+  luck about a viewport.
+- **`Director.burnFrom` IS AN EXTENSIBLE FIELD WITH TWO INEXTENSIBLE READERS,
+  AND MY OWN WITHDRAWAL NOTE ASSERTED THE OPPOSITE.** Build 293 added the
+  field under the rule that "a signal with TWO causes needs a field saying
+  which", and build 336's first draft wrote that it "exists precisely so a
+  third cause can be NAMED rather than silently captioned 'clear the
+  turret'". True of the field; **false of both readers**, which are two-way
+  ternaries whose else arm is the CONTACT answer:
+  `game.js:3352` is `burn === 'crowd' ? ON_CROWD : ON_GLITCH` and
+  `enemies.js:8832` is `cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED
+  GAVE OUT'`. **And the caption half is worse than mis-keyed, it is silent**:
+  `sayOnce` opens `if (lineSeen(l.id)) continue` and `markLine` persists per
+  DEVICE, so a one-element array whose line has already been read says
+  nothing ever -- a third cause would be silent on any device that has met
+  contact and would spend the wrong line on a fresh one. Build 293 fixed the
+  VALUE and left the SHAPE, and the form that cannot regress is one
+  `{ contact, crowd, ... } -> { line, reason }` table rather than a third
+  ternary. **A field being extensible is not the same as the code that reads
+  it being extensible**, and the sentence claiming otherwise was load-bearing
+  for the only future work the withdrawal invites -- which is exactly the
+  kind of prose nothing can fail for.
+- **TWO DOCSTRINGS NAMED FUNCTIONS THAT DO NOT EXIST, one of them mine.**
+  `config.js` said "`standoffOf` throws for a type that declares none" from
+  build 335 -- the function is `lobOf`, and the paragraph FOUR LINES BELOW
+  names it correctly. And `tutorial.js:146` said "See Game.watchGlitch";
+  `grep -rn watchGlitch src/ scripts/ index.html` returns that comment and
+  nothing else, the reader being inside `Game.checkContact`. Both were found
+  by a reviewer grepping the names rather than reading past them, which is
+  the cheapest sweep there is: **grep every identifier a docstring names.**
+- **KITE ARRIVING AS A FORMATION WAS RAISED AS THE BIGGEST LIVE FINDING AND
+  IT IS MEASURED CLEAN.** `formable(kite)` is true (no `solo`) while VEIL --
+  the other choose-a-place-and-hold gait -- carries `solo: true`, and build
+  330 measured 30 sheets arriving as a formation leaving **20 of 30 staged in
+  the throat**. Measured for KITE through the real `Director.emit`, four
+  cells of viewport and rung: **`staged: 0` in every one**, 32 of 32 arriving
+  at rung 29 and 57 of 57 at the cap. The difference is the BODY, not the
+  gait: `spawnFormation` pitches slots at `r * 2 + 8`, which is 48 for an
+  r-20 kite and 216 for a 104-unit sheet, so a formation of sheets is an
+  edge-to-edge wall and a formation of kites is an ordinary shape. **A
+  structural analogy is a reason to measure, not a finding** -- the same rule
+  as a fan-out's pointer.
+- **THE RELEASE-GATE FUSE ARM DREW `held: 0` IN THE SUITE AND 25.4s STANDALONE
+  ON THE SAME TREE, AND ALL FOUR OF BUILD 322'S CONFOUNDS ARE ALREADY
+  PINNED.** Build 336's second suite run turned it red at
+  "held 0s of 300 ... 0 waves of wait", on a build whose executable content is
+  a KITE-only slot allocator thirty thousand lines further down the file and
+  a band the fuse arm's rung does not draw. Run standalone on the same tree,
+  minutes later: **held 25.4s, the fuse rose 1.251 against the 1.254 the
+  identity predicts (0.24% out), 24.7s of WAIT against 5.2s of contact, and
+  all three arms green.** So this is a draw, and the recorded distribution
+  for `held` now runs **0, 1.4, 13.6, 15.7, 25.4, 29.1, 37.5, 39.4, 42.5,
+  50.8, 54.3 and up to 154.4** seconds across the builds that have measured
+  it -- a floor of 10 on ONE draw of that.
+  What is NOT the cause: the loaded round, the rotation, the rung and the
+  tree are all pinned inside `play()` (build 322), and the detail string
+  proves it run by run. **The candidate left is the TRAIT ROLL** --
+  `traitsFor` is seeded off `world.runSeed`, which `restart()` re-rolls, so
+  SWARM doubles the bodies and MENDING heals them, and at rung 28 whether the
+  field drowns at all turns on that. Not run down here, because the window is
+  300 seconds an arm and this is the case CLAUDE.md already records as six
+  builds of tuning a number instead of finding it. **The next person to touch
+  it should pin the seed and pool three runs, the way the sibling arm's field
+  channel already does** -- and should note that a liveness floor is the one
+  conjunct in it that has never been pooled.

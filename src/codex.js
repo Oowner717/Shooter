@@ -563,8 +563,12 @@ export const CODEX = [
    * static (`invMass` 0, no `hp`, no `applyDamage`) and `CFG.gun.inPlay` has
    * been false since build 289, so the player cannot push up-field at all.
    * That is FLINT's fault again -- a counter named in prose that nobody can
-   * use -- and it is the second half of the same sentence whose FIRST half
-   * (the bolt) is build 336's.
+   * use -- and build 336 struck the FIRST half of the same sentence for the
+   * same kind of reason: the bolt is withdrawn, measured, because there is
+   * nothing at range for it to attack (no turret health), the one existing
+   * ranged payload is the shader and saturates at three bodies, and a
+   * shootable bolt takes the gun for its whole flight. The whole reading is
+   * in `CFG`'s kite block; what is left is the station, which is the object.
    *
    * What IS measured, and what this line rests on:
    *

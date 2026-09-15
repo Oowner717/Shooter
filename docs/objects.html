@@ -424,7 +424,21 @@
             measured against the build it landed in rather than against this page. KITE landed at
             335 as the STATION ONLY: the derived stand-off line and the ranks behind it, with the
             lob deferred, because the station needed a derivation of its own before anything could
-            be thrown from it. The <span class="num">420</span> below is not it &mdash;
+            be thrown from it &mdash; and at 336 <strong>the lob was withdrawn</strong>, so five of
+            the six rules is what phase 6 will ship. The reading is in the type's own block: there
+            is no turret health, so a ranged attack cannot do damage; <code>world.shock</code>, the
+            only ranged payload the game has, is the corruption shader and is written
+            <code>Math.max</code> at all eleven of its sites (ten on the bosses, one on a hurled
+            MASS landing), so it saturates at three bodies and every further bolt is free; the fuse is one of
+            the two live channels and its bracket is empty (a bolt cheap enough to survive the
+            delivered count is 1/43 of one legible on its own, and salvage denial has no middle); and a shootable bolt is strictly nearer the machine than the kite that fired it,
+            which hands the assist 15&ndash;57 permanently-nearest targets. The count is the
+            reason all four bite: this page authors &ldquo;two or three&rdquo; and the budget
+            delivers <span class="num">16</span> at rung 29, <span class="num">43</span> at 35 and
+            <span class="num">104</span> at the ceiling, capped at <code>maxEnemies</code> 57 from
+            about rung 38 &mdash; and SWARM, which this wave rolls about half the time, doubles it.
+            The
+            <span class="num">420</span> below is not it either &mdash;
             <code>420 - r</code> is <code>CFG.shooter.aimRange</code> to the digit, so the number in
             this page is the derivation already, evaluated at era 1 and written down as a distance;
             held literally it sits above the portal rim at 320&times;568 era 1 and behind the yard
@@ -1155,8 +1169,8 @@
 
     { name: 'KITE', band: 7, levels: '43–49', threat: 8, fam: 'volatile', r: 20, hp: 130, speed: 36, accel: 140, armor: 0, drops: 4,
       gait: 'standoff', count: 'two or three',
-      what: 'Holds <span class="num">420</span> units and never comes closer. Every <span class="num">3.2</span>s it lobs one slow arcing bolt at the machine — the first body in the game that attacks from outside contact range, and the first reason to push up-field instead of waiting.',
-      counter: 'The bolt is slow and visible and can be shot out of the air. Or close the distance: it has no answer to something already inside its range.',
+      what: 'Closes to the far edge of what your assist can reach and holds it, sliding sideways in ranks, and never comes closer. Shipped at build <span class="num">335</span>. The <span class="num">420</span> was not a distance &mdash; it is the reach plus a radius, evaluated at era 1, and the station is derived from the reach itself now. THE BOLT IS WITHDRAWN, measured, at build <span class="num">336</span>: there is no turret health for it to damage, the one existing ranged payload (<code>world.shock</code>) is the corruption shader and is written with <code>Math.max</code>, so it saturates at three bodies, and the delivered count is <span class="num">16&ndash;57</span> rather than two or three.',
+      counter: 'The gun, the reach and one press. It stands at 90% of what an UNBOUGHT assist can see, so it is the one body that makes ARRAY worth buying; it is the lightest thing in the game, so a PULSE throws the whole line 434 units and buys 14&ndash;16 seconds. Shooting a bolt down was arithmetically unavailable at every rung (a fully bought turret fires 3.885 rounds a second against 5&ndash;18 bolts, short already at the very first rung this band is played on), and closing the distance is not a move the player has &mdash; the turret is static and <code>CFG.gun.inPlay</code> has been false since build 289.',
       view: 36, viewAct: 64,
       draw: function (c, R, t, act) {
         c.save();
