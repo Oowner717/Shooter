@@ -4,7 +4,7 @@
 import { CFG } from './config.js';
 import { TAU, rand, spread, rgba, drawGlow, segClosest, segSeg, drawBolt } from './util.js';
 import { spark, dot, ring, edgeHit } from './fx.js';
-import { SHARD_R } from './enemies.js';
+import { SHARD_R, threadSpan, ownsLink } from './enemies.js';
 import { contactAt } from './physics.js';
 import { wallLine, shielded } from './yard.js';
 import { audio } from './audio.js';
@@ -543,6 +543,40 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     }
   };
   test(world.enemies);
+
+  /*
+   * ---- A THREAD: THE ONLY THING IN THIS GAME THAT STOPS A ROUND WITHOUT
+   * BEING A BODY (build 332) ----------------------------------------------
+   *
+   * A LOOM's pair strings one between them and it is cover in the literal
+   * sense. It is a SEPARATE pass rather than an arm of `test` above, because
+   * that loop rejects on the body's own `hitReach` bounding box and a thread
+   * reaches up to 190 units away from either end -- inflating `hitReach` to
+   * cover it would change what the sweep looks at for every body in the game.
+   *
+   * It takes part in the contest for `bestT`, so a thread crossed before the
+   * body behind it wins and a body in front of it still wins: the geometry
+   * decides, exactly as it does between a body and a WARDEN's plate.
+   *
+   * `ownsLink` solves each pair once -- the half standing to the left -- so
+   * the same segment is not tested twice per step.
+   */
+  for (let i = 0; i < world.enemies.length; i++) {
+    const e = world.enemies[i];
+    const L = e.type.bond;
+    if (!e.beam || !L || !L.stops || !ownsLink(e)) continue;
+    const sp = threadSpan(e);
+    if (!sp) continue;
+    const tr = sp.r + p.r;
+    const ct = segSeg(ax, ay, bx, by, sp.ax, sp.ay, sp.bx, sp.by);
+    if (ct.d2 <= tr * tr && ct.t < bestT) {
+      bestT = ct.t;
+      bestKind = 'thread';
+      bestTarget = e;
+      hitX = ct.qx; hitY = ct.qy; hitR = sp.r;
+    }
+  }
+
   // Energy is not in the way of anything. A round passes straight through it:
   // it is not a target, it is the thing you were shooting *for*.
 
@@ -667,6 +701,32 @@ function resolveSegment(world, p, ax, ay, bx, by) {
     case 'shard': {
       bestTarget.enemy.hitShard(bestTarget.shard, p.damage, c.x, c.y, c.nx, c.ny);
       endProjectile(world, p, c.x, c.y, true);
+      return;
+    }
+    /*
+     * ---- ABSORBED, THE WAY THE YARD WALL ABSORBS -------------------------
+     *
+     * `impacted` false, so the round is swallowed rather than burst: an HE
+     * that meets a thread does not detonate against it and a SLIVER does not
+     * fan off it, which is the same ruling the era-2 wall carries a hundred
+     * lines above -- and it is what makes the guide's own analogy ("our
+     * rounds stop on the thread the way they stop on the era-two wall") true
+     * of the mechanism rather than only of the picture.
+     *
+     * Nothing takes the damage. The pair is not hurt by its own cover and the
+     * round simply did not happen, which is why the answer is the SPOOLS: the
+     * thread is inset by a radius at each end precisely so they stay
+     * shootable (see `threadSpan`), and either of them drops it.
+     *
+     * A piercing round is stopped too, deliberately: `pierce` is a rule about
+     * going through a BODY, and a promise that cover holds cannot have one
+     * upgrade quietly exempt from it.
+     */
+    case 'thread': {
+      for (let i = 0; i < 3; i++) {
+        spark(c.x, c.y, spread(120), spread(120), bestTarget.type.color, 0.16, 1.8);
+      }
+      endProjectile(world, p, c.x, c.y, false);
       return;
     }
     case 'graft': {

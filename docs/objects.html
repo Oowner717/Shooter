@@ -419,7 +419,17 @@
             object and wants a fresh entry above rather than this one.</li>
           <li><strong>Which of the nineteen ship together.</strong> Six of them (LOOM's thread, VEIL's
             occlusion, MIRE's ground, KITE's lob, CHAFF's ghosts, ANVIL's immunity) each add a rule
-            the player has to be taught. They should not arrive in one build.</li>
+            the player has to be taught. They should not arrive in one build. Four of the six are in
+            &mdash; CHAFF at 323, ANVIL at 328, VEIL at 330, LOOM at 332 &mdash; and each rule was
+            measured against the build it landed in rather than against this page.</li>
+          <li><strong>MIRE's ground wants re-speccing before it is built.</strong> Its three payload
+            clauses are a mine taking twice as long to arm, a DECOY decaying, and the intake pulling
+            at half rate. The first two are the clauses GYRE was withdrawn for at build 331 &mdash;
+            mines are out of play, and a DECOY is a purchase standing nine seconds of every
+            twenty-four &mdash; and the third was measured invisible in the same pass: drops no
+            longer expire and <code>collectData</code> pulls at 26&nbsp;u/s&sup2;, so delaying
+            income costs nothing at all. It needs a payload that is live in this build before it is
+            worth a gait.</li>
           <li><strong>Names.</strong> Field objects are plain nouns and anomaly pieces are
             mathematical terms; all of them follow the first convention. SHARD, ECHO, MITE, PLATE,
             SEED, CREST, BOUND and TILE are already taken by anomaly pieces and are avoided.</li>
@@ -1063,7 +1073,7 @@
     { name: 'LOOM', band: 6, levels: '36–42', threat: 10, fam: 'multiply', r: 20, hp: 110, speed: 34, accel: 120, armor: 0, drops: 3,
       gait: 'paired', count: 'a pair, always',
       what: 'A pair that walks <em>apart</em>, stringing a bright thread between them. Our rounds stop on the thread the way they stop on the era-two wall. It is the enemy building cover, and it gets wider the longer it lives.',
-      counter: 'Either end drops it. They separate slowly, so the first four seconds are free — and a blast or a mine reaches under the thread, which rounds do not.',
+      counter: 'Either end drops it. They separate slowly, so the first four seconds are free — and a blast or a mine reaches under the thread, which rounds do not. <b>Shipped at build 332 into band 5, and two thirds of that counter measured true:</b> a round aimed at a body 40 units behind a full-span thread delivers <b>0</b> against 26 to the same body in the same place with the link down; both ends still take a whole round, because the thread is inset by a radius at each end so the spools stay shootable — which makes the blocking span <code>d &minus; 2r</code>, 16 units at release and 150 at full, so "the first four seconds are free" falls out of the geometry rather than being a fitted delay; and a 90-point blast centred under a standing thread delivers <b>88.2</b>, because <code>applyBlast</code> measures centre to centre and consults nothing in between. The MINE is not a counter: <code>CFG.mines.inPlay</code> has been false since build 289, and the codex line does not offer one. Band 6 does not exist — <code>perBand</code> is 7, so the five authored bands cover rungs 1–35 and a sixth holding one wave would play that wave at every rung from 36 to 42. Threat derives <b>7.33</b> against the 10 authored here (two pools of 110, and <code>threatOf</code> had to learn that a pair with no shared pool counts both halves), and the wave is priced at band 5\'s own mean.',
       view: 44, viewAct: 66,
       draw: function (c, R, t, act) {
         var d = act ? 52 : 22 + Math.sin(t) * 3;

@@ -519,6 +519,42 @@ export const CODEX = [
     name: 'VEIL',
     line: 'A membrane that goes wide before it comes down, and then simply hangs there across the field. It is not coming for you and it does not have to: every round aimed at anything behind it stops in it instead, and a sheet is a hundred units wide. Most of what your gun does while one stands is spent on cloth. It is the lightest thing out there for its size, though -- the one body a press throws right off the field, where an ANVIL will not move an inch -- so the answer is rarely the gun.',
   },
+  /*
+   * ---- LOOM's LINE NAMES THE TWO COUNTERS THAT WERE MEASURED -------------
+   *
+   * `docs/objects.html` offers "either end drops it... and a blast or a mine
+   * reaches under the thread, which rounds do not". Two thirds of that is
+   * true and measured here, and the mine is not: `CFG.mines.inPlay` has been
+   * false since build 289, and builds 317 and 319 each shipped a codex line
+   * offering a mine as an answer that 323 had to correct. A line is a
+   * promise; this one does not make that one.
+   *
+   *   - EITHER END: a round aimed at a spool takes 26 of its health with the
+   *     thread at full span, from both ends, because `threadSpan` insets each
+   *     end by that body's own radius. The pair cannot hide behind its own
+   *     cover.
+   *   - A BLAST UNDERNEATH: 88.2 of 90 delivered to a LURCHER standing 40
+   *     units behind a full-span thread, because `applyBlast` measures centre
+   *     to centre and consults nothing in between. PULSE is the one every run
+   *     owns -- it is `essential`, so no purchase and no hold can take it --
+   *     and it is radial from the machine, so it never picks a target at all.
+   *   - AND THE ROUNDS REALLY DO STOP: the same shot at the same body with
+   *     the same geometry reads 0 damage with the thread up and 26 with it
+   *     down, `beam` being the only difference. It is absorbed the way the
+   *     era-2 wall absorbs -- `impacted` false -- so an HE does not even go
+   *     off against it.
+   *
+   * The line does NOT say the gun will refuse the shot for you, because it
+   * will not: the thread is deliberately outside `occluders` (see the type),
+   * so an assist left to itself will spend rounds on cover. That is the cost
+   * the object exists to impose and the reason the first four seconds matter
+   * -- the blocking span is `len - 2r`, 16 units at release and 150 at full.
+   */
+  {
+    id: 'loom',
+    name: 'LOOM',
+    line: 'Two spools that come down together and then walk apart, paying out a bright thread between them as they go. The thread is not aimed at you and it does not have to be: a round that meets it simply stops, whatever was behind it, and the longer the pair lives the more of the field it covers. Shoot it early, while the gap is still narrower than the bodies making it. After that, either spool drops the whole thing -- the thread never quite reaches them -- or put a blast underneath it, which reaches what your rounds cannot.',
+  },
   {
     id: 'quarry',
     name: 'QUARRY',

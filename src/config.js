@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '331';
+export const BUILD = '332';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '331';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '7ba2b17';
+export const REV = '651c570';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1451,22 +1451,28 @@ export const CFG = {
    * with something that reaches both... focusing one half is the trap").
    * Recorded here because the next reader will have the guide open.
    */
-  yoke: {
-    len: 60, // the beam, centre to centre -- 2.3r, the guide's own spacing
-    /*
-     * Radians a second about the midpoint, and it is COMPENSATED rather than
-     * held: `grip` blends the tangential velocity toward this, and both
-     * `linearDamping` and `drive`'s own accel term pull it back every frame,
-     * which delivers 0.59 of a raw target -- measured 0.692 rad/s against
-     * this 1.2 before `pairOn` grossed the ask up by those two terms.
-     * Delivered 1.143-1.172 over three runs. See `Enemy.pairOn`: a target
-     * rate is not a rate, which this repo has now paid for three times.
-     */
-    spin: 1.2,
-    grip: 3, // how hard the pair is held at that rate, per second
-    snap: 0.5, // the share of the pool that, on ONE half, breaks the beam
-    alone: 1.9, // ...and what the survivor's speed is multiplied by
-  },
+  /*
+   * ---- `CFG.yoke` IS GONE, AND THE NUMBERS ARE ON THE TYPES (build 332) --
+   *
+   * It held `len`, `spin`, `grip`, `snap` and `alone`, and `pairOn`,
+   * `pourPool`, `drawYoke` and `pairOf` all read it BY NAME -- so LOOM, the
+   * second `paired` type, would have worn YOKE's beam length, rotation rate,
+   * grip, pool share and survivor speed in total silence, with no field to
+   * set and nothing to fail. Not one of those five numbers is the GAIT's:
+   * they are all facts about one pair.
+   *
+   * That is the sixth instance of this exact shape -- `plated` reading
+   * `CFG.flint` (319), `ride` reading `CFG.graft` (322), `respawn` (324),
+   * `planted` (328) and `bar` reading `CFG.cartwheel` (330) -- and the
+   * second found BEFORE it did any damage, because the new type was authored
+   * against the block. The rule build 330 stated holds: a number about the
+   * GAIT is shared, a number about the BODY is the type's. So each pair type
+   * carries its own `bond` block, `pairOf` throws for a missing or malformed
+   * one, and `check-build` holds it in both directions.
+   *
+   * YOKE's five numbers are unchanged to the digit and the ORDINAL hash is
+   * what says so.
+   */
 
   /*
    * ---- A PLATE ON ONE FACE, AND A BODY THAT KEEPS IT POINTED AT YOU -----
@@ -5133,6 +5139,30 @@ export const ENEMY_TYPES = [
     shape: 'yoke',
     gait: 'paired',
     pair: 2,
+    /*
+     * The pair's own numbers, which lived in `CFG.yoke` until build 332 --
+     * see the note where that block was. Unchanged to the digit.
+     *
+     * `spin` is COMPENSATED rather than held: `grip` blends the tangential
+     * velocity toward it, and both `linearDamping` and `drive`'s own accel
+     * term pull it back every frame, which delivers 0.59 of a raw target --
+     * measured 0.692 rad/s against this 1.2 before `pairOn` grossed the ask
+     * up by those two terms. Delivered 1.143-1.172 over three runs. See
+     * `Enemy.pairOn`: a target rate is not a rate.
+     *
+     * `pool: true` is what makes this pair ONE 150 rather than two: it is
+     * read by `spawnPair` (which gives both halves one ceiling) and by
+     * `pourPool` (the share that snaps the beam). LOOM declares no pool and
+     * so has two, which is why either end drops its thread.
+     */
+    bond: {
+      len: 60, // the beam, centre to centre -- 2.3r, the guide's own spacing
+      spin: 1.2, // radians a second about the midpoint, before compensation
+      grip: 3, // how hard the pair is held at that rate, per second
+      alone: 1.9, // what a survivor's speed is multiplied by
+      pool: true, // one pool of health across both halves
+      snap: 0.5, // the share of it that, landed on ONE half, breaks the beam
+    },
     r: 26,
     hp: 150,
     density: 0.95,
@@ -5153,6 +5183,113 @@ export const ENEMY_TYPES = [
     glow: '#5a2fb0',
     weight: 0, // never chosen by the ordinary spawn roll -- it is authored
     drops: 5, // energy it leaves when it comes apart
+  },
+  {
+    /*
+     * LOOM: a pair that walks APART, and the thread between them stops our
+     * rounds. Build 332, phase 6q, and the seventeenth object to ship.
+     *
+     * It is the first thing in this game that stops a round anywhere but at
+     * the edges of the field. The guide's analogy is exact and was CHECKED
+     * rather than assumed: `updateProjectiles` clips a round's step at
+     * `wallLine` and takes it there with `impacted` false, so the era-2 wall
+     * really does absorb our rounds, and the thread is that rule brought into
+     * the middle of the arena. (The first draft of this paragraph said the
+     * wall did no such thing. It reads `shielded`, which refuses the CHOOSER
+     * and the damage path, and there is a second mechanism a hundred lines
+     * above it that does the absorbing.) A VEIL, by contrast, only makes the
+     * assist decline a shot it cannot make, and `spent` structure is passed
+     * straight through.
+     *
+     * ---- ...AND THE ASSIST IS NOT TOLD, WHICH IS A DECISION --------------
+     *
+     * `occluders` is VEIL's and the thread is deliberately NOT in it. Two
+     * reasons, and the first is a guarantee: build 330's argument that an
+     * occlusion rule can never leave the gun with nothing to shoot rests on
+     * sheets being LEVEL, so that "in front of" is a strict order by depth --
+     * a thread turns about its midpoint, two crossed threads could hide each
+     * other's spools, and a silent gun plus the build-291 release gate is a
+     * run that cannot climb. The second is the object: what LOOM costs is
+     * rounds, and an assist that declined the shot would refuse to pay it.
+     *
+     * ---- WHAT THE BAND IS, AND WHY IT IS NOT THE GUIDE'S -----------------
+     *
+     * `docs/objects.html` puts LOOM in band 6 at rungs 36-42, and BANDS 6
+     * AND 7 DO NOT EXIST: `CFG.waves.perBand` is 7, so the five authored
+     * bands cover rungs 1-35 and everything above that draws bands 4-5.
+     * Standing one up for this object would be worse than the band it has:
+     * `budgetAt` is the mean threat of a band's OWN roster and `shuffle`
+     * filters to the in-band waves, so a band 6 holding one wave would play
+     * that one wave at every rung from 36 to 42. Band 6 wants a roster, not
+     * a member. Band 5 is where the deepest authored play actually is, and
+     * that is where this goes -- with the guide's rungs recorded rather than
+     * quietly honoured.
+     *
+     * ---- TWO POOLS, WHICH IS THE DIFFERENCE FROM A YOKE ------------------
+     *
+     * A YOKE is two bodies of one 150 and where you aim decides what you are
+     * left holding. A LOOM is two bodies of 110 EACH, and the thread is up
+     * while both of them are: "either end drops it" is the guide's counter
+     * and it is the whole reason the object has a way in. So it declares no
+     * `pool`, `pourPool` does not run for it, and `threatOf` counts BOTH
+     * halves -- the same rule that makes a TOW count what it drags, a QUARRY
+     * what it becomes and a REMNANT what comes back.
+     *
+     * ---- THE COLOUR IS THE MULTIPLY FAMILY'S, AND IT IS ALREADY SHARED ---
+     *
+     * `#7cffb2` at dE 0.0 against SPLITTER, HERALD and QUARRY -- so this is
+     * the fourth type in one green rather than a new collision, and the
+     * standing ruling (SHOAL 314, SPINDLE 315, SHRIKE 317) applies without a
+     * fresh sweep: the family is what the colour means and the silhouette
+     * carries the distinction. Here the silhouette is unusually safe, because
+     * the thread is the picture -- nothing else in the game paints a bright
+     * line between two bodies, a TOW's cable being the harmless grey.
+     */
+    id: 'loom',
+    opens: 0,
+    name: 'LOOM',
+    shape: 'loom',
+    gait: 'paired',
+    pair: 2,
+    /*
+     * ---- THE THREAD'S GEOMETRY IS DERIVED FROM THE BODIES IT HANGS OFF ---
+     *
+     * `stops` is the thread's own radius -- what a round has to miss. What it
+     * does NOT say is how long the blocking segment is: that is `d - 2r`, the
+     * separation less one radius at each end, because the thread's ends are
+     * AT the two centres and a round arriving at a spool from the side would
+     * otherwise be eaten a unit short of the body it was aimed at. "Either
+     * end drops it" is the counter, so the ends have to be shootable, and
+     * deriving the inset from the radius is the idiom `roll` takes from
+     * `edgeEase` and `dive` from `grabPad`: before adding a rule about where
+     * the thread reaches, use the one that already says where it must not.
+     *
+     * It also gives the guide's "the first four seconds are free" for free
+     * rather than as a fitted delay -- at `len` 56 the blocking span is 16
+     * units of a 968-wide field, so it is the GROWTH that turns the pair into
+     * cover.
+     */
+    bond: {
+      len: 56, // centre to centre at release -- 2.8r, barely wider than they are
+      span: 190, // ...and what it grows to
+      grow: 14, // seconds from one to the other, linearly
+      spin: 0.3, // radians a second about the midpoint, before compensation
+      grip: 3, // how hard that rate is held, per second
+      alone: 1.4, // a survivor stops building cover and comes on faster
+      stops: 3, // the thread's radius: what a round has to miss
+    },
+    r: 20,
+    hp: 110,
+    density: 0.8,
+    speed: 34,
+    accel: 120,
+    restitution: 0.35,
+    wobble: 0.4,
+    armor: 0,
+    color: '#7cffb2',
+    glow: '#22d37a',
+    weight: 0, // never chosen by the ordinary spawn roll -- it is authored
+    drops: 3, // energy it leaves when it comes apart
   },
   {
     /*
@@ -7057,6 +7194,27 @@ export const WAVES = [
   { of: [['yoke', 6], ['glut', 1]], band: 5 },
 
   /*
+   * ...and the LOOM wave.
+   *
+   * The partner is a LURCHER on purpose, and the combination is the point
+   * rather than either body: a LURCHER closes and GRIPS, so the thing
+   * filling the glitch fuse walks on while the rounds meant for it stop on
+   * the thread. A heavy partner would just be a second wall.
+   *
+   * Three pairs and two LURCHERs weighs 34.33 against band 5's own mean of
+   * 36.44, so it re-prices the band by -0.41% -- build 315's lever, and the
+   * counts were chosen by measuring rather than by eye: the first draft was
+   * four pairs and three LURCHERs, which weighs 47.83, sits 31% OVER the mean
+   * and would have lengthened every other wave in band 5 by 2.2%.
+   *
+   * Note `threatOf` sees 7.33 a pair -- 220 of health, both halves, because
+   * LOOM declares no pool -- and still cannot see what the thread costs a
+   * ROUND, which is the same blind spot it has for FLINT's armour, for what a
+   * LATCH gives its host and for what CHAFF costs the assist.
+   */
+  { of: [['loom', 3], ['lurcher', 2]], band: 5 },
+
+  /*
    * ...and the LATCH wave, which closes band 3.
    *
    * Three latches and two BLOOMs weighs 20.47 against band 3's own mean of
@@ -7222,7 +7380,7 @@ export const GAITS = {
   roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
   flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
   cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
-  paired: 'two bodies on a rigid beam, turning about their midpoint while the midpoint advances',
+  paired: 'two bodies on a rigid link, turning about their midpoint while the midpoint advances -- held at a fixed length by a YOKE, walked apart by a LOOM',
   dive: 'holds height across the top, then runs down the edge of the machine and climbs back for another',
   ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
   hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',

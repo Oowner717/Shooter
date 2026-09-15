@@ -31695,7 +31695,7 @@ if (MINE_LINE) {
  *      wave's OTHER entry, which does form up, so the arm is shown able to
  *      tell the two spawn paths apart before it is believed about either.
  *   2. the beam holds its length, against a non-rigid tether that does not.
- *   3. the pair turns at the rate `CFG.yoke` authors, which is a claim about
+ *   3. the pair turns at the rate its own `bond` block authors, which is a claim about
  *      a DELIVERED rate and not about the expression that asks for it.
  *   4. focused fire leaves a survivor; spread fire over the same pool leaves
  *      none. Each is the other's control: same bodies, same total, different
@@ -31711,7 +31711,7 @@ if (MINE_LINE) {
     const out = {};
     const T = TYPE_BY_ID.yoke;
     out.cfg = pairOf(T);
-    out.spin = CFG.yoke.spin;
+    out.spin = out.cfg.spin;
     g.restart();
     /*
      * Eighteen cases in the damage-bench family leave `director.update`
@@ -31757,7 +31757,7 @@ if (MINE_LINE) {
         for (const e of made) {
           const o = e.tether && e.tether.other;
           if (e.beam && o && o !== e && made.includes(o)) rec.beamed++;
-          if (!o || Math.abs(Math.hypot(o.x - e.x, o.y - e.y) - CFG.yoke.len) > 0.05) rec.bad++;
+          if (!o || Math.abs(Math.hypot(o.x - e.x, o.y - e.y) - T.bond.len) > 0.05) rec.bad++;
         }
         for (let i = 0; i < made.length; i++) {
           for (let j = i + 1; j < made.length; j++) {
@@ -31769,7 +31769,7 @@ if (MINE_LINE) {
       }
       out.per = per;
       out.slotGap = T.r * 2 + 8;
-      out.span = T.r * 2 + CFG.yoke.len;
+      out.span = T.r * 2 + T.bond.len;
     }
 
     /*
@@ -31815,7 +31815,7 @@ if (MINE_LINE) {
      * taught that headroom beats sensitivity.
      *
      * RECORDED AND NOT ACTED ON: a pair that rolls `loiter` really does
-     * deliver about 104% of the spin `CFG.yoke` authors, so an authored
+     * deliver about 104% of the spin the type's `bond` block authors, so an authored
      * constant depends on a spawn roll in play as well as in the probe.
      * Exempting `paired` in `OWN_SPEED` would fix the rotation AND make the
      * pair close faster, which is a balance change -- the same reason
@@ -32052,7 +32052,7 @@ if (MINE_LINE) {
     + `with \`rigid\` off the same press leaves them at ${r.rope.back.toFixed(2)}, which is the `
     + `pair solver's own overlap floor of ${r.floor.toFixed(1)} rather than anything the link did`);
 
-  check('...and turns at the rate CFG.yoke authors, which is a DELIVERED rate',
+  check('...and turns at the rate its own bond block authors, which is a DELIVERED rate',
     r.beam.rate > r.spin * 0.9 && r.beam.rate < r.spin * 1.05,
     `${r.beam.rate.toFixed(3)} rad/s against an authored ${r.spin} on a route with no `
     + `dawdle (pinned: unpinned it reads 93.6-104.3% and one draw in twenty came 0.7 points `
@@ -37161,6 +37161,342 @@ if (MINE_LINE) {
     + `the same release arrived ${G.controlArrived} (dead ${G.controlDead}) having `
     + `wandered ${G.controlCrossed} units of lateral on its route -- so arriving is `
     + 'not what this arm is about, holding a chosen column on the way is');
+}
+
+/*
+ * ---- LOOM: A THREAD THAT STOPS A ROUND, AND THE TWO WAYS ROUND IT --------
+ *
+ * Build 332, phase 6q. A pair that walks apart stringing a thread between
+ * them, and the thread is the first thing in this game that stops a round
+ * anywhere but at the edges of the field.
+ *
+ * Five claims, and the first is the object:
+ *
+ *   1. THE THREAD STOPS THE ROUND, measured as an A/B on `beam` alone --
+ *      the same body in the same place hit by the same shot, with the link
+ *      up and down. Not a margin: it is 0 damage against a full hit.
+ *   2. EITHER END DROPS IT. `threadSpan` insets each end by that body's own
+ *      radius precisely so the spools stay shootable, which is the guide's
+ *      counter and the only way in. Both ends, at full span.
+ *   3. A BLAST REACHES UNDER IT, because `applyBlast` measures centre to
+ *      centre and consults nothing in between -- the other counter, and the
+ *      one every run owns through PULSE.
+ *   4. THE WIDTH IS DELIVERED. `bond.span` over `bond.grow` is a positional
+ *      constraint rather than a velocity blend, so unlike every `speed` in
+ *      this repo's "a target rate is not a rate" family it arrives exactly:
+ *      asserted against the authored ramp to 2%, which nothing steered can
+ *      manage.
+ *   5. THE SALVAGE CANNOT INHERIT IT. A mote is built from the parent's TYPE
+ *      (build 322's LATCH fault), so it carries `bond` -- and `beam` is
+ *      written by `spawnPair` alone, so the door is already shut. Asserted
+ *      rather than left to be rediscovered.
+ *
+ * ...and the sixth arm is the refactor's no-op proof: YOKE's five numbers
+ * moved out of `CFG.yoke` onto the type, and a yoke still shares one pool,
+ * still snaps at the same share and still weighs exactly what it did.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { WAVES, CFG, TYPE_BY_ID } = await import('/src/config.js');
+    const E = await import('/src/enemies.js');
+    const U = await import('/src/util.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const out = {};
+    const L = TYPE_BY_ID.loom.bond;
+    /*
+     * Eighteen cases upstream leave the director stubbed and `spawnLock`
+     * pinned and nothing puts either back; this case wants NO wave, so it
+     * sets both deliberately and hands the stub back at the end.
+     */
+    const clean = () => {
+      g.debugClearField();
+      w.projectiles.length = 0;
+      w.mines.length = 0;
+      w.effects.length = 0;
+      w.ghosts.length = 0;
+      w.drops.length = 0;
+      w.debris.length = 0;
+      if (w.respawns) w.respawns.length = 0;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+      /*
+       * ---- ...AND THE WAVE'S RULES, WHICH COST THIS CASE A SUITE RUN -----
+       *
+       * `Director.load` seeds `d.traits` and only `score` clears it (build
+       * 327), `scaleToTier` stamps it onto every body spawned afterwards, and
+       * a case upstream leaves ARMORED rolled -- which DISCARDS the first hit
+       * each second. Every measurement here is a SINGLE hit, so all four
+       * damage arms read exactly zero on a build where the thread works
+       * perfectly: 0 from a round with the link down, 0 from both spools, 0
+       * of a 90-point blast, and a YOKE that would not snap. The arms assert
+       * this is empty, because a zero from a world that cannot be hurt is not
+       * a measurement of anything.
+       */
+      w.director.traits = [];
+    };
+    const step = (n) => { for (let i = 0; i < n; i++) g.update(1 / 60); };
+    /*
+     * ---- THE POSITIONS ARE THE MACHINE'S, AND THAT IS NOT WHAT FIXED THIS -
+     *
+     * Four of this case's arms failed in the suite while passing standalone
+     * and the cause was the wave TRAITS above, not the geometry. It is worth
+     * writing down which, because the era was a plausible story that a probe
+     * agreed with: the suite leaves the world at era 2, where the mount is at
+     * 1558 against 1012.6, and `shielded` refuses the damage path for
+     * anything above the yard wall -- so an absolute `y` looked like the
+     * suspect. Measured both ways at era 2 with the traits cleared, the
+     * absolute version passes every arm. **The era was never a cause.**
+     *
+     * The relative placement stays anyway, as robustness rather than as a
+     * fix, and it is stated as that: the era is a quantity six hundred cases
+     * upstream can move, and `s.y` follows it. The era and the mount are
+     * printed for the same reason -- a measurement that does not say where it
+     * stood cannot be read six builds later.
+     */
+    const midY = () => s.y - 170;
+    // A pair, held still and levelled so the geometry under test is known.
+    // `release` is the door -- `debugSpawn` makes one body and a pair is two
+    // (the TOW rule, build 192) -- and the halves are pinned rather than
+    // frozen so `pairOn` still runs and still owns the link.
+    const layPair = (y, wide) => {
+      clean();
+      const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, y);
+      for (const e of pr) { e.staged = false; e.born = 1; }
+      if (wide) for (const e of pr) { e.bondT = 999; e.tether.len = L.span; }
+      for (let i = 0; i < 40; i++) {
+        for (const e of pr) { e.vx = 0; e.vy = 0; e.cruise = 0; e.hp = e.maxHp; }
+        g.update(1 / 60);
+      }
+      const mid = (pr[0].x + pr[1].x) / 2;
+      const half = (wide ? L.span : L.len) / 2;
+      pr[0].x = mid - half; pr[0].y = y;
+      pr[1].x = mid + half; pr[1].y = y;
+      return pr;
+    };
+    const fireAt = (tx, ty) => {
+      s.aim = Math.atan2(ty - s.y, tx - s.x);
+      s.cd = 0;
+      return s.shoot(w);
+    };
+    // Fly the round out, holding everything still so only the round moves.
+    const flyOut = (hold) => {
+      for (let i = 0; i < 120; i++) {
+        for (const e of hold) { e.vx = 0; e.vy = 0; e.cruise = 0; }
+        g.update(1 / 60);
+        if (!w.projectiles.length) return i + 1;
+      }
+      return -1;
+    };
+    w.up.damage = 1; // one known round, so the A/B is a number and not a kill
+
+    // ---- 1. the thread stops it, and the switch is `beam` ---------------
+    const shot = (up) => {
+      const pr = layPair(midY(), true);
+      const sp = E.threadSpan(pr[0]) || E.threadSpan(pr[1]);
+      const mid = (pr[0].x + pr[1].x) / 2;
+      const mark = E.spawnOne(w, TYPE_BY_ID.lurcher, mid, midY() - 40);
+      mark.staged = false; mark.born = 1; mark.hp = mark.maxHp;
+      if (!up) for (const e of pr) e.beam = false;
+      const hp0 = mark.hp;
+      const fired = fireAt(mark.x, mark.y);
+      const frames = flyOut([...pr, mark]);
+      return {
+        fired, frames, took: +(hp0 - mark.hp).toFixed(2),
+        span: sp ? +Math.hypot(sp.bx - sp.ax, sp.by - sp.ay).toFixed(1) : null,
+        threadY: sp ? +sp.ay.toFixed(1) : null, markY: +mark.y.toFixed(1),
+      };
+    };
+    out.behind = shot(true);
+    out.clear = shot(false);
+
+    // ---- 2. either end drops it ----------------------------------------
+    {
+      const pr = layPair(midY(), true);
+      out.ends = [];
+      for (const e of [pr[0], pr[1]]) {
+        const hp0 = e.hp;
+        fireAt(e.x, e.y);
+        flyOut(pr);
+        out.ends.push(+(hp0 - e.hp).toFixed(2));
+      }
+      // ...and cutting one takes the thread with it.
+      //
+      // `layPair` pins the halves still, which leaves `cruise` at 0 -- and
+      // `0 * alone` is 0, so the first version of this arm read the
+      // multiplier as zero on a build where it works. Give the survivor a
+      // cruise to be multiplied and the claim is the multiplier.
+      const before = !!(E.threadSpan(pr[0]) || E.threadSpan(pr[1]));
+      const cruise0 = 100;
+      pr[0].cruise = cruise0;
+      pr[1].destroy(w);
+      step(3);
+      out.cut = {
+        before, after: !!E.threadSpan(pr[0]), beam: !!pr[0].beam,
+        hurried: +(pr[0].cruise / cruise0).toFixed(2), alone: L.alone,
+      };
+    }
+
+    // ---- 3. a blast reaches under it -----------------------------------
+    {
+      const pr = layPair(midY(), true);
+      const mid = (pr[0].x + pr[1].x) / 2;
+      const under = E.spawnOne(w, TYPE_BY_ID.lurcher, mid, midY() - 40);
+      under.staged = false; under.born = 1; under.hp = under.maxHp;
+      const hp0 = under.hp;
+      E.applyBlast(w, { x: under.x, y: under.y - 6, r: 200, damage: 90, impulse: 0, source: 'pulse' });
+      out.blast = { took: +(hp0 - under.hp).toFixed(1), of: 90,
+        thread: !!(E.threadSpan(pr[0]) || E.threadSpan(pr[1])) };
+    }
+
+    // ---- 4. the width is delivered against the authored ramp -----------
+    {
+      clean();
+      const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, Math.max(120, s.y - 640));
+      for (const e of pr) { e.staged = false; e.born = 1; }
+      const marks = [2, 4, 8, 14, 18];
+      const sep = [];
+      let at = 0;
+      for (const m of marks) {
+        step(Math.round((m - at) * 60));
+        at = m;
+        sep.push(+Math.hypot(pr[0].x - pr[1].x, pr[0].y - pr[1].y).toFixed(1));
+      }
+      const want = marks.map((m) => L.len + (L.span - L.len) * Math.min(1, m / L.grow));
+      out.grow = { marks, sep, want: want.map((v) => +v.toFixed(1)),
+        worst: +Math.max(...sep.map((v, i) => Math.abs(v / want[i] - 1))).toFixed(4) };
+    }
+
+    // ---- 5. the salvage inherits the block and not the thread ----------
+    {
+      clean();
+      const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, midY());
+      for (const e of pr) { e.staged = false; e.born = 1; }
+      step(10);
+      pr[0].destroy(w);
+      step(3);
+      const motes = (w.drops || []).concat(w.enemies.filter((e) => e.isDrop));
+      out.motes = { n: motes.length, bond: motes.length ? !!motes[0].type.bond : null,
+        beam: motes.some((m) => !!m.beam), thread: motes.some((m) => !!E.threadSpan(m)) };
+    }
+
+    // ---- 6. the block move is a no-op for YOKE -------------------------
+    {
+      clean();
+      const Y = E.pairOf(TYPE_BY_ID.yoke);
+      const pr = E.release(w, TYPE_BY_ID.yoke, w.width * 0.5, midY());
+      for (const e of pr) { e.staged = false; e.born = 1; }
+      step(2);
+      const pool = pr[0].maxHp === pr[1].maxHp && pr[0].hp === pr[1].hp;
+      const hp0 = pr[0].maxHp;
+      // the snap: pour the share into ONE half and the beam breaks
+      pr[0].applyDamage(w, hp0 * Y.snap + 1, 0, -1, 0, 0, null, 0, 'bolt');
+      step(2);
+      out.yoke = {
+        len: Y.len, spin: Y.spin, grip: Y.grip, snap: Y.snap, alone: Y.alone, pool: !!Y.pool,
+        shared: pool, len2: +Math.hypot(pr[0].x - pr[1].x, pr[0].y - pr[1].y).toFixed(1),
+        snapped: pr.some((e) => e.dead), stillBeamed: pr.filter((e) => !e.dead).some((e) => e.beam),
+        threat: +E.threatOf(TYPE_BY_ID.yoke).toFixed(4),
+        loomThreat: +E.threatOf(TYPE_BY_ID.loom).toFixed(4),
+        nominal: +(TYPE_BY_ID.loom.hp / CFG.waves.threatPerHp).toFixed(4),
+        // Divided RAW and rounded for the message -- build 313's rule, which
+        // the first version of this arm broke by comparing two `toFixed(4)`
+        // copies at a tolerance of 1e-9.
+        halves: +(E.threatOf(TYPE_BY_ID.loom)
+          / (TYPE_BY_ID.loom.hp / CFG.waves.threatPerHp)).toFixed(6),
+      };
+    }
+
+    // ---- ...and the wave is priced at its band's own mean --------------
+    {
+      const th = (q) => (q.of || []).reduce((a, [id, n]) => a + n * E.threatOf(TYPE_BY_ID[id]), 0);
+      const band = WAVES.filter((q) => q.band === 5 && !q.teach);
+      const mine = band.find((q) => (q.of || []).some(([id]) => id === 'loom'));
+      const others = band.filter((q) => q !== mine).map(th);
+      const mean = others.reduce((a, b) => a + b, 0) / others.length;
+      out.priced = { wave: +th(mine).toFixed(2), mean: +mean.toFixed(2),
+        ratio: +(th(mine) / mean).toFixed(4) };
+    }
+
+    delete w.director.update;
+    w.spawnLock = 0;
+    out.era = w.era;
+    out.mount = +s.y.toFixed(0);
+    out.traits = (w.director.traits || []).length;
+    return out;
+  });
+
+  const B = r.behind;
+  const C2 = r.clear;
+  check('a round that meets a LOOM\'s thread stops there and delivers nothing',
+    B.fired && C2.fired
+    // ...in a world that can be hurt at all: ARMORED discards the first hit
+    // each second and every arm here is one hit
+    && r.traits === 0
+    // the thread is between the machine and the body, which is the geometry
+    && B.threadY !== null && B.markY < B.threadY
+    // ...and it is the THREAD: 0 with the link up, a whole round with it down
+    && B.took === 0 && C2.took > 5,
+    `a body ${(B.threadY - B.markY).toFixed(1)} units behind a thread spanning ${B.span} took `
+    + `${B.took} of a round that delivers ${C2.took} to the same body in the same place with `
+    + `the link down (fired ${B.fired}/${C2.fired}, round gone in ${B.frames}/${C2.frames} `
+    + `frames, era ${r.era}, mount ${r.mount}). The only difference between the two runs `
+    + 'is `beam`');
+
+  check('...and either spool is still shootable, which is the way in',
+    r.traits === 0 && r.ends.length === 2 && r.ends.every((v) => v > 5)
+    // ...and cutting one takes the thread with it and hurries the survivor
+    && r.cut.before && !r.cut.after && !r.cut.beam
+    && Math.abs(r.cut.hurried - r.cut.alone) < 0.01,
+    `at full span both ends took [${r.ends.join(', ')}] -- the thread is inset by a radius at `
+    + `each end -- and cutting one half left thread ${r.cut.after}, beam ${r.cut.beam}, the `
+    + `survivor's cruise x${r.cut.hurried} against an authored x${r.cut.alone}`);
+
+  check('a blast reaches under a thread, which is what rounds cannot do',
+    r.traits === 0 && r.blast.thread && r.blast.took > r.blast.of * 0.9,
+    `${r.blast.took} of ${r.blast.of} delivered through a standing thread `
+    + `(${r.blast.thread}, ${r.traits} wave traits in force), because applyBlast measures `
+    + `centre to centre. That is PULSE's `
+    + 'geometry, and PULSE is essential -- no purchase and no hold can take it');
+
+  check('a LOOM walks apart at the width its type authored, and a constraint delivers it',
+    r.grow.worst < 0.02
+    // ...and it really grew: the last mark is the full span
+    && r.grow.sep[r.grow.sep.length - 1] > r.grow.sep[0] * 2,
+    `separation ${r.grow.sep.join(' / ')} at ${r.grow.marks.join('/')}s against an authored `
+    + `${r.grow.want.join(' / ')} -- worst ${(r.grow.worst * 100).toFixed(2)}% out. A rigid `
+    + 'constraint is positional, so unlike every steered speed in this suite the ask arrives');
+
+  check('the salvage a LOOM leaves carries the block and cannot carry a thread',
+    r.motes.n > 0 && r.motes.bond === true && !r.motes.beam && !r.motes.thread,
+    `${r.motes.n} motes, bond ${r.motes.bond} (inherited from the parent's type, which is `
+    + `build 322's LATCH fault), beam ${r.motes.beam}, thread ${r.motes.thread} -- the door is `
+    + 'shut by `beam` having one writer rather than by a guard');
+
+  const Y = r.yoke;
+  check('moving the pair numbers onto the type left YOKE exactly where it was',
+    Y.len === 60 && Y.spin === 1.2 && Y.grip === 3 && Y.snap === 0.5 && Y.alone === 1.9 && Y.pool
+    // one pool, one ceiling, and the beam still holds its length
+    && Y.shared && Math.abs(Y.len2 - 60) < 1.5
+    // ...and the share still snaps it
+    && Y.snapped && !Y.stillBeamed
+    // ...and it still weighs ONE body's health where a LOOM weighs two
+    && Y.threat === 5 && Math.abs(Y.halves - 2) < 1e-6,
+    `yoke len ${Y.len} spin ${Y.spin} grip ${Y.grip} snap ${Y.snap} alone ${Y.alone}, one pool `
+    + `${Y.shared}, beam measured ${Y.len2}, snapped ${Y.snapped} (survivor beamed `
+    + `${Y.stillBeamed}); threat ${Y.threat} for one pool against a LOOM's ${Y.loomThreat}, `
+    + `which is ${Y.nominal} x${Y.halves} because it has two`);
+
+  check('the LOOM wave is priced at band 5\'s own mean',
+    Math.abs(r.priced.ratio - 1) < 0.1,
+    `${r.priced.wave} against the band's other waves at ${r.priced.mean} (ratio `
+    + `${r.priced.ratio}) -- build 315's lever. The first draft was four pairs and three `
+    + 'LURCHERs at 47.83, which is 31% over and lengthens every other wave in the band');
 }
 
 // --- report -----------------------------------------------------------------

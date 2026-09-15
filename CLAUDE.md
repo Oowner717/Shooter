@@ -6405,3 +6405,218 @@ came from before believing the other one covers it.
   that had anything to say.
 
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
+
+- **LOOM IS IN FROM BUILD 332, AND ITS THREAD IS THE FIRST THING IN THIS GAME
+  THAT STOPS A ROUND ANYWHERE BUT AT THE EDGES OF THE FIELD.** Phase 6q, band
+  5, the seventeenth object to ship. A pair that walks apart stringing a
+  bright thread between them; a round that meets the thread is ABSORBED --
+  `impacted` false, so an HE does not even go off against it -- and delivers
+  nothing to whatever it was aimed at. Two to go: MIRE and KITE.
+- **THE GUIDE'S ANALOGY IS EXACT AND I NEARLY SHIPPED A NOTE SAYING IT WAS
+  FALSE.** `docs/objects.html` says "our rounds stop on the thread the way
+  they stop on the era-two wall", and my first reading -- from a grep of
+  `shielded`, which refuses the CHOOSER and the damage path -- was that rounds
+  pass straight through the wall and the analogy pointed at nothing. It does
+  not: `updateProjectiles` CLIPS the round's step at `wallLine` and takes it
+  there with `impacted` false, a hundred lines above the `shielded` call, and
+  that is the precedent the thread is built on. The docstring was corrected
+  before it shipped. **A mechanism named by a design document is worth
+  grepping for in the file that would implement it, not only in the file whose
+  name matches the words.**
+- **`CFG.yoke` WAS FIVE NUMBERS ABOUT ONE PAIR READ BY NAME IN FOUR PLACES,
+  AND THAT IS THE SIXTH INSTANCE OF THE SHARED-BLOCK FAULT.** `pairOn`,
+  `pourPool`, `drawYoke` and `pairOf` all read it, so LOOM -- the second
+  `paired` type -- would have worn YOKE's beam length, rotation rate, grip,
+  pool share and survivor speed in total silence, with no field to set and
+  nothing to fail. `plated` reading `CFG.flint` (319), `ride` reading
+  `CFG.graft` (322), `respawn` (324), `planted` (328) and `bar` reading
+  `CFG.cartwheel` (330) are the same shape, and this is the SECOND found
+  before it did any damage, because the new type was authored against the
+  block. Each pair type carries its own `bond` block now, `pairOf` throws for
+  a malformed one, and `check-build` calls it for every pair type at build
+  time. The no-op is asserted rather than argued: YOKE's five numbers to the
+  digit, one pool still shared, the beam still 60, the share still snapping,
+  and `threatOf(yoke) === 5` exactly.
+- **...AND `pool` IS WHAT MAKES THE TWO PAIRS DIFFERENT OBJECTS, IN ONE
+  FIELD.** A YOKE is two bodies of ONE 150 and where you aim decides what you
+  are left holding; a LOOM is two bodies of 110 EACH, and the thread is up
+  while both are, which is the whole of "either end drops it". So `spawnPair`
+  shares the ceiling only when the bond says to, `pourPool` does not run at
+  all for an unpooled pair -- and `threatOf` had to learn the difference:
+  **a pair with two pools counts BOTH halves** (7.33 for a LOOM against 5.00
+  for a YOKE), the same rule that makes a TOW count what it drags, a QUARRY
+  what it becomes and a REMNANT what comes back. `many` reads
+  `school || beads || 1` and a pair is one, which is why nothing had to change
+  when YOKE shipped and something did now.
+- **THE THREAD'S BLOCKING SPAN IS `d - 2r`, AND THAT DERIVES THE GUIDE'S OWN
+  "THE FIRST FOUR SECONDS ARE FREE".** The link's ends are AT the two centres,
+  so a thread drawn all the way to them would eat a round arriving at a spool
+  from the side a unit short of the body it was aimed at -- and "either end
+  drops it" is the only way in to the object. Inset by each body's own radius
+  and the spools are always shootable, whatever the pair has grown to; the
+  blocking span is then 16 units at release and 150 at full span, so the free
+  opening falls out of the geometry instead of being a fitted delay. Same
+  idiom as `roll` taking its turn from `edgeEase`, `dive` its lane from
+  `grabPad` and `sheetLaneFor` its band from `edgeEase`: **before adding a
+  rule about where a thing reaches, use the one that already says where it
+  must not.**
+- **A ROTATING SEGMENT CANNOT JOIN `occluders`, AND THE GUARANTEE IS WHY.**
+  Build 330 shipped an argument that an occlusion rule can never leave the gun
+  with nothing to shoot, and its first clause is that a sheet is LEVEL, so
+  "in front of" is a strict order by depth and no two sheets can hide each
+  other. A thread turns about its midpoint: two crossed threads could hide
+  each other's spools, `autoTarget` returns null, and a silent gun plus the
+  build-291 release gate is a run that cannot climb. So the thread is
+  deliberately NOT in `occluders` -- and the second reason is the object
+  itself, because what LOOM costs is rounds and an assist that declined the
+  shot would refuse to pay it. The asymmetry with VEIL is a decision and is
+  written at the type.
+- **A RIGID CONSTRAINT DELIVERS ITS ASK, WHICH IS THE FIRST TIME THIS PHASE
+  SOMETHING DID.** "A target speed is not a speed" is in here nine times
+  (298, 308, 316, 317, 318, 322, 323, 324, 330) and every one of them was a
+  velocity BLEND fighting `linearDamping` and `drive`. The growth here is
+  positional -- `solveTethers` corrects the pair to `tether.len` and `pairOn`
+  grows the number -- so the measured separation is **75.0 / 94.2 / 132.5 /
+  189.9 / 190.0 at 2/4/8/14/18s against an authored 75.1 / 94.3 / 132.6 /
+  190.0 / 190.0**, worst 0.19% out. The case asserts 2%, which nothing steered
+  in this game could manage. **Ask whether the quantity is steered or
+  constrained before compensating it.**
+- **THE OBJECT'S A/B IS ONE FLAG AND THE RESULT IS AN ABSOLUTE.** Same body,
+  same place, same round, `beam` up and down: **0 damage against 26**. No
+  margin, no threshold, and the switch is inside the mechanism rather than
+  around it -- which is the shape build 314's serial A/B established and the
+  cheapest kind of case this suite has. The blast counter is the same:
+  **88.2 of 90** delivered to a body 40 units behind a full-span thread,
+  because `applyBlast` measures centre to centre. PULSE is the press every run
+  owns (`essential`, so no purchase and no hold can take it) and it is radial
+  from the machine, so it never picks a target at all.
+- **A MOTE OFF A LOOM CARRIES THE `bond` BLOCK AND CANNOT CARRY A THREAD, AND
+  THE DOOR WAS ALREADY SHUT.** `shed` builds every mote with `new Enemy(t,
+  ...)` off the PARENT's type -- build 322's LATCH fault, where a mote
+  inherited `gait: 'ride'` and grafted onto the next body for free. Here the
+  inherited field is inert because `beam` has exactly one writer
+  (`spawnPair`), so `threadSpan` refuses on its first property read: measured,
+  3 motes with `bond` true, `beam` false and no thread. **Build 322's answer
+  was a guard and this one is a door that was already shut, which is the
+  better outcome and only knowable by checking** -- the case asserts it rather
+  than leaving it to be rediscovered.
+- **TWO INSTRUMENT FAULTS IN THE CASE'S FIRST RUN, AND BOTH WERE MINE RATHER
+  THAN THE BUILD'S.** The survivor-speed arm read the multiplier as **x0 on a
+  build where it works**, because the helper that lays a pair PINS it still --
+  `cruise` 0, and `0 * alone` is 0. It sets a cruise of 100 and reads 140 now.
+  And the threat arm compared two `toFixed(4)` copies at a tolerance of 1e-9
+  (7.3333 against 3.6667 x 2 = 7.3334), which is build 313's own rule --
+  **round for the message, divide the raw** -- broken by the build that quotes
+  it. Both were caught by running the case through the standalone harness
+  BEFORE the suite, which is thirteen minutes an arm cheaper than finding out
+  afterwards.
+- **RENDER IT AND LOOK, AND THE PICTURE WAS RIGHT FOR ONCE.** Measured off an
+  offscreen canvas at world scale: the thread paints **922 lit pixels of which
+  906 are green and ZERO carry the harmless grey's signature** (`g` the mean of
+  `r` and `b`), peaking at 209 of 255 in a band 10 units deep -- which is
+  `stops * 2` = 6 for the core plus the weave's ticks at +-1.6 `stops`, so
+  what you see is the width a round has to miss. Build 316's fault (a hostile
+  pair strung together in `#8fa9c4`, the game's one grey, which the colour
+  rule promises means harmless) is the one this could most easily have
+  repeated, and the drawn PNG says it reads as two reels paying out a ladder.
+  The core is stroked at exactly `stops * 2` on purpose: the picture is the
+  rule rather than a sign for it.
+- **THE COST PROXY WAS NOT DELIVERABLE AND IS RECORDED AS THIN RATHER THAN
+  QUOTED.** VEIL's build measured 63% of delivered damage going into membrane,
+  and the equivalent here would be the share of the assist's locked frames
+  whose shot cannot land. Measured over the real wave at rung 32 it read
+  **0 of 1,373 locked frames blocked** -- and the run only ever had ONE pair
+  and one thread loose in 31 seconds, because the probe's director stub drained
+  its jobs before the wave filled. So the zero is a measurement of an empty
+  field and not of the mechanism, and it is written down that way. What the
+  case carries instead is the controlled A/B, which is an absolute. **A number
+  from a scenario that did not happen is worse than no number**, and the tell
+  was in the same output: `maxLooms: 2`.
+- **BAND 6 DOES NOT EXIST, AND STANDING ONE UP FOR ONE OBJECT WOULD BE WORSE
+  THAN THE BAND IT HAS.** The guide puts LOOM, MIRE and KITE in bands 6 and 7
+  at rungs 36-49; `CFG.waves.perBand` is 7, so the five authored bands cover
+  rungs 1-35 and everything above draws bands 4-5. `budgetAt` is the mean
+  threat of a band's OWN roster and `shuffle` filters to the in-band waves, so
+  a band 6 holding a single wave would play that one wave at every rung from
+  36 to 42. **A band wants a roster, not a member.** Band 5 is where the
+  deepest authored play actually is and that is where this went, with the
+  guide's rungs recorded rather than quietly honoured.
+- **THE WAVE'S COUNTS WERE CHOSEN BY MEASURING AND THE FIRST DRAFT WAS 31%
+  OVER.** `[['loom', 4], ['lurcher', 3]]` weighs 47.83 against band 5's own
+  mean of 36.44 and would have lengthened every other wave in the band by
+  2.2%; `[['loom', 3], ['lurcher', 2]]` weighs 34.33, a ratio of 0.942, and
+  re-prices the band by -0.41%. Build 315's lever, used by arithmetic rather
+  than by eye -- and the arm asserts THIS wave's ratio to its band's other
+  waves, never the band's absolute move, because build 328 already paid for a
+  conjunct on how little a wave moves its band (a sibling arriving heavy makes
+  it false with nothing about the wave changing).
+- **FOUR ARMS FAILED IN THE SUITE AND PASSED STANDALONE, AND IT WAS INHERITED
+  WAVE TRAITS: ARMORED DISCARDS A HIT, AND EVERY MEASUREMENT IN THE CASE WAS
+  ONE HIT.** Zero damage from a round with the thread down, zero from both
+  spools, zero of a 90-point blast, and a YOKE that would not snap -- which
+  reads exactly like the object being dead. `Director.load` seeds `d.traits`,
+  only `score` clears it (build 327), `scaleToTier` stamps it onto every body
+  spawned afterwards, and ARMORED's own rule is that **the first hit each
+  second does not happen**. A case whose every arm is a single round, a single
+  blast or a single `applyDamage` call is maximally exposed to it. One line
+  (`w.director.traits = []`) and the arms assert it, because a zero from a
+  world that cannot be hurt is not a measurement. Build 316's note already
+  said a case that loads a real wave carries that wave's traits for the rest
+  of its life; what is new is that the case that PAYS may be one that never
+  loaded a wave at all.
+- **...AND MY FIRST DIAGNOSIS WAS THE ERA, WHICH A PROBE CONFIRMED BECAUSE THE
+  PROBE DID NOT CONTAIN THE FAULT.** The suite leaves the world at era 2
+  (mount 1558 against 1012.6) and `shielded` refuses the damage path above the
+  yard wall, so the case's absolute `y 600` was a plausible cause; I made the
+  geometry relative to the mount, reproduced era 2 standalone, and it passed.
+  It passed because that run had no traits in force. **Two reverts settled it
+  in eighty seconds**: restore the traits and the SAME FOUR arms fail in the
+  same order; keep the absolute `y` with the traits cleared and all seven
+  pass. The era was never a cause. The relative geometry stays as robustness
+  and the notes say so rather than claiming a fix.
+  **Verify a fix in a world that contains the fault**, which is build 330's
+  "the instrument had the identical fault" and build 305's "a probe built on
+  the wrong reader agrees with itself" arriving through a third door -- and
+  the cheap discipline that catches all three is to reproduce the failure
+  BEFORE changing anything.
+  **And the liveness conjunct is what turned this into a red case rather than
+  a green one**: the A/B's control has to deliver a whole round, so a world
+  where nothing can be hurt fails instead of passing empty. An absolute-zero
+  arm with no live control would have shipped.
+- **THE SUITE IS A READER, AND A GREP THAT STOPS AT `src/` PLUS
+  `check-build.mjs` MISSES IT.** `CFG.yoke` had three LIVE reads in
+  `regress.mjs`'s own YOKE case (`CFG.yoke.spin`, `.len` twice) and I moved
+  the block without them: `CFG.yoke` is undefined afterwards, so
+  `CFG.yoke.spin` is a TypeError inside `page.evaluate` -- **which kills the
+  runner with no case output at all**, the failure build 310 already paid for
+  with `WAVES[-1]`. Caught by grepping again while the suite was running, for
+  a reason unrelated to it, and the run was killed and restarted rather than
+  read. Thirteen minutes. When a symbol moves, the reader set is
+  `grep -rn "SYMBOL" src/ scripts/ index.html sw.js docs/` -- all of it, once,
+  before the suite is launched and not after.
+- **THE ORDINAL HASH DID NOT MOVE, AND IT WAS WORTH RUNNING RATHER THAN
+  ARGUING.** `-1334607133` either side, both readings taken in this container
+  per the differential rule, with build 331 served from a worktree on :8098.
+  This build puts a NEW DOOR in `resolveSegment` -- the one place a round is
+  tested against anything -- on `fight.mjs`'s own hot path, rewires the whole
+  `paired` gait onto a different object, and adds a multiplicative term to
+  `threatOf`. Every one of those reduces to the identity for a body that is
+  not a LOOM, by inspection: the thread loop's first condition is `!e.beam`
+  and `beam` has one writer, `pairOn` and `pourPool` are reached by pair types
+  alone, and the new `halves` factor is 1 for everything else. **Build 329's
+  lesson is that an argument from inspection is exactly what this repo does
+  not accept**, and an unchanged hash is what "a collision-model change that
+  provably did not touch any existing body" looks like measured -- the same
+  claim build 315's capsule made and the only instrument that can make it.
+- **The LOOM case leaves `w.up.damage` at 1, deliberately and on the record.**
+  Its A/B is a known round rather than a kill, and it is the LAST case in the
+  file, so nothing downstream inherits it today; `reset()` rebuilds `world.up`
+  from its defaults table, so any case that calls `restart()` clears it
+  anyway. Anything appended after it owes itself a damage value, which is the
+  same rule the eighteen damage-bench cases already carry about the director
+  stub and `spawnLock`.
+- **The partner is a LURCHER because the combination is the object.** A
+  LURCHER closes and GRIPS, so the thing filling the glitch fuse walks on
+  while the rounds meant for it stop on the thread. A heavy partner would just
+  be a second wall, and the two-or-three-type rule exists because the problem
+  is meant to be a combination.

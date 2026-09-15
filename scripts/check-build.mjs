@@ -1073,15 +1073,26 @@ if (comers.length) {
 
 
 /*
- * ---- A PAIR IS ONE POOL, AND THE BEAM HAS TO CLEAR THE PAIR SOLVER ------
+ * ---- A PAIR CARRIES ITS OWN NUMBERS, AND THE LINK HAS TO CLEAR THE PAIR
+ * SOLVER ------------------------------------------------------------------
  *
- * `pairOf` throws for a `pair` that is not exactly 2, for a `snap` outside
- * (0, 1) and for an `alone` at or under 1 -- the fourth mandatory-field rule
- * after `levels` (224), `band` (303) and `beads`/`climb`, and for the same
- * measured reason: a defaulted value indistinguishable from a chosen one is
- * the shape this repo keeps paying for. Called here so a bad table fails the
- * BUILD rather than the first release, because a throw inside `release` is a
- * throw in the rAF loop and build 288 records that reading as a freeze.
+ * `pairOf` throws for a `pair` that is not exactly 2 and for a malformed
+ * `bond` block -- the fourth mandatory-field rule after `levels` (224),
+ * `band` (303) and `beads`/`climb`, and for the same measured reason: a
+ * defaulted value indistinguishable from a chosen one is the shape this repo
+ * keeps paying for. Those five numbers were `CFG.yoke` until build 332, read
+ * by name in four places, so LOOM would have worn YOKE's beam length,
+ * rotation, grip, pool share and survivor speed without declaring one of
+ * them. Called here so a bad table fails the BUILD rather than the first
+ * release, because a throw inside `release` is a throw in the rAF loop and
+ * build 288 records that reading as a freeze.
+ *
+ * A THREAD is checked against the bodies it hangs off, not against a number
+ * of its own: `threadSpan` insets each end by that body's radius so the
+ * spools stay shootable ("either end drops it" is the counter), which makes
+ * the blocking span `len - 2r` -- and a `stops` radius at or past that inset
+ * is a thread that has swallowed its own ends. Both the release length and
+ * the full span are checked, because the object grows.
  *
  * It also refuses a beam shorter than two radii, which is the pair solver's
  * floor: `resolvePair` corrects any overlap and exempts nothing, so a beam
@@ -1098,9 +1109,31 @@ if (tightBeam.length) {
   for (const line of tightBeam) console.error(`pair: ${line}`);
   process.exit(1);
 }
-console.log(`pair: ${pairs.length} type(s) share one pool across a rigid beam (`
-  + `${pairs.map((y) => `${y.id} 2x r${y.r} at ${y.len} (${(y.len / y.r).toFixed(2)}r), snap `
-    + `${y.snap}, survivor x${y.alone}`).join('; ') || 'none'})`);
+const badThread = [];
+for (const y of pairs.filter((q) => q.stops)) {
+  const span = y.len - y.r * 2;
+  if (!(span > 0)) {
+    badThread.push(`${y.id}: a link of ${y.len} between two r${y.r} bodies has no thread `
+      + `between them (${span.toFixed(1)} units past the insets)`);
+  } else if (!(y.stops * 2 < span)) {
+    badThread.push(`${y.id}: a thread ${(y.stops * 2).toFixed(1)} thick does not fit the `
+      + `${span.toFixed(1)} units its own insets leave at release`);
+  }
+  if (y.span && !(y.span - y.r * 2 > span)) {
+    badThread.push(`${y.id}: growing to ${y.span} does not widen the blocking span`);
+  }
+}
+if (badThread.length) {
+  for (const line of badThread) console.error(`pair: ${line}`);
+  process.exit(1);
+}
+console.log(`pair: ${pairs.length} type(s) on a rigid link (`
+  + `${pairs.map((y) => `${y.id} 2x r${y.r} at ${y.len} (${(y.len / y.r).toFixed(2)}r), `
+    + (y.pool ? `ONE pool, snap ${y.snap}` : 'two pools')
+    + (y.span ? `, out to ${y.span} over ${y.grow}s` : '')
+    + (y.stops ? `, a thread ${y.stops * 2} thick blocking ${(y.len - y.r * 2).toFixed(0)}`
+      + `-${(y.span - y.r * 2).toFixed(0)} units` : '')
+    + `, survivor x${y.alone}`).join('; ') || 'none'})`);
 
 
 /*

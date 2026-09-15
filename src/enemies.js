@@ -186,7 +186,8 @@ export function drawSpecimen(ctx, id, r) {
     case 'dart': drawDart(ctx, r, 0, 0); break;
     case 'bar': drawBar(ctx, r, 0, 0, t.bar); break;
     case 'sheet': drawVeil(ctx, r, 0, 0, t.bar); break;
-    case 'yoke': drawYoke(ctx, r, 0, 0, true); break;
+    case 'yoke': drawYoke(ctx, r, 0, 0, true, TYPE_BY_ID.yoke.bond.len / 2); break;
+    case 'loom': drawLoom(ctx, r, 0, 0, true); break;
     /*
      * NOSE DOWN in the glossary, which is a different frame from the field.
      * `drawShrike` draws along local +x because `FACES_TRAVEL` writes
@@ -482,6 +483,9 @@ export class Enemy {
      */
     this.graftRegen = 0;
     this.tether = null; // the other half of a TOW, if any
+    // Seconds this body's link has been loose, which is the only clock a
+    // growing bond has. Read and written by `pairOn` alone.
+    this.bondT = 0;
     this.traits = null; // the wave's rules, if it was released by a traited one
     this.plateT = 0; // ARMORED: until the plate turns another hit away
     this.hitAt = 0; // MENDING: when this body was last hurt
@@ -1234,12 +1238,12 @@ export class Enemy {
    * @param {number} dt
    */
   pairOn(world, dt) {
-    const Y = CFG.yoke;
+    const L = this.type.bond;
     const o = this.tether && this.tether.other;
     if (this.beam && (!o || o.dead || o.fizzle > 0)) {
       this.beam = false;
       this.tether = null;
-      this.cruise *= Y.alone;
+      this.cruise *= L.alone;
       // Its own share starts again, or a survivor that had absorbed the pool
       // up to the snap would snap a second time off its next hit.
       this.took = 0;
@@ -1253,10 +1257,29 @@ export class Enemy {
      * them because a pool is what is left rather than the best of two
      * readings.
      */
-    if (o.hp !== this.hp) {
+    if (L.pool && o.hp !== this.hp) {
       const low = Math.min(o.hp, this.hp);
       o.hp = low;
       this.hp = low;
+    }
+    /*
+     * ---- ...AND A LOOM WALKS APART -------------------------------------
+     *
+     * The separation is the TETHER's `len` and the constraint is rigid, so
+     * growing the number is what pushes the two halves out -- there is no
+     * second steering term and nothing for the march to fight. Both halves
+     * run this and write the same value onto their own tether record, which
+     * is idempotent by construction rather than by agreement.
+     *
+     * The clock only runs while the body is LOOSE: `Enemy.update` refuses
+     * this whole method for a `staged` body, so a pair queued in the throat
+     * arrives at its authored `len` however long the mouth held it -- which
+     * is the same reason `rise` measures its climb from the floor and not
+     * from the spawn.
+     */
+    if (L.span) {
+      this.bondT += dt;
+      this.tether.len = L.len + (L.span - L.len) * clamp(this.bondT / L.grow, 0, 1);
     }
     const slow = this.frozen(world) ? 0.12 : 1;
     const mx = (this.x + o.x) / 2;
@@ -1289,7 +1312,8 @@ export class Enemy {
      * and therefore erases the part of the velocity that DIFFERS between
      * them. Steady state is `want * grip / (grip + damping + accel/100)`,
      * which is 0.59 of the authored rate: measured 0.692 rad/s against the
-     * 1.2 in `CFG.yoke`.
+     * 1.2 the yoke's own `bond` block authors (it was `CFG.yoke.spin` until
+     * build 332 moved the pair's numbers onto the types).
      *
      * So the target is grossed up by those two terms rather than by a fitted
      * constant -- which is the correct dependency as well as the honest one:
@@ -1305,11 +1329,11 @@ export class Enemy {
      * turning fastest whenever it happened to lie across the field.
      */
     const fight = CFG.physics.linearDamping + this.accel / 100;
-    const want = Y.spin * d * slow * ((Y.grip + fight) / Y.grip);
+    const want = L.spin * d * slow * ((L.grip + fight) / L.grip);
     const mvx = (this.vx + o.vx) / 2;
     const mvy = (this.vy + o.vy) / 2;
     const cur = (this.vx - mvx) * tx + (this.vy - mvy) * ty;
-    const k = clamp(Y.grip * dt, 0, 1);
+    const k = clamp(L.grip * dt, 0, 1);
     this.vx += tx * (want - cur) * k;
     this.vy += ty * (want - cur) * k;
     // The picture points ALONG the beam, so `drawYoke` can draw its half in
@@ -1644,7 +1668,7 @@ export class Enemy {
     if (!o || o.dead) return;
     o.hp = this.hp;
     this.took += real;
-    if (this.hp > 0 && this.took >= this.maxHp * CFG.yoke.snap) this.destroy(world);
+    if (this.hp > 0 && this.took >= this.maxHp * this.type.bond.snap) this.destroy(world);
   }
 
   /**
@@ -3229,7 +3253,7 @@ export class Enemy {
     }
     // A YOKE's two halves read one number, and which of them absorbed it is
     // what decides whether the beam breaks. See `pourPool`.
-    if (this.beam) this.pourPool(world, real);
+    if (this.beam && this.type.bond.pool) this.pourPool(world, real);
     if (this.hp <= 0) this.destroy(world);
   }
 
@@ -3878,7 +3902,8 @@ export class Enemy {
       case 'dart': drawDart(ctx, this.r, this.phase, world.time); break;
       case 'bar': drawBar(ctx, this.r, this.phase, world.time, this.type.bar); break;
       case 'sheet': drawVeil(ctx, this.r, this.phase, world.time, this.type.bar); break;
-      case 'yoke': drawYoke(ctx, this.r, this.phase, world.time, this.beam); break;
+      case 'yoke': drawYoke(ctx, this.r, this.phase, world.time, this.beam, this.type.bond.len / 2); break;
+      case 'loom': drawLoom(ctx, this.r, this.phase, world.time, this.beam); break;
       case 'flint': drawFlint(ctx, this.r, this.phase, world.time); break;
       case 'shrike': drawShrike(ctx, this.r, this.phase, world.time,
         this.divePhase === 'dive' && !(this.fizzle > 0)); break;
@@ -4025,6 +4050,63 @@ export class Enemy {
         ctx.lineTo(px + (dy / d) * 3, py - (dx / d) * 3);
       }
       ctx.stroke();
+    }
+
+    /*
+     * ---- A LOOM'S THREAD, AND WHAT YOU SEE IS WHAT BLOCKS ---------------
+     *
+     * Drawn in world space for the cable's reason -- it is a link between two
+     * bodies and not decoration on one -- and drawn ONCE per pair, because a
+     * bright line stroked twice is a brighter line. It is the type's own
+     * green and never `#8fa9c4`: build 316 shipped a hostile pair strung
+     * together in the game's one grey, which the colour rule promises means
+     * harmless, and only rendering it and looking found it.
+     *
+     * The CORE is stroked at `stops * 2` -- the exact width a round has to
+     * miss -- so the picture is the rule rather than a sign for it, and the
+     * two stubs from each spool out to the inset are drawn fainter and
+     * thinner: the link is there and stops nothing, which is the counter
+     * drawn instead of said.
+     */
+    if (this.beam && t.bond && t.bond.stops && ownsLink(this)) {
+      const sp = threadSpan(this);
+      if (sp) {
+        const o = this.tether.other;
+        const L = t.bond;
+        const grown = L.span ? clamp((this.tether.len - L.len) / (L.span - L.len), 0, 1) : 1;
+        ctx.strokeStyle = rgba(t.color, 0.3 + 0.45 * grown);
+        ctx.lineWidth = L.stops * 2;
+        ctx.beginPath();
+        ctx.moveTo(sp.ax, sp.ay);
+        ctx.lineTo(sp.bx, sp.by);
+        ctx.stroke();
+        ctx.strokeStyle = rgba(t.glow, 0.45);
+        ctx.lineWidth = Math.max(CFG.hairline, L.stops * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(sp.ax, sp.ay);
+        ctx.moveTo(o.x, o.y);
+        ctx.lineTo(sp.bx, sp.by);
+        ctx.stroke();
+        // The weave running along it: phase off world.time and the body's own
+        // `phase`, never Math.random, so it is the same thread every frame.
+        const tdx = sp.bx - sp.ax;
+        const tdy = sp.by - sp.ay;
+        const td = Math.hypot(tdx, tdy) || 1;
+        const n = Math.min(12, Math.max(2, Math.round(td / 18)));
+        const slide = ((world.time * 0.35 + this.phase) % 1) / n;
+        ctx.strokeStyle = rgba(t.glow, 0.8);
+        ctx.lineWidth = Math.max(CFG.hairline, L.stops * 0.7);
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const k = i / n + slide;
+          const px = sp.ax + tdx * k;
+          const py = sp.ay + tdy * k;
+          ctx.moveTo(px - (tdy / td) * L.stops * 1.6, py + (tdx / td) * L.stops * 1.6);
+          ctx.lineTo(px + (tdy / td) * L.stops * 1.6, py - (tdx / td) * L.stops * 1.6);
+        }
+        ctx.stroke();
+      }
     }
 
     if (this.warded && this.warded.length) {
@@ -5540,6 +5622,39 @@ function drawQuarry(ctx, r, phase, time) {
 }
 
 /**
+ * A LOOM spool: a reel with a turning hub, drawn along local +x toward its
+ * partner -- the same frame `pairOn` writes for a yoke half, and the same
+ * reason (a rotation copied without its frame turns the drawing ninety
+ * degrees, which is what the DECOY's barrel did for sixty builds).
+ *
+ * The hub turns only while the thread is up, which is the one feature here
+ * that cannot be read off a still frame: a spool that has stopped paying out
+ * is a survivor. The lip on the +x rim says which way the pair is strung, so
+ * one spool alone still reads as half of something.
+ */
+function drawLoom(ctx, r, phase, time, beam) {
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.82, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  const a0 = phase + (beam ? time * 1.6 : 0);
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    const a = a0 + i * (Math.PI / 3);
+    ctx.moveTo(Math.cos(a) * r * 0.78, Math.sin(a) * r * 0.78);
+    ctx.lineTo(-Math.cos(a) * r * 0.78, -Math.sin(a) * r * 0.78);
+  }
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.34, 0, TAU);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(r * 0.82, 0, r * 0.22, -1.25, 1.25);
+  ctx.stroke();
+}
+
+/**
  * A yoke half: a shield with a socket, and its half of the beam.
  *
  * ---- THE PICTURE IS DRAWN ALONG LOCAL +x, TOWARD THE PARTNER ----------
@@ -5565,8 +5680,7 @@ function drawQuarry(ctx, r, phase, time) {
  * draws this shape with no body at all -- and the glossary wants the half
  * that is still attached, since that is what a YOKE is.
  */
-function drawYoke(ctx, r, phase, time, beam) {
-  const half = CFG.yoke.len / 2;
+function drawYoke(ctx, r, phase, time, beam, half) {
   const th = r * 0.17;
   const face = r * 0.68; // where the shield's flat side is
   /*
@@ -6324,6 +6438,16 @@ export function threatOf(type) {
    */
   const many = type.school || type.beads || 1;
   /*
+   * ...and BOTH HALVES of a pair that does not share a pool. A YOKE is two
+   * bodies of ONE 150 and weighs exactly 150 -- `many` is 1 for it and
+   * nothing here had to change when it shipped. A LOOM is two bodies of 110
+   * EACH, so the health a player actually has to shoot is 220, and a band
+   * that priced it at 110 would be paying for half of what it gets. Same
+   * rule as the TOW's load, the QUARRY's children and the REMNANT's return:
+   * count what arrives with the body.
+   */
+  const halves = type.pair && !(type.bond && type.bond.pool) ? type.pair : 1;
+  /*
    * ...and what COMES BACK, for the reason a TOW counts what it drags and a
    * QUARRY counts what it becomes: the health a player actually has to shoot
    * for one REMNANT is its own 300 plus the 150 the second body arrives with.
@@ -6340,7 +6464,7 @@ export function threatOf(type) {
    * for: an arithmetic a second type wears without choosing it.
    */
   const again = type.respawn ? 1 + respawnOf(type).hp : 1;
-  return (type.hp * fractureFactor(type) * many * again
+  return (type.hp * fractureFactor(type) * many * halves * again
     + (towed ? towed.hp : 0)) / CFG.waves.threatPerHp;
 }
 
@@ -6757,6 +6881,65 @@ export function occluded(sheets, sx, sy, e) {
 }
 
 /**
+ * The stretch of a pair's link that actually stops a round, or null.
+ *
+ * ---- THE ENDS ARE INSET BY A RADIUS, AND THAT IS THE COUNTER ------------
+ *
+ * The link's ends are AT the two centres, so a thread drawn all the way to
+ * them would eat a round arriving at a spool from the side a unit short of
+ * the body it was aimed at -- and "either end drops it" is the whole way in
+ * to this object. Inset by each body's own radius and the spools are always
+ * shootable, whatever the pair has grown to. Derived from the rule it would
+ * otherwise fight, which is the idiom `roll` takes from `edgeEase` and
+ * `dive` from `grabPad`.
+ *
+ * It also means the span is `d - 2r` rather than `d`: at LOOM's release
+ * length that is 16 units of a 968-wide field, so the guide's "the first
+ * four seconds are free" falls out of the geometry instead of being a fitted
+ * delay.
+ *
+ * `beam` is the fact this reads, which is also what keeps a MOTE off it: a
+ * mote built by `shed` inherits the parent's TYPE and therefore its `bond`
+ * block (build 322's LATCH fault), and `beam` is written by `spawnPair`
+ * alone -- so the door is already shut rather than needing a guard. The case
+ * asserts that rather than leaving it to be rediscovered.
+ *
+ * @returns {{ax:number, ay:number, bx:number, by:number, r:number}|null}
+ */
+export function threadSpan(e) {
+  const L = e.type.bond;
+  if (!e.beam || !L || !L.stops) return null;
+  const o = e.tether && e.tether.other;
+  if (!o || e.dead || o.dead || e.fizzle > 0 || o.fizzle > 0) return null;
+  let dx = o.x - e.x;
+  let dy = o.y - e.y;
+  const d = Math.hypot(dx, dy);
+  if (!(d > e.r + o.r)) return null;
+  dx /= d;
+  dy /= d;
+  return {
+    ax: e.x + dx * e.r,
+    ay: e.y + dy * e.r,
+    bx: o.x - dx * o.r,
+    by: o.y - dy * o.r,
+    r: L.stops,
+  };
+}
+
+/**
+ * Solve each pair once: the half standing to the left owns the link.
+ *
+ * `solveTethers` has taken this convention since it was written, and the
+ * thread needs it for a reason of its own -- a bright line stroked twice is a
+ * brighter line, so the DRAW path cannot simply do it from both ends.
+ */
+export function ownsLink(e) {
+  const o = e.tether && e.tether.other;
+  if (!o) return false;
+  return e.x < o.x || (e.x === o.x && e.y <= o.y);
+}
+
+/**
  * The column a `spread` body crosses to, picked once on its first loose frame.
  *
  * ---- FARTHEST-POINT, AND THE MACHINE'S COLUMN IS OCCUPIED GROUND -------
@@ -6901,14 +7084,46 @@ export function diveLane(world, e) {
   return clamp(s.x + side * gap, e.r + 4, world.width - e.r - 4);
 }
 
+/**
+ * A pair type's own link, validated.
+ *
+ * ---- THE NUMBERS ARE THE TYPE'S AND THERE IS NO DEFAULT (build 332) -----
+ *
+ * This read `CFG.yoke` until LOOM arrived, and so did `pairOn`, `pourPool`
+ * and `drawYoke` -- so the second `paired` type would have worn YOKE's beam
+ * length, rotation rate, grip, pool share and survivor speed in silence,
+ * with no field to set and nothing to fail. That is the sixth instance of
+ * the shape (`plated`/319, `rides`/322, `respawn`/324, `planted`/328,
+ * `bar`/330) and it throws rather than defaulting, for `levelsOf`'s reason:
+ * a value inherited in silence is indistinguishable from one that was
+ * chosen. `check-build` calls this for every pair type at build time, which
+ * is where a malformed block should be caught -- a throw at spawn is a throw
+ * in the rAF loop, and build 288 records that reading as a freeze.
+ *
+ * `pool` and `span` are CAPABILITIES rather than settings, and each brings
+ * its own required numbers: a pooled pair needs the `snap` share that breaks
+ * it, a growing one needs the `span` it grows to and the `grow` clock.
+ */
 export function pairOf(type) {
   const n = type && type.pair;
-  if (n !== 2) throw new Error(`${type && type.id}: pair must be exactly 2, got ${n}`);
-  const Y = CFG.yoke;
-  if (!(Y.len > type.r * 2)) throw new Error(`yoke.len ${Y.len} must clear two radii (${type.r * 2})`);
-  if (!(Y.snap > 0 && Y.snap < 1)) throw new Error(`yoke.snap ${Y.snap} must be a share of the pool`);
-  if (!(Y.alone > 1)) throw new Error(`yoke.alone ${Y.alone} must be a speed a survivor GAINS`);
-  return { n, len: Y.len, snap: Y.snap, alone: Y.alone };
+  const id = type && type.id;
+  if (n !== 2) throw new Error(`${id}: pair must be exactly 2, got ${n}`);
+  const L = type && type.bond;
+  if (!L || typeof L !== 'object') throw new Error(`${id}: a pair type needs a bond block`);
+  if (!(L.len > type.r * 2)) throw new Error(`${id}: bond.len ${L.len} must clear two radii (${type.r * 2})`);
+  if (!(L.spin > 0)) throw new Error(`${id}: bond.spin ${L.spin} must be a rate about the midpoint`);
+  if (!(L.grip > 0)) throw new Error(`${id}: bond.grip ${L.grip} must be positive`);
+  if (!(L.alone > 1)) throw new Error(`${id}: bond.alone ${L.alone} must be a speed a survivor GAINS`);
+  if (L.pool && !(L.snap > 0 && L.snap < 1)) throw new Error(`${id}: bond.snap ${L.snap} must be a share of the pool`);
+  if (!L.pool && L.snap !== undefined) throw new Error(`${id}: bond.snap is a pooled pair's number and this pair has two pools`);
+  if (L.span !== undefined) {
+    if (!(L.span > L.len)) throw new Error(`${id}: bond.span ${L.span} must be wider than bond.len ${L.len}`);
+    if (!(L.grow > 0)) throw new Error(`${id}: bond.grow ${L.grow} must be the seconds it takes`);
+  } else if (L.grow !== undefined) {
+    throw new Error(`${id}: bond.grow is the clock for a bond.span and there is none`);
+  }
+  if (L.stops !== undefined && !(L.stops > 0)) throw new Error(`${id}: bond.stops ${L.stops} must be the thread's radius`);
+  return L;
 }
 
 /**
@@ -6943,9 +7158,15 @@ function spawnPair(world, type, x, y, opts = {}) {
    * `rand(0.92, 1.1)`, so without this the two halves would disagree about
    * what the pool's full is and `snap` -- a share of `maxHp` -- would be a
    * different number on each of them.
+   *
+   * A LOOM declares no pool and so keeps both rolls: two bodies of 110 each,
+   * either of which drops the thread. That is the whole difference between
+   * the two pair types and it is one field.
    */
-  b.maxHp = a.maxHp;
-  b.hp = a.hp;
+  if (P.pool) {
+    b.maxHp = a.maxHp;
+    b.hp = a.hp;
+  }
   /*
    * ...and one turning SENSE. `routeSide` is a coin flip taken per body in
    * the constructor, and `pairOn` reads it to decide which way round the
