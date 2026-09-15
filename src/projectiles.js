@@ -723,6 +723,36 @@ function resolveSegment(world, p, ax, ay, bx, by) {
      * upgrade quietly exempt from it.
      */
     case 'thread': {
+      /*
+       * ---- AND THE MARK HAS TO SURVIVE A BUSY FIELD (build 334) -----------
+       *
+       * `spark` returns null on its first line once `fx.budgetLeft` is spent,
+       * and the budget is `maxParticles * quality - active.length` -- so the
+       * one signal that a round was EATEN was gone exactly when the field is
+       * busiest, which is the only time this object is on it. Measured, same
+       * shot either way: a clear field adds 7 particles and a field whose
+       * frame budget is spent adds **ZERO**, with the round still absorbed
+       * and no ring to fall back on. Nothing failed for it -- the mechanic
+       * was perfect and the player was told nothing.
+       *
+       * `ring` is not budget-gated (it has its own pool), so the mark is a
+       * ring and the sparks are what the budget adds when it can. Three rules
+       * shape it and all three are already written down:
+       *
+       *  - FILLED and small, because a SCATTER puts five pellets into one
+       *    thread in a frame: overlapping outlines scribble and overlapping
+       *    glows add, which is build 330's AIRBURST finding, and `ring`'s
+       *    `fill` term is a `drawGlow` under `lighter`.
+       *  - drawn AT the radius it means rather than expanding into it, since
+       *    `drawFx` fades and thins a ring as it grows -- so a ring authored
+       *    to arrive at a radius is dimmest exactly there (build 211).
+       *  - and it claims no reach: `stops` is the half-thickness a round has
+       *    to miss, so a mark that size is the thread saying where it caught
+       *    this one, not a hoop over ground nothing reached (build 330's rule
+       *    about HAIL's held circle).
+       */
+      const stops = (bestTarget.type.bond && bestTarget.type.bond.stops) || 3;
+      ring(c.x, c.y, stops * 1.1, stops * 1.6, 0.2, bestTarget.type.color, 1.4, 0.75);
       for (let i = 0; i < 3; i++) {
         spark(c.x, c.y, spread(120), spread(120), bestTarget.type.color, 0.16, 1.8);
       }

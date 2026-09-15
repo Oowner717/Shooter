@@ -31740,10 +31740,42 @@ if (MINE_LINE) {
       const at = WAVES.findIndex((v) => (v.of || []).some(([id]) => id === 'yoke'));
       if (at < 0) throw new Error('no YOKE wave authored');
       d.setTier(32);
+      /*
+       * `load` seeds the wave's rules and nothing clears them until `score`
+       * (build 327), and SWARM halves `maxHp` -- which is build 316's own
+       * finding about this very case, one arm along.
+       */
+      d.traits = [];
       const per = {};
-      for (let k = 0; k < 60; k++) {
+      /*
+       * ---- THE WAVE IS DRIVEN UNTIL ITS JOBS DRAIN, NOT A FIXED 60 --------
+       *
+       * This loop ran `k < 60` and failed on build 333 with the CONTROL
+       * vacuous -- 60 releases, all of them yoke, and the GLUT half of the
+       * comparison never reached. Measured rather than guessed: `load`
+       * refuses to group a type that cannot form up (build 333's `formable`),
+       * so the authored `['yoke', 6]` swells to 64 at rung 32 and is pushed
+       * as **sixty-four jobs of one** where it used to be one job of 64 --
+       * and `load` then Fisher-Yates SHUFFLES the list, so the single
+       * `glut x11` job lands at a uniform index in 0..64. Sixty iterations
+       * miss it whenever it lands past 60, which is five indices of
+       * sixty-five: **about one run in thirteen**.
+       *
+       * So build 333's fix turned this case's loop bound into a 7.7% flake.
+       * That is build 331's finding verbatim -- "a loop bound is a fitted
+       * margin wearing a `for` statement's clothes" -- and the answer is the
+       * same: drive the thing to completion and bound the loop as a backstop
+       * off the wave's own job count rather than off a number.
+       *
+       * Loaded ONCE, before the loop, rather than lazily inside it: a reload
+       * mid-census would re-shuffle and start a second wave's worth of jobs,
+       * so the figures would be two waves' releases under one denominator.
+       */
+      d.load(w, WAVES[at]);
+      const jobsAt = d.jobs.length;
+      const cap = 4 * (jobsAt + 4);
+      for (let k = 0; k < cap && d.jobs.length; k++) {
         clear();
-        if (!d.jobs.length) d.load(w, WAVES[at]);
         d.lastRelease = -1e9;
         d.emit(w);
         const made = w.enemies.slice();
@@ -31768,6 +31800,8 @@ if (MINE_LINE) {
         }
       }
       out.per = per;
+      out.jobsAt = jobsAt;
+      out.left = d.jobs.length;
       out.slotGap = T.r * 2 + 8;
       out.span = T.r * 2 + T.bond.len;
     }
@@ -32033,13 +32067,22 @@ if (MINE_LINE) {
   check('a YOKE arrives as a PAIR, and the wave beside it still forms up',
     Y.releases >= 20 && Y.lo === 2 && Y.hi === 2
     && Y.beamed === Y.releases * 2 && Y.bad === 0 && Y.over === 0
+    // ...and the CONTROL was actually reached. This conjunct read `!!other`
+    // and drew nothing on build 333, because the census stopped at a fixed
+    // sixty releases and the one grouped job can be shuffled past it -- see
+    // the loop's own note. The wave is driven to the end now, so "the jobs
+    // drained" is what says the comparison is live rather than a hope.
+    && r.left === 0
     && !!other && other[1].lo > 2,
     `${Y.releases} releases through Director.emit, every one of them ${Y.lo}-${Y.hi} bodies, `
     + `${Y.beamed} of ${Y.releases * 2} halves beamed to a partner that arrived with them, `
     + `${Y.bad} beams off ${r.cfg.len} and a worst overlap of ${Y.over}. The same wave's `
-    + `${other ? other[0].toUpperCase() : '?'} job forms up ${other ? other[1].lo : '?'}-`
+    + `${other ? other[0].toUpperCase() : 'MISSING'} job forms up ${other ? other[1].lo : '?'}-`
     + `${other ? other[1].hi : '?'} at a time, which is what this arm can tell apart: a `
-    + `formation lays slots ${r.slotGap} apart and a pair spans ${r.span}`);
+    + `formation lays slots ${r.slotGap} apart and a pair spans ${r.span}. `
+    + `${r.jobsAt} jobs asked, ${r.left} left -- a pair type is pushed as one job per pair `
+    + `and the formable one as a single grouped job, so the census has to drain the wave `
+    + `rather than stop at a count`);
 
   const held = r.beam.hi - r.beam.lo;
   check('...on a beam that holds its length, which a rope would not',
@@ -37204,6 +37247,9 @@ if (MINE_LINE) {
     // derived (`entryLine`) rather than the old `ENTRY_Y + entryDepth`, so a
     // notch at the top of the screen moves it and this arm follows.
     const P = await import('/src/portal.js');
+    // ...and the effects pool, for the arm about the absorb's own mark: the
+    // budget is what decides whether a spark exists at all.
+    const FX = await import('/src/fx.js');
     const g = window.__sim;
     const w = g.world;
     const s = w.shooter;
@@ -37541,6 +37587,77 @@ if (MINE_LINE) {
       };
     }
 
+    // ---- 8b. THE MARK SURVIVES A SPENT PARTICLE BUDGET ------------------
+    {
+      /*
+       * `spark` returns null on its first line once `fx.budgetLeft` is spent
+       * (`maxParticles * quality - active.length`), and three sparks were the
+       * WHOLE of the signal that a round had been eaten -- so it vanished
+       * exactly on the field this object is played on. Measured on the same
+       * shot either way: a clear field adds 7 particles and a spent one adds
+       * ZERO, with the round still absorbed. `ring` has its own pool and is
+       * not budget-gated, so the mark is a ring and the sparks are what the
+       * budget adds when it can.
+       *
+       * The field is starved the way one arrives -- by filling the pool with
+       * real sparks until the frame's budget is gone -- rather than by
+       * writing `quality`, which the governor floors at 0.45 and which
+       * `resize()` owns.
+       */
+      const shotWith = (starve) => {
+        clean();
+        FX.fx.reset();
+        const pr = layPair(midY(), true);
+        const mid = (pr[0].x + pr[1].x) / 2;
+        const mark = E.spawnOne(w, TYPE_BY_ID.lurcher, mid, midY() - 40);
+        mark.staged = false; mark.born = 1; mark.hp = mark.maxHp;
+        let filler = 0;
+        if (starve) while (FX.fx.budgetLeft > 0 && filler < 4000) {
+          FX.spark(10, 10, 0, 0, '#ffffff', 5, 1);
+          filler++;
+        }
+        const p0 = FX.fx.particles.active.length;
+        const r0 = FX.fx.rings.active.length;
+        const budget = FX.fx.budgetLeft;
+        const hp0 = mark.hp;
+        fireAt(mark.x, mark.y);
+        let rings = r0;
+        let parts = p0;
+        for (let i = 0; i < 120; i++) {
+          for (const e of [...pr, mark]) { e.vx = 0; e.vy = 0; e.cruise = 0; }
+          g.update(1 / 60);
+          rings = Math.max(rings, FX.fx.rings.active.length);
+          parts = Math.max(parts, FX.fx.particles.active.length);
+          if (!w.projectiles.length) break;
+        }
+        return { budget: +budget.toFixed(0), rings: rings - r0, parts: parts - p0,
+          absorbed: mark.hp === hp0 };
+      };
+      out.feed = { free: shotWith(false), starved: shotWith(true) };
+      // ...and a round that meets NOTHING leaves no mark, or the arm is
+      // counting whatever the muzzle throws rather than the absorb.
+      {
+        clean();
+        FX.fx.reset();
+        const pr = layPair(midY(), true);
+        for (const e of pr) e.beam = false;
+        const mid = (pr[0].x + pr[1].x) / 2;
+        const mark = E.spawnOne(w, TYPE_BY_ID.lurcher, mid, midY() - 40);
+        mark.staged = false; mark.born = 1; mark.hp = mark.maxHp;
+        while (FX.fx.budgetLeft > 0) FX.spark(10, 10, 0, 0, '#ffffff', 5, 1);
+        const r0 = FX.fx.rings.active.length;
+        fireAt(mark.x, mark.y);
+        let rings = r0;
+        for (let i = 0; i < 120; i++) {
+          for (const e of [...pr, mark]) { e.vx = 0; e.vy = 0; e.cruise = 0; }
+          g.update(1 / 60);
+          rings = Math.max(rings, FX.fx.rings.active.length);
+          if (!w.projectiles.length) break;
+        }
+        out.feed.clear = { rings: rings - r0, took: +(mark.maxHp - mark.hp).toFixed(1) };
+      }
+    }
+
     // ---- 9. the debug overlay can SHOW the thread -----------------------
     {
       clean();
@@ -37728,6 +37845,27 @@ if (MINE_LINE) {
     + `(ratio ${r.ratio.omega}) -- one factor, both mechanisms. Build 332 shipped `
     + '1.000 against 0.119: the one press a player has against this object did not touch '
     + 'the only thing it does');
+
+  check('the mark an ABSORB leaves survives a spent particle budget',
+    // the mark arrives either way, which is the claim
+    r.feed.free.rings >= 1 && r.feed.starved.rings >= 1
+    // ...and the starved run really was starved, and the free one really was
+    // free -- without this pair the arm is two identical runs agreeing
+    && r.feed.starved.budget === 0 && r.feed.free.budget > 0
+    && r.feed.free.parts >= 3 && r.feed.starved.parts === 0
+    // ...and the round was absorbed in both, so the mark is the absorb's
+    && r.feed.free.absorbed && r.feed.starved.absorbed
+    // ...and a round that met NOTHING leaves no ring and delivers its damage,
+    // or the arm is counting whatever the muzzle throws
+    && r.feed.clear.rings === 0 && r.feed.clear.took > 5,
+    `absorbed with the frame's budget free: ${r.feed.free.rings} ring, `
+    + `${r.feed.free.parts} particles (budget ${r.feed.free.budget}); with it SPENT: `
+    + `${r.feed.starved.rings} ring, ${r.feed.starved.parts} particles (budget `
+    + `${r.feed.starved.budget}). The same shot with the link down leaves `
+    + `${r.feed.clear.rings} rings and takes ${r.feed.clear.took} health. `
+    + '`spark` returns null once the budget is gone and three sparks were the whole of '
+    + 'the signal, so the one thing that says a round was EATEN vanished exactly on a '
+    + 'busy field -- which is the only field this object is played on');
 
   check('the HITBOXES overlay can show the thread, which is a hit boundary',
     // lit between the spools with the link up, and nothing there without it,

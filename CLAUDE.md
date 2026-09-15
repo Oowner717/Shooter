@@ -6837,3 +6837,123 @@ came from before believing the other one covers it.
   claim build 332 made about `resolveSegment` and 315 about the capsule.
   The instruments with something to say about the rest are the census (asked
   against arrived, per wave) and the clear table, and both are above.
+
+- **BUILD 334 IS 333'S SUITE RUN, AND THE ONE RED CASE WAS 333'S OWN FIX
+  HOLLOWING OUT A 332 CONTROL.** 740 of 741, and the failure was the YOKE
+  formation arm reporting its pair half perfect (60 releases, 2-2 bodies, 120
+  of 120 halves beamed, 0 beams off, 0 overlap) with **the control missing
+  entirely** -- its detail printed `?` for the type and `?-?` for the count,
+  which is the arm's own message saying the comparison never happened.
+  Measured rather than guessed. `Director.load` refuses to group a type that
+  cannot form up (333's `formable`), so the authored `['yoke', 6]` swells to
+  **64 at rung 32 and is pushed as sixty-four jobs of ONE** where it used to
+  be one job of 64 -- and `load` then Fisher-Yates SHUFFLES the list, so the
+  wave's single `glut x11` job lands at a uniform index in 0..64. A census
+  that stops at sixty releases misses it whenever it lands past 60: five
+  indices of sixty-five, **about one run in thirteen**. Before 333 the yoke
+  entry was one job and the control was hit in the first two iterations,
+  always.
+  So a correctness fix turned a case's `for` bound into a 7.7% flake, which is
+  build 331's finding verbatim -- **a loop bound is a fitted margin wearing a
+  `for` statement's clothes** -- and the fix is the same: load once, drive
+  until the jobs DRAIN, bound the loop off the wave's own job count as a
+  backstop, and assert `jobs left === 0` so the control cannot go quiet again.
+  Reads 63 releases, GLUT 11-11, 64 jobs asked and 0 left, three runs of
+  three. **Anything that changes the SHAPE of a list owes a re-read to every
+  case that walks it a fixed number of times.**
+- **THE ONE SIGNAL THAT A ROUND WAS EATEN VANISHED EXACTLY ON THE FIELD THE
+  OBJECT IS PLAYED ON.** Build 332's thread absorb threw three `spark`s and
+  nothing else, and `spark` returns null on its first line once
+  `fx.budgetLeft` is spent -- which is `maxParticles * quality -
+  active.length`, and a crowded band-5 wave with a bought turret spends it
+  every frame (build 325 measured a single boss teardown making 164 particles
+  in one frame of a 620 budget, 279 at the governor's 0.45 floor). Measured on
+  the same shot either way: a clear field adds **7 particles** and a field
+  whose frame budget is spent adds **ZERO**, with the round still absorbed and
+  **no ring to fall back on**. The mechanic was perfect and the player was
+  told nothing. Nothing could fail for it: every arm in the case measures the
+  DAMAGE, and the damage was right.
+  `ring` has its own pool and is not budget-gated, so the mark is a ring now
+  and the sparks are what the budget adds when it can. Three existing rules
+  shaped it: FILLED and small, because `ring`'s `fill` term is a `drawGlow`
+  under `lighter` and overlapping outlines scribble while overlapping glows
+  add (build 330's AIRBURST); drawn AT the radius it means rather than
+  expanding into it, because `drawFx` fades and thins a ring as it grows
+  (211); and sized off `bond.stops`, the half-thickness a round has to miss,
+  so it claims no reach it does not have (330's rule about HAIL's held
+  circle). Rendered and looked at, zoomed x4 off an offscreen canvas: one
+  absorb reads as a bright ring with a glow core sitting ON the thread, and
+  three SCATTER volleys into one thread ADD into one brighter mark rather
+  than scribbling. Revert-proved: with the ring taken out the arm reads 0
+  rings both ways.
+  **The general shape: an effect whose whole feedback goes through a BUDGETED
+  pool has no feedback in the state it is about.** Grep for a mechanic whose
+  only mark is `spark` or `dot` -- both gate on `budgetLeft` -- and ask what
+  the field looks like when it matters.
+- **AND THE INSTRUMENT FOR THAT HAD TO STARVE THE FIELD THE WAY ONE ARRIVES.**
+  Writing `fx.quality` does not do it: the governor floors it at 0.45 and
+  `resize()` owns the backing store, which is the trap build 198's governor
+  case already records. Filling the pool with real sparks until
+  `budgetLeft <= 0` is the honest reproduction, and the arm asserts the pair
+  -- `starved.budget === 0` and `free.budget > 0`, `free.parts >= 3` and
+  `starved.parts === 0` -- because without it the case is two identical runs
+  agreeing with each other. And the first version of the probe wrote
+  `fx.particles.active = 0`: `active` is an ARRAY, so the next `spawn()` threw
+  `this.active.push is not a function` and the probe reported the game broken.
+- **`pgrep -f` MATCHES ITS OWN WAITER, AND THAT COST FORTY MINUTES OF
+  WAITING.** `while pgrep -f 'regress.mjs --json' >/dev/null; do sleep 30;
+  done` never exits, because the `bash -c` running the loop has that pattern
+  in its own command line -- so three separate background waiters sat forever
+  and I went on reporting the suite as running when it had finished. It was
+  found by `ps`: load average 0.18 and no node process. CLAUDE.md already
+  records the destructive half of this (build 310: `pkill -f` killing its own
+  shell, exit 144) and the read-only half from the same note; what is new is
+  that the read-only half does not error -- it just never finishes, and it
+  looks exactly like a long run. **Watch the OUTPUT FILE, not the process
+  name**: the runner writes its summary and its `--json`, and `ls -la` on
+  those answers the question in one command.
+- **BUMPING THE BUILD LITERAL WHILE A SUITE IS RUNNING KILLS THE SUITE, AND
+  THE UPDATER IS DOING ITS JOB.** `regress.mjs` drives the SERVED tree on
+  :8099 with `-c-1`, and `main.js`'s `askServer()` range-fetches the first
+  4096 bytes of index.html and reloads the page when the build literal it
+  reads differs from its own. So editing `index.html` and `src/config.js`
+  mid-run -- which is the last step of every build -- makes the page reload
+  itself and the runner dies with **"page.evaluate: Execution context was
+  destroyed, most likely because of a navigation"**, thirteen minutes in, with
+  ten lines of stack and no case output at all. CLAUDE.md already recorded
+  this from the other direction (build 329: match the literal in BOTH files
+  in a bisect worktree, or the same thing happens); the live tree has the same
+  exposure and it is the one edit every build makes. **Bump the literal before
+  the run or after it, never during** -- and if a run dies with that message,
+  check `curl -s -r 0-4096 .../index.html` against the page's own build before
+  looking for anything else.
+- **Recorded for the next object rather than acted on here: EVERY RANGED
+  ATTACK ALREADY IN THIS GAME IS COSMETIC.** KITE, one of the two objects
+  left in phase 6, is specified as "the first body in the game that attacks
+  from outside contact range". That claim is false and the existing instances
+  are the warning. Verified by grep: `world.shock` is written at TEN sites --
+  `amplitude.js:373`, `boss.js:1590` (the lash), `dynamo.js:384/574/759`,
+  `gnomon.js:348/361`, `parity.js:359`, `terminus.js:482/794` -- and its only
+  readers are `game.js:3863` (decay at `dtRaw / tow.hurl.shockFor`) and
+  `game.js:3872`, where it is one term of `glitch.level`, the compositing
+  shader. So nine boss ranged attacks deliver a look and nothing else, and
+  `CFG.glitch.perAttacker` is 0.34 against TERMINUS's beam at 0.30: **one
+  LURCHER touching the machine is worth more shader than every ranged boss
+  attack in the game, and unlike them it also fills the fuse, taxes the intake
+  and scores the wave.**
+  What that means for the object: there is no turret health at all (the
+  `Shooter` constructor declares no `hp`, no `applyDamage`, and `game.js`'s
+  pair solver bills `impactDamage` behind `if (a.applyDamage)`, which is false
+  for it), so a bolt cannot do damage and a bolt that only sets `world.shock`
+  is the tenth empty payload -- which is what GYRE was withdrawn for at 331.
+  The two channels that ARE live and reachable from range, both verified by
+  reading: the fuse's CROWD half, which a standing body already feeds through
+  `hostileCount` and the build-291 release gate with no new code; and salvage
+  denial, which `Enemy.feed` (a GLUT eating `world.drops`, marking them `dead`
+  and `dissolved` so they pay nothing) already does from the floor. The intake
+  tax is NOT reachable as written -- `intakeRate` reads `world.attackers.size`
+  and nothing else, and `checkContact` re-tests and evicts every frame, so a
+  body at range cannot be in that set. And `Game.watchGlitch` is
+  `burn === 'crowd' ? ON_CROWD : ON_GLITCH`, a two-way ternary, so **a third
+  cause would silently be captioned "clear the turret"** -- which is exactly
+  the fault build 293 wrote `burnFrom` to fix.
