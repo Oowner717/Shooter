@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '336';
+export const BUILD = '337';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '336';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '341704b';
+export const REV = '8fe096c';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -720,6 +720,16 @@ export const CFG = {
        * wave. Sealed until the run has stood on `sheetRung`, because that is
        * where the ladder starts asking questions worth answering.
        */
+      /*
+       * ...and the two nodes read THIS rather than restating it. It was a
+       * third copy of a 10: `upgrades.js` authored `rung: 10` on RECALL and
+       * on OVERCLOCK, this said 10, and the only reader of this was
+       * `regress.mjs` -- so the suite's guard was calibrated against a value
+       * the game never consulted. Edit the nodes and the case correctly goes
+       * red; edit THIS alone and the case ALSO went red, reporting the nodes
+       * as mis-sealed when nothing about the seal had moved. One owner now,
+       * which is the `LOTS` / `ANOMALIES.length` / `rungsEvery` correction.
+       */
       sheetRung: 10,
       recallCd: 60, // seconds
       recallClean: 0.75, // cleared at least this much and RECALL scores a clean
@@ -1295,13 +1305,23 @@ export const CFG = {
      * what it becomes.
      */
     /*
-     * How long the mark it leaves stands, as a share of `back`. One, so the
-     * mark is the clock made visible rather than a decoration that could
-     * drift out of step with it -- there is one object and one owner, and the
-     * player can see how long is left. The mark is NOT where the body comes
-     * back (that is the portal); it is the statement that one is coming.
+     * ---- THE MARK'S LIFE IS `back`, AND A `mark` SHARE CAME OUT ---------
+     *
+     * A `mark: 1` stood here from build 324, documented as "how long the
+     * mark it leaves stands, as a share of `back`" -- and `enemies.js`
+     * writes `life: rs.back` with no multiplier, so the field had NO READER
+     * and its value being the identity is the only reason nothing could tell.
+     * Authoring `mark: 0.8` to shorten the mark would have changed nothing,
+     * in silence, on a field whose entire docstring is about that share.
+     * That is the `world.endless` shape: a constant threaded rather than a
+     * branch taken.
+     *
+     * Deleted rather than wired, because the paragraph's own argument is the
+     * reason to delete it -- the mark is the clock MADE VISIBLE, there is one
+     * object and one owner, and a second number that could drift out of step
+     * with the clock is the thing it was arguing against. The mark stands for
+     * exactly `back` because it IS `back`.
      */
-    mark: 1,
   },
 
   // ---- chaff ----------------------------------------------------------
@@ -2178,6 +2198,25 @@ export const CFG = {
        *
        * SPINE's own answer to volume is `shatter` above, which is area rather
        * than cadence and is what the round was given one for.
+       *
+       * ---- AND IT LEFT THE FIELD THOSE TWO NUMBERS WERE WRITTEN INTO -----
+       *
+       * Build 225 deleted `hold: t * g.tapGap` from `shooter.js`, deleted
+       * `tapGap` and `tapFade`, and wrote this paragraph naming both -- and
+       * left `Projectile.hold`, the field the first of them supplied, with
+       * its own comment reading "DOUBLE TAP: the follow-up round waits this
+       * long at the muzzle before it sets off". It was read on EVERY FRAME
+       * FOR EVERY ROUND (`if (!p.dead && p.hold > 0) { p.hold -= dt;
+       * dot(...); continue; }`) and could never be non-zero: one
+       * `new Projectile` call site, seven `fire()` callers, no `hold:`
+       * anywhere. Removed at build 336+1 with the ORDINAL hash unmoved,
+       * which is what "a branch that could never be taken" looks like
+       * measured rather than argued.
+       *
+       * The lesson is not "sweep harder". It is that a removal pass which
+       * writes down which CONFIG values it took out has not thereby found
+       * the code that read them -- `git show <commit> -- <file>` on the
+       * removing commit is the sweep, and it takes one command.
        */
     },
     /*
@@ -4540,18 +4579,33 @@ export const CFG = {
   },
 
   /*
-   * What the TURRET branch bolts on. Every node in it is a part you can see,
-   * and its level is how much of that part there is — see Shooter.drawRig().
-   * The names in the tree are the parts: FEED, GIMBAL, SIGHT, SPINES, SHROUD,
-   * INTAKE.
+   * What the TURRET branch bolts on -- see `Shooter.drawMachine`, which is
+   * where the parts are drawn from a node's level.
+   *
+   * ---- AND FOUR OF THE SIX NUMBERS HERE HAD NO READER -----------------
+   *
+   * `CFG.rig` is accessed at exactly four sites in the whole tree
+   * (shooter.js:1089 and :1867, game.js:1879 for `flash`; shooter.js:1319
+   * for `pile`), so `ring`, `spine`, `feed` and `dish` were shipped in the
+   * bundle and read by nothing. `dish` is build 150's deleted ARRAY gadget
+   * BY NAME -- that build replaced the hung-on gadgets with structure on the
+   * drawn machine, and CLAUDE.md records the same removal leaving five
+   * TURRET lines "still describing the hung-on gadgets... ARRAY had been
+   * selling a scanning dish for sixty builds and drawing a flat fin". The
+   * prose was fixed then and the numbers behind it were not.
+   *
+   * The docstring was the expensive half and it was wrong three ways: it
+   * claimed every key is "a part you can see", which is true of two of six;
+   * it named `Shooter.drawRig()`, which does not exist anywhere in the tree
+   * (the build-336 `standoffOf` trap, twice more -- the other is
+   * upgrades.js); and it listed SIGHT as a current part, five builds after
+   * shooter.js recorded SIGHT as gone. Build 313's dead-field sweep cannot
+   * see any of this: its domain is keys declared on `ENEMY_TYPES`, not `CFG`
+   * blocks.
    */
   rig: {
     flash: 0.9, // seconds the machine flares while a part goes on
-    ring: 0.2, // gimbal: each level adds a ring this much further out
-    spine: 9, // spines: length of each spike, in world units
     pile: 8, // pile: how far the weight travels in the deck, per level
-    feed: 7, // feed: belt housing depth
-    dish: 20, // array: dish aperture, growing with the level
   },
 
   // ---- feel -----------------------------------------------------------
@@ -6164,10 +6218,12 @@ export const ENEMY_TYPES = [
      * block, so a second rider would have worn SEED's growth and healing in
      * total silence with no field to set and nothing to fail. The same is
      * true here -- a second type that came back on a different clock, at a
-     * different share, would wear these. So a number about the RULE is
-     * shared (`CFG.remnant.mark`) and a number about THIS BODY's return is
-     * its own, `respawnOf` throws for a malformed block, and `check-build`
-     * holds it in both directions. That is the fourth mandatory-field guard
+     * different share, would wear these. So a number about THIS BODY's
+     * return is its own, `respawnOf` throws for a malformed block, and
+     * `check-build` holds it in both directions. (The shared half of that
+     * sentence named `CFG.remnant.mark`, which had no reader and came out at
+     * build 337 -- what is genuinely shared is the MARK ITSELF, the idiom
+     * that says a return is pending.) That is the fourth mandatory-field guard
      * after `levels` (224), `band` (303) and `beads`/`climb`/`rides`.
      */
     respawn: {

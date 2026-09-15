@@ -7454,3 +7454,173 @@ came from before believing the other one covers it.
   it should pin the seed and pool three runs, the way the sibling arm's field
   channel already does** -- and should note that a liveness floor is the one
   conjunct in it that has never been pooled.
+
+- **BUILD 337 IS A REMOVAL PASS, AND ITS SEED IS THE OLDEST ORPHAN THIS REPO
+  HAS FOUND: `Projectile.hold`, DEAD SINCE BUILD 225 AND READ ON EVERY FRAME
+  FOR EVERY ROUND.** `this.hold = opts.hold ?? 0` under a comment reading
+  "DOUBLE TAP: the follow-up round waits this long at the muzzle before it
+  sets off", with the branch
+  `if (!p.dead && p.hold > 0) { p.hold -= dt; dot(...); continue; }` in
+  `updateProjectiles` -- the hottest loop in the game. Zero suppliers: ONE
+  `new Projectile` call site, seven `fire()` callers, and no `hold:` anywhere
+  in shooter.js, abilities.js, mines.js or turrets.js.
+  **And the removing commit named the two numbers it took out.**
+  `git log -S "hold:" -- src/shooter.js` dates the orphan to `056d365`
+  "Build 225: DOUBLE TAP comes out", whose diff deletes
+  `hold: t * g.tapGap` and `damage: g.damage * g.tapFade ** t` -- and build
+  225 also deleted `tapGap` and `tapFade` from `CFG` and wrote a paragraph
+  naming both, which is still there. **So the removal pass documented exactly
+  which config values it deleted and left the field they were written into.**
+  The lesson is not "sweep harder": it is that
+  `git show <commit> -- <file>` on the removing commit IS the sweep, and it
+  takes one command.
+  **The ORDINAL hash is the right instrument and it did not move** --
+  `-1334607133` either side, both readings in this container. A branch removed
+  from the round update loop that provably touched nothing is a claim only
+  that instrument can make.
+- **TEN MORE OF THE SAME SHAPE, ALL VERIFIED BY GREP BEFORE ACTING.** A
+  read-only fan-out pointed at the shape rather than at a file, and every one
+  of these was then confirmed here with a property grep showing ZERO reads:
+  - **`Ordinal.gaze`** (boss.js) -- `Math.atan2` on every frame of stage IV,
+    read by nothing, duplicating an identical atan2 fourteen lines below.
+    The commit that removed it was "Replace the gaze with worn armour": it
+    took the drawing and left the field. TWO false comments promised the
+    visual -- "// the eye tracks you" and `config.js`'s "the core's eye
+    tracking the turret" -- in the one paragraph a reader goes to in order to
+    learn what that stage looks like, and the beams turning in the same
+    sentence is what made it survive a skim.
+  - **`Hud._bossArriving`** -- a repaint memo written twice a fight and read
+    nowhere, among three siblings (`_bossTitle`, `_bossGhost`,
+    `_bossShells`) that ARE read as guards. Deliberately NOT "fixed" by
+    wiring the guard: `classList.toggle` is idempotent and the unguarded
+    `recede(0.5)` is documented as deliberate, so a test there would be a
+    behaviour change dressed as a tidy-up.
+  - **`Game.resetShown`** -- write-only since build **82**, i.e. **254
+    builds**, more than twice `Projectile.hold`. It was the end screen's
+    state; build 82 deleted its reader and its partner `endTimer`, build
+    186's dead-CSS sweep took the `#endScreen`/`#endText`/`#resetBtn`/
+    `body.ending` family it drove, and the JS half was never swept. It
+    carried NO COMMENT, which is why it read as a live reset between the two
+    live ones either side of it.
+  - **`Fractal.recalled`** -- and this one is `diveT`'s shape rather than a
+    stale constant: a `back` accumulator maintained across a nested loop, one
+    declaration and three increments, into a field nothing read. The bodies
+    really are revived; only the count was thrown away. It also sat one
+    letter from the live `recall()` method, which is build 324's
+    `reform`/`Boss.reform` collision -- the shape that blinds a grep sweep.
+  - **`Background.nebula`** -- an empty array that has never had a reader in
+    any build; the live bloom is cached in `deep`/`deepCtx`.
+  - **FOUR OF `CFG.rig`'S SIX KEYS.** `CFG.rig` is accessed at exactly four
+    sites tree-wide (three for `flash`, one for `pile`), so `ring`, `spine`,
+    `feed` and `dish` shipped in the bundle and were read by nothing --
+    and **`dish` is build 150's deleted ARRAY gadget BY NAME**, the same
+    removal CLAUDE.md already records as leaving five TURRET lines "still
+    describing the hung-on gadgets... ARRAY had been selling a scanning dish
+    for sixty builds". The prose was fixed at 150; the numbers behind it were
+    not. Its docstring was wrong three ways: every key is "a part you can
+    see" (true of two of six), it named `Shooter.drawRig()` (no such function
+    anywhere), and it listed SIGHT as current five builds after shooter.js
+    recorded SIGHT as gone.
+  - **`CFG.remnant.mark`** -- MINE, from build 324, and the most instructive
+    of the ten. Documented as "how long the mark it leaves stands, as a share
+    of `back`", and `enemies.js` writes `life: rs.back` with **no
+    multiplier**. Its value being the identity is the only reason nothing
+    could tell: **authoring `mark: 0.8` to shorten the mark would have
+    changed nothing, in silence, on a field whose entire docstring is about
+    that share.** Deleted rather than wired, because the paragraph's own
+    argument is the reason to delete it -- the mark is the clock made
+    visible, there is one object and one owner, and a second number that can
+    drift out of step with the clock is the thing it was arguing against.
+  - **`Hud.setKills`'s `fitBar()` call** -- build 222's fault EXACTLY
+    INVERTED. 222 had three signature terms and no caller for the kill count,
+    "re-run by accident through a sibling that had been deleted"; 295 removed
+    the term and left the caller. Its justifying paragraph says the count "is
+    one of the three digit runs `fitBar` is keyed on" while `fitBar`'s own
+    docstring, forty lines below in the same file, says "the kill count came
+    OUT of this signature in build 295" -- **two paragraphs in one file
+    saying opposite things about the same three numbers.** The rule that
+    catches both directions is `fitBar`'s own: a signature term owes the box
+    a chip, and a caller owes the signature a term.
+  - **`sheetRung`, a third copy of a 10 the game never reads** -- and the
+    suite's guard was calibrated against it. `upgrades.js` authored
+    `rung: 10` on RECALL and on OVERCLOCK, `CFG.waves.tier.sheetRung` said
+    10, and the ONLY reader of the constant was `regress.mjs`. So editing the
+    nodes correctly reddened the case, and editing the constant ALONE also
+    reddened it -- reporting the nodes as mis-sealed when nothing about the
+    seal had moved. The nodes read the constant now.
+  - **`body.loadoutOpen` in `ladder-probe.mjs`** -- no writer since build
+    226, so the 'loadout' arm of its ternary could never be taken, and its
+    live neighbour covered for it (the loadout IS a menu tab now, so
+    `menu.toggle()` closes it). What it cost was diagnostic: a run stalled
+    behind AMMO or MINES reported 'menu'. `Game.loadoutOpen` is the getter
+    build 226 wrote for exactly this.
+- **THE PATTERN ACROSS ALL ELEVEN IS ONE SENTENCE: A REMOVAL PASS DELETES
+  THE CONFIG AND THE PROSE AND MISSES THE CODE THAT READ THEM.** Builds 82,
+  150, 186, 222, 225, 226, 295 and 324 each left exactly one of these, and
+  every one was invisible to build 313's dead-field sweep **because that
+  sweep's domain is keys declared on `ENEMY_TYPES`** -- not `CFG` blocks, not
+  class constructors, not HUD fields, not probe scripts. Its green has never
+  said anything about any of them. **Ask what a guard's domain is before
+  reading its green as coverage**, and for a removal, grep the removing
+  commit's own diff.
+- **AND `FIELD_LISTS` IS THE DERIVATION, BECAUSE FIVE PLACES HAD WRITTEN THE
+  SAME LIST OUT AND EVERY ONE OF THEM WAS WRONG.** `world` carries **fifteen
+  arrays** -- measured, not counted: nine that are the field (enemies,
+  ghosts, respawns, drops, debris, projectiles, effects, mines, pendingBlasts)
+  and six that are run state (apertures, gunAt, guns, ledger, offered,
+  reconciled), plus three Sets outside both (attackers, abilityHold,
+  unlocked). `takeField` empties exactly the nine and keeps exactly the six.
+  What was there before:
+  - `takeField`'s **docstring** said "three of the seven lists" and its
+    **body comment** said "the six lists that are not `enemies`", while the
+    body drained **eight** -- two wrong counts in a paragraph whose whole
+    subject is wrong counts ("a clear that names three of them under a
+    comment about needing a clean field is this repo's own scar").
+  - the era-switch arm's `out.lists` named **seven**, omitting `ghosts` and
+    `respawns`, and it is asserted with `every((n) => n === 0)` -- so the one
+    arm whose entire subject is that every list is empty **could not see a
+    leak in either of them.**
+  - the evolution's `out.tookField` named **eight** and omitted `respawns`,
+    which build 324 added to the same `takeField` that line asserts the
+    completeness of, under a comment calling `ghosts` "the eighth list, which
+    build 323 added" -- a count right at 323 and wrong from 324.
+  - two `inNoList` furniture sweeps named **seven** under a comment reading
+    "setEra empties all seven".
+  One exported constant now, `takeField` iterates it, all four suite sites
+  read it. **`pendingBlasts` IS LAST AND THE ORDER IS LOAD-BEARING** -- a
+  body coming apart in the enemies pass pushes a blast on its way out -- so
+  reordering the array is a behaviour change and says so at the site.
+- **...AND A CONSTANT IS A NINTH COPY UNLESS SOMETHING ASSERTS THE PARTITION
+  IS TOTAL.** The guard that makes it a derivation: every array on a fresh
+  world is EITHER a field list or named run state, so a tenth of either kind
+  fails until somebody classifies it. **Proved able to read a one, twice** --
+  planting a `zzzNewList` reads `unclassified: ['zzzNewList']`, and leaving a
+  field list non-empty after the clear reads `fieldLeft: ['respawns']`. And
+  the second arm FILLS all fifteen before clearing, because without the fill
+  it passes on a world that was already empty, **which is what four of the
+  five hand-written versions of this list were doing.**
+- **`PREFS.hints` DID NOT TURN THE LOT OFF, AND CLAUDE.md HAS SAID IT DID
+  SINCE THE BAND WAS WRITTEN.** `game.js`'s contact line was the ONE ungated
+  `sayOnce` in the game: six siblings all carry `this.hintsAllowed` and this
+  one carried nothing, with no comment saying why -- so a player who turned
+  the captions off still got the first and most important one. Gated now, and
+  what that changes is narrower than it looks, which is why the gate is the
+  answer rather than a risk: `hintsAllowed` is
+  `pref('hints') && phase === 'staging'`, contact first happens during the
+  eight teach waves, which ARE staging; and it was never spending the line on
+  the title screen, because `phase` is 'boot' there and the grab loop skips
+  `e.harmless` so the boot field's drifters cannot grip. What it removes is
+  the hints-OFF case, which is the promise. **If the site is ever wanted
+  exempt -- and there is an argument, since it names the one tool that
+  answers a body on the mount -- the exemption has to be written there**,
+  because a missing gate and a chosen exemption are otherwise the same text.
+  Revert-proved: with the gate removed the hints-off arm says the line TWICE
+  while `hintsAllowed` reads false.
+- **`hints` IS 0/1 AND NOT BOOLEAN, AND `setPref` CLAMPS A VALUE IT DOES NOT
+  RECOGNISE TO THE DEFAULT.** So `setPref('hints', false)` silently turns
+  hints **ON** (`def: 1`), and the first version of that case measured two
+  identical arms and reported the gate missing on a build that has it. The
+  arm throws if the pref refuses rather than trusting it. **A setter that
+  falls back to a default swallows a wrong-typed argument in silence** --
+  same family as `levels ?? 3` and an omitted `band` reading as band 1, on
+  the setter side instead of the author side.

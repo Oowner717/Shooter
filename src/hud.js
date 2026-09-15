@@ -1241,8 +1241,22 @@ export class Hud {
      * the bar re-fitted for a growing count by accident, through a sibling
      * that has now been removed. Called here, it fires when the count gains a
      * digit and at no other time -- which is what the sig was always for.
+     *
+     * ---- AND THE COUNT LEFT THAT SIGNATURE AT BUILD 295 ----------------
+     *
+     * So the paragraph above is history and the call it justified is gone.
+     * `fitBar`'s own docstring, forty lines below, has said "the kill count
+     * came OUT of this signature in build 295" since that build moved the
+     * OBJECTS chip out of `#barChips` -- and `sig` is the purse's rendered
+     * length and the buys' digit count, with no kill term. Two paragraphs in
+     * one file saying opposite things about the same three numbers.
+     *
+     * This is build 222's fault EXACTLY INVERTED: 222 had three terms and no
+     * caller for the kill count, re-run by accident through a sibling that
+     * had been deleted; 295 removed the term and left the caller. The rule
+     * that catches both is the one `fitBar` states: a signature term owes
+     * the box a chip, and a caller owes the signature a term.
      */
-    this.fitBar();
   }
 
   /*
@@ -2917,7 +2931,6 @@ export class Hud {
     }
     if (!boss) {
       this._bossSeen = null; this._bossGhost = null; this._bossShells = 0;
-      this._bossArriving = false;
       return;
     }
 
@@ -2942,7 +2955,17 @@ export class Hud {
      * arrival runs for several seconds and the timer counts down through it.
      */
     if (g.arriving) this.recede(0.5);
-    this._bossArriving = g.arriving;
+    /*
+     * ...and NOT memoised. A `this._bossArriving = g.arriving` stood here,
+     * written twice a fight and read nowhere, among three siblings
+     * (`_bossTitle`, `_bossGhost`, `_bossShells`) that ARE read as guards --
+     * so an audit of the family found four memos of which one did nothing,
+     * and it was the one on the arrival. Do not put it back as a guard
+     * either: `classList.toggle` is idempotent and the unguarded
+     * `recede(0.5)` above is deliberate, so a test here would be a behaviour
+     * change dressed as a tidy-up. If a non-idempotent write ever goes behind
+     * the arrival, the memo comes back WITH its reader in the same commit.
+     */
     this.el.bossFill.style.transform = `scaleX(${g.core.toFixed(3)})`;
     /*
      * The ghost only ever falls, and it falls late. It holds where the health

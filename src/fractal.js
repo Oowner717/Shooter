@@ -388,11 +388,10 @@ export class Fractal extends Boss {
       this.sprang = true;
       // Everything it ever had, back at part health -- and not one body more
       // than it arrived with, which is the cap that stops this being a wall.
-      let back = 0;
       for (const m of this.mids) {
-        if (m.dead) { this.revive(world, m, C.recurseHp); back++; }
+        if (m.dead) { this.revive(world, m, C.recurseHp); }
         for (const t of m.mites) {
-          if (t.dead) { this.revive(world, t, C.recurseHp); back++; }
+          if (t.dead) { this.revive(world, t, C.recurseHp); }
           // ...including the ones that got loose. They are recalled.
           if (!t.host) {
             t.host = m;
@@ -400,11 +399,22 @@ export class Fractal extends Boss {
             t.invMass = 0;
             t.cruise = 0;
             t.accel = 0;
-            back++;
           }
         }
       }
-      this.recalled = back;
+      /*
+       * A `back` accumulator ran across this whole nested loop -- one
+       * declaration and three increments -- into `this.recalled`, which
+       * nothing ever read. Not a stale constant but MAINTAINED ARITHMETIC
+       * with no supplier on the reading side, which is `diveT`'s shape
+       * exactly (build 325: one increment on a hot path, three resets, zero
+       * readers). The bodies really are revived and re-hosted; only the count
+       * of them was being thrown away. If the count is ever wanted for a
+       * caption or the gauge, it comes back with its reader in the same
+       * commit. Note `recalled` also sat one letter from the live `recall()`
+       * method below, which is build 324's `reform`/`Boss.reform` collision
+       * -- the shape that blinds a grep-based sweep.
+       */
       flash(0.55, '#ffffff');
       for (let i = 0; i < 4; i++) {
         ring(this.x, this.y, 10 + i * 22, 420 + i * 200, 0.45 + i * 0.14,

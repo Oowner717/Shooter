@@ -3617,7 +3617,7 @@ export class Enemy {
      * The promise is a record rather than the body: the body is about to be
      * swept off `world.enemies` and a dead body cannot hold a clock. It goes
      * in `world.respawns`, where the MARK and the CLOCK are one object --
-     * `CFG.remnant.mark` says why -- carrying the wave it belonged to, so
+     * the promise carries the rules -- the wave it belonged to, so
      * `Director.standing` can refuse to let that wave end while a return is
      * outstanding. That is the whole of the object's cost, and `Director`
      * owns the clock: frozen while a boss is up, resumed with the wave, which
@@ -10348,9 +10348,11 @@ export function spawnByGait(world, type, x) {
  *
  * `world.respawns` is the ninth list and it holds one thing: a REMNANT that
  * has been destroyed once and is coming back. The MARK and the CLOCK are the
- * same object -- see `CFG.remnant.mark` -- so the player can see how long is
- * left, and there is no way for a decorative mark and a hidden timer to drift
- * apart.
+ * same object -- the mark's life IS `respawn.back`, written as `life: rs.back`
+ * with nothing between them -- so the player can see how long is left, and
+ * there is no way for a decorative mark and a hidden timer to drift apart. A
+ * `CFG.remnant.mark` share stood between them from build 324 to 337 and had
+ * no reader, which is why it went: the second number is the drift.
  *
  * It is NOT bodies. What `world.enemies` membership would have bought a
  * pending return is everything build 323's census lists for a copy, and every

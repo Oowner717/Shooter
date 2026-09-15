@@ -66,9 +66,6 @@ class Projectile {
     this.burst = opts.burst || null;
     this.chain = !!opts.chain; // ARC: jumps on from whatever it hits
     this.jumps = opts.jumps ?? CFG.rounds.arc.jumps;
-    // DOUBLE TAP: the follow-up round waits this long at the muzzle before
-    // it sets off.
-    this.hold = opts.hold ?? 0;
     // SPINE: bodies it carries on through, and what it keeps of its damage
     // each time it does.
     this.pierce = opts.pierce ?? 0;
@@ -152,12 +149,6 @@ export function updateProjectiles(world, dt) {
     // a timed round goes off wherever it happens to be
     if (p.life <= 0) endProjectile(world, p, p.x, p.y, true);
     if (p.ignoreT > 0) p.ignoreT -= dt; else p.ignore = null;
-
-    if (!p.dead && p.hold > 0) {
-      p.hold -= dt;
-      dot(p.x, p.y, 0, 0, p.color, 0.06, 5);
-      continue;
-    }
 
     if (!p.dead) {
       let nx = p.x + p.vx * dt;

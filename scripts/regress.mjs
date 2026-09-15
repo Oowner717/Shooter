@@ -2990,11 +2990,17 @@ check('nothing reads a field that does not exist', ghosts.length === 0,
     for (const el of document.querySelectorAll('#quickBar .qc, #abilities .ab')) {
       try { tap(el); } catch (e) { threw.push(`${el.id || el.className}: ${e.message}`); }
       /*
-       * Two of those cells are the config buttons and they open the loadout
-       * sheet, which sets `body.loadoutOpen` -- that drops the strip and the
-       * ability bar to a quarter opacity and holds the run. Left standing it
-       * failed three later cases, one of them the title-screen paint check,
-       * which is a fair report of a sheet nobody closed.
+       * Two of those cells are the config buttons and they open the menu on
+       * its AMMO or MINES tab -- which drops the strip and the ability bar to
+       * a quarter opacity and holds the run. Left standing it failed three
+       * later cases, one of them the title-screen paint check, which is a
+       * fair report of a sheet nobody closed.
+       *
+       * This paragraph said the sheet "sets `body.loadoutOpen`" until build
+       * 337. It does not, and has not since build 226 folded the sheet into
+       * the menu: nothing writes that class, and CLAUDE.md already records
+       * that its one CSS rule never disabled a button either. The state is
+       * `Game.loadoutOpen`, a getter off the menu's tab.
        */
       g.closeLoadout();
     }
@@ -21036,11 +21042,16 @@ if (MINE_LINE) {
     // ---- the switch ------------------------------------------------------
     out.switched = g.setEra(2);
     out.era = w.era;
-    out.lists = {
-      enemies: w.enemies.length, drops: w.drops.length, debris: w.debris.length,
-      projectiles: w.projectiles.length, effects: w.effects.length,
-      mines: w.mines.length, blasts: w.pendingBlasts.length,
-    };
+    /*
+     * Derived, not restated. This named SEVEN and omitted `ghosts` and
+     * `respawns` -- and it is asserted with `every((n) => n === 0)`, so the
+     * one arm whose whole subject is that every list is empty could not see
+     * a leak in either of them. `FIELD_LISTS` plus `enemies` is the set
+     * `takeField` actually drains, so a tenth list is covered by existing.
+     */
+    const GM = await import('/src/game.js');
+    out.lists = { enemies: w.enemies.length };
+    for (const k of GM.FIELD_LISTS) out.lists[k] = w[k].length;
     out.attackersCleared = w.attackers.size === 0 && (!near || near.attacking === false);
     // The three that would each hide a leak the other two miss.
     out.paidNothing = w.bytes === before.energy
@@ -21481,7 +21492,9 @@ if (MINE_LINE) {
       out.survives = !!w.yard && w.enemies.length === 0 && w.effects.length === 0;
 
       // ---- and it is in none of the lists anything walks -------------------
-      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles', 'ghosts'];
+      // Derived: this named seven under a comment reading "setEra empties all
+      // seven", and omitted `respawns` and `pendingBlasts`.
+      const lists = ['enemies', ...(await import('/src/game.js')).FIELD_LISTS];
       out.inNoList = lists.every((k) => !(w[k] || []).includes(a))
         && !(w.attackers && w.attackers.has && w.attackers.has(a));
       out.notABody = a.hp === undefined && a.applyDamage === undefined
@@ -21577,7 +21590,9 @@ if (MINE_LINE) {
       g.setEra(2);
       out.two = read(w.portal);
       const P = w.portal;
-      const lists = ['enemies', 'drops', 'debris', 'effects', 'mines', 'projectiles', 'ghosts'];
+      // Derived, for the reason its twin above is: seven written out, with
+      // `respawns` and `pendingBlasts` missing.
+      const lists = ['enemies', ...(await import('/src/game.js')).FIELD_LISTS];
       out.inNoList = lists.every((k) => !(w[k] || []).includes(P));
       out.notABody = P.hp === undefined && P.applyDamage === undefined
         && P.invMass === undefined && P.type === undefined && P.r === undefined;
@@ -24074,11 +24089,16 @@ if (MINE_LINE) {
      */
     out.duringActI = w.enemies.length;
     for (let f = 0; f < 60 * 5; f++) g.update(1 / 60);
-    out.tookField = w.enemies.length === 0 && w.drops.length === 0
-      && w.mines.length === 0 && w.effects.length === 0 && w.debris.length === 0
-      && w.projectiles.length === 0 && w.pendingBlasts.length === 0
-      // ...and CHAFF's copies, the eighth list, which build 323 added
-      && w.ghosts.length === 0;
+    /*
+     * Derived. This wrote eight out by hand and omitted `respawns` -- which
+     * build 324 added to the same `takeField` this line is asserting the
+     * completeness of -- under a comment calling `ghosts` "the eighth list,
+     * which build 323 added", a count that was right at 323 and wrong from
+     * 324 onward.
+     */
+    const GMx = await import('/src/game.js');
+    out.tookField = w.enemies.length === 0
+      && GMx.FIELD_LISTS.every((k) => w[k].length === 0);
     out.paidNothing = w.bytes === before.energy && w.earned === before.earned
       && w.kills === before.kills;
 
@@ -38559,6 +38579,192 @@ if (MINE_LINE) {
     + 'and measured 26 of 57 on one point at 320x568 era 2, which is that wall '
     + '(8x4) against rung 35 exactly. It cost no health either way (0.355 of the '
     + 'pool worst, which is the settling); it cost the picture');
+}
+
+/*
+ * ---- THE WORLD'S ARRAYS PARTITION, AND THAT IS WHAT MAKES IT A GUARD -----
+ *
+ * `FIELD_LISTS` on its own is a ninth copy of a list that has been written
+ * out wrong five times. What turns it into a derivation is this: every array
+ * on a fresh world is EITHER a field list or named run state, so a tenth of
+ * either kind fails here until somebody classifies it -- which is the shape
+ * `LOTS`, `ANOMALIES.length` and `rungsEvery` all have, and the shape
+ * `world.apertures` sized 8 against 9 anomalies did not.
+ *
+ * Measured at build 337: fifteen arrays, nine field and six run state, plus
+ * three Sets that are deliberately outside both and are named, because a Set
+ * is cleared by hand and `attackers` in particular has to come off together
+ * with its per-body flag.
+ *
+ * Three arms, and each one fails for a different reason:
+ *   - the PARTITION is total (a new array is classified)
+ *   - `takeField` empties EVERY field list and NO run list (the claim the
+ *     four derived sites above rest on, asserted once here rather than
+ *     assumed at each of them)
+ *   - ...and it is shown able to read a one: the same arrays filled and the
+ *     run lists still full afterwards, or "everything was empty" would pass
+ *     on a world that was empty to begin with
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim, w = g.world;
+    const GM = await import('/src/game.js');
+    g.restart();
+    const arrays = Object.keys(w).filter((k) => Array.isArray(w[k])).sort();
+    const sets = Object.keys(w).filter((k) => w[k] instanceof Set).sort();
+    const field = ['enemies', ...GM.FIELD_LISTS];
+    const run = GM.RUN_LISTS;
+    const unclassified = arrays.filter((k) => !field.includes(k) && !run.includes(k));
+    const missing = [...field, ...run].filter((k) => !arrays.includes(k));
+    // fill everything, so what survives the clear is readable rather than
+    // inherited -- an empty world makes every "is empty" arm vacuous
+    for (const k of arrays) w[k].push({ mark: true });
+    const filled = arrays.filter((k) => w[k].length > 0).length;
+    g.takeField(true);
+    const fieldLeft = field.filter((k) => w[k].length > 0);
+    const runGone = run.filter((k) => w[k].length === 0);
+    for (const k of arrays) w[k].length = 0;
+    return {
+      n: arrays.length, arrays, sets, field: field.length, run: run.length,
+      unclassified, missing, filled, fieldLeft, runGone,
+      setsNamed: ['attackers', 'abilityHold', 'unlocked'],
+    };
+  });
+
+  check('every array on the world is either the field or the run, and nothing else',
+    r.unclassified.length === 0 && r.missing.length === 0
+    && r.field + r.run === r.n
+    // ...and the Sets really are the only things outside both, or the
+    // partition is over a smaller world than the one the game has
+    && r.sets.every((k) => r.setsNamed.includes(k))
+    && r.setsNamed.every((k) => r.sets.includes(k)),
+    `${r.n} arrays: ${r.field} field + ${r.run} run. Unclassified `
+    + `[${r.unclassified.join(' ')}], named-but-absent [${r.missing.join(' ')}]. `
+    + `Sets outside both: [${r.sets.join(' ')}]. A tenth list of either kind fails `
+    + 'here until it is classified, which is the whole reason FIELD_LISTS is not '
+    + 'just a ninth copy of a literal that has been written out wrong five times');
+
+  check('...and takeField empties every one of the field lists and none of the run',
+    r.fieldLeft.length === 0 && r.runGone.length === 0
+    // the instrument reads a one: everything was full going in
+    && r.filled === r.n,
+    `filled ${r.filled} of ${r.n} arrays, then took the field: still standing `
+    + `[${r.fieldLeft.join(' ')}] of the field (want none), emptied `
+    + `[${r.runGone.join(' ')}] of the run (want none). Without the fill this arm `
+    + 'passes on a world that was already empty, which is what four of the five '
+    + 'hand-written versions of this list were doing');
+}
+
+/*
+ * ---- PREFS.hints TURNS THE LOT OFF, AND IT DID NOT ----------------------
+ *
+ * CLAUDE.md has stated as a repo fact since the teaching band was written
+ * that "`PREFS.hints` turns the lot off, opening included". It was false for
+ * exactly one site: `game.js`'s contact line was the ONE ungated `sayOnce`
+ * in the game -- six siblings all carry `this.hintsAllowed` and no comment
+ * said why this one did not, which is build 224's rule (a missing gate and a
+ * chosen exemption are the same text). So a player who turned the captions
+ * off still got the first and most important one, and got it in phases
+ * every other line is kept out of.
+ *
+ * The A/B is the pref and nothing else: same field, same body, same window.
+ * Revert-proved -- with the gate removed the hints-OFF arm says the line
+ * TWICE while `hintsAllowed` reads false.
+ *
+ * Three things the setup needs and two of them cost a run:
+ *   - `hints` is 0/1 and NOT boolean. `setPref` clamps a value it does not
+ *     recognise to `s.def`, which is 1 -- so `setPref('hints', false)`
+ *     silently turns hints ON, and the first version of this case measured
+ *     two identical arms and reported the gate missing on a build that has
+ *     it. The arm throws if the pref refuses, rather than trusting it.
+ *   - every OTHER teaching line has to be marked said, walked by SHAPE, or
+ *     the OPENING owns the band and the contact line never gets a turn
+ *     (build 299).
+ *   - the body has to be HEALED and re-pinned every frame: `resolvePair`
+ *     bills `impactDamage` both ways, so a mount held for four seconds is
+ *     empty by the end (build 293).
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim, w = g.world;
+    const E = await import('/src/enemies.js');
+    const T = await import('/src/tutorial.js');
+    const C = await import('/src/codex.js');
+    const S = await import('/src/settings.js');
+    const { TYPE_BY_ID, CFG } = await import('/src/config.js');
+    const was = S.pref('hints');
+    const run = (hints) => {
+      g.restart();
+      w.era = 2; g.setEra(1);
+      w.director.update = () => {};
+      w.director.traits = [];
+      w.spawnLock = 1e9;
+      w.autoAim = false; w.autoFire = false;
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts']) {
+        if (w[k]) w[k].length = 0;
+      }
+      if (w.respawns) w.respawns.length = 0;
+      if (w.attackers) { for (const e of w.attackers) e.attacking = false; w.attackers.clear(); }
+      C.forgetLines();
+      const spare = new Set(T.ON_CONTACT.map((l) => l.id));
+      for (const v of Object.values(T)) {
+        if (!Array.isArray(v)) continue;
+        for (const l of v) {
+          const id = typeof l === 'string' ? null : (l && l.id);
+          if (id && !spare.has(id)) C.markLine(id);
+        }
+      }
+      S.setPref('hints', hints);
+      if (S.pref('hints') !== hints) throw new Error(`setPref refused ${hints}: hints is 0/1, not boolean`);
+      const s = w.shooter;
+      const at = s.y - (s.r + 18 + CFG.shooter.grabPad * 0.5);
+      const b = E.release(w, TYPE_BY_ID.lurcher, s.x, at);
+      const e = Array.isArray(b) ? b[0] : b;
+      e.staged = false; e.born = true; e.bornFor = 9;
+      let said = 0;
+      const real = g.hud.showHint.bind(g.hud);
+      g.hud.showHint = (text, ...rest) => {
+        if (T.ON_CONTACT.some((l) => l.text === text)) said++;
+        return real(text, ...rest);
+      };
+      let gripped = 0;
+      for (let f = 0; f < 240; f++) {
+        e.hp = e.maxHp; e.x = s.x; e.y = at;
+        g.update(1 / 60);
+        if (w.attackers.has(e)) gripped++;
+      }
+      g.hud.showHint = real;
+      return { said, gripped, allowed: g.hintsAllowed };
+    };
+    const on = run(1);
+    const off = run(0);
+    // ...and put the device back: a pref outlives every restart after it.
+    S.setPref('hints', was);
+    C.forgetLines();
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.autoAim = true;
+    w.autoFire = true;
+    for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
+      if (w[k]) w[k].length = 0;
+    }
+    return { on, off, restored: S.pref('hints') === was, sites: 7 };
+  });
+
+  check('a body on the mount says the contact line only when hints are on',
+    // the claim
+    r.on.said > 0 && r.off.said === 0
+    // ...and the gate really was off, or the arms differ for another reason
+    && r.on.allowed === true && r.off.allowed === false
+    // ...and both arms actually held the mount, or neither measured anything
+    && r.on.gripped > 100 && r.off.gripped > 100
+    // ...and the device is as it was found
+    && r.restored,
+    `hints on: ${r.on.said} contact lines said over ${r.on.gripped} gripped frames `
+    + `(hintsAllowed ${r.on.allowed}); hints off: ${r.off.said} over ${r.off.gripped} `
+    + `(hintsAllowed ${r.off.allowed}); pref restored ${r.restored}. Reverting the `
+    + 'gate reads 2 with hints off, so this arm discriminates. All 7 sayOnce sites '
+    + 'in game.js now carry the gate');
 }
 
 // --- report -----------------------------------------------------------------

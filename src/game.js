@@ -83,6 +83,54 @@ function titleRandom(fn) {
  *  allocates nothing. */
 const BRACKET_CORNERS = [-1, -1, 1, -1, -1, 1, 1, 1];
 
+/*
+ * ---- THE LISTS THAT ARE THE FIELD, IN ONE PLACE ---------------------------
+ *
+ * `takeField` drains these eight, and `enemies` is the ninth and is handled
+ * on its own above them: it is MARKED (`spent` + `dissolved`, so nothing of
+ * it pays, counts or can be shot on the way out) and only emptied when the
+ * clear is instant, because the cinematic wants the bodies present while
+ * they dissolve.
+ *
+ * `pendingBlasts` IS LAST AND THE ORDER IS LOAD-BEARING: a body coming apart
+ * during the enemies pass pushes a blast on its way out, so the blast list
+ * has to be drained after everything that can add to it. Reordering this
+ * array is a behaviour change.
+ *
+ * Written out here rather than at each site because FOUR suite arms and one
+ * function had each restated a SUBSET of it, and every one of them was
+ * wrong: `takeField`'s own docstring said "three of the seven lists" and its
+ * body comment "the six lists that are not `enemies`" while the body drained
+ * eight; the era-switch arm's `out.lists` named seven and omitted `ghosts`
+ * and `respawns`, asserting `every((n) => n === 0)` over a set that could
+ * not see a leak in either; the evolution's `out.tookField` named eight and
+ * omitted `respawns`, under a comment calling `ghosts` "the eighth list,
+ * which build 323 added" -- a count that was right at 323 and wrong from
+ * 324; and two `inNoList` furniture sweeps named seven under a comment
+ * reading "setEra empties all seven".
+ *
+ * That is the hand-kept-list shape, and the fix is the one `LOTS`,
+ * `ANOMALIES.length` and `rungsEvery` all got: ask the structure. What makes
+ * it a guard rather than a ninth copy is `RUN_LISTS` beside it and the case
+ * that asserts the PARTITION IS TOTAL -- measured, a fresh world carries
+ * fifteen arrays, these nine and those six, so a tenth of either kind fails
+ * the suite until somebody classifies it.
+ */
+export const FIELD_LISTS = ['ghosts', 'respawns', 'drops', 'debris', 'projectiles', 'effects', 'mines', 'pendingBlasts'];
+
+/*
+ * ...and the arrays on the world that are RUN STATE and must survive a
+ * clear. `apertures` is the way-in count per anomaly, `gunAt`/`guns` the
+ * emplacements (out of play since 289 and still persisted), `ledger` what
+ * has been bought, `offered` what a trait lane has put up, `reconciled`
+ * which anomalies are answered. None of them is on the field and none of
+ * them may be emptied by taking it. Three Sets sit outside both lists and
+ * are named in the case: `attackers` (released by hand, membership and the
+ * per-body flag coming off together), `abilityHold` (AXIOM's) and
+ * `unlocked`.
+ */
+export const RUN_LISTS = ['apertures', 'gunAt', 'guns', 'ledger', 'offered', 'reconciled'];
+
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
@@ -731,7 +779,15 @@ export class Game {
 
     this.mineTimer = 0;
     this.saveTimer = SAVE_EVERY;
-    this.resetShown = false;
+    /*
+     * A `this.resetShown = false` stood here, write-only since build 82 --
+     * TWO HUNDRED AND FIFTY-FOUR builds, more than twice `Projectile.hold`'s
+     * 111. It was the end screen's state: build 82 deleted its reader and its
+     * partner `endTimer`, and build 186's dead-CSS sweep took the
+     * `#endScreen`/`#endText`/`#resetBtn`/`body.ending` family it drove --
+     * the JS half was never swept. It carried no comment at all, which is why
+     * it read as a live reset between the two live ones either side of it.
+     */
     this.hud.clearAlerts();
     this.hud.setKills(0);
     this.hud.setBytes(0);
@@ -1013,10 +1069,12 @@ export class Game {
    * Take the field, paying nothing for it.
    *
    * Extracted from `setEra` when the cinematic needed the same thing without
-   * the era switch. It is the whole of the clear and not a subset: three of
-   * the seven lists under a comment about needing a clean field is this
-   * repo's own scar, and blasts drain LAST because a body coming apart pushes
-   * one on its way out.
+   * the era switch. It is the whole of the clear and not a subset -- naming
+   * three of them under a comment about needing a clean field is this repo's
+   * own scar -- and it takes the list from `FIELD_LISTS` rather than writing
+   * it out, because the two counts that used to be in this paragraph and the
+   * one below it said SEVEN and SIX against a body that drained EIGHT. See
+   * `FIELD_LISTS` for why the order matters.
    */
   takeField(instant = true) {
     const w = this.world;
@@ -1037,19 +1095,12 @@ export class Game {
     if (instant) w.enemies.length = 0;
 
     /*
-     * ...and the six lists that are not `enemies`, which is the half of this
-     * that has been got wrong before: a clear that names three of them under a
-     * comment about needing a clean field is CLAUDE.md's own scar. Blasts are
-     * drained LAST, because a body coming apart pushes one on its way out.
+     * ...and every list that is not `enemies`, in `FIELD_LISTS`'s order --
+     * blasts LAST, because a body coming apart in the pass above pushes one
+     * on its way out. This block wrote the eight out by hand under a comment
+     * that said "six", which is the fault the comment was about.
      */
-    w.ghosts.length = 0;
-    w.respawns.length = 0;
-    w.drops.length = 0;
-    w.debris.length = 0;
-    w.projectiles.length = 0;
-    w.effects.length = 0;
-    w.mines.length = 0;
-    w.pendingBlasts.length = 0;
+    for (const k of FIELD_LISTS) w[k].length = 0;
 
     // Membership and flag come off together, or the grab loop -- which skips
     // anything already `attacking` -- can never take a body back.
@@ -3331,8 +3382,35 @@ export class Game {
         ring(s.x, s.y, 10, 120, 0.3, '#ff2d55', 3);
       }
     }
-    // What it is and what it costs, said while something is doing it.
-    if (w.attackers.size) this.sayOnce(ON_CONTACT);
+    /*
+     * What it is and what it costs, said while something is doing it.
+     *
+     * ---- AND IT IS GATED, WHICH IT WAS NOT UNTIL BUILD 336+1 -------------
+     *
+     * This was the ONE ungated `sayOnce` in the game: every sibling carries
+     * `this.hintsAllowed` (`:1757`, `:1780`, and the three below this line),
+     * this one carried nothing, and no comment said why. CLAUDE.md has
+     * stated as a repo fact since the band was written that "`PREFS.hints`
+     * turns the lot off, opening included" -- false for exactly this site,
+     * so a player who turned the captions off still got the first and most
+     * important one.
+     *
+     * `hintsAllowed` is `pref('hints') && phase === 'staging'`, and what
+     * that changes is narrower than it looks, which is why the gate is the
+     * right answer rather than a risk. It cannot suppress the line where it
+     * is meant to fire: contact first happens during the eight teach waves,
+     * which ARE staging. It cannot have been spending the line on the title
+     * screen either -- `phase` is 'boot' there, but the grab loop above
+     * skips `e.harmless` and the boot field is drifters, so nothing could
+     * grip. What it removes is the hints-OFF case, which is the promise, and
+     * 'evolve', where a caption over the cinematic is not wanted.
+     *
+     * If this site is ever WANTED exempt -- and there is an argument, since
+     * it names the one tool that answers a body on the mount -- the
+     * exemption has to be written here. A missing gate and a chosen
+     * exemption are the same text otherwise, which is build 224's rule.
+     */
+    if (w.attackers.size && this.hintsAllowed) this.sayOnce(ON_CONTACT);
     /*
      * ...and the glitch timer explains itself the first time a fuse is
      * actually burning, which is the first moment there is a ring to point at.

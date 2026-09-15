@@ -116,7 +116,15 @@ const read = () => page.evaluate(() => {
       asked: d.asked, contact: +d.contact.toFixed(1), hitPatience: d.hitPatience },
     order: d.order.map((i, k) => (k <= d.at ? '[' : '') + (W[i].teach ? 'T' : (W[i].band || 1)) + (k <= d.at ? ']' : '')).join(' '),
     buttons: [...document.querySelectorAll('#ui button')].map((b) => b.getBoundingClientRect()).filter((q) => q.width > 0).map((q) => ({ l: q.left, t: q.top, r: q.right, b: q.bottom })),
-    panel: document.body.classList.contains('loadoutOpen') ? 'loadout' : document.body.classList.contains('menuOpen') ? 'menu' : null,
+    // Read off the MENU, not off a class. `body.loadoutOpen` has had no
+    // writer since build 226 folded the loadout sheet into the menu's AMMO
+    // and MINES tabs, so the 'loadout' arm of this ternary could never be
+    // taken -- a dead branch whose live neighbour covered for it, since the
+    // loadout IS a menu tab now and `menu.toggle()` closes it. That is the
+    // `world.endless` shape, and what it cost was diagnostic: a run stalled
+    // behind AMMO or MINES reported 'menu'. `Game.loadoutOpen` is the getter
+    // build 226 wrote for exactly this.
+    panel: window.__sim.loadoutOpen ? 'loadout' : document.body.classList.contains('menuOpen') ? 'menu' : null,
   };
 });
 

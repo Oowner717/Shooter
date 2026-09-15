@@ -872,7 +872,7 @@ export const UPGRADES = {
     /*
      * This branch is named for what it bolts on rather than for the stat it
      * moves. Every one of them puts a visible fitting on the machine — see
-     * Shooter.drawRig() — and a row that says GIMBAL and then grows a gimbal
+     * Shooter.drawMachine() — and a row that says GIMBAL and then grows a gimbal
      * ring is a row you can point at. The line still states the effect,
      * because the effect is what is being paid for.
      */
@@ -980,13 +980,13 @@ export const UPGRADES = {
      * rung 10, which is where the ladder starts asking questions worth
      * answering.
      */
-    { id: 'recall', name: 'RECALL', levels: 1, rung: 10,
+    { id: 'recall', name: 'RECALL', levels: 1, rung: CFG.waves.tier.sheetRung,
       line: 'End the running wave and take what is cleared. One, then a minute.',
       apply: (up, world) => {
         world.director.recall.max = 1;
         world.director.recall.held = 1;
       }, icon: MARK.standing },
-    { id: 'overclock', name: 'OVERCLOCK', levels: 1, rung: 10,
+    { id: 'overclock', name: 'OVERCLOCK', levels: 1, rung: CFG.waves.tier.sheetRung,
       line: 'The next wave arrives twice as fast and pays double.',
       apply: (up, world) => {
         world.director.overclock.max = 1;

@@ -103,7 +103,6 @@ class Background {
     this.flow = 0;
     this.dust = [];
     this.columns = [];
-    this.nebula = [];
     this.w = 0;
     this.h = 0;
     this.vpx = 0;

@@ -1563,10 +1563,20 @@ export class Ordinal extends Boss {
     this.y = this.y0 + (s.y - C.close - this.y0) * e;
     background.setFocus(this.x, this.y);
 
-    // the eye tracks you
-    this.gaze = Math.atan2(s.y - this.y, s.x - this.x);
-
-    // ...and the beams turn, in sweeps rather than continuously
+    /*
+     * ...and the beams turn, in sweeps rather than continuously.
+     *
+     * A `this.gaze = Math.atan2(s.y - this.y, s.x - this.x)` stood here under
+     * a comment reading "the eye tracks you", computed on every frame of this
+     * stage and read by NOTHING -- and an identical atan2 sits fourteen lines
+     * below where a beam does use the bearing. The commit that deleted the
+     * eye was "Replace the gaze with worn armour"; it took the drawing and
+     * left the field, which is `windAt`/`rateAt` and `Projectile.hold` again.
+     * The comment was the expensive half: it promised a tracking eye in the
+     * one paragraph a reader goes to in order to learn what this stage looks
+     * like, and the beams turning in the same sentence made it survive a
+     * skim.
+     */
     this.lashA = (this.lashA || 0) + C.lashSpin * raw;
     this.lashT = (this.lashT || 0) - raw;
     if (this.lashT <= 0) {
