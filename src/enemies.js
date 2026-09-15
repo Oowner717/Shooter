@@ -6447,7 +6447,7 @@ export function hostileCount(world) {
  * and a wave's own placement against `driftCap` -- so the question is about
  * one type. It read `e.harmless`, which was already wrong for SEED (a
  * SCION's three quietly suppressed the ambient trickle) and would be wrong
- * again for every one of the twenty harmless objects: five EMBERs on the
+ * again for every harmless object phase 6 adds: five EMBERs on the
  * floor would have stopped the grey arriving. Branched on the id, because
  * the branch is about one type -- the same correction build 275 made to
  * `spawnGroup`.
@@ -7657,7 +7657,9 @@ export class Director {
      * `perBand` is SEVEN from build 301, so the five authored bands cover
      * rungs 1 to 35 and rungs 36-49 still draw band 4-5. That is the part of
      * the plan this build does not deliver: bands 6 and 7 want rosters of
-     * their own and those are the twenty objects of phase 6. It is a far
+     * their own and those are phase 6's objects -- nineteen since GYRE was
+     * withdrawn at build 331, and see the note above `ENEMY_TYPES`'s phase-6
+     * block in config.js for why. It is a far
      * shorter tail than the forty rungs `perBand: 2` left, and it is stated
      * rather than hidden.
      */

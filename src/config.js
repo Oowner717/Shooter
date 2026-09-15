@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '330';
+export const BUILD = '331';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '330';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e3f8e1d';
+export const REV = '7ba2b17';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -313,8 +313,9 @@ export const CFG = {
        * that every rung drew band 4-5 with bigger numbers on it, and the
        * ladder introduced nothing new for forty rungs. At seven the five
        * authored bands cover rungs 1 to 35 and bands 6-7 still draw band 5,
-       * because their own rosters are the twenty objects of phase 6. That is
-       * a known limit of this build rather than the shape it is aiming at.
+       * because their own rosters are phase 6's objects -- nineteen of them
+       * since GYRE was withdrawn at build 331. That is a known limit of this
+       * build rather than the shape it is aiming at.
        *
        * What it also does is give `budget.open`/`close` below something to
        * walk ACROSS. A ramp over two rungs is a step; over six it is a band
@@ -4821,6 +4822,60 @@ export const ENEMY_TYPES = [
     drops: 2, // energy it leaves when it comes apart
   },
   /*
+   * ---- GYRE IS WITHDRAWN, AND NINETEEN IS WHAT THIS PHASE SHIPS ----------
+   *
+   * Build 331. `docs/objects.html` authors twenty objects and one of them has
+   * no door in this game. GYRE is an orbiting body swinging a weighted arm
+   * that "does not damage you -- it MOVES YOUR THINGS: a mine it passes is
+   * dragged out of its lane, a DECOY is shoved off its mark", and its counter
+   * is "lay for it". Measured, every clause of that is empty here:
+   *
+   *   - MINES have no door at all. `CFG.mines.inPlay` has been false since
+   *     build 289, so the first half of what it does and the WHOLE of its
+   *     counter are about a system a player cannot reach. Builds 317 and 319
+   *     each shipped a codex line offering a mine as an answer and 323 had to
+   *     correct both; this would have been the same fault at the scale of a
+   *     whole object.
+   *   - The DECOY is a PURCHASE (`LOCKABLE.abilities`) with `life` 9 against
+   *     a `cooldown` of 24, so it stands at most **37.5% of the time** for a
+   *     player who presses it the moment it recharges and **0%** for one who
+   *     never bought it. An object whose only live target is optional and
+   *     intermittent is the `world.endless` shape: a reader whose other
+   *     branch is almost never taken.
+   *   - SALVAGE can be moved and it costs nothing. `collectData` accelerates
+   *     every drop at `energy.pull` 26 u/s^2 toward the machine and drops do
+   *     not expire -- build 325 deleted the `ttl` that used to end them -- so
+   *     a mote flung 100 / 200 / 300 units out is back in **2.8 / 3.9 /
+   *     4.8 seconds** and none of it is lost. A delay in income, invisible.
+   *
+   * ...and the GAIT cannot carry the object on its own, which is the finding
+   * that settled it. `orbit` is "closes to 300 units and circles, never
+   * arrives, never leaves", and the obvious re-spec -- the body your barrel
+   * cannot keep up with -- is arithmetic away from true: delivered speed is
+   * `44 * 1.6 / 2.15` = **32.7 u/s**, so at radius 300 its bearing moves
+   * 0.109 rad/s against `shooter.autoTurnRate` 4.2, which is **2.6% of the
+   * barrel's slew** (5.2% at radius 150). Nothing about circling this machine
+   * is a tracking problem.
+   *
+   * Worse, an orbit fights two rules this repo has already paid for.
+   * `autoTarget`'s cone is `aimClamp + 0.04` = +-80.2 degrees, so **45% of a
+   * full circle is inside it**: an orbiting HOSTILE is unchoosable for more
+   * than half of a **58-second** orbit while `Director.standing` and
+   * `hostileCount` hold the wave and the build-291 release gate open -- build
+   * 312's `tumble` finding, on a body that never arrives by design. And the
+   * arena clamps it: at era 1 the mount stands 210 units above the floor
+   * (1012.6 against 1223), so a 300-radius circle passes 90 units under the
+   * field and is squashed flat.
+   *
+   * WHAT WOULD BRING IT BACK, said plainly so the next reader does not have
+   * to re-derive it: the mine line returning (one flag), AND the circle
+   * becoming an ARC derived from the cone the way `roll` derives its turn
+   * from `edgeEase` and `dive` derives its lane from `grabPad`. Both of those
+   * together are a different object and would want a fresh spec; withdrawing
+   * it is the honest state until then. Phase 6 has three left -- LOOM, MIRE
+   * and KITE -- and the ordinals in the notes below are dated records of the
+   * count as it stood when each shipped.
+   *
    * ---- the first two of the twenty (docs/objects.html), build 307 ---------
    *
    * Both are HARMLESS, both are grey, and both LEAVE -- which is the thing
@@ -5650,7 +5705,8 @@ export const ENEMY_TYPES = [
      */
     id: 'anvil',
     /*
-     * NO ENERGY GATE, like every other one of the twenty, and the reason is
+     * NO ENERGY GATE, like every other one of phase 6's objects, and the
+     * reason is
      * worth writing down because the first draft carried `MB(4)` and the
      * build failed for it.
      *
@@ -5662,7 +5718,7 @@ export const ENEMY_TYPES = [
      * save never had an ANVIL to lose.
      *
      * And the gate would have done nothing anyway. The BAND is the gate for
-     * all of the twenty: this wave is authored into band 5, which is only
+     * all of them: this wave is authored into band 5, which is only
      * drawn at rungs 29-35, and a run standing there has banked orders of
      * magnitude more than any threshold worth writing.
      */

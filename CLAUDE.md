@@ -6311,4 +6311,97 @@ came from before believing the other one covers it.
   the wall is a tempo cost rather than a stall -- and `emit`'s hold, not the
   gait, is what keeps thirty of them off the screen at once.
 
+- **GYRE IS WITHDRAWN FROM BUILD 331, AND EVERY CLAUSE OF IT WAS MEASURED
+  EMPTY RATHER THAN ARGUED AWAY.** `docs/objects.html` authored twenty
+  objects; nineteen is what phase 6 will ship. GYRE was an orbiting body
+  swinging a weighted arm that "does not damage you -- it MOVES YOUR THINGS: a
+  mine it passes is dragged out of its lane, a DECOY is shoved off its mark",
+  countered by "lay for it". Four readings, none of them close:
+  - **MINES have no door.** `CFG.mines.inPlay` false since build 289, so the
+    first half of the `what` and the WHOLE of the `counter` are about a system
+    a player cannot reach. Builds 317 and 319 each shipped a codex LINE
+    offering a mine as an answer and 323 had to correct both; this is that
+    fault at the scale of a whole object, and the guide's counter is the same
+    two words ("lay for it").
+  - **The DECOY is optional and intermittent.** It is in `LOCKABLE.abilities`,
+    so it is a purchase, and `life` 9 against `cooldown` 24 is **37.5% duty**
+    for a player pressing it the instant it recharges and **0%** for one who
+    never bought it. An object whose only live target is that is the
+    `world.endless` shape -- a reader whose other branch is almost never
+    taken.
+  - **SALVAGE moves and costs nothing.** `collectData` accelerates every drop
+    at `energy.pull` 26 u/s^2 toward the machine, and drops do not expire --
+    build 325 deleted the `ttl` that used to end them -- so a mote flung 100 /
+    200 / 300 units out is back in **2.8 / 3.9 / 4.8 seconds** with none of it
+    lost. A delay in income is not a payload; it is invisible.
+  - **And the GAIT cannot carry it alone, which is what settled it.** The
+    obvious re-spec is "the body your barrel cannot keep up with", and the
+    arithmetic refuses it before any code: delivered speed is
+    `44 * 1.6 / 2.15` = **32.7 u/s**, so at radius 300 the bearing moves 0.109
+    rad/s against `shooter.autoTurnRate` 4.2 -- **2.6% of the barrel's slew**,
+    5.2% at radius 150. Circling this machine is not a tracking problem.
+- **...AND AN ORBIT FIGHTS TWO RULES THIS REPO HAS ALREADY PAID FOR.**
+  `autoTarget`'s cone is `aimClamp + 0.04` = +-80.2 degrees, so **45% of a
+  full circle is inside it**: an orbiting HOSTILE is unchoosable for more than
+  half of a **58-second** orbit while `Director.standing` and `hostileCount`
+  hold the wave and the build-291 release gate open -- build 312's `tumble`
+  finding, on a body whose spec says "never arrives, never leaves". And the
+  arena clamps it: era 1's mount stands **210 units** above the floor (1012.6
+  against 1223), so a 300-radius circle passes 90 units UNDER the field. The
+  fix for both is an ARC derived from the cone, the way `roll` takes its turn
+  from `edgeEase` and `dive` its lane from `grabPad` -- which with the mine
+  line back is a different object and wants a fresh spec. **Both halves come
+  back together or not at all**, and that is written where the roster lives
+  rather than left for the next reader to re-derive.
+- **A WITHDRAWAL IS A DENOMINATOR MOVING, WHICH IS BUILD 329'S RULE OWED A
+  GREP.** "A derived number quoted in prose is a copy, and copies go stale in
+  silence -- when one moves, grep for who was quoting it." `grep -rn "the
+  twenty"` over src/, scripts/ and docs/ found **38** hits, most of them other
+  twenties (twenty-one upgrades, twenty-five damage sources, the twenty pieces
+  the bosses make, ANVIL's twenty-six seconds). The LIVE claims about THIS
+  roster were **thirteen**, counted off the diff rather than by eye: 3 in
+  `config.js`, 2 in `enemies.js`, 4 in the guide and 4 in the plan. Fixed by
+  making them
+  say what they are about ("phase 6's objects", "every other one of them")
+  rather than restating a count -- the same correction `LOTS` and
+  `ANOMALIES.length` got. The DATED ordinals ("Build 328, phase 6o, and the
+  fifteenth of the twenty") are left alone: they are records of the count as
+  it stood when each object shipped, and rewriting them would be rewriting
+  history rather than correcting a copy.
+- **AND THE REMOVAL FOUND A HAND-KEPT LIST NAMING THE ROW IT DELETED.**
+  `docs/objects.html`'s `HERO_GAITS` is a literal array of eight gait ids used
+  to pick which cards get the big treatment, and `'orbit'` was one of them --
+  so deleting the gait's table entry left a list asking for a row that no
+  longer exists. Both doc pages were loaded headlessly afterwards and checked
+  for a thrown error rather than assumed: no `pageerror` on either, 19 objects
+  and 21 gaits in the guide's own arrays, `Orbit` gone from the rendered text.
+  **A removal is the cheapest way to find out which of your lists were really
+  assumptions** -- build 290 recorded that about taking a system out of play,
+  and it holds for one row of one table.
+- **A FRAME COUNT IS A THRESHOLD, AND BUILD 330'S OWN NEW ARM HAD ONE AT THE
+  EDGE OF ITS DRAW.** The VEIL gait arm ran a flat **7000 frames (116.7s)**
+  and waited for the sheet to reach the machine -- and this build, which
+  changes no executable line, failed it at y 1431 with 127 units still to go,
+  about three seconds short. Measured standalone, six releases arrive in
+  **79.4 to 99.8 seconds**: the spread is the MOUTH's own x jitter, which sets
+  the gap to the chosen lane anywhere from 264 to 336, and a sheet delivering
+  16.14 u/s spends that difference. So the cap was 17% clear of its own worst
+  draw, and the suite -- where synthetic steps ride on the page's rAF loop --
+  crossed it. **A loop bound is a fitted margin wearing a `for` statement's
+  clothes**, and the tell is the same as always: a number chosen once, near
+  the truth, against a quantity that rolls.
+  It is DERIVED now, set on the frame the body comes loose from the depth it
+  actually has left and the speed its own type delivers, times 2.5 -- the
+  traverse lengthens the path by at most `sqrt(1 + slant^2)` = 1.32 and the
+  fold eases the last of it. That reads 184-186s against arrivals at 79-86s,
+  2.2x clear, it moves with the era instead of being right at one, and the
+  detail prints BOTH figures so the next reader can see the headroom without
+  writing a probe (build 320's whole point).
+- **The hash was NOT run and does not need to be.** This build changes no
+  executable line: a withdrawal from a design document, four count statements
+  in comments, and one literal array in a doc page. CLAUDE.md's rule is that
+  the hash is owed by a change to energy, targeting or the boss, and there is
+  no change at all here -- which is also why the suite is the only instrument
+  that had anything to say.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.

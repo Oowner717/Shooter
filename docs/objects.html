@@ -299,7 +299,7 @@
             <span class="num">31</span> dE of one of eight anchors, and the anchors are
             <span class="num">30</span> to <span class="num">142</span> dE apart. Nobody wrote that
             down, and it is the only room left in a palette where, per the working notes, every
-            saturated hue is spoken for. So the twenty below take family hues rather than new ones:
+            saturated hue is spoken for. So the nineteen below take family hues rather than new ones:
             <strong>hue says what it does to you, shape says which one it is, gait says how it
             arrives.</strong></p>
         </div>
@@ -399,11 +399,29 @@
           <li><strong>Salvage.</strong> <code>drops</code> counts are sketched from mass and nothing
             more. The two harmless objects that can leave the field with their salvage — EMBER and
             LANTERN — are an economy question, not a gait question.</li>
-          <li><strong>Which of the twenty ship together.</strong> Six of them (LOOM's thread, VEIL's
+          <li><strong>GYRE is withdrawn, and this page authored twenty.</strong> Build 331,
+            measured rather than argued: every clause of what it did needs a door this game does not
+            have. <em>Mines</em> have been out of play since build 289 (<code>CFG.mines.inPlay</code>),
+            which is the first half of what it does and the whole of its counter. A <em>DECOY</em> is a
+            purchase that stands <span class="num">9</span> seconds of every
+            <span class="num">24</span> &mdash; at most 37.5% of the time, and 0% for a run that never
+            bought it. <em>Salvage</em> can be shoved and costs nothing: the intake pulls every drop
+            back at <span class="num">26</span>&thinsp;u/s&sup2; and drops no longer expire, so a mote
+            flung 200 units out is home again in <span class="num">3.9</span> seconds with none of it
+            lost. And the gait cannot carry it alone &mdash; at radius 300 the body's bearing moves
+            <span class="num">6.3</span>&deg;/s against a barrel that slews at
+            <span class="num">241</span>&deg;/s, so circling this machine is 2.6% of a tracking
+            problem, while 55% of that circle sits outside <code>autoTarget</code>'s
+            &plusmn;80&deg; cone and holds the wave open from where nothing can shoot it. The
+            <strong>orbit</strong> gait went with it. Both come back together or not at all: the mine
+            line returning, and the circle becoming an arc derived from the cone the way
+            <code>roll</code> takes its turn from <code>edgeEase</code> &mdash; which is a different
+            object and wants a fresh entry above rather than this one.</li>
+          <li><strong>Which of the nineteen ship together.</strong> Six of them (LOOM's thread, VEIL's
             occlusion, MIRE's ground, KITE's lob, CHAFF's ghosts, ANVIL's immunity) each add a rule
             the player has to be taught. They should not arrive in one build.</li>
           <li><strong>Names.</strong> Field objects are plain nouns and anomaly pieces are
-            mathematical terms; all twenty follow the first convention. SHARD, ECHO, MITE, PLATE,
+            mathematical terms; all of them follow the first convention. SHARD, ECHO, MITE, PLATE,
             SEED, CREST, BOUND and TILE are already taken by anomaly pieces and are avoided.</li>
         </ul>
       </div>
@@ -531,13 +549,6 @@
         if (u < 0.56) { var k = (u - 0.34) / 0.22; return { x: 0.5, y: 0.2 + k * 0.82 }; }
         var k2 = (u - 0.56) / 0.44;
         return { x: 0.5 + Math.sin(k2 * Math.PI) * 0.33, y: 1.02 - k2 * 0.82 };
-      } },
-    { id: 'orbit', name: 'Orbit', who: 'GYRE', n: 1,
-      note: 'Closes to a set radius of the machine and circles it. Never arrives, never leaves.',
-      path: function (t) {
-        if (t < 0.3) return { x: 0.5, y: (t / 0.3) * 0.64 };
-        var a = (t - 0.3) / 0.7 * TAU - Math.PI / 2;
-        return { x: 0.5 + Math.cos(a) * 0.3, y: 0.79 + Math.sin(a) * 0.15 };
       } },
     { id: 'standoff', name: 'Standoff', who: 'KITE, HERALD, TOW', n: 1,
       note: 'Closes to its own range and holds it, sliding sideways. Anything it does to you, it does from there.',
@@ -702,7 +713,7 @@
     }
   }
 
-  /* ---- 3. the twenty ---------------------------------------------------
+  /* ---- 3. the nineteen -------------------------------------------------
    * Each `draw` works in world units with the origin at the body's centre;
    * the frame scales it. `act` is the second frame: the thing it does.
    */
@@ -888,38 +899,6 @@
           ln(c, HL * 1.1, '#5d9cff'); c.globalAlpha = 0.7; c.stroke();
         }
         c.globalAlpha = 1;
-      } },
-
-    { name: 'GYRE', band: 5, levels: '29–35', threat: 7, fam: 'kinetic', r: 22, hp: 200, speed: 44, accel: 160, armor: 0.1, drops: 5,
-      gait: 'orbit', count: 'one or two',
-      what: 'Closes to <span class="num">300</span> units of the machine and circles it, swinging a weighted arm. The arm does not damage you — it <em>moves your things</em>: a mine it passes is dragged out of its lane, a DECOY is shoved off its mark.',
-      counter: 'It holds one radius, so it crosses the same arc every time. Lay for it, or take it before it settles.',
-      view: 46, viewAct: 56,
-      draw: function (c, R, t, act) {
-        var a = act ? -0.5 : t * 1.1;
-        if (act) {
-          c.save(); ln(c, 3, '#c9e84a'); c.globalAlpha = 0.3;
-          arc(c, 0, 0, R * 1.9, -2.5, -0.5); c.stroke(); c.restore();
-        }
-        c.save(); c.rotate(a);
-        pth(c, [0, 0, R * 1.9, 0]); ln(c, HL * 2.4, '#c9e84a'); c.stroke();
-        poly(c, 3, R * 0.5, 0, R * 1.9, 0); shell(c, '#c9e84a', 0.3);
-        c.restore();
-        arc(c, 0, 0, R); shell(c, '#c9e84a', 0.14);
-        arc(c, 0, 0, R * 0.52); ln(c, HL * 1.4, '#c9e84a'); c.stroke();
-        for (var i = 0; i < 6; i++) {
-          var b = i * TAU / 6 + a * 0.4;
-          pth(c, [Math.cos(b) * R * 0.52, Math.sin(b) * R * 0.52, Math.cos(b) * R, Math.sin(b) * R]);
-          ln(c, HL, '#c9e84a'); c.stroke();
-        }
-        if (act) {
-          c.save();
-          poly(c, 6, 9, 0, R * 1.2, R * 1.5); ln(c, HL * 1.4, '#ffb347'); c.globalAlpha = 0.9; c.stroke();
-          ln(c, 2, W); c.lineCap = 'round';
-          pth(c, [R * 0.5, R * 1.2, R * 1.05, R * 1.42]); c.stroke();
-          pth(c, [R * 0.9, R * 1.16, R * 1.05, R * 1.42, R * 0.78, R * 1.44]); c.stroke();
-          c.restore();
-        }
       } },
 
     { name: 'SPINDLE', band: 3, levels: '15–21', threat: 6, fam: 'kinetic', r: 30, hp: 180, speed: 40, accel: 130, armor: 0.15, drops: 5,
@@ -1459,7 +1438,9 @@
   FAMS.forEach(function (f) { FAM_HEX[f.id] = f.hex; });
 
   // -- hero
-  var HERO_GAITS = ['dive', 'orbit', 'standoff', 'flock', 'tumble', 'paired', 'rise', 'creep'];
+  // 'orbit' was here until build 331 withdrew GYRE, which was its only
+  // declarer -- a hand-kept list naming a row the table no longer has.
+  var HERO_GAITS = ['dive', 'standoff', 'flock', 'tumble', 'paired', 'rise', 'creep'];
   var HERO_COL = ['#ffd166', '#c9e84a', '#ff5d8f', '#7ef9ff', '#c9e84a', '#b98cff', '#8fa9c4', '#5d9cff'];
   var FREE = { tumble: 1, rise: 1 };   // the two that are not coming for you
   var heroEl = document.getElementById('hero');

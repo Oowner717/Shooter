@@ -37004,19 +37004,43 @@ if (MINE_LINE) {
     let x0 = null;
     let closest = 1e9;
     let laneAt = null;
-    for (let f = 0; f < 7000; f++) {
+    /*
+     * ---- THE WINDOW IS DERIVED FROM THE BODY'S OWN COLUMN AND SPEED ------
+     *
+     * Build 331. It was a flat 7000 frames (116.7s) and that is 17% clear of
+     * this crossing, which is the margin-straddling-the-draw fault with a
+     * frame count instead of a threshold: measured standalone, six releases
+     * arrive in **79.4 to 99.8 seconds** (the spread is the mouth's own x
+     * jitter, so the gap to the lane runs 264 to 336), and one suite run --
+     * on a build that changed no executable line -- ran out at y 1431 with
+     * 127 units left to go, about three seconds short.
+     *
+     * So the cap is set once the body is loose, off the depth it actually has
+     * left and the speed its own type delivers (`speed * k / (k + damping)`,
+     * 16.14 u/s), times 2.5 -- the traverse lengthens the path by at most
+     * `sqrt(1 + slant^2)` = 1.32 and the fold eases the last of it. That is
+     * about 171 seconds against a worst draw of 84 after coming loose, 2.0x
+     * clear, and it moves with the era rather than being right at one.
+     */
+    let cap = 6000;
+    let usedFrames = 0;
+    for (let f = 0; f < cap; f++) {
       g.update(1 / 60);
       if (!e1) e1 = w.enemies.find((e) => e.type.id === 'veil' && !e.isDrop) || null;
       if (!e1) continue;
       if (!e1.staged && x0 === null) {
         x0 = e1.x;
         laneAt = e1.sheetLane;
+        const kk = Math.max(0.01, TYPE_BY_ID.veil.accel / 100);
+        const deliv = TYPE_BY_ID.veil.speed * kk / (kk + CFG.physics.linearDamping);
+        cap = f + Math.ceil(((s.y - e1.y) / deliv) * 60 * 2.5);
       }
       if (x0 !== null) closest = Math.min(closest, Math.abs(e1.x - laneAt));
+      usedFrames = f + 1;
       if (e1.dead || e1.attacking) break;
     }
     const sheetEnd = { arrived: e1 ? !!e1.attacking : false, dead: e1 ? !!e1.dead : null,
-      y: e1 ? Math.round(e1.y) : null };
+      y: e1 ? Math.round(e1.y) : null, frames: usedFrames, cap };
     // ...and a control from the same release, which takes a route instead
     clean();
     d.setTier(32);
@@ -37053,6 +37077,8 @@ if (MINE_LINE) {
       mount: Math.round(s.y),
       controlCrossed: Math.round(cAcross),
       controlArrived: c1 ? !!c1.attacking : false,
+      secs: +(sheetEnd.frames / 60).toFixed(1),
+      capSecs: +(sheetEnd.cap / 60).toFixed(1),
       controlDead: c1 ? !!c1.dead : null,
       dead: sheetEnd.dead,
       grouped: out.grouped,
@@ -37130,7 +37156,8 @@ if (MINE_LINE) {
     && G.controlArrived,
     `released at x ${G.startX}, lane ${G.lane} of [${G.lanes.join(' ')}], a gap of `
     + `${G.gap} closed to ${G.closest}; arrived ${G.arrived} (dead ${G.dead}) at y `
-    + `${G.endY} against a mount at ${G.mount}, grouped ${G.grouped}. A LURCHER from `
+    + `${G.endY} in ${G.secs}s of a derived ${G.capSecs}s window, against a mount at `
+    + `${G.mount}, grouped ${G.grouped}. A LURCHER from `
     + `the same release arrived ${G.controlArrived} (dead ${G.controlDead}) having `
     + `wandered ${G.controlCrossed} units of lateral on its route -- so arriving is `
     + 'not what this arm is about, holding a chosen column on the way is');
