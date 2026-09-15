@@ -37200,6 +37200,10 @@ if (MINE_LINE) {
     const { WAVES, CFG, TYPE_BY_ID } = await import('/src/config.js');
     const E = await import('/src/enemies.js');
     const U = await import('/src/util.js');
+    // The entry line, for the one arm that needs a pair to straddle it. It is
+    // derived (`entryLine`) rather than the old `ENTRY_Y + entryDepth`, so a
+    // notch at the top of the screen moves it and this arm follows.
+    const P = await import('/src/portal.js');
     const g = window.__sim;
     const w = g.world;
     const s = w.shooter;
@@ -37412,6 +37416,180 @@ if (MINE_LINE) {
       };
     }
 
+    // ---- 7. the ROTATION is delivered, which is a claim about the rate
+    //         and never about the expression that asks for it -------------
+    {
+      clean();
+      const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, Math.max(120, s.y - 640));
+      for (const e of pr) { e.staged = false; e.born = 1; }
+      g.update(1 / 60);
+      let prev = Math.atan2(pr[1].y - pr[0].y, pr[1].x - pr[0].x);
+      let turn = 0;
+      let secs = 0;
+      for (let f = 0; f < 60 * 8; f++) {
+        g.update(1 / 60);
+        if (pr[0].dead || pr[1].dead) break;
+        const a = Math.atan2(pr[1].y - pr[0].y, pr[1].x - pr[0].x);
+        let da = a - prev;
+        while (da > Math.PI) da -= 2 * Math.PI;
+        while (da < -Math.PI) da += 2 * Math.PI;
+        prev = a;
+        turn += Math.abs(da);
+        secs += 1 / 60;
+      }
+      const k = TYPE_BY_ID.loom.accel / 100;
+      const fight = CFG.physics.linearDamping + k;
+      out.spin = {
+        got: +(turn / Math.max(0.01, secs)).toFixed(3),
+        want: L.spin,
+        // what the same blend delivers with the compensation taken out, which
+        // is the figure this arm has to be able to tell the ask apart from
+        naive: +(L.spin * L.grip / (L.grip + fight)).toFixed(3),
+        secs: +secs.toFixed(1),
+        sep: +Math.hypot(pr[1].x - pr[0].x, pr[1].y - pr[0].y).toFixed(1),
+      };
+    }
+
+    // ---- 7b. ONE CLOCK PER LINK: the halves do not come loose together
+    {
+      /*
+       * ---- THE STAGGER HAS TO BE REAL, AND `staged = true` IS NOT ---------
+       *
+       * The first version of this arm re-asserted `pr[1].staged = true`
+       * before every `g.update` and measured both clocks at 3.000 -- no
+       * stagger at all on a build where the mechanism works. `Enemy.update`
+       * clears the flag inside that same update, on the frame the body's
+       * `y - r` passes `entryLine`, and `drive` (which is where `pairOn` is
+       * called from) runs AFTER it in `physicsStep`. So a flag written from
+       * outside is undone before the thing it was meant to gate ever looks
+       * at it: measured, `stagedHeldFrames` 0 of 60.
+       *
+       * What produces the stagger is the geometry the real throat produces:
+       * the pair STRADDLES the entry line, so the lower half is born and the
+       * upper one is still marching. Held by the line itself, which is the
+       * one writer, so nothing here has to fight `Enemy.update`. Measured 76
+       * frames of stagger -- half again the 50 the real wave at rung 32
+       * produced through the real director.
+       */
+      clean();
+      const line = P.entryLine(w, E.ENTRY_Y);
+      const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, line - 60);
+      for (const e of pr) e.born = 0;
+      // Turned vertical: the lower half is past the line and the upper half,
+      // one `len` above it, is not.
+      const mid = (pr[0].x + pr[1].x) / 2;
+      pr[0].x = mid; pr[0].y = line + TYPE_BY_ID.loom.r + 40;
+      pr[1].x = mid; pr[1].y = pr[0].y - L.len;
+      const looseAt = [null, null];
+      for (let f = 0; f < 60 * 8; f++) {
+        g.update(1 / 60);
+        pr.forEach((e, i) => { if (!e.staged && looseAt[i] === null) looseAt[i] = f; });
+      }
+      const age = (v) => L.len + (L.span - L.len) * Math.min(1, v / L.grow);
+      out.clocks = {
+        bondT: pr.map((e) => +e.bondT.toFixed(3)),
+        len: pr.map((e) => +e.tether.len.toFixed(2)),
+        sep: +Math.hypot(pr[1].x - pr[0].x, pr[1].y - pr[0].y).toFixed(2),
+        loose: looseAt,
+        stagger: looseAt.every((v) => v !== null) ? Math.abs(looseAt[0] - looseAt[1]) : null,
+        fromMin: +age(Math.min(...pr.map((e) => e.bondT))).toFixed(2),
+        fromMax: +age(Math.max(...pr.map((e) => e.bondT))).toFixed(2),
+        // one frame of the ramp, which is what a per-body accumulator can
+        // legitimately leave between two records that run in series
+        perFrame: +((L.span - L.len) / L.grow / 60).toFixed(3),
+      };
+    }
+
+    // ---- 8. STASIS holds the THREAD, not only the rotation --------------
+    {
+      const held = (on) => {
+        clean();
+        const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, midY());
+        for (const e of pr) { e.staged = false; e.born = 1; }
+        g.update(1 / 60);
+        const len0 = pr[0].tether.len;
+        let prev = Math.atan2(pr[1].y - pr[0].y, pr[1].x - pr[0].x);
+        let turn = 0;
+        let frozen = false;
+        for (let f = 0; f < 60 * 6; f++) {
+          if (on) w.stasis = 9;
+          g.update(1 / 60);
+          if (on) frozen = pr[0].frozen(w);
+          const a = Math.atan2(pr[1].y - pr[0].y, pr[1].x - pr[0].x);
+          let da = a - prev;
+          while (da > Math.PI) da -= 2 * Math.PI;
+          while (da < -Math.PI) da += 2 * Math.PI;
+          prev = a;
+          turn += Math.abs(da);
+        }
+        w.stasis = 0;
+        return { grew: +(pr[0].tether.len - len0).toFixed(1), omega: +(turn / 6).toFixed(3), frozen };
+      };
+      out.free = held(false);
+      out.frozen = held(true);
+      /*
+       * The FACTOR is not quoted here. `0.12` is written out in five places
+       * in enemies.js and there is no `CFG.stasis` to read it from, so a
+       * copy in this case would be a sixth -- the hand-kept-list shape this
+       * repo keeps paying for. What the arm asserts instead is that the
+       * growth is held by THE SAME factor as the rotation, which is the
+       * actual claim (one function, one `slow`) and needs no literal at all.
+       */
+      out.ratio = {
+        grew: +(out.frozen.grew / Math.max(0.01, out.free.grew)).toFixed(3),
+        omega: +(out.frozen.omega / Math.max(0.001, out.free.omega)).toFixed(3),
+      };
+    }
+
+    // ---- 9. the debug overlay can SHOW the thread -----------------------
+    {
+      clean();
+      const pr = E.release(w, TYPE_BY_ID.loom, w.width * 0.5, midY());
+      for (const e of pr) { e.staged = false; e.born = 1; e.bondT = 999; e.tether.len = L.span; }
+      for (let i = 0; i < 40; i++) {
+        for (const e of pr) { e.vx = 0; e.vy = 0; e.cruise = 0; }
+        g.update(1 / 60);
+      }
+      const mid = (pr[0].x + pr[1].x) / 2;
+      pr[0].x = mid - L.span / 2; pr[0].y = midY();
+      pr[1].x = mid + L.span / 2; pr[1].y = midY();
+      /*
+       * Rendered to an offscreen canvas, never screenshotted off the page:
+       * the page's own rAF loop repaints between a draw and a shot, which
+       * this repo has paid for three times (builds 211, 298, 322).
+       */
+      const paint = (on) => {
+        const was = pr.map((e) => e.beam);
+        if (!on) for (const e of pr) e.beam = false;
+        const cv = document.createElement('canvas');
+        cv.width = 520;
+        cv.height = 180;
+        const c2 = cv.getContext('2d');
+        c2.fillStyle = '#000';
+        c2.fillRect(0, 0, cv.width, cv.height);
+        c2.save();
+        c2.translate(260 - mid, 90 - midY());
+        g.drawHitboxes(c2);
+        c2.restore();
+        const d = c2.getImageData(0, 0, cv.width, cv.height).data;
+        // the overlay's own green, counted ONLY between the two spools and
+        // within a few units of the thread's row, so neither disc's outline
+        // can be mistaken for it
+        let lit = 0;
+        const rows = {};
+        for (let x = 260 - 60; x <= 260 + 60; x++) {
+          for (let y = 90 - 8; y <= 90 + 8; y++) {
+            const i = (y * cv.width + x) * 4;
+            if (d[i + 1] > 60 && d[i + 1] > d[i] + 20) { lit++; rows[y - 90] = 1; }
+          }
+        }
+        for (const e of pr) e.beam = was.shift();
+        const band = Object.keys(rows).map(Number);
+        return { lit, half: band.length ? Math.max(...band.map(Math.abs)) : 0 };
+      };
+      out.overlay = { on: paint(true), off: paint(false), stops: L.stops };
+    }
+
     // ---- ...and the wave is priced at its band's own mean --------------
     {
       const th = (q) => (q.of || []).reduce((a, [id, n]) => a + n * E.threatOf(TYPE_BY_ID[id]), 0);
@@ -37492,11 +37670,324 @@ if (MINE_LINE) {
     + `${Y.stillBeamed}); threat ${Y.threat} for one pool against a LOOM's ${Y.loomThreat}, `
     + `which is ${Y.nominal} x${Y.halves} because it has two`);
 
+  const S = r.spin;
+  check('a LOOM pair turns at the rate its own bond block authors, delivered',
+    r.traits === 0
+    // within 15% of the ask, which is 2x the worst of six measured bins
+    && Math.abs(S.got / S.want - 1) < 0.15
+    // ...and at least three times closer to the ask than to what the same
+    // blend delivers UNCOMPENSATED, or the arm cannot tell the two apart
+    && Math.abs(S.got - S.want) * 3 < Math.abs(S.got - S.naive),
+    `${S.got} rad/s against an authored ${S.want} over ${S.secs}s (separation ${S.sep}), `
+    + `where the same blend with the compensation taken out delivers ${S.naive}. `
+    + '`want` scales with the separation and a LOOM\'s grows 3.4x, so the rate is the '
+    + 'claim and the expression that asks for it is not');
+
+  check('one LINK has one clock, however the two halves came loose',
+    // THE SCENARIO RAN: the pair straddled the entry line and the two halves
+    // were born frames apart, which is the condition the whole claim is
+    // about -- a probe that releases both halves together cannot see any of
+    // this, and that is exactly what the growth arm above does
+    r.clocks.stagger > 30
+    // ...so the two per-body clocks really do differ, which is what a
+    // per-body LENGTH would have differed by
+    && Math.abs(r.clocks.bondT[0] - r.clocks.bondT[1]) > 0.5
+    // ...and the length is the one the LATER half's clock gives, not the
+    // earlier one's. That is the discriminating pair: 12 units apart here,
+    // so a build reading its own clock cannot pass both
+    && Math.abs(r.clocks.len[0] - r.clocks.fromMin) < 1
+    && Math.abs(r.clocks.len[0] - r.clocks.fromMax) > 5
+    // ...and the two records agree, to within the one frame of ramp a pair of
+    // accumulators running in series can leave between them -- derived from
+    // the ramp rather than fitted, and measured at half of it (a substep)
+    && Math.abs(r.clocks.len[0] - r.clocks.len[1]) < r.clocks.perFrame
+    // ...and the separation the constraint delivered is that length
+    && Math.abs(r.clocks.sep - r.clocks.len[0]) < 2,
+    `the pair straddled the entry line and its halves were born `
+    + `${r.clocks.stagger} frames apart (at ${r.clocks.loose.join(' and ')}), leaving the `
+    + `clocks at ${r.clocks.bondT.join(' / ')} -- and the records read `
+    + `${r.clocks.len.join(' / ')} with the pair ${r.clocks.sep} apart, against the later `
+    + `clock's ${r.clocks.fromMin} and the earlier one's ${r.clocks.fromMax}. At build 332 `
+    + 'each half read its OWN clock, so on the real wave at rung 32 the two records disagreed '
+    + 'by up to 8.0 units and `solveTethers` -- which reads whichever half is leftmost, and a '
+    + 'rotating pair swaps that twice a revolution -- flipped between them');
+
+  check('STASIS holds a LOOM\'s THREAD and not only its rotation',
+    // it really was held, and the rotation really was slowed -- the half that
+    // already worked, and the liveness this arm needs before its own zero
+    r.frozen.frozen && r.ratio.omega < 0.3
+    // ...and the thread really was growing in the control, or a held zero is
+    // a measurement of nothing
+    && r.free.grew > 20
+    // ...and the GROWTH is held by THE SAME factor as the rotation. It was
+    // not at build 332: the clock sat one line above `slow`, so the ratio
+    // read 1.000 against the rotation's 0.119 -- 57.4 units either way.
+    && Math.abs(r.ratio.grew - r.ratio.omega) < 0.05,
+    `held six seconds: the thread grew ${r.frozen.grew} against ${r.free.grew} free `
+    + `(ratio ${r.ratio.grew}) and turned ${r.frozen.omega} against ${r.free.omega} `
+    + `(ratio ${r.ratio.omega}) -- one factor, both mechanisms. Build 332 shipped `
+    + '1.000 against 0.119: the one press a player has against this object did not touch '
+    + 'the only thing it does');
+
+  check('the HITBOXES overlay can show the thread, which is a hit boundary',
+    // lit between the spools with the link up, and nothing there without it,
+    // so a disc's outline cannot be what is being counted
+    r.overlay.on.lit > 50 && r.overlay.off.lit === 0
+    // ...and what it draws is the width a round has to miss, not a sign for it
+    && Math.abs(r.overlay.on.half - r.overlay.stops) <= 1,
+    `${r.overlay.on.lit} overlay pixels along the thread with the link up against `
+    + `${r.overlay.off.lit} without it, in a band ${r.overlay.on.half} units either side `
+    + `of the axis against a thread radius of ${r.overlay.stops}. This overlay is the only `
+    + 'place the hit profile can be seen and it had to be taught the capsule (315) and the '
+    + 'plate (319) the same way');
+
   check('the LOOM wave is priced at band 5\'s own mean',
     Math.abs(r.priced.ratio - 1) < 0.1,
     `${r.priced.wave} against the band's other waves at ${r.priced.mean} (ratio `
     + `${r.priced.ratio}) -- build 315's lever. The first draft was four pairs and three `
     + 'LURCHERs at 47.83, which is 31% over and lengthens every other wave in the band');
+}
+
+/*
+ * ---- A WAVE SENDS WHAT IT ASKED FOR, AND FOR NINE WAVES IT DID NOT -------
+ *
+ * Build 333. `Director.emit` takes the whole job off the list with `shift()`,
+ * so a type it refuses to form up releases ONE body -- or one pair -- and the
+ * remainder of that job is discarded. Three sites decided whether a count may
+ * arrive as a shape and all three answered differently (`!solo` in `load`,
+ * `!tows && !pair` in `emit`, `!tows && !solo` in `spawnFormation`), so a TOW
+ * or a pair was grouped by one and refused by the next.
+ *
+ * Measured at rung 32 before the fix, authored bodies against arrived bodies:
+ * 1 of 96, 1 of 18, 1 of 32, 1 of 88, 1 of 76, 1 of 50, 1 of 40 for the seven
+ * TOW waves, 2 of 126 for YOKE and 2 of 62 for LOOM -- one to three per cent,
+ * in the deepest authored band, while `budgetAt` had priced the whole ask and
+ * `threatOf` had counted every body of it. Nothing failed: no verdict goes
+ * down, and `cleared`'s denominator falls with the job, so the only symptom
+ * was that band 5 was cheaper than its own prices.
+ *
+ * `formable(type)` is the one predicate now and all three sites read it. This
+ * case is the other half: it asks the DIRECTOR for every wave that carries
+ * such a type -- derived from the roster, so a new wave or a tenth
+ * multiplicity field is covered by existing rather than by being added here.
+ *
+ * Driven through `load` and then `emit`, which is the door: build 307's own
+ * case called the dispatch directly and could not see build 309's identical
+ * fault one function along.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { WAVES, CFG, TYPE_BY_ID } = await import('/src/config.js');
+    const E = await import('/src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = { formAt: CFG.waves.formAt, cap: CFG.maxEnemies, rows: [] };
+
+    // The roster's own answer to "which types cannot arrive as a shape", and
+    // the waves that carry one. Neither list is written out here.
+    out.refused = Object.values(TYPE_BY_ID).filter((t) => !E.formable(t)).map((t) => t.id).sort();
+    /*
+     * EVERY ordinary wave, not only the ones carrying a type that cannot form
+     * up. The first version of this arm asked only those, and it caught the
+     * partial-formation drop by accident -- through the one TOW wave that also
+     * carries a mote job of 70 against a cap of 57. The drop is not about
+     * pairs: it is about any job larger than the headroom, which at a deep
+     * rung is most of them.
+     */
+    const carries = [];
+    WAVES.forEach((q, i) => { if (!q.teach && (q.of || []).length) carries.push(i); });
+    out.waves = carries.length;
+    out.withRefused = WAVES.filter((q, i) => carries.includes(i)
+      && (q.of || []).some(([id]) => !E.formable(TYPE_BY_ID[id]))).length;
+
+    for (const i of carries) {
+      g.restart();
+      w.era = 1;
+      g.setEra(2);
+      const d = w.director;
+      d.setTier(32);
+      d.traits = [];
+      d.update = () => {};
+      w.spawnLock = 1e9;
+      g.debugClearField();
+      d.load(w, WAVES[i], 0);
+      /*
+       * What the job list asks for IN BODIES: a pair and a TOW are each two,
+       * and that is the number `threatOf` priced -- it counts what a TOW
+       * drags and both halves of an unpooled pair.
+       */
+      const ask = {};
+      for (const j of d.jobs) {
+        const t = j.type;
+        const per = t.pair || (t.tows ? 2 : (t.school || t.beads || 1));
+        ask[t.id] = (ask[t.id] || 0) + j.n * per;
+      }
+      const made = {};
+      for (let f = 0; f < 4000 && d.jobs.length; f++) {
+        d.lastRelease = -1e9;
+        const before = w.enemies.length;
+        d.emit(w);
+        for (let k = before; k < w.enemies.length; k++) {
+          made[w.enemies[k].type.id] = (made[w.enemies[k].type.id] || 0) + 1;
+        }
+        // held empty so `maxEnemies` never refuses a release and the job list
+        // is the only thing deciding
+        w.enemies.length = 0;
+        for (const k of ['drops', 'debris', 'effects', 'projectiles']) if (w[k]) w[k].length = 0;
+      }
+      // a TOW's load arrives under its own id, so fold it back onto the head
+      if (made.towMass) {
+        made.tow = (made.tow || 0) + made.towMass;
+        delete made.towMass;
+      }
+      const shy = [];
+      for (const [id, n] of Object.entries(ask)) {
+        const got = made[id] || 0;
+        if (got < n) shy.push(`${id} ${got} of ${n}`);
+      }
+      out.rows.push({ i, of: (WAVES[i].of || []).map(([id, n]) => `${id}x${n}`).join('+'),
+        askBodies: Object.values(ask).reduce((a, b) => a + b, 0),
+        gotBodies: Object.values(made).reduce((a, b) => a + b, 0),
+        shy });
+    }
+    delete w.director.update;
+    w.spawnLock = 0;
+    return out;
+  });
+
+  const shy = r.rows.filter((q) => q.shy.length);
+  const big = r.rows.filter((q) => q.askBodies > r.cap).length;
+  check('every wave releases the bodies its own budget asked for',
+    // the case has something to be about: a real roster, real waves, a
+    // `formAt` low enough that a scaled count crosses it, waves that carry a
+    // type which cannot form up at all, and jobs bigger than the field cap --
+    // which is the condition the partial drop needed
+    r.refused.length > 0 && r.waves > 20 && r.withRefused > 0 && r.formAt <= 3 && big > 0
+    // ...and not one wave comes up short
+    && shy.length === 0,
+    `${r.waves} ordinary waves at rung 32, ${r.withRefused} of them carrying a type that `
+    + `cannot arrive as a shape (${r.refused.join(', ')}), ${big} asking for more bodies `
+    + `than the field cap holds, formAt ${r.formAt}: `
+    + `${r.rows.length - shy.length} of ${r.rows.length} delivered every body they asked `
+    + `for, worst ask ${Math.max(...r.rows.map((q) => q.askBodies))}`
+    + (shy.length ? `. SHORT: ${shy.map((q) => `[${q.i}] ${q.of} ${q.shy.join(', ')}`).join('; ')}`
+      : '')
+    + '. Before build 333 the nine band-5 waves carrying a TOW or a pair read 1 of 96, '
+    + '2 of 126 and 2 of 62 -- `emit` shifts the whole job, so a refused formation '
+    + 'released one body -- and a formation larger than the headroom dropped the rest');
+}
+
+/*
+ * ---- TETHERED SHARES ACROSS ITS OWN LINK, AND NOT ACROSS EVERY LINK ------
+ *
+ * Build 333. `Enemy.applyDamage`'s sharing block tested "this body has a
+ * tether and both ends carry the trait", under a docstring claiming that left
+ * a TOW's own cable untouched. `scaleToTier` stamps `d.traits` onto every body
+ * released while a trait is up, so on a rung that rolls TETHERED every link on
+ * the field had both ends traited -- and the block reached two links it was
+ * never about, in opposite directions:
+ *
+ *   - a LOOM pair became ONE pool. Hit one half for 50 and the other read
+ *     113 -> 67, against an object whose entire counter is that either end
+ *     drops it, and a budget that prices two pools of 110 (7.33 threat).
+ *   - a TOW was HEALED. Shooting the load for 50 took the head from 126 to
+ *     254, because `o.hp = this.hp` copies whichever number the struck body
+ *     happens to hold, and the load's pool is larger than the head's.
+ *
+ * `shared` on the link -- written by the one site that makes this trait's
+ * pairing -- is the fix, and the trait tests went with it: they were a proxy
+ * for "this link is the trait's" and the mark is the fact.
+ *
+ * Four arms, because three of them are zeroes and a zero needs the one beside
+ * it: the trait still shares across the pair it MADE (50 of 50), it shares
+ * nothing without the trait, and it shares nothing across a LOOM's thread or
+ * a TOW's cable with the trait up.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { TYPE_BY_ID } = await import('/src/config.js');
+    const E = await import('/src/enemies.js');
+    const { TRAIT_BY_ID } = await import('/src/traits.js');
+    const g = window.__sim;
+    const w = g.world;
+    const s = w.shooter;
+    const clean = () => {
+      g.debugClearField();
+      for (const k of ['projectiles', 'mines', 'effects', 'ghosts', 'drops', 'debris']) {
+        if (w[k]) w[k].length = 0;
+      }
+      if (w.respawns) w.respawns.length = 0;
+      w.director.update = () => {};
+      w.director.pairing = null;
+      w.spawnLock = 1e9;
+      w.timeScale = 1;
+      w.stasis = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.director.traits = [];
+    };
+    /*
+     * Every body is laid relative to the MOUNT, not at an absolute y: the
+     * suite leaves the world at era 2, where the yard wall is up-field of any
+     * fixed depth and `shielded` refuses the damage path outright. Build 332
+     * lost four arms to that.
+     */
+    const y = s.y - 200;
+    const hit = (e) => e.applyDamage(w, 50, 0, -1, 0, 0, null, 0, 'bolt');
+    const arm = (what, traited) => {
+      clean();
+      if (traited) w.director.traits = TRAIT_BY_ID.tethered ? [TRAIT_BY_ID.tethered] : [];
+      let a;
+      let b;
+      if (what === 'pair') {
+        // two ORDINARY bodies, released in turn, which is what the trait pairs
+        a = E.release(w, TYPE_BY_ID.lurcher, w.width * 0.4, y)[0];
+        b = E.release(w, TYPE_BY_ID.lurcher, w.width * 0.6, y)[0];
+      } else {
+        const made = E.release(w, TYPE_BY_ID[what], w.width * 0.5, y);
+        [a, b] = made;
+        if (what === 'tow') {
+          // the LOAD is the one to shoot: the fault copied its larger pool
+          // onto the head, so hitting the head could not have seen it
+          [a, b] = [made.find((e) => e !== made[0]) || made[1], made[0]];
+        }
+      }
+      for (const e of [a, b]) { e.staged = false; e.born = 1; e.vx = 0; e.vy = 0; e.cruise = 0; }
+      g.update(1 / 60);
+      const traits = [a, b].map((e) => (e.traits || []).map((t) => t.id).join('+') || '-');
+      const linked = !!(a.tether && a.tether.other === b);
+      const shared = !!(a.tether && a.tether.shared);
+      const h0 = [a.hp, b.hp];
+      hit(a);
+      return { what, traited, traits, linked, shared,
+        hp0: h0.map((v) => +v.toFixed(1)), hp1: [+a.hp.toFixed(1), +b.hp.toFixed(1)],
+        took: +(h0[0] - a.hp).toFixed(1), partner: +(h0[1] - b.hp).toFixed(1) };
+    };
+    return {
+      on: arm('pair', true),
+      off: arm('pair', false),
+      loom: arm('loom', true),
+      tow: arm('tow', true),
+    };
+  });
+
+  check('TETHERED shares across the pair it made and across no other link',
+    // it still does its job, which is the one that makes the three zeroes mean
+    // something: the trait pairs two ordinary bodies and writes one pool
+    r.on.linked && r.on.shared && Math.abs(r.on.partner - r.on.took) < 0.01 && r.on.took > 40
+    // ...and without the trait there is no pairing and no sharing
+    && !r.off.linked && !r.off.shared && r.off.partner === 0
+    // ...and a LOOM keeps TWO pools with the trait up, which is the object
+    && r.loom.traits.every((t) => t.includes('tethered')) && !r.loom.shared
+    && r.loom.partner === 0 && r.loom.took > 40
+    // ...and a TOW's cable is untouched, which its docstring always claimed
+    && r.tow.traits.every((t) => t.includes('tethered')) && !r.tow.shared
+    && r.tow.partner === 0,
+    `trait up: a made pair shares ${r.on.partner} of ${r.on.took} (linked ${r.on.linked}, `
+    + `shared ${r.on.shared}); trait off: ${r.off.partner} with no link; a LOOM pair `
+    + `[${r.loom.traits.join(' ')}] moves its other half ${r.loom.partner} (was 46 at build `
+    + `332, which made two pools of 110 into one); a TOW's head moves ${r.tow.partner} for a `
+    + '50 into the load (was -128 -- shooting the MASS healed the head from 126 to 254)');
 }
 
 // --- report -----------------------------------------------------------------

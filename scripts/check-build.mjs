@@ -487,7 +487,7 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, o
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
-const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, threatOf } = await import(new URL('../src/enemies.js', import.meta.url));
+const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
 
 /*
  * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------
@@ -1100,6 +1100,47 @@ if (comers.length) {
  * holding them together -- the chain's measured fault, on an axis the rigid
  * tether cannot give ground on.
  */
+/*
+ * ---- ONE PREDICATE DECIDES WHAT MAY ARRIVE AS A SHAPE ------------------
+ *
+ * Three sites ask that question -- `Director.load` (group the entry into one
+ * job of n, or split it into n singles), `Director.emit` (send this job as a
+ * formation) and `spawnFormation` (roll a type out of a list) -- and until
+ * build 333 they answered `!solo`, `!tows && !pair` and `!tows && !solo`.
+ * The disagreement cost 97-99% of the TOW and pair bodies in nine band-5
+ * waves, because `emit` shifts the whole job off the list and a refused
+ * formation released exactly one.
+ *
+ * So the guard is not on a value, it is on the three sites still reading the
+ * same function. A fourth multiplicity field arriving in `release` is then
+ * one edit to `formable` rather than three that can be made two at a time.
+ */
+const formSites = [
+  ['Director.load groups', /if \(!wave\.teach && (.*?) && n >= W\.formAt\)/],
+  ['Director.emit forms up', /if \(job\.n > 1 && (.*?)\) \{/],
+  ['spawnFormation rolls', /const single = kinds\.filter\(\(k\) => (.*?)\);/],
+];
+const formBad = [];
+for (const [what, re] of formSites) {
+  const m = gaitSrc.match(re);
+  if (!m) formBad.push(`${what}: the site could not be found -- this guard has rotted`);
+  else if (!m[1].includes('formable(')) {
+    formBad.push(`${what} tests \`${m[1].trim()}\` instead of calling formable()`);
+  }
+}
+if (formBad.length) {
+  for (const line of formBad) console.error(`formable: ${line}`);
+  process.exit(1);
+}
+const unformable = ENEMY_TYPES.filter((t) => !formable(t)).map((t) => t.id);
+// `WAVES` is bound further down this file; CFGMOD is the copy already in
+// scope here, which is the same module object.
+const formWaves = CFGMOD.WAVES.filter((q) => !q.teach && (q.of || []).length);
+const carriers = formWaves.filter((q) => (q.of || []).some(([id]) => !formable(TYPE_BY_ID[id])));
+console.log(`formable: ${formSites.length} sites read one predicate; `
+  + `${unformable.length} type(s) cannot arrive as a shape (${unformable.join(' ') || 'none'}), `
+  + `carried by ${carriers.length} of ${formWaves.length} ordinary waves`);
+
 const pairs = ENEMY_TYPES.filter((t) => t.pair).map((t) => ({ id: t.id, r: t.r, ...pairOf(t) }));
 const tightBeam = pairs
   .filter((y) => y.len <= y.r * 2 + CFG.physics.slop)
@@ -1109,24 +1150,61 @@ if (tightBeam.length) {
   for (const line of tightBeam) console.error(`pair: ${line}`);
   process.exit(1);
 }
+/*
+ * The one claim about a thread that `pairOf` does not already make.
+ *
+ * This had three clauses and TWO of them could not fail: `pairOf` throws
+ * unless `bond.len > 2r`, which is exactly "the insets leave a thread", and
+ * unless `bond.span > bond.len`, which is exactly "growing widens it" -- and
+ * `pairs` above is built by calling `pairOf`, so a type that broke either
+ * one never reaches this loop. A clause that is counted and cannot fail is
+ * worse than a missing one (build 319), so they are gone and the reason is
+ * here rather than in a diff.
+ *
+ * What is left is arithmetic nobody else does: the thread is drawn and
+ * blocked at `stops` either side of the axis, and it has to FIT between the
+ * two insets on the frame the pair is released -- at `bond.len`, which is
+ * the narrowest the link ever is.
+ */
 const badThread = [];
 for (const y of pairs.filter((q) => q.stops)) {
   const span = y.len - y.r * 2;
-  if (!(span > 0)) {
-    badThread.push(`${y.id}: a link of ${y.len} between two r${y.r} bodies has no thread `
-      + `between them (${span.toFixed(1)} units past the insets)`);
-  } else if (!(y.stops * 2 < span)) {
+  if (!(y.stops * 2 < span)) {
     badThread.push(`${y.id}: a thread ${(y.stops * 2).toFixed(1)} thick does not fit the `
       + `${span.toFixed(1)} units its own insets leave at release`);
-  }
-  if (y.span && !(y.span - y.r * 2 > span)) {
-    badThread.push(`${y.id}: growing to ${y.span} does not widen the blocking span`);
   }
 }
 if (badThread.length) {
   for (const line of badThread) console.error(`pair: ${line}`);
   process.exit(1);
 }
+/*
+ * ---- ...AND WHAT `span` DECIDES BESIDES THE WIDTH ----------------------
+ *
+ * `span` is authored as "what the link grows to" and does a second job
+ * nobody wrote down: both halves steer at the mount and the link is rigid,
+ * so a pair that survives its transit parks STRADDLING the machine at a
+ * standoff of `span / 2`. Measured over ninety seconds with nothing
+ * shooting, a LOOM at full span closes to 71.2 and 84.9 against a grab
+ * distance of 48 and settles at 99 / 91 -- **zero grip frames, and
+ * `world.attackers` empty** -- while a YOKE, whose half-link is 30 against
+ * a grab of 54, grips on arrival and holds for 4,142 of 5,400 frames.
+ *
+ * Both are correct: a LOOM is a wall that costs rounds and its wave pairs
+ * it with a LURCHER, which is the half that grips. What was wrong is the
+ * SILENCE -- build 329's lesson about the broadphase cell, one field along.
+ * So the figure is printed beside the link, and a `span` edit that hands
+ * this object a contact behaviour shows up in the same line that authored
+ * it. It is deliberately not a refusal: which side of the grab band a pair
+ * should sit on is a design decision and both answers are in play.
+ */
+const standoff = pairs.map((y) => {
+  const reach = y.r + CFG.shooter.r + CFG.shooter.grabPad;
+  const off = (y.span || y.len) / 2;
+  return `${y.id} parks at ${off.toFixed(0)} against a grab of ${reach.toFixed(0)}`
+    + ` (${off > reach ? 'never grips' : 'grips'})`;
+});
+console.log(`pair: ${standoff.join('; ') || 'none'}`);
 console.log(`pair: ${pairs.length} type(s) on a rigid link (`
   + `${pairs.map((y) => `${y.id} 2x r${y.r} at ${y.len} (${(y.len / y.r).toFixed(2)}r), `
     + (y.pool ? `ONE pool, snap ${y.snap}` : 'two pools')

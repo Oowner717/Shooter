@@ -186,7 +186,10 @@ export function drawSpecimen(ctx, id, r) {
     case 'dart': drawDart(ctx, r, 0, 0); break;
     case 'bar': drawBar(ctx, r, 0, 0, t.bar); break;
     case 'sheet': drawVeil(ctx, r, 0, 0, t.bar); break;
-    case 'yoke': drawYoke(ctx, r, 0, 0, true, TYPE_BY_ID.yoke.bond.len / 2); break;
+    // `t.bond`, not `TYPE_BY_ID.yoke.bond`: the half-beam is the TYPE's own
+    // number, and reading one type's block from another type's icon is the
+    // shared-block fault this build spent itself on, one draw call along.
+    case 'yoke': drawYoke(ctx, r, 0, 0, true, t.bond.len / 2); break;
     case 'loom': drawLoom(ctx, r, 0, 0, true); break;
     /*
      * NOSE DOWN in the glossary, which is a different frame from the field.
@@ -1276,12 +1279,74 @@ export class Enemy {
      * arrives at its authored `len` however long the mouth held it -- which
      * is the same reason `rise` measures its climb from the floor and not
      * from the spawn.
+     *
+     * ---- ...AND IT RUNS AT `slow`, WHICH IT DID NOT AT BUILD 332 ---------
+     *
+     * The clock sat one line ABOVE the `frozen` factor, so STASIS held the
+     * pair's ROTATION at 0.12 and its GROWTH at full rate: measured over six
+     * seconds of a pinned field, the rotation delivered 0.031 rad/s against
+     * 0.288 free (the factor working) and the thread widened **57.4 units
+     * either way, to the tenth** -- 30% of its whole span, while the body
+     * was to all appearances stopped. The one press a player has against
+     * this object did not touch the only thing it does.
+     *
+     * That is build 319's `Enemy.face` fault verbatim -- the plated branch
+     * was the one rotation in this file that ignored `frozen`, alone among
+     * three that scale by 0.12 -- and it is the same lesson: **a new
+     * mechanism inherits none of the rules the old ones learned**, so grep
+     * the file for the state before writing one. `slow` is read by the
+     * rotation eight lines down, so the two now cannot disagree.
      */
-    if (L.span) {
-      this.bondT += dt;
-      this.tether.len = L.len + (L.span - L.len) * clamp(this.bondT / L.grow, 0, 1);
-    }
     const slow = this.frozen(world) ? 0.12 : 1;
+    if (L.span) {
+      this.bondT += dt * slow;
+      /*
+       * ---- ONE CLOCK PER LINK, NOT ONE PER BODY (build 333) -------------
+       *
+       * `bondT` is a field on a BODY and the length is a property of the
+       * LINK, and the two halves do not come loose on the same frame:
+       * `Enemy.update` refuses `pairOn` while a body is `staged`, and a pair
+       * marching down the throat tilts, so one half passes the entry line
+       * first. Measured on the real wave at rung 32 through the real
+       * director: the halves cleared `staged` **up to 50 frames apart**,
+       * which left the two clocks at 1.017 and 0.183 and THEIR OWN TETHER
+       * RECORDS DISAGREEING ABOUT THE LENGTH BY UP TO 8.0 UNITS.
+       *
+       * That is not a cosmetic disagreement, because `solveTethers` solves
+       * each pair once and reads the record of whichever half is LEFTMOST --
+       * and a rotating pair swaps which that is twice a revolution. So the
+       * constraint's target length flipped between two diverging numbers,
+       * and the separation the object is about was not a function of time at
+       * all.
+       *
+       * `min` of the two is the pair's age since the LATER half came loose,
+       * which is symmetric (so both records hold the same number and the
+       * handover has nothing to hand over), monotone, and the honest reading
+       * of "the pair walks apart once it is loose". The case's growth arm
+       * could not see any of this: it releases both halves un-staged on the
+       * same frame, which is the one arrangement where a per-body clock is
+       * right. What CAN see it is a pair straddling the entry line -- the
+       * lower half born, the upper one still marching -- which measures a
+       * stagger of 71 to 92 frames and, reverted, records 14.7 units apart.
+       *
+       * The two records still differ by one SUBSTEP of the ramp (measured
+       * 0.08 of the 0.16 a frame is worth), because the halves run in series
+       * and the second one's `min` has already seen the first one's
+       * increment. That is a bounded lag rather than a divergence, and the
+       * case asserts the bound off the ramp rather than off the day's value.
+       *
+       * End to end on the real wave at rung 32, era 2, three runs, 38 pairs
+       * released through the real director: the separation on the frame both
+       * halves are loose is **55.94 to 56.53, mean 56.07 to 56.13**, against
+       * an authored 56 -- so the blocking span is the 15.9 to 16.5 the type's
+       * own docstring quotes. Build 332 read 55.9 to 79.0 there, mean 61-62,
+       * worst +41%, and a blocking span of 15.9 to 39.0: the figure the whole
+       * opening of the object rests on was out by up to 2.4x in play while
+       * the case read the ramp as 0.19% out.
+       */
+      const age = Math.min(this.bondT, o.bondT);
+      this.tether.len = L.len + (L.span - L.len) * clamp(age / L.grow, 0, 1);
+    }
     const mx = (this.x + o.x) / 2;
     const my = (this.y + o.y) / 2;
     let ax = this.x - mx;
@@ -3240,13 +3305,29 @@ export class Enemy {
      *
      * Written across rather than halved, so shooting either half is shooting
      * the same health -- which is the point, and is what makes a tethered
-     * pair different from two bodies that happen to be joined. Guarded on the
-     * other half being alive and traited, so a TOW's own tether (which shares
-     * nothing) is untouched.
+     * pair different from two bodies that happen to be joined.
+     *
+     * ---- AND IT IS THE LINK THAT SAYS SO, NOT THE TRAIT (build 333) -----
+     *
+     * This tested "has a tether, and both ends carry the trait", under a
+     * docstring claiming that left a TOW's own cable untouched. It did not:
+     * `scaleToTier` stamps `d.traits` on every body released while the trait
+     * is up, so on such a rung EVERY link on the field had both ends traited
+     * -- a TOW's cable and, from build 332, a LOOM's thread. Measured, the
+     * fault ran both ways: a LOOM pair became one pool (hit one half for 50,
+     * the other went 113 -> 67, against an object whose whole counter is
+     * that either end drops it and a budget that prices two pools), and a
+     * TOW was HEALED (shooting the load for 50 took the head 126 -> 254,
+     * because `o.hp = this.hp` copies whichever number the struck body has).
+     *
+     * `shared` is written by the ONE site that makes this trait's pairing
+     * and nowhere else, so the question the branch asks is now the question
+     * it means. The trait tests are gone with it: they were a proxy for
+     * "this link is the trait's", and the mark is the fact.
      */
-    const o = this.tether && this.tether.other;
-    if (o && !o.dead && o.traits && hasTrait(o.traits, 'tethered')
-        && hasTrait(this.traits, 'tethered')) {
+    const link = this.tether;
+    const o = link && link.other;
+    if (link && link.shared && o && !o.dead) {
       o.hp = this.hp;
       o.flash = this.flash;
       if (o.hp <= 0) o.destroy(world);
@@ -6637,8 +6718,30 @@ export function release(world, type, x, y, opts) {
     if (e && !e.harmless && !type.tows) {
       const waiting = d.pairing;
       if (waiting && !waiting.dead && !waiting.tether) {
-        e.tether = { other: waiting, len: 96 };
-        waiting.tether = { other: e, len: 96 };
+        /*
+         * `shared` is what makes the POOL this trait's own, and it is the
+         * fix for build 333's measured fault: `applyDamage` used to write
+         * one half's health onto the other whenever a body HAD a tether and
+         * both ends were traited, which is every link on the field once a
+         * rung rolls this trait -- `scaleToTier` stamps `d.traits` on every
+         * body released while it is up. So the trait reached two links it
+         * was never about, and the block's own docstring said it did not.
+         *
+         *   - a LOOM's pair became ONE pool: hit one half for 50 and the
+         *     other read 113 -> 67. Two pools of 110 is the object ("either
+         *     end drops it") and is what `threatOf` prices, so the wave
+         *     arrived at half the health it was bought at.
+         *   - a TOW was HEALED: shooting the load for 50 took the head from
+         *     126 to 254, because `o.hp = this.hp` copies the larger number
+         *     the wrong way. Shooting the MASS made the head stronger.
+         *
+         * The mark is on the LINK rather than on the bodies because that is
+         * the thing this trait creates -- the two types above make their own
+         * links for their own reasons, and a flag on the body could not tell
+         * the three apart.
+         */
+        e.tether = { other: waiting, len: 96, shared: true };
+        waiting.tether = { other: e, len: 96, shared: true };
         e.hp = Math.min(e.hp, waiting.hp);
         waiting.hp = e.hp;
         d.pairing = null;
@@ -7104,6 +7207,54 @@ export function diveLane(world, e) {
  * its own required numbers: a pooled pair needs the `snap` share that breaks
  * it, a growing one needs the `span` it grows to and the `grow` clock.
  */
+/**
+ * Can `n` of this type arrive as ONE FORMATION -- a shape through the mouth?
+ *
+ * ---- THREE SITES ASKED THIS AND ALL THREE ANSWERED DIFFERENTLY ----------
+ *
+ * `Director.load` decides whether to GROUP an entry into one job of n or to
+ * split it into n singles; `Director.emit` decides whether a job of n goes
+ * out as a shape; `spawnFormation` rolls its own type out of a list. Until
+ * build 333 they read `!solo`, `!tows && !pair` and `!tows && !solo`
+ * respectively -- three sets for one question -- and the disagreement was
+ * not cosmetic. `emit` takes the whole job off the list with `shift()`, so a
+ * type it refuses to form up releases ONE body (or one pair) and **the
+ * remainder of the job is discarded**.
+ *
+ * Measured at rung 32, era 2, driving `load` then `emit` with the field held
+ * empty so nothing but the job list decides -- authored bodies against
+ * arrived bodies, for every band-5 wave that carries one of these types:
+ *
+ *     tow x2 + needle x3        1 of 96      loom x3 + lurcher x2   2 of 62
+ *     tow x1 + bulwark + mote   1 of 18      yoke x6 + glut x1      2 of 126
+ *     tow x1 + prism x2 ...     1 of 32
+ *     tow x2 + herald + mote    1 of 88      ...and every OTHER type in
+ *     tow x2 + splitter x2      1 of 76      those waves arrived in full
+ *     tow x3 + needle x2        1 of 50      (prism 32 of 32, glut 20 of 20)
+ *     tow x2 + glut x2 + mote   1 of 40
+ *
+ * So **1 to 3% of the authored TOW and pair bodies were reaching the field**
+ * in all nine of them, in the deepest authored band, with the wave's BUDGET
+ * priced for the whole ask -- `load` scales an entry's count until the
+ * wave's threat meets `budgetAt`, and `threatOf` counts a TOW's load and
+ * both halves of an unpooled pair, so the budget had bought bodies that
+ * `emit` then threw away. It does not cost a rung (no verdict goes down, and
+ * `cleared`'s denominator falls with the job), which is exactly why nothing
+ * noticed: it made band 5 quietly cheaper than its own prices.
+ *
+ * `formAt` is 3, so ANY real rung crosses it -- the fault needed no unusual
+ * wave, only a scaled one. Build 313 wrote this rule down while fixing
+ * `solo`: "skipping the formation falls through to ONE release and silently
+ * drops the other n-1 bodies... `load` is where the GROUPING decision is
+ * taken, so refusing to group there keeps the count: n singles instead."
+ * That is the fix, and the reason it is ONE function is that the same
+ * paragraph's other half -- two sites, one rule, and they cannot disagree --
+ * was the half that did not hold.
+ */
+export function formable(type) {
+  return !!type && !type.solo && !type.tows && !type.pair;
+}
+
 export function pairOf(type) {
   const n = type && type.pair;
   const id = type && type.id;
@@ -7502,7 +7653,7 @@ export function spawnFormation(world, kinds, count) {
    * caller that names the type (the director, the debug picker) goes through
    * load's half, and a caller that hands over a list goes through this one.
    */
-  const single = kinds.filter((k) => !k.tows && !k.solo);
+  const single = kinds.filter((k) => formable(k));
   const type = weightedPick(single.length ? single : kinds);
   const gap = type.r * 2.5 + 8;
   /*
@@ -8728,7 +8879,7 @@ export class Director {
        * The other half of the rule is in `spawnFormation`, which ROLLS its
        * own type from a list -- the same line that already drops TOWs.
        */
-      if (!wave.teach && !type.solo && n >= W.formAt) jobs.push({ type, n });
+      if (!wave.teach && formable(type) && n >= W.formAt) jobs.push({ type, n });
       else for (let i = 0; i < n; i++) jobs.push({ type, n: 1 });
     }
     this.asked = asked;
@@ -9317,8 +9468,18 @@ export class Director {
      * teaching.
      */
     const P = CFG.waves.press;
-    const done = this.jobsAt > 1 ? 1 - (this.jobs.length - 1) / (this.jobsAt - 1) : 1;
-    const press = teach ? 1 : P.open + (P.close - P.open) * clamp(done, 0, 1);
+    /*
+     * Clamped, because from build 333 a job can go BACK on the list: a
+     * formation that did not fit re-queues its remainder, so `jobs.length`
+     * can exceed the `jobsAt` captured at load and this term can go
+     * negative -- which would extrapolate the gap ramp past its own opening
+     * value rather than interpolating inside it.
+     */
+    const done = this.jobsAt > 1
+      ? clamp(1 - (this.jobs.length - 1) / (this.jobsAt - 1), 0, 1)
+      : 1;
+    // `done` is clamped where it is derived, so this is a plain interpolation.
+    const press = teach ? 1 : P.open + (P.close - P.open) * done;
     // OVERCLOCK halves the gap: the same wave, arriving at twice the rate.
     const squeeze = this.overclock.armed ? CFG.waves.tier.overclockGap : 1;
     /*
@@ -9398,10 +9559,50 @@ export class Director {
      * their count, and both were measured on the builds that shipped them;
      * neither is touched here.
      */
-    if (job.n > 1 && !t.tows && !t.pair) {
+    if (job.n > 1 && formable(t)) {
       const room = Math.min(job.n, CFG.maxEnemies - hostileCount(world));
-      if (room >= 2) { spawnFormation(world, [t], room); this.lastRelease = world.time || 0; return; }
+      if (room >= 2) {
+        spawnFormation(world, [t], room);
+        /*
+         * ...and WHAT DID NOT FIT GOES BACK ON THE LIST (build 333).
+         *
+         * The gate twenty lines above states this rule in as many words --
+         * "hold the job rather than dropping it: a wave is a group, and
+         * losing half of it to a cap the player is about to clear would make
+         * waves quietly inconsistent" -- and then this branch dropped
+         * `job.n - room` every time a scaled formation was larger than the
+         * headroom, because the job was already `shift`ed off the list.
+         * Measured at rung 32 on the band-5 wave `tow x1 + bulwark x1 +
+         * mote x4`, with the field held EMPTY so the headroom was at its most
+         * generous: the mote job asked 70 and 57 arrived, the cap exactly,
+         * and the other 13 were gone. In play the headroom is whatever the
+         * player has not yet cleared, so the loss is larger and varies with
+         * how well they are doing -- a wave quietly smaller the worse the
+         * field is, which is the opposite of what the cap is for.
+         *
+         * A rule written down is not a rule applied: this is the same
+         * sentence that gate keeps, one screen down, and the same shape as
+         * the refused-formation fall-through `formable` exists to close.
+         */
+        if (job.n > room) this.jobs.unshift({ ...job, n: job.n - room });
+        this.lastRelease = world.time || 0;
+        return;
+      }
     }
+    /*
+     * ...and so does the rest of a job that leaves ONE body at a time.
+     *
+     * Everything past here releases exactly one -- one body, one pair, one
+     * chain, one school -- so a job of n that reaches it owes the list n-1.
+     * That is where the nine band-5 waves were losing 97-99% of their TOW and
+     * pair bodies before `formable` stopped them being grouped at all, and it
+     * is still the path a formable type takes when the headroom is down to
+     * one. `unshift` rather than `push`, so the remainder of a job stays
+     * consecutive: `load` already splits a small count into n singles in the
+     * authored order, and interleaving here would make a wave arrive in a
+     * different order depending only on whether its count crossed `formAt`.
+     */
+    if (job.n > 1) this.jobs.unshift({ ...job, n: job.n - 1 });
     let x = rand(t.r + 12, world.width - t.r - 12);
     // Two SCIONs arriving on top of each other seed the same host twice and
     // read as one event rather than two decisions.

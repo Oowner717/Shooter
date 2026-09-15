@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '332';
+export const BUILD = '333';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '332';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '651c570';
+export const REV = '532c73a';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -782,6 +782,28 @@ export const CFG = {
     thinFrac: 0.25,
     // Three or more of one type in a regular wave arrive together in formation
     // rather than filing in. Tutorial waves never do — they always file in.
+    /*
+     * ---- ...AND CROSSING IT USED TO COST THE WAVE MOST OF ITSELF --------
+     *
+     * A count at or above this is GROUPED into one job; below it the entry
+     * becomes n singles. Three is low enough that any scaled count crosses
+     * it, so until build 333 every deep-rung wave was grouped -- and
+     * `Director.emit` takes the whole job off the list with `shift()`, so a
+     * type it refuses to form up released ONE body and a formation larger
+     * than the field's headroom released only what fit. Both dropped the
+     * rest. Measured at rung 32: 1 to 3% of the TOW and pair bodies arrived
+     * in the nine band-5 waves that carry them, and a mote job of 70 landed
+     * 57 with the field held empty. `formable` and the re-queue are the fix;
+     * the numbers and the reasoning are at `formable` in enemies.js.
+     *
+     * What it cost in play, measured after the fix -- the heaviest ordinary
+     * wave of each band, at that band's own middle rung, fully bought,
+     * against the 120s cap: band 1 5.0s (18 bodies), band 2 9.1s (15),
+     * band 3 9.6s (37), band 4 31.8s (60), band 5 46.2s (137), every body
+     * delivered and nothing left standing. Band 5's three pair and TOW waves
+     * at rungs 29/32/35 read 25.6-68.0s. So the ladder pays about twice the
+     * seconds it used to for its deepest waves and stays inside the cap.
+     */
     formAt: 3,
 
     /*
@@ -5267,7 +5289,30 @@ export const ENEMY_TYPES = [
      * It also gives the guide's "the first four seconds are free" for free
      * rather than as a fitted delay -- at `len` 56 the blocking span is 16
      * units of a 968-wide field, so it is the GROWTH that turns the pair into
-     * cover.
+     * cover. Measured in play rather than derived: on the band-5 wave at rung
+     * 32, era 2, through the real director, 38 pairs across three runs were
+     * released at a separation of 55.94 to 56.53 (mean 56.07-56.13) for a
+     * blocking span of 15.9 to 16.5. Build 332 read 55.9 to 79.0 (mean 61-62)
+     * and 15.9 to 39.0 there, because each half ran its own growth clock --
+     * see `pairOn`'s ONE CLOCK PER LINK note.
+     *
+     * ---- ...AND `span` ALSO SETS THE STANDOFF AT THE MACHINE -------------
+     *
+     * Both halves steer at the mount and the link is rigid, so a pair that
+     * survives its transit parks STRADDLING the machine at `span / 2` = 95 --
+     * against a grab distance of `r + s.r + grabPad` = 48. Measured over
+     * ninety seconds with nothing shooting: closest approach 71.2 and 84.9,
+     * settling at 99 / 91, **zero grip frames and `world.attackers` empty**,
+     * where a YOKE (half-link 30 against a grab of 54) grips on arrival and
+     * holds 4,142 frames of 5,400. So a LOOM never bills `impactDamage` and
+     * never feeds the contact half of the glitch fuse.
+     *
+     * That is in character -- a LOOM is a wall that costs rounds, and its
+     * wave pairs it with a LURCHER, which is the half that grips -- and it
+     * was SILENT, which is build 329's fault about the broadphase cell one
+     * field along. `check-build` prints the standoff beside the link now, so
+     * a `span` edit that hands this object a contact behaviour shows up in
+     * the line that authored it.
      */
     bond: {
       len: 56, // centre to centre at release -- 2.8r, barely wider than they are

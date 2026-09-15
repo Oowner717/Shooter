@@ -20,7 +20,7 @@ import { fx, updateFx, drawFx, drawFlash, settleScreen, spark, ring, ripple, sha
 import { background } from './background.js';
 import { glitch } from './glitch.js';
 import { audio } from './audio.js';
-import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts, drawRespawns, occluders, occluded } from './enemies.js';
+import { Director, spawnOne, release, spawnFormation, spawnDrift, spawnGroup, hostileCount, driftCount, applyBlast, solveTethers, collectData, drawIn, intakeRate, ENTRY_Y, dividend, updateGhosts, drawGhosts, drawRespawns, occluders, occluded, threadSpan, ownsLink } from './enemies.js';
 import { Shooter, Front } from './shooter.js';
 import { Abilities, wardStanding } from './abilities.js';
 import { updateProjectiles, drawProjectiles } from './projectiles.js';
@@ -4597,6 +4597,35 @@ export class Game {
         ctx.arc(e.x - ux, e.y - uy, th, a - Math.PI / 2, a + Math.PI / 2, true);
         ctx.arc(e.x + ux, e.y + uy, th, a + Math.PI / 2, a - Math.PI / 2, true);
         ctx.closePath();
+      }
+      /*
+       * ---- A THREAD, FOR THE SAME REASON THE CAPSULE IS HERE -------------
+       *
+       * From build 332 a LOOM's pair strings one between them and a round
+       * that meets it STOPS -- the first thing in this game that does that
+       * anywhere but at the edges of the field, and the only hit boundary
+       * that is not attached to a body at all. So this overlay could not
+       * show it, which is the third time: build 315 had to teach it
+       * SPINDLE's capsule and 319 FLINT's arc, and both of those notes say
+       * in as many words that this is the only place the hit profile can be
+       * SEEN. A boundary the debug overlay cannot draw is a boundary nobody
+       * can check against what a round actually did.
+       *
+       * Drawn from `threadSpan`, which is the same function the sweep tests
+       * against -- so the picture cannot drift from the rule, which is the
+       * correction build 319 made to `drawFlint`'s arcs -- and once per pair
+       * via `ownsLink`, because this is one path with one stroke and a
+       * subpath laid twice is drawn at twice the alpha.
+       */
+      if (e.beam && e.type.bond && e.type.bond.stops && !e.isDrop && ownsLink(e)) {
+        const sp = threadSpan(e);
+        if (sp) {
+          const a = Math.atan2(sp.by - sp.ay, sp.bx - sp.ax);
+          ctx.moveTo(sp.ax + Math.cos(a - Math.PI / 2) * sp.r, sp.ay + Math.sin(a - Math.PI / 2) * sp.r);
+          ctx.arc(sp.ax, sp.ay, sp.r, a - Math.PI / 2, a + Math.PI / 2, true);
+          ctx.arc(sp.bx, sp.by, sp.r, a + Math.PI / 2, a - Math.PI / 2, true);
+          ctx.closePath();
+        }
       }
       ctx.moveTo(e.x + e.r, e.y);
       ctx.arc(e.x, e.y, e.r, 0, TAU);

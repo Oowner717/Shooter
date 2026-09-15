@@ -6620,3 +6620,220 @@ came from before believing the other one covers it.
   while the rounds meant for it stop on the thread. A heavy partner would just
   be a second wall, and the two-or-three-type rule exists because the problem
   is meant to be a combination.
+
+- **BUILD 333 IS A REVIEW OF THE BUILD BEFORE IT, AND THE BIGGEST THING IT
+  FOUND WAS NOT IN THE DIFF: NINE BAND-5 WAVES HAD BEEN DELIVERING 1-3% OF
+  THEIR AUTHORED TOW AND PAIR BODIES.** `Director.emit` takes the whole job
+  off the list with `shift()`, and two paths past that point release less than
+  the job asked for and drop the rest:
+  - a type it REFUSES to form up (`tows`, `pair`) fell through to one release
+  - a formation LARGER than the field's headroom released `room` and returned
+  Measured at rung 32, era 2, driving `load` then `emit` with the field held
+  empty so nothing but the job list decides -- authored bodies against arrived:
+  **tow+needle 1 of 96 · tow+bulwark+mote 1 of 18 · tow+prism+needle 1 of 32 ·
+  tow+herald+mote 1 of 88 · tow+splitter 1 of 76 · tow+needle 1 of 50 ·
+  tow+glut+mote 1 of 40 · yoke+glut 2 of 126 · loom+lurcher 2 of 62**, while
+  every OTHER type in those waves arrived in full (prism 32 of 32, glut 20 of
+  20). The mote job of the one wave that carries both faults read 57 of 70 --
+  the field cap exactly, with the other 13 gone.
+- **IT COST NOTHING VISIBLE, WHICH IS WHY IT LASTED.** No verdict goes down
+  (`score`'s three are surge/clean/stall and the glitch timer is the only way
+  down), and `cleared()`'s denominator counts what is still QUEUED -- so the
+  denominator fell with the dropped job and the bar read fine. The only symptom
+  was that band 5, the deepest authored band, was quietly cheaper than its own
+  prices: `load` scales an entry until the wave's threat meets `budgetAt`, and
+  `threatOf` counts a TOW's load and both halves of an unpooled pair, so the
+  budget had bought bodies `emit` then threw away. **A fault with no failing
+  signal needs somebody to ask the door what came out of it**, and what made me
+  ask was noticing that build 332 never measured its own wave's CLEAR -- the
+  arm build 330 called "the one most worth having".
+- **THE FIX IS ONE PREDICATE AND ONE RE-QUEUE, AND BUILD 313 HAD ALREADY
+  WRITTEN BOTH HALVES DOWN.** Three sites decided whether a count may arrive as
+  a shape and all three answered differently: `!solo` in `Director.load`,
+  `!tows && !pair` in `emit`, `!tows && !solo` in `spawnFormation` -- so a pair
+  was grouped by the first and refused by the second, and `spawnFormation`'s own
+  filter had never heard of a pair at all. `formable(type)` is the one function
+  now and all three read it. And the partial formation re-queues its remainder,
+  which is the rule the gate TWENTY LINES ABOVE IT states in as many words:
+  "hold the job rather than dropping it: a wave is a group, and losing half of
+  it to a cap the player is about to clear would make waves quietly
+  inconsistent." **A rule written down is not a rule applied** -- that gate
+  keeps it, and the branch one screen down broke it.
+- **A JOB THAT CAN GO BACK ON THE LIST BREAKS AN ARITHMETIC THAT ASSUMED IT
+  COULD NOT.** `press`'s progress term is `1 - (jobs.length - 1) / (jobsAt -
+  1)` off the count captured at `load`, and a re-queue can make `jobs.length`
+  exceed `jobsAt` -- which sends `done` negative and extrapolates the gap ramp
+  past its own opening value instead of interpolating inside it. Clamped.
+  **Anything that makes a monotone quantity non-monotone owes every reader of
+  it a re-read**, which is the same shape as build 301's closed seam breaking a
+  case whose window was shorter than the old gap.
+- **THE PRICE IS MEASURED AND THE LADDER STAYS INSIDE ITS CAP.** Heaviest
+  ordinary wave of each band, at that band's own middle rung, fully bought,
+  everything delivered, nothing left standing: **band 1 5.0s (18 bodies) ·
+  band 2 9.1s (15) · band 3 9.6s (37) · band 4 31.8s (60) · band 5 46.2s
+  (137)** against the 120s cap, and band 5's three pair/TOW waves at rungs
+  29/32/35 read 25.6 to 68.0s. Before the fix the same band-5 waves cleared in
+  17.6-41.2s, so the deepest waves now cost about twice the seconds -- which is
+  the budget being delivered rather than a nerf, and it is recorded here
+  because build 306 already owns the sentence about band 5 and the cap.
+- **THE GUARD IS ON THE THREE SITES STILL READING ONE FUNCTION, not on a
+  value.** `check-build` finds each site by its own source line and fails the
+  build if it tests anything but `formable(` -- build 314's idiom, which read
+  the multiplicity list out of `release`'s own source rather than keeping a
+  list beside it. **Proved able to fail**: reverting `emit`'s site to
+  `!t.tows && !t.pair` in a copy of the tree exits 1 with
+  "Director.emit forms up tests `!t.tows && !t.pair` instead of calling
+  formable()". A fourth multiplicity field is then one edit rather than three
+  that can be made two at a time.
+- **...AND THE CASE ASKS THE DIRECTOR FOR EVERY WAVE, WHICH IS WHAT CAUGHT THE
+  SECOND DROP.** Its first version asked only the waves carrying a type that
+  cannot form up -- and it caught the partial-formation drop BY ACCIDENT,
+  through the one TOW wave that also carries a mote job of 70 against a cap of
+  57. Widened to all 41 ordinary waves it reads 41 of 41 delivering every body
+  they asked for, worst ask 304, and it costs 3.3 seconds because it drives
+  `load` and `emit` with the field cleared rather than playing anything.
+  **A guard scoped to where you found the fault will only find that fault**;
+  the vacuity terms are the roster's own (there are types that cannot form up,
+  waves that carry them, and 27 of 41 asks larger than the field cap).
+- **STASIS HELD A LOOM'S ROTATION AND NOT ITS THREAD, WHICH IS BUILD 319'S
+  `Enemy.face` FAULT IN CODE ONE DAY OLD.** The growth clock sat one line
+  ABOVE `const slow = this.frozen(world) ? 0.12 : 1`. Measured over six
+  seconds of a pinned field, with the unheld run as the control: the rotation
+  delivered **0.031 rad/s against 0.288 free** -- the factor working -- and the
+  thread widened **57.4 units either way, to the tenth**, 30% of its whole
+  span, while the body was to all appearances stopped. The one press a player
+  has against this object did not touch the only thing it does. `dt * slow`,
+  and the arm asserts the growth is held by THE SAME factor as the rotation
+  rather than quoting 0.12 -- which is written out in five places in
+  enemies.js with no `CFG.stasis` to read it from, so a sixth copy in the
+  suite would be the hand-kept-list shape. Measured after: 0.120 against
+  0.128, one factor, both mechanisms.
+- **`drawHitboxes` COULD NOT SHOW THE ONE THING IN THE GAME THAT STOPS A ROUND
+  MID-FIELD, AND THAT IS THE THIRD TIME.** Build 315 had to teach that overlay
+  SPINDLE's capsule and 319 FLINT's arc, and both notes say in as many words
+  that it is the only place the hit profile can be SEEN -- then 332 added a hit
+  boundary that is not attached to a body at all and did not teach it. It draws
+  the thread from `threadSpan`, the same function the sweep tests against, so
+  the picture cannot drift from the rule (319's correction to `drawFlint`'s
+  arcs). Measured: **484 overlay pixels along the thread with the link up
+  against 0 without it**, in a band 4 units either side of the axis against a
+  thread radius of 3 -- what is drawn is the width a round has to miss.
+- **THE ROTATION RATE WAS UNASSERTED, AND MEASURING IT IS HOW I FOUND THE REST
+  OF THIS BUILD.** YOKE's case has had an arm on its delivered rate since 316
+  ("the case is on the delivered rate, never on the expression that asks for
+  it") and LOOM shipped without one, on a gait whose ask SCALES with a
+  separation that grows 3.4x over the body's life. It is fine -- **0.281 to
+  0.316 rad/s across four separation bins against an authored 0.3**, against
+  0.189 for the same blend uncompensated -- and the arm now says so with the
+  uncompensated figure as its discriminator. The probe that measured it is what
+  turned up the crossing (31.9s at era 1, 52.3s at era 2, closing 21-22 u/s)
+  and then the clear, and the clear is what turned up the drop.
+- **RECORDED, NOT FIXED: a LOOM at a side wall is squeezed to 55% of its
+  span.** `edgeEase` pushes anything within 96 units of an edge back at 300
+  u/s^2 and the rigid link gives way: measured, a pair forced to its full 190
+  and released at `r + 24` from the wall settled at **104.6**, so the blocking
+  span there is 65 units rather than 150, with no damage and no jitter (the
+  link's length held between 104.6 and 190 and neither half died). The wall
+  rule winning is the documented precedence -- `edgeEase`'s own docstring is
+  about exactly this -- and in a real wave it costs nothing: over the whole
+  band-5 wave at three rungs the mean separation read 115-150 with a max of
+  190, so the pair reaches its full width where it matters.
+- **THE TETHERED TRAIT SHARED HEALTH ACROSS ANY TETHER IN THE GAME, AND A TOW
+  WAS BEING HEALED BY IT.** The trait's block in
+  `spawnGroup` strings two unpaired bodies together and `applyDamage` then
+  poured one half's `hp` onto whatever `this.tether.other` happened to be --
+  and `tether` is written by THREE things, only one of which is a health pool.
+  Measured with the trait rolled: a TOW's head hit for 50 wrote its health
+  onto the MASS it drags, taking the mass from **126 to 254** (it is the
+  heavier half, so the assignment is a heal), and a LOOM pair became ONE pool
+  -- hit one half for 50 and the other read the same, which is the difference
+  between the two pair types collapsed by a wave rule. The fix is one field:
+  the trait marks its OWN link `shared: true` and the share tests it, so
+  `spawnTow`'s cable and `spawnPair`'s beam are untouched. YOKE still shares,
+  through `bond.pool` in `pairOn`, which is where a pool belongs.
+  **A field read for what it IMPLIES rather than for what it SAYS** is build
+  234's `harmless` lesson (borrowed for a side effect) from the other side: a
+  tether says two bodies are joined, not that they are one body.
+- **ONE CLOCK PER LINK, AND `staged` IS PER BODY.** `pairOn`'s docstring said
+  a pair queued in the throat "arrives at its authored `len` however long the
+  mouth held it" because `drive` refuses the method for a `staged` body. It
+  does not: `staged` clears per HALF, so the half born first ran the growth
+  clock while its partner was still marching, and each half wrote its own
+  `tether.len`. `solveTethers` reads whichever half is currently LEFTMOST and
+  a rotating pair swaps that twice a revolution, so the constraint's target
+  flipped between two diverging numbers. Measured on the real wave at rung 32,
+  era 2, three runs: the halves clear `staged` up to **147 frames** apart, and
+  the separation on the frame both are loose read **55.9 to 79.0, mean 61-62,
+  worst +41%** -- so the blocking span the whole object opens with ("16 units
+  at `len` 56", quoted in three places) measured **15.9 to 39.0, up to 2.4x**.
+  `Math.min(this.bondT, o.bondT)` is the pair's age since the LATER half came
+  loose: symmetric, monotone, and the honest reading. Re-measured the same
+  way: **55.94 to 56.53, mean 56.07-56.13**, blocking 15.9 to 16.5.
+- **...AND `e.staged = true` FROM OUTSIDE IS NOT A HOLD, WHICH COST THE ARM
+  TWO ATTEMPTS.** `Enemy.update` clears the flag inside the same `g.update`
+  that a probe sets it in -- on the frame `y - r` passes `entryLine` -- and
+  `drive`, where `pairOn` is called from, runs AFTER it in `physicsStep`. So
+  re-asserting it before every step held it for **0 of 60 frames** and both
+  clocks read 3.000: no stagger at all, on a build where the mechanism works.
+  What produces one is the geometry the throat produces -- the pair STRADDLES
+  the entry line, lower half born and upper half still marching -- which is
+  held by the line itself and needs nothing to fight. 71 to 92 frames of
+  stagger, and reverted to a per-body clock the two records read **132.57 and
+  117.90**, 14.7 units apart. **A flag with one writer cannot be driven from
+  outside it; arrange the state that writer is about.**
+- **A CASE WHOSE EVERY ARM WRITES `staged = false` ON BOTH HALVES IN ONE
+  STATEMENT IS A CASE THAT CANNOT SEE A PER-BODY CLOCK.** Build 332's growth
+  arm read the ramp as 0.19% out while the figure was 41% out in play, because
+  the one arrangement a per-body clock is right for is the one the case set
+  up. The general shape: **a setup that normalises the very asymmetry the
+  mechanism is about measures the symmetric case and reports it as the
+  mechanism.** The two records now differ by one SUBSTEP of the ramp (0.08 of
+  the 0.16 a frame is worth, because the halves run in series and the second
+  one's `min` has already seen the first one's increment) -- a bounded lag,
+  asserted off the ramp rather than off the day's value.
+- **`span` ALSO SETS THE STANDOFF AT THE MACHINE, AND THAT WAS SILENT.** Both
+  halves steer at the mount and the link is rigid, so a pair that survives its
+  transit parks STRADDLING the machine at `span / 2` = 95 -- against a grab
+  distance of `r + s.r + grabPad` = 48. Measured over ninety seconds with
+  nothing shooting: closest approach 71.2 and 84.9, settling at 99 / 91, **zero
+  grip frames and `world.attackers` empty**, where a YOKE (half-link 30
+  against a grab of 54) grips on arrival and holds 4,142 frames of 5,400. So a
+  LOOM never bills `impactDamage` and never feeds the contact half of the
+  glitch fuse. Both behaviours are defensible -- a LOOM is a wall that costs
+  rounds, and its wave pairs it with a LURCHER, which is the half that grips --
+  so this is build 329's broadphase cell one field along: **the coupling is
+  correct and the silence was the fault, and the fix for a silent correct
+  change is a pin, not a revert.** `check-build` prints the standoff and which
+  side of the grab band each pair sits on, deliberately without refusing
+  either, because which side is a design decision.
+- **TWO OF THE NEW PAIR GUARD'S THREE CLAUSES COULD NOT FAIL.** `pairOf`
+  throws unless `bond.len > 2r` (which IS "the insets leave a thread") and
+  unless `bond.span > bond.len` (which IS "growing widens it"), and
+  `check-build` builds its pair list BY CALLING `pairOf` -- so a type that
+  broke either never reached the loop. Gone, with the reason at the site:
+  a clause that is counted and cannot fail is worse than a missing one. What
+  is left is the arithmetic nobody else does, that a thread `2 * stops` thick
+  fits between the insets at `len`, which is the narrowest the link ever is.
+- **AND THE GLOSSARY DREW ONE TYPE'S ICON FROM ANOTHER TYPE'S BLOCK.**
+  `case 'yoke': drawYoke(..., TYPE_BY_ID.yoke.bond.len / 2)` inside
+  `drawSpecimen`, whose switch already has the type in scope as `t`. Latent
+  today because one type declares `shape: 'yoke'` -- and it is the exact fault
+  this build spent itself on (a number about the BODY read from a shared
+  place), one draw call along, written by the build that moved the block.
+- **THE HASH WAS RUN AND DID NOT MOVE -- `-1334607133` EITHER SIDE, both
+  readings taken in this container with 332 served from a worktree on :8097.**
+  It is not the instrument for the WAVE half of this build and that is
+  structural rather than a shrug: `fight.mjs` opens from `openBoss` and
+  `Game.update` is `if (w.boss) {...} else { director.update() }`, so the
+  director never releases and the engine is invisible to it -- builds 300,
+  301, 307 and 318 all recorded that, and 318 corrected the one reading that
+  had claimed otherwise. What it IS the instrument for is the tether share,
+  because that is a new condition on `applyDamage`, which is the door every
+  hit in a boss fight comes through. No boss module writes a `tether`, so the
+  narrowing is unreachable there by structure -- and build 329's lesson is
+  that an argument from inspection is exactly what this repo does not accept.
+  An unchanged hash is what "a change on the damage path provably did not
+  reach anything already using it" looks like measured, which is the same
+  claim build 332 made about `resolveSegment` and 315 about the capsule.
+  The instruments with something to say about the rest are the census (asked
+  against arrived, per wave) and the clear table, and both are above.
