@@ -8540,6 +8540,15 @@ came from before believing the other one covers it.
   that command happened to `cd` first.
   **The invocation that actually serves a worktree is
   `cd <worktree> && http-server -p N -c-1 --silent` with NO path.**
+  **And the way to find and stop one is `/proc`, not `ps`.** Because the
+  cmdline is empty, no pattern match reaches these processes -- which is the
+  same family as `pgrep -f` matching its own shell, from the other side: there
+  the pattern matched too much, here it matches nothing. What works, and what
+  cleared seven strays while leaving the live server up:
+  `for pid in $(pgrep -x http-server); do readlink /proc/$pid/cwd; done` to
+  see which tree each one is serving, then `kill` the ones whose cwd is not
+  the one you want. A dead worktree shows as `cwd=/tmp/xxx (deleted)`, which
+  is itself the tell that a server outlived the directory it was serving.
 - **SO THE CHAIN OF WRONG CONCLUSIONS RAN: right prediction, wrong
   refutation, wrong instrument story -- and the prediction was right all
   along.** 343 predicted the hash would move and named the channel in advance
