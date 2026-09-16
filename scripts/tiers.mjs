@@ -66,7 +66,7 @@ import { WAVES, ENEMY_TYPES, CFG, kB, fmtBytes, fmtRate } from '../src/config.js
 import { NODES, priceOf } from '../src/tree.js';
 
 const require = createRequire(import.meta.url);
-import { checkServed } from './served.mjs';
+import { checkServed, requireWorld } from './served.mjs';
 const { chromium } = require('playwright');
 
 const args = process.argv.slice(2);
@@ -285,6 +285,14 @@ for (let r = 0; r < RUNS; r++) {
   });
   await page.goto(URL, { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.__sim);
+  // What this probe's figures are read off. `served.mjs` refuses a served
+  // tree that lacks any of them: the purse is declared because it HAS been
+  // renamed (world.energy -> world.bytes at build 286), which is what made
+  // phase 5's build-283 column a table of a tree it never read.
+  {
+    const { abort } = await requireWorld(page, ['bytes'], 'tiers.mjs');
+    if (abort) { await browser.close(); process.exit(1); }
+  }
   await page.evaluate(() => { document.getElementById('startBtn').click(); });
 
   for (const tier of tiers) {

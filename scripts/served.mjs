@@ -85,3 +85,52 @@ export const checkServed = async (base, expect, who) => {
   }
   return { abort: false, served };
 };
+
+/*
+ * ...AND WHICH TREE IT READ IS NOT THE SAME QUESTION AS WHETHER IT CAN READ
+ * IT.
+ *
+ * Build 346. `checkServed` above answers "is this the commit I meant to
+ * serve". It says nothing about whether the probe's own field names exist on
+ * that commit -- and a `--url` differential reaches back tens of builds, so a
+ * rename in between makes the probe write a dead property and read
+ * `undefined`, silently, on exactly the side it was pointed at deliberately.
+ *
+ * Proved rather than argued, on the one differential that had it. Phase 5 of
+ * the byte migration ran `tiers.mjs` against build 283 and 287 and reported
+ * `buys` identical at all twenty tiers. The probe funds a tier with ONE line,
+ * `w.bytes = spend` -- and build 286 renamed `world.energy` to `world.bytes`,
+ * so build 283's `Game.buy` reads `w.energy` and that write lands on a
+ * property nothing consults. Measured, the phase-5 probe against a correctly
+ * served 283: **buys 0, 0, 0 at tiers 1-3 and pay 0 B**, against a recorded
+ * 1, 2, 3 and "pay is x1000". So that reading was not of build 283's tree,
+ * which is a positive demonstration where build 344 could only say a no-move
+ * result is indistinguishable from a stale serve.
+ *
+ * The check has to run IN THE PAGE, because a world is the only thing that
+ * can answer it -- and it cannot be DERIVED from the probe's source, which is
+ * the thing tried first: `w` is the WINDOW in `w.requestAnimationFrame` and
+ * the WORLD in `w.bytes`, in the same file, so a harvest of `w.X` collects
+ * both and can refuse for a field the world was never meant to have. So the
+ * probe DECLARES what its numbers depend on, which is a claim rather than a
+ * restatement -- and what is derived is who has to make it: any probe whose
+ * source touches the purse must call this, which `check-build.mjs` holds.
+ */
+export const requireWorld = async (page, fields, who) => {
+  const missing = await page.evaluate((names) => {
+    const w = window.__sim && window.__sim.world;
+    if (!w) return names.slice();
+    return names.filter((n) => !(n in w));
+  }, fields);
+  if (missing.length) {
+    console.error(`\n${who}: the served tree has no world.${missing.join(', world.')} `
+      + `-- every figure this probe derives from ${missing.length > 1 ? 'those fields' : 'that field'} `
+      + `would be read off \`undefined\`, so the run is refused rather than printed. `
+      + `A --url differential reaching back far enough crosses a rename: `
+      + `world.energy became world.bytes at build 286, which is how phase 5's `
+      + `build-283 column came to report a tree it had never read.`);
+    return { abort: true, missing };
+  }
+  console.log(`  world has ${fields.map((f) => `.${f}`).join(' ')}`);
+  return { abort: false, missing };
+};

@@ -2224,9 +2224,15 @@ came from before believing the other one covers it.
   recorded tables in `docs/pacing.md` are from another container and are not
   comparable, the same rule the ORDINAL hash already carries. What it proved is
   the thing the hash cannot see: the hash is one fight at tier 1 with no tree,
-  and the ladder's AFFORDABILITY is a different claim. `buys` identical at all
-  twenty rungs, and the tier-20 loadout identical to the id, is what "the same
-  purchases are still affordable at the same tiers" looks like measured.
+  and the ladder's AFFORDABILITY is a different claim. **IT PROVED NOTHING AND
+  THE READING IS STRUCK -- see build 346.** It reported `buys` identical at all
+  twenty rungs and the tier-20 loadout identical to the id; the probe funds a
+  tier with the one line `w.bytes = spend`, build 286 renamed `world.energy` to
+  `world.bytes`, and 283's `Game.buy` therefore reads a field that write never
+  touches. Measured on a correctly served 283, that same probe reads **buys 0
+  at every tier and pay 0 B**, so the 283 column was a table of `undefined`.
+  What survives is the first half of the paragraph: a differential DOES need
+  both builds in one container, and `--url` is still how.
 - **A column width is a unit-bearing constant too.** `tiers.mjs` padded `spend`
   to 9 characters and `pay` to 6, both sized for point-magnitude figures, so at
   byte magnitudes the band ran into the spend and the pay into the pay/s --
@@ -8718,6 +8724,12 @@ came from before believing the other one covers it.
   twenty-rung runs, against a claim that is about affordability rather than
   about physics. Flagged rather than spent, which is the rule about a request
   that will blow the budget.
+  **BOTH SENTENCES WERE WRONG AND BUILD 346 SETTLED IT.** It is not
+  "indistinguishable from a stale serve" -- it is positively PROVED to have
+  been one, from git alone before anything was run. And re-taking it is not
+  mechanical: the probe cannot read a pre-286 purse at all, so the reading is
+  void rather than pending. The debt is closed by striking the claim, not by
+  spending two twenty-rung runs on it.
 - **THE CURRENT ORDINAL FIGURE IS `-954811922`, and build 340's note saying
   `1664149562` "is the number to compare against from build 340 on" went
   stale three builds later.** That number was right for 340 through 342 and
@@ -8730,3 +8742,100 @@ came from before believing the other one covers it.
   probe rather than to clear a change -- and it is build 329's rule arriving
   on this file's own prose: a derived number quoted in a note is a copy, and
   when it moves, grep for who was quoting it.
+
+- **BUILD 346 CLOSES 345'S DEBT BY DISPROVING THE CLAIM RATHER THAN
+  RE-TAKING IT, AND THE PROOF COST NOTHING BUT `git show`.** Build 344's tell
+  was that a `--url` differential reporting NO MOVE cannot be told apart from
+  a stale serve. For build 287's phase-5 `tiers.mjs` reading it is stronger
+  than that: **the 283 column is positively impossible.** The probe funds each
+  tier with ONE line -- `0bb3cfa:scripts/tiers.mjs:292`, `w.bytes = spend` --
+  and build 286 renamed `world.energy` to `world.bytes`, so
+  `1fab593:src/game.js` has `const purse = ... : w.energy;` where
+  `8bacf56` has `: w.bytes;`. On 283's tree that write lands on a property
+  `buy()` never consults, the purse stays where `reset()` left it, and every
+  purchase is refused for lack of funds. The record says `buys` 1, 2, 3, 5, 5,
+  8, 12, 16, 25, 33, 15, 24, 38, 58, 82, 111, 141... on BOTH sides.
+  **Then measured rather than argued, which is build 329's rule.** That exact
+  probe (`0bb3cfa`, the commit that ran the differential, with its own local
+  `src/` so its prices match) against a 283 served the correct way: **buys 0,
+  0, 0 at tiers 1-3, dps flat at 86 -- the stock gun -- and pay 0 B**. What
+  that PROVES is that the column labelled 283 was not build 283's tree; that
+  it was specifically the live tree is the inference on top, from build 344's
+  finding that this container's `http-server` serves its own CWD. Either way
+  "the same purchases are still affordable at the same tiers" was never
+  measured. It is struck in place in
+  the 287 block above rather than deleted, because the paragraph's first half
+  (a differential needs both builds in one container) is still right.
+- **`--expect` ANSWERS "WHICH TREE" AND NOT "CAN THE PROBE READ IT", AND THAT
+  IS A SECOND, INDEPENDENT HOLE.** Build 345 shipped the first; this is the
+  one that actually bit 287. A `--url` differential reaches back tens of
+  builds and crosses renames, and the failure is SILENT in the worst way --
+  a write to a dead property and a read of `undefined`, on exactly the side
+  that was pointed there deliberately. `requireWorld(page, ['bytes'], who)`
+  in `served.mjs` refuses a served tree that lacks a field the probe's
+  figures come off. Proved in both directions on all six callers: pointed at
+  283 each one refuses at boot, names itself and explains the rename;
+  pointed at the shipping tree each prints `world has .bytes` and proceeds.
+- **AND IT TURNED A CONFUSING LATE THROW INTO A NAMED EARLY REFUSAL, which is
+  worth more than the refusal itself.** Before the check, the CURRENT
+  `tiers.mjs` against 283 died 200 lines into the measurement with
+  `TypeError: threatOfWave is not a function` -- a function build 301 added,
+  eighteen builds after 283. So the current probe cannot run against that
+  tree at all, and it says so loudly by luck; the purse fault in the same run
+  would have been silent. **A probe reaching back far enough is reading an
+  API as well as a tree**, and the loud failure and the silent one live one
+  line apart.
+- **A THIRD HOLE, RECORDED AND NOT CLOSED: the probes import the LOCAL tree
+  while driving the SERVED game.** `tiers.mjs:65-66` imports `WAVES`,
+  `ENEMY_TYPES`, `CFG`, `kB`, `fmtBytes`, `NODES` and `priceOf` from
+  `../src/`, so under `--url` the price table, the wave roster, the type
+  roster and every config number are HEAD's and only the GAME is the old
+  build. For a differential across a PRICE or CURRENCY change -- which is
+  exactly what phase 5 was -- both sides therefore share one price table.
+  That is a third reason the 287 reading could not have been about 283's
+  economy, and closing it means fetching the served module graph rather than
+  importing it, which is its own piece of work.
+- **THE DETECTION IS DERIVED AND THE LIST IS DECLARED, because `w` names two
+  different objects in one file.** Harvesting the fields from the probe's own
+  source was tried first and cannot work: `w.requestAnimationFrame` is the
+  WINDOW and `w.bytes` is the WORLD, in the same file, so a harvest collects
+  both and would refuse for fields the world was never meant to have. So each
+  probe DECLARES what its numbers depend on -- a claim, which this repo
+  accepts when stated at the site -- and what is derived is WHO has to make
+  it: any probe that reads the purse AND can be aimed at a caller-chosen
+  base. `check-build` holds that, with five revert proofs plus the vacuity
+  arm.
+- **...AND THE FIRST DETECTION NAMED A SYMPTOM, WHICH ITS OWN FIRST RUN
+  SHOWED.** It asked only "does this read the purse" and failed the build for
+  `regress.mjs` and `ladder-probe.mjs`. Both DO read it -- and both can be
+  aimed elsewhere too (`--port`, and a positional `baseUrl` at `argv[5]`), so
+  they share the exposure and are WIRED rather than excused, which took the
+  guard from four probes to six. What is not exposed is a purse-reading probe
+  against a hard-coded server, and there is none. **A guard's detection has
+  to name the exposure, not a symptom of it** -- the exposure is being
+  aimable at a tree that might not have the field.
+- **`contact.mjs` IS OUT BY A FACT ABOUT ITSELF RATHER THAN BY AN
+  EXEMPTION.** It takes `--url` and touches no currency at all, so the
+  conjunction excludes it with nothing written down -- and build 345's
+  opposite ruling still holds for the `--expect` check, which it DOES get,
+  because there the detection is `flag('url'` and over-coverage is cheap.
+  Two guards, two detections, each matching its own exposure.
+- **BUILD 345'S OWN GUARD FIRED WITH A FALSE MESSAGE, AND THAT IS THE COST OF
+  PINNING A LINE INSTEAD OF A FACT.** It tested
+  `/import \{ checkServed \} from '\.\/served\.mjs'/` -- the whole statement
+  -- so adding `requireWorld` to the same import failed the build for four
+  probes with "does not import checkServed" **while they did**. Loosened to
+  match inside the braces. A guard that fires for the wrong reason is worse
+  than one that does not fire: the message sends the next reader at the wrong
+  file.
+- **AND MY OWN INSERTION PUT THE NEW GUARD INSIDE A LOOP BODY THAT NEVER
+  RUNS, caught because the REVERT PROOF'S BASELINE printed nothing.** The
+  anchor string `skip a flag's value`);` occurs twice -- once in a
+  `posBad.push(...)` inside the `for`, once in the block's closing
+  `console.log` -- and the first match is the one inside the loop. So fifty-nine
+  lines of guard sat in an `else if` arm that only runs when a probe already
+  fails, `node --check` passed, `check-build` exited 0, and all five revert
+  proofs read EMPTY. **A revert proof whose baseline prints nothing has not
+  measured the revert; it has measured a guard that is not running** -- so
+  print the baseline first and read it, which is the same rule as a zero from
+  an instrument never shown to read a one.

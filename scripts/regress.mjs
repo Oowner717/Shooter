@@ -51,6 +51,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
+import { requireWorld } from './served.mjs';
 
 const argPort = process.argv.indexOf('--port');
 const PORT = argPort > 0 ? process.argv[argPort + 1] : '8099';
@@ -71,6 +72,14 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.
 
 await page.goto(BASE, { waitUntil: 'load' });
 await page.waitForTimeout(900);
+// What this suite's figures are read off. A tree served at a base URL the
+// caller chose may not have them: world.energy became world.bytes at build
+// 286, and phase 5's build-283 column was a table of `undefined` because of
+// it. `served.mjs` carries the whole finding.
+{
+  const { abort } = await requireWorld(page, ['bytes'], 'regress.mjs');
+  if (abort) { await browser.close(); process.exit(1); }
+}
 
 // --- the title screen, before anything presses it ----------------------------
 /*

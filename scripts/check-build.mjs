@@ -859,7 +859,12 @@ if (!urlProbes.length) {
 const probeBad = [];
 for (const f of urlProbes) {
   const s = readFileSync(new URL(f, probeDir), 'utf8');
-  if (!/import \{ checkServed \} from '\.\/served\.mjs'/.test(s)) {
+  // Matched inside the braces rather than as a whole statement: build 346 added
+  // `requireWorld` to the same import and this guard failed the build for four
+  // probes that DO import checkServed, with a message saying they do not. A
+  // guard pinned to an exact line reports the wrong fault the first time a
+  // second name joins it.
+  if (!/import \{[^}]*\bcheckServed\b[^}]*\} from '\.\/served\.mjs'/.test(s)) {
     probeBad.push(`${f} takes --url and does not import checkServed`);
   } else if (!/await checkServed\(/.test(s)) {
     probeBad.push(`${f} imports checkServed and never calls it`);
@@ -924,6 +929,7 @@ for (const [f, s] of posProbes) {
       + 'build 340\'s fault, which made every hash that probe printed a different fight');
   } else if (!/if \(i > 0 && \/\^--\/\.test\((?:args|argv)\[i - 1\]\)\) continue;/.test(s)) {
     posBad.push(`${f} reads a bare-number positional and does not skip a flag's value`);
+
   }
 }
 if (posBad.length) {
@@ -932,6 +938,82 @@ if (posBad.length) {
 }
 console.log(`positional: all ${posProbes.length} probe(s) with a bare-number positional `
   + `(${posProbes.map(([f]) => f).join(' ')}) skip a flag's value`);
+/*
+ * ---- AND THE PROBE HAS TO BE ABLE TO READ THE TREE IT WAS POINTED AT ----
+ *
+ * Build 346, and it is the hole `--expect` does NOT close. That flag answers
+ * "is this the commit I meant to serve"; it says nothing about whether the
+ * probe's own field names exist on that commit. A `--url` differential
+ * reaching back tens of builds crosses renames, and the failure is silent --
+ * a write to a dead property and a read of `undefined`, on exactly the side
+ * that was pointed there deliberately.
+ *
+ * Demonstrated, not supposed. Phase 5 of the byte migration reported `buys`
+ * identical at all twenty tiers across builds 283 and 287; the probe funds a
+ * tier with the single line `w.bytes = spend`, and build 286 renamed
+ * `world.energy` to `world.bytes`, so 283's `Game.buy` reads a field that
+ * write never touched. Measured on a correctly served 283, that probe reads
+ * buys 0 / 0 / 0 and pay 0 B where the record says 1 / 2 / 3 -- so the claim
+ * was of a tree it had never read, and it is struck rather than re-taken.
+ *
+ * WHO has to declare is DERIVED and the LIST is declared, which is the one
+ * split available here: `w` is the WINDOW in `w.requestAnimationFrame` and
+ * the WORLD in `w.bytes`, in the same file, so harvesting `w.X` cannot tell
+ * a world field from a global and would refuse for fields the world never
+ * had. The purse is the detection instead -- a probe that touches it is a
+ * probe whose figures come off it -- and `contact.mjs` is outside this guard
+ * by not touching the purse, which is a fact about that probe rather than an
+ * exemption somebody wrote down.
+ */
+/*
+ * The detection is the CONJUNCTION, and the first version got it wrong in a way
+ * its own first run showed: it asked only "does this read the purse", which is a
+ * symptom, and named `regress.mjs` and `ladder-probe.mjs` as faults. They do read
+ * it -- and they also take a caller-chosen base (`--port`, and a positional
+ * baseUrl), so they share the exposure and are wired rather than excused. What
+ * is NOT exposed is a probe that reads the purse against a hard-coded server, and
+ * there is none. **A guard's detection has to name the exposure, not a symptom of
+ * it** -- the exposure is being aimable at a tree that might not have the field.
+ */
+const AIMABLE = /flag\('url'|'--port'|baseUrl/;
+const pursed = readdirSync(probeDir)
+  .filter((f) => f.endsWith('.mjs') && f !== SELF)
+  .map((f) => [f, readFileSync(new URL(f, probeDir), 'utf8')])
+  // ...and the helper itself is out by DEFINING the function rather than by
+  // being named: `served.mjs` contains the purse in its own docstring and
+  // cannot import itself, and an exemption list of one is still a list.
+  .filter(([, s]) => !/export const requireWorld/.test(s))
+  .filter(([, s]) => (/\bw\.bytes\b/.test(s) || /\bworld\.bytes\b/.test(s))
+    && AIMABLE.test(s))
+  .sort();
+if (!pursed.length) {
+  console.error('world: no probe reads the purse off the served world, so this guard is '
+    + 'asserting nothing -- the detection has drifted, not the exposure');
+  process.exit(1);
+}
+const worldBad = [];
+for (const [f, s] of pursed) {
+  if (!/import \{[^}]*\brequireWorld\b[^}]*\} from '\.\/served\.mjs'/.test(s)) {
+    worldBad.push(`${f} reads the purse off the served world and does not import requireWorld`);
+  } else if (!/await requireWorld\(page, \[[^\]]*'bytes'[^\]]*\]/.test(s)) {
+    worldBad.push(`${f} imports requireWorld and does not declare 'bytes' to it, `
+      + 'which is the one field of its own that has been renamed');
+  } else if (!/if \(abort\) \{ await browser\.close\(\); process\.exit\(1\); \}/
+      .test(s.replace(/^[ \t]+/gm, ''))) {
+    worldBad.push(`${f} calls requireWorld and does not exit on its verdict, `
+      + 'so the refusal is a print');
+  }
+}
+if (worldBad.length) {
+  for (const line of worldBad) console.error(`world: ${line}`);
+  console.error('world: --expect says WHICH tree was served and this says whether the probe '
+    + 'can read it. Without the pair, a differential across a rename reports a table of '
+    + 'undefined and exits 0.');
+  process.exit(1);
+}
+console.log(`world: all ${pursed.length} purse-reading probe(s) `
+  + `(${pursed.map(([f]) => f).join(' ')}) declare their served-world fields and refuse a `
+  + `tree without them`);
 
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];

@@ -24,6 +24,7 @@ import { writeFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+import { requireWorld } from './served.mjs';
 
 const SECONDS = parseInt(process.argv[2] || '180', 10);
 const TIER = parseInt(process.argv[3] || '1', 10);
@@ -50,6 +51,14 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 
 await page.goto(BASE, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__sim && window.__sim.world);
+// What this probe's figures are read off. A tree served at a base URL the
+// caller chose may not have them: world.energy became world.bytes at build
+// 286, and phase 5's build-283 column was a table of `undefined` because of
+// it. `served.mjs` carries the whole finding.
+{
+  const { abort } = await requireWorld(page, ['bytes'], 'ladder-probe.mjs');
+  if (abort) { await browser.close(); process.exit(1); }
+}
 await sleep(600);
 await page.click('#startBtn');
 await sleep(1200);

@@ -35,7 +35,7 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-import { checkServed } from './served.mjs';
+import { checkServed, requireWorld } from './served.mjs';
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const argv = process.argv.slice(2);
@@ -351,6 +351,14 @@ for (let i = 0; i < RUNS; i++) {
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   await page.goto(BASE, { waitUntil: 'load' });
   await page.waitForFunction(() => !!window.__sim);
+  // What this probe's figures are read off. `served.mjs` refuses a served
+  // tree that lacks any of them: the purse is declared because it HAS been
+  // renamed (world.energy -> world.bytes at build 286), which is what made
+  // phase 5's build-283 column a table of a tree it never read.
+  {
+    const { abort } = await requireWorld(page, ['bytes'], 'fight.mjs');
+    if (abort) { await browser.close(); process.exit(1); }
+  }
   await page.evaluate((step) => {
     const g = window.__sim;
     document.getElementById('startBtn').click();
