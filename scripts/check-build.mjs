@@ -305,10 +305,26 @@ for (const t of ENEMY_TYPES) {
  * `world.apertures` came to be sized 8 against 9 anomalies: an exempt word
  * that turns out to HAVE a dispatch arm fails the build, so the list cannot
  * quietly outlive its reason and each addition stays a deliberate edit with a
- * reason written beside it. Phase 2's `lurch`, `drag` and `wander` are all
- * fall-throughs or on-top modifiers and will want the same exemption; if that
- * list reaches three or four, mark the fall-through words in GAITS itself and
- * have this guard ask the structure instead.
+ * reason written beside it.
+ *
+ * ---- AND THE FORECAST THAT USED TO BE HERE WAS TWO-THIRDS WRONG ----------
+ *
+ * It read: "Phase 2's `lurch`, `drag` and `wander` are all fall-throughs or
+ * on-top modifiers and will want the same exemption; if that list reaches
+ * three or four, mark the fall-through words in GAITS itself." Both words that
+ * landed came in with a REAL dispatch arm instead -- `lurch` at
+ * `gait === 'lurch'` (build 338) and `drag` at `gait === 'drag' &&
+ * this.tether` (339) -- so `NO_ARM` is still `['march']` and the advice was
+ * never taken. A prediction left in the present tense reads as guidance, and
+ * following it here would have been the mechanism by which a word slipped the
+ * one guard that can see a missing implementation.
+ *
+ * Worth knowing about the OTHER way past this test, measured rather than
+ * reasoned: `case 'wander':` added beside the existing `case 'hover':` on the
+ * harmless switch's shared `default:` arm satisfies `dispatches` while
+ * implementing nothing new. The pattern can see an ABSENT arm; it cannot see
+ * an arm that does nothing, and nothing static can. What refused `wander` is
+ * the argument at its GAITS entry, not this guard.
  */
 const gaitCode = gaitSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 const NO_ARM = ['march'];
@@ -483,6 +499,61 @@ for (const t of ENEMY_TYPES) {
  * physically reach is a door that never opens, and a clamp that can never
  * clamp is a branch whose other arm is dead code.
  */
+/*
+ * ---- a DRAG type needs the two blocks `windUp` reads, and there is no
+ *      default -------------------------------------------------------------
+ *
+ * Build 339 re-keyed the TOW's mechanism off `type.hurl` onto the gait, which
+ * left the word and the blocks able to disagree -- and the failure is a THROW
+ * on `steer`'s hot path, which build 288 records as reading like a freeze
+ * rather than an error. Reproduced rather than argued: a `drag` type with no
+ * `hurl` gives `TypeError: Cannot read properties of undefined (reading
+ * 'range')` at `windUp`'s `const H = this.type.hurl`, and one with `hurl` but
+ * no `tows` gives the same on `this.type.tows.length`.
+ *
+ * And it is REACHABLE without a probe: a `drag` type with no `tows` is not
+ * intercepted by `release`'s `if (type.tows) return spawnTow(...)`, so it
+ * falls into the TETHERED trait block, which writes `e.tether` -- and
+ * `this.tether` is the second conjunct of both flag-uses. An ordinary trait
+ * roll gets there.
+ *
+ * Held in BOTH directions, the shape the rides guard already has: a `drag`
+ * type missing either block fails, and a `hurl` block on a type that does not
+ * declare `drag` is a block nothing reads. Green on arrival -- only TOW
+ * declares the word and it carries both.
+ *
+ * One more thing a second `drag` type has to know, and the guard says it:
+ * `spawnTow` takes no type argument and hard-keys `const head =
+ * TYPE_BY_ID.tow`, so a second one WITH a `tows` block is released as a
+ * literal TOW.
+ */
+
+const draggers = ENEMY_TYPES.filter((t) => t.gait === 'drag');
+const dragBad = [];
+for (const t of draggers) {
+  if (!t.hurl || typeof t.hurl !== 'object') {
+    dragBad.push(`${t.id} declares gait 'drag' and no hurl block -- windUp reads `
+      + 'this.type.hurl.range and would throw on steer\'s hot path');
+  }
+  if (!t.tows || typeof t.tows !== 'object') {
+    dragBad.push(`${t.id} declares gait 'drag' and no tows block -- windUp reads `
+      + 'this.type.tows.length, and note spawnTow hard-keys TYPE_BY_ID.tow, so a '
+      + 'second dragger needs that function generalised first');
+  }
+}
+for (const t of ENEMY_TYPES) {
+  if (t.hurl && t.gait !== 'drag') {
+    dragBad.push(`${t.id} carries a hurl block and its gait is '${t.gait}', not `
+      + "'drag' -- nothing reads it, which is the kind:'works' fault");
+  }
+}
+if (dragBad.length) {
+  for (const line of dragBad) console.error(`drag: ${line}`);
+  process.exit(1);
+}
+console.log(`drag: ${draggers.length} dragger (${draggers.map((t) => t.id).join(' ')}), `
+  + 'each with both the hurl and tows blocks its mechanism reads');
+
 const riders = ENEMY_TYPES.filter((t) => t.gait === 'ride');
 const worstRide = Math.max(0, ...riders.map((t) => t.rides.armor));
 /*
@@ -657,7 +728,40 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, o
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
-const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, lobOf, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
+const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, lobOf, stainOf, STAIN_KEYS, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
+
+/*
+ * ---- a SERPENT type declares its own ground, and there is no default -----
+ *
+ * Fourth mandatory block after `rides`, `respawn` and `bond`, and it is here
+ * for the reason all three of those are: a second type declaring the gait
+ * would otherwise wear MIRE's radius, clock and reach in silence, with no
+ * field to set and nothing to fail. A number about the GAIT is shared
+ * (`CFG.serpent`, the weave) and a number about the BODY is the type's.
+ *
+ * Called at BUILD time, which is the whole point -- `serpentOn` reads
+ * `this.type.stain` inside `drive`, and a throw from there is build 288's
+ * freeze rather than an error anybody reads. Held in both directions: a
+ * `stain` block on a type that does not declare `serpent` is a block nothing
+ * reads.
+ */
+const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
+const stainBad = [];
+for (const t of weavers) {
+  try { stainOf(t); } catch (e) { stainBad.push(e.message); }
+}
+for (const t of ENEMY_TYPES) {
+  if (t.stain && t.gait !== 'serpent') {
+    stainBad.push(`${t.id} carries a stain block and its gait is '${t.gait}', not `
+      + "'serpent' -- nothing reads it, which is the kind:'works' fault");
+  }
+}
+if (stainBad.length) {
+  for (const line of stainBad) console.error(`stain: ${line}`);
+  process.exit(1);
+}
+console.log(`stain: ${weavers.length} weaver (${weavers.map((t) => t.id).join(' ')}), `
+  + `each declaring all ${STAIN_KEYS.length} of ${STAIN_KEYS.join('/')}`);
 
 /*
  * ---- A FRACTURE HAS TO TERMINATE, and nothing else would say so ----------

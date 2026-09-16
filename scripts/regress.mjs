@@ -38943,6 +38943,265 @@ if (MINE_LINE) {
     + `${r.fixedNull} -- so the three zeroes are an instrument's and not a stub's`);
 }
 
+/*
+ * ---- MIRE: IT DOES NOT HURT YOU, IT MAKES THE FIGHT NOT PAY --------------
+ *
+ * Build 340, and the last of the object guide's nineteen. It was re-specced
+ * before it was built (build 339) because all three of its authored payload
+ * clauses measured empty; what it ships with is salvage denial, on the
+ * primitive `Enemy.feed` already uses.
+ *
+ * Six arms. The A/B for the payload is the STAIN's presence with everything
+ * else held -- the same body, the same kill, the same place -- which is as
+ * clean a switch as this suite gets, and the control is an absolute: without
+ * the stain the same salvage survives.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const { Stain, Patch } = await import('../src/patch.js');
+    const { CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { stainOf } = await import('../src/enemies.js');
+    const out = {};
+
+    /*
+     * Every arm starts from here. `restart()` is not a reset of everything a
+     * case can leave behind -- the director stub and `spawnLock` outlive it,
+     * and eighteen damage-bench cases upstream leave both set -- so this sets
+     * what the question depends on, including the trait roll, because ARMORED
+     * discards the first hit each second and every arm here is one hit.
+     */
+    const clean = () => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      w.drops.length = 0;
+      w.effects.length = 0;
+      w.director.traits = [];
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.up.damage = 1;
+    };
+    const st = stainOf(TYPE_BY_ID.mire);
+
+    // ---- 1. the stain EATS the pay, and without it the pay survives -------
+    const salvage = (withStain) => {
+      clean();
+      const x = w.width * 0.4;
+      const y = w.shooter.y - 300;
+      const v = g.debugSpawn('mote', x, y);
+      v.staged = false;
+      v.spawnIn = 0;
+      v.applyDamage(w, 1e9);
+      const made = w.drops.length;
+      const s = withStain
+        ? new Stain(x, y, { r: st.rFloor, life: st.life, eat: st.eat, tick: st.tick })
+        : null;
+      if (s) w.effects.push(s);
+      const bytes0 = w.bytes;
+      const slain0 = w.director.slain || 0;
+      for (let f = 0; f < 24; f++) g.update(1 / 60);
+      return { made, alive: w.drops.filter((d) => !d.dead).length,
+        ate: s ? s.ate : 0, banked: Math.round(w.bytes - bytes0),
+        slain: (w.director.slain || 0) - slain0 };
+    };
+    out.eaten = salvage(true);
+    out.kept = salvage(false);
+
+
+    // ---- 3. the WEAVE opens out, which is the whole gait ------------------
+    /*
+     * Measured as the widest lateral offset reached in the TOP third of the
+     * crossing against the widest in the bottom third, on ONE body -- a
+     * within-body ratio, because an absolute would have to be right about the
+     * viewport and the era. The control is the same body with `ampFloor`
+     * pinned to `ampRim`, which is the mechanism switched off and nothing
+     * else: same gait, same route, same speed, same stains.
+     */
+    const weave = (open) => {
+      clean();
+      const was = CFG.serpent.ampFloor;
+      if (!open) CFG.serpent.ampFloor = CFG.serpent.ampRim;
+      const e = g.debugSpawn('mire', w.width * 0.5, 240);
+      e.staged = false; e.spawnIn = 0;
+      const s = w.shooter;
+      const top = [];
+      const low = [];
+      const rim = e.y;
+      for (let f = 0; f < 60 * 120; f++) {
+        g.update(1 / 60);
+        if (e.dead || e.y > s.y - 60) break;
+        const down = (e.y - rim) / Math.max(1, s.y - rim);
+        const off = Math.abs(e.x - s.x);
+        if (down < 0.34) top.push(off);
+        else if (down > 0.62) low.push(off);
+      }
+      CFG.serpent.ampFloor = was;
+      const wide = (a) => (a.length ? Math.max(...a) : 0);
+      return { top: Math.round(wide(top)), low: Math.round(wide(low)),
+        n: top.length + low.length, endY: Math.round(e.y) };
+    };
+    out.open = weave(true);
+    out.flat = weave(false);
+
+    // ---- 4. the GROUND gets wider with it, off the same `down` ------------
+    clean();
+    {
+      const e = g.debugSpawn('mire', w.width * 0.5, 240);
+      e.staged = false; e.spawnIn = 0;
+      const s = w.shooter;
+      const radii = [];
+      for (let f = 0; f < 60 * 120; f++) {
+        g.update(1 / 60);
+        if (e.dead || e.y > s.y - 60) break;
+        for (const x of w.effects) {
+          if (x.theirs && !x.seen) { x.seen = true; radii.push(Math.round(x.r)); }
+        }
+      }
+      out.ground = { laid: radii.length, first: radii[0], last: radii[radii.length - 1],
+        rose: radii.length > 1 && radii[radii.length - 1] > radii[0],
+        rRim: st.rRim, rFloor: st.rFloor };
+    }
+
+    // ---- 5. the GROUND does no damage, against ground that does ----------
+    /*
+     * "It does no damage at all" is the object's core, and the thing that
+     * could accidentally break it is the ground: `Patch`'s own `retire()`
+     * docstring records that a patch on `dps: 0` STILL takes a point off
+     * everything standing in it four times a second, because `applyDamage`
+     * floors a hit at `Math.max(1, ...)`. A `Stain` is a different class for
+     * exactly that reason, and this is the arm that says so.
+     *
+     * The control is a real `Patch` over the same body, which is what makes
+     * the zero mean something. THE FUSE WAS TRIED FIRST and is the wrong
+     * instrument: the glitch timer runs from `Director.update`, which every
+     * arm here stubs, so it read 0.000 for MIRE and 0.000 for a LURCHER on
+     * the mount -- a dead control that would have passed.
+     */
+    const standIn = (kind) => {
+      clean();
+      const x = w.width * 0.4;
+      const y = w.shooter.y - 300;
+      const e = g.debugSpawn('bulwark', x, y);
+      e.staged = false;
+      e.spawnIn = 0;
+      const hp0 = e.hp;
+      if (kind === 'stain') {
+        w.effects.push(new Stain(x, y, { r: st.rFloor, life: st.life, eat: st.eat, tick: st.tick }));
+      } else if (kind === 'patch') {
+        w.effects.push(new Patch(x, y, { r: st.rFloor, life: st.life, dps: 40, tick: 0.25 }));
+      }
+      for (let f = 0; f < 60 * 4; f++) { e.x = x; e.y = y; e.vx = 0; e.vy = 0; g.update(1 / 60); }
+      return { kind, lost: Math.round(hp0 - e.hp), hp0: Math.round(hp0) };
+    };
+    out.inStain = standIn('stain');
+    out.inPatch = standIn('patch');
+    out.bare = standIn('none');
+
+    // ---- 6. a mote off a MIRE neither weaves nor lays ---------------------
+    /*
+     * `shed` builds every mote with `new Enemy(t, ...)` off the parent's type,
+     * so a mote off a MIRE carries `gait: 'serpent'` -- build 322's LATCH
+     * fault, where a mote off a rider grafted onto the next body. Here the
+     * guard is `!this.isDrop` on the arm in `drive`, so the assertion is that
+     * the flag really is inherited AND that nothing came of it.
+     */
+    clean();
+    {
+      const e = g.debugSpawn('mire', w.width * 0.45, w.shooter.y - 260);
+      e.staged = false; e.spawnIn = 0;
+      e.applyDamage(w, 1e9);
+      const motes = [...w.drops];
+      const before = w.effects.filter((x) => x.theirs).length;
+      for (let f = 0; f < 60 * 3; f++) g.update(1 / 60);
+      out.mote = {
+        n: motes.length,
+        gait: motes.length ? motes[0].type.gait : null,
+        wove: motes.filter((d) => (d.weaveT || 0) !== 0).length,
+        laid: w.effects.filter((x) => x.theirs).length - before,
+      };
+    }
+    return out;
+  });
+
+  check('a MIRE takes the PAY and not the health',
+    // it eats...
+    r.eaten.ate >= 3 && r.eaten.alive === 0 && r.eaten.banked === 0
+    // ...and the same salvage survives with no stain on it, which is the claim
+    && r.kept.made === r.eaten.made && r.kept.alive === r.kept.made && r.kept.banked === 0
+    /*
+     * ...and what it ate SCORED nothing, asserted as the difference BETWEEN
+     * the two arms. That is the only honest form here: an absolute read 1 on
+     * a working build, because the body killed to MAKE the drops is itself a
+     * kill and is swept in the same window. `dead` alone would book each drop
+     * -- `Game.sweep` is `if (!e.dissolved) noteDestroyed(e)` then
+     * `if (e.counts && !e.dissolved) registerKill(e)` -- so `dissolved` is the
+     * flag under test, and four eaten drops would show as a difference of
+     * four.
+     */
+    && r.eaten.slain === r.kept.slain,
+    `a mote shed ${r.eaten.made} drops: with a stain on them ${r.eaten.ate} were eaten, `
+    + `${r.eaten.alive} left alive and ${r.eaten.banked} B banked; with no stain, `
+    + `${r.kept.made} shed and ${r.kept.alive} still alive. The sweep booked `
+    + `${r.eaten.slain} kills either way, so the eaten drops scored none of them -- `
+    + 'which is what `dissolved` is for');
+
+  const openR = r.open.low / Math.max(1, r.open.top);
+  const flatR = r.flat.low / Math.max(1, r.flat.top);
+  check('...and the weave OPENS OUT, which no route in this game does',
+    /*
+     * The two RATIOS against each other, not an absolute on either. The
+     * control is not flat: with `ampFloor` pinned to `ampRim` the amplitude is
+     * constant and the body still reaches wider low down than up top --
+     * measured 7 against 18, a ratio of 2.6 -- because it starts at the centre
+     * and needs time to build any swing at all. So a ceiling of 1.5 on the
+     * control straddled the truth. The opening-out run reads 16 against 134, a
+     * ratio of 8.4, which is 3.2x the control's; the bound is 2x.
+     */
+    openR > flatR * 2
+    // ...and the mechanism really is what differs, or the ratio is a draw
+    && openR > 4 && flatR < 4
+    // ...and both runs actually crossed, or neither measured anything
+    && r.open.n > 200 && r.flat.n > 200,
+    `open: widest ${r.open.top} in the top third against ${r.open.low} in the bottom `
+    + `(x${openR.toFixed(2)}); flat: ${r.flat.top} against ${r.flat.low} `
+    + `(x${flatR.toFixed(2)}), a separation of x${(openR / Math.max(0.01, flatR)).toFixed(2)}. `
+    + `${r.open.n} and ${r.flat.n} samples. Every ROUTE folds in instead -- `
+    + '`routeLateral` scales by reach and closing, both zero at the machine');
+
+  check('...and the ground it lays gets wider with it',
+    r.ground.laid >= 4 && r.ground.rose
+    && r.ground.first >= r.ground.rRim && r.ground.last <= r.ground.rFloor,
+    `${r.ground.laid} stains, the first r ${r.ground.first} and the last r `
+    + `${r.ground.last}, inside the authored ${r.ground.rRim}..${r.ground.rFloor} -- `
+    + 'sized off the same `down` the weave uses, so the two halves of "wider the '
+    + 'closer it gets" cannot disagree');
+
+  check('...and its ground does no damage, against ground that does',
+    // four seconds standing in a stain costs exactly what bare ground costs...
+    r.inStain.lost === r.bare.lost
+    // ...while the same four seconds in a Patch of the same radius costs real
+    // health, which is what says the instrument can read a one
+    && r.inPatch.lost > 60,
+    `a BULWARK of ${r.bare.hp0} standing four seconds in a stain lost `
+    + `${r.inStain.lost}, on bare ground ${r.bare.lost}, and in a Patch of the same `
+    + `radius ${r.inPatch.lost}. "It does no damage at all" is the object's core, and `
+    + 'the thing that could break it is the ground: a Patch on zero dps still bites, '
+    + 'because applyDamage floors a hit at Math.max(1, ...) -- which is why a Stain '
+    + 'is a different class and not an option on that one');
+
+  check('...and a mote off one neither weaves nor lays',
+    r.mote.n > 0 && r.mote.gait === 'serpent' && r.mote.wove === 0 && r.mote.laid === 0,
+    `${r.mote.n} motes, each carrying gait '${r.mote.gait}' off the parent type, `
+    + `${r.mote.wove} of them weaving and ${r.mote.laid} stains laid in three seconds `
+    + '-- the guard is `!this.isDrop` on the arm in `drive`, and the inherited flag '
+    + 'is asserted so the zero is not a zero over nothing');
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

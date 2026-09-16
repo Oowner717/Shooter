@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '339';
+export const BUILD = '340';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '339';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a90395c';
+export const REV = 'e0eb7b8';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1760,6 +1760,86 @@ export const CFG = {
     look: 150, // ...and how far ahead it aims once it is on it
     lanes: 7, // candidate columns, odd so the machine's own is one of them
   },
+
+  /*
+   * ---- SERPENT: a weave whose amplitude GROWS with depth -----------------
+   *
+   * MIRE's gait, and the reason it needed a new word rather than a route.
+   * `ROUTES` already holds a "serpentine" (width 250, weave 0.55) and that is
+   * the thing not to mistake this for: `routeLateral` scales every route's
+   * offset by `reach = (d / 520k) ** commit` and `closing = (d - 170k) / 210k`,
+   * BOTH of which go to zero as the body closes -- so every route in the game
+   * FOLDS IN, and no combination of width, weave and commit can invert a
+   * monotone factor. This one opens out.
+   *
+   * The amplitude is a share of the field's HALF-WIDTH, interpolated on the
+   * body's own depth between the entry line and the mount, so it is scale-
+   * invariant across the two eras the way `roll`'s slant is.
+   *
+   * `sway` is the peak speed of the lateral TARGET as a share of the body's
+   * own cruise, and the weave rate is DERIVED from it and the amplitude
+   * (`omega = sway * cruise / amp`) rather than authored. KITE paid for the
+   * other way round at build 335: a sinusoid authored in radians a second
+   * against an amplitude in units is a target the body cannot reach, and what
+   * you get is a lag rather than a weave. Under 1 so the crossing still
+   * closes: the weave is what it does on the way, not instead of arriving.
+   */
+  serpent: {
+    /*
+     * MEASURED, not chosen. Swept 0.5/1.0/1.6/2.4/3.2 over a whole crossing,
+     * counting the half-cycles and the widest offset the body actually
+     * reached:
+     *
+     *   sway  half-cycles  widest
+     *   0.5        1        144
+     *   1.0        2        187
+     *   1.6        3        142
+     *   2.4        4        108
+     *   3.2        5         85
+     *
+     * 1.0 is both ends of the answer at once: it is where the swing is WIDEST
+     * -- past it the body can no longer track the target and the lag eats the
+     * amplitude, which is the failure KITE's `sway` was authored to avoid --
+     * and it is the guide's own cycle count, its illustrative path being
+     * `sin(7t)` across the crossing, which is 7 radians and therefore about
+     * 1.1 full cycles. A weave nobody can see is not this object: at 0.5 the
+     * body completed ONE half-cycle in a 39-second crossing, which reads as a
+     * drift rather than a weave.
+     */
+    sway: 1,
+    ampRim: 0.06, // barely a weave as it comes through the mouth...
+    ampFloor: 0.34, // ...and a third of the half-width by the time it arrives
+  },
+
+  /*
+   * ---- MIRE's GROUND, which is what the object actually is ---------------
+   *
+   * It does no damage at all -- that is the core of the design and not a
+   * detail -- so what the stain takes is the PAY: salvage that comes to rest
+   * in it is eaten, marked `dead` and `dissolved` so it never scores and
+   * never reaches the purse. The primitive is shipped: `Enemy.feed` is a GLUT
+   * doing exactly this to `world.drops`, under the comment "eaten, not
+   * destroyed: it must not score".
+   *
+   * All three of the payloads the object guide authored were measured EMPTY at
+   * build 339 and the re-spec is on MIRE's own card: a mine's arming time
+   * (`CFG.mines.inPlay` false since 289), a DECOY's decay (a purchase at 37.5%
+   * duty and 0% unbought), and "the intake pulls at half rate" -- which is
+   * dead in all three of its readings, the sharpest being that
+   * `CFG.energy.pull` is measurably inert: drops are STEERED as well as
+   * pulled, so mean distance closed in three seconds reads 268.1 at the full
+   * pull, 248.5 at half and 265.9 at ZERO.
+   *
+   * THE NUMBERS ARE ON THE TYPE, as a `stain` block, and this paragraph is
+   * all that lives here. A number about the GAIT is shared and a number about
+   * the BODY is the type's -- build 330's rule, arrived at after five separate
+   * builds paid for the other way round: a second `plated` type would have
+   * worn `CFG.flint`'s arc, a second `ride` type `CFG.graft`'s growth, and
+   * the same for `respawn`, `planted` and `bar`. A second body that lays
+   * ground wants its own radius and its own clock, so those go on the type and
+   * `stainOf` throws for a `serpent` type that declares none. What stays
+   * shared above is the weave, which really is the gait's.
+   */
 
   /*
    * ---- STANDOFF: the RANKS, which is the gait's and not any type's -------
@@ -5793,6 +5873,76 @@ export const ENEMY_TYPES = [
   },
   {
     /*
+     * ---- MIRE: it does not hurt you, it makes the fight not pay ----------
+     *
+     * The last of the object guide's nineteen, and the only one that was
+     * re-specced before it was built -- see its card in docs/objects.html for
+     * the measurements. All three of its authored payload clauses were empty:
+     * a mine's arming time (`CFG.mines.inPlay` false since build 289), a
+     * DECOY's decay (a purchase at 37.5% duty and 0% unbought), and "the
+     * intake pulls at half rate", which is dead in all three of its possible
+     * readings. The body, the gait and the counter are the guide's; the
+     * payload is salvage.
+     *
+     * NO DAMAGE AT ALL is the core rather than a detail, and it is what makes
+     * the stain's channel the right one: salvage denial is always on, needs no
+     * purchase, has no duty cycle and costs no health. `Stain.swallow` marks a
+     * drop `dead` and `dissolved`, which is `Enemy.feed`'s pair -- the second
+     * flag being the one `Game.sweep` reads to tell being eaten from being
+     * destroyed, so an eaten mote books no kill and no codex entry.
+     *
+     * `wobble` is 0 and written out rather than omitted, the same reason
+     * LATCH's and CHAFF's are: the WEAVE is this body's lateral and the whole
+     * of its picture, and `drive`'s clumsy heading wander on top of it would
+     * muddy the one thing the gait is. `upright` because the drips hang down.
+     *
+     * The colour is not the guide's `#ff5d8f`, which is BLOOM's body colour at
+     * dE 0.0 and the same collision KITE had to answer at build 335. Swept
+     * across the rose band against all 89 roster tones: `#bc1aa7` is 21.3 from
+     * its nearest (`#ff3fc0`), inside the 15-23 this repo documents as
+     * working, and 35+ from both BLOOM and KITE. The best-separated colour in
+     * that band is a pure red at 24.6 and is refused: red is the glitch and
+     * the alert register in this game and is spoken for by meaning rather
+     * than by distance.
+     */
+    id: 'mire',
+    opens: 0,
+    name: 'MIRE',
+    shape: 'mire',
+    gait: 'serpent',
+    r: 24,
+    hp: 160,
+    density: 0.7,
+    speed: 30,
+    accel: 100,
+    restitution: 0.4,
+    wobble: 0,
+    armor: 0,
+    upright: true,
+    /*
+     * The ground it lays, on the TYPE and not in a shared block -- build 330's
+     * rule, and `stainOf` throws for a `serpent` type that declares none.
+     * `rRim`/`rFloor` are the radius at the two ends of the column, so "wider
+     * the closer it gets" is the ground as well as the weave; `eat` is the
+     * reach past that radius, the shape `glut.eat.reach` already has; `tick`
+     * is the sweep clock, Patch's own rate, because anything continuous in
+     * this game runs on a clock and not on the frame.
+     */
+    stain: {
+      every: 1.1,
+      rRim: 34,
+      rFloor: 78,
+      life: 7,
+      eat: 6,
+      tick: 0.25,
+    },
+    color: '#bc1aa7',
+    glow: '#7a1170',
+    weight: 0, // authored into its wave, never rolled by the ordinary spawn
+    drops: 4,
+  },
+  {
+    /*
      * SPINDLE: the only body in this game that is not a circle to a round.
      *
      * A bar 96 long and 11 thick, turning end over end at two thirds of a
@@ -7753,6 +7903,22 @@ export const WAVES = [
    * here, and eleven bodies is still the ceiling.
    */
   { of: [['tow', 2], ['needle', 3]], band: 5 },
+  /*
+   * MIRE's wave. The BULWARK is the combination rather than ballast: 676
+   * health behind 0.4 of armour is about fifteen seconds of barrel, so it
+   * cannot be rushed -- and while those seconds run the two MIREs are laying
+   * ground, and the BULWARK's own salvage falls wherever it happened to die.
+   * That is the object's whole lesson made unavoidable: you do not get to
+   * choose WHEN it dies, so you have to choose WHERE. The MOTEs make the
+   * denial legible on the first pass, being small drops eaten at once.
+   *
+   * Weighs 35.27 against band 5's own mean of 36.30 -- a ratio of 0.971, so
+   * it sits inside build 315's +-10% lever and re-prices the band by about
+   * three tenths of a per cent. Priced by measuring the alternatives: two
+   * MIREs and three SPLITTERs is 26.57 (0.73, outside), three and three MOTEs
+   * 19.10 (0.53).
+   */
+  { of: [['mire', 2], ['bulwark', 1], ['mote', 2]], band: 5 },
   { of: [['tow', 1], ['bulwark', 1], ['mote', 4]], band: 5 },
   { of: [['tow', 1], ['prism', 2], ['needle', 3]], band: 5 },
   // A pair and a beacon: the HERALD is what keeps you looking away while the
@@ -8107,6 +8273,7 @@ export const GAITS = {
   ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
   hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',
   creep: 'the straight line and nothing else: no lane, no wobble, and no impulse in the game turns it',
+  serpent: 'weaves down the field, and the weave OPENS OUT as it closes -- the one lateral in the game that does not fold in, painting ground behind it that gets wider with it',
   spread: 'goes wide before it comes down, taking the emptiest lane it can find -- it is covering ground, not coming for you',
   standoff: 'closes to the far edge of what the assist can reach and holds it, sliding sideways -- it will not come to you',
 };

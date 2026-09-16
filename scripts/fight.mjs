@@ -42,7 +42,40 @@ const flag = (name, def) => {
   const i = argv.indexOf(`--${name}`);
   return i >= 0 ? argv[i + 1] : def;
 };
-const N = Number(argv.find((a) => /^\d+$/.test(a)) || 1);
+/*
+ * ---- THE ANOMALY NUMBER, AND WHY THIS IS NOT `argv.find(/^\d+$/)` --------
+ *
+ * It was, and the bug is that a FLAG'S VALUE is also a bare number. CLAUDE.md
+ * documents this probe as
+ *
+ *     node scripts/fight.mjs --seed 20260824 --hash 9000
+ *
+ * with no positional at all -- and `find` then returned **20260824**, the
+ * seed, so the canonical instrument of this repo ran "ANOMALY 20260824"
+ * instead of ORDINAL and said so in its own heading, every time. Measured on
+ * build 339: the documented command reports `ANOMALY 20260824 ... hash
+ * -1334607133` with nine bodies on the field, while `fight.mjs 1` reports
+ * `ANOMALY 1` with 39/31/26/10/41 bodies across its samples and a hash of
+ * 1664149562.
+ *
+ * It still worked as a DIFFERENTIAL -- the degenerate number is stable and
+ * reproduced across builds 337, 338 and 339 -- which is exactly why it
+ * survived: a differential instrument that is measuring the wrong thing
+ * still looks like it is working. What it could not do is see anything that
+ * needs a boss on the field.
+ *
+ * So the positional is read as a positional: the first token that is a bare
+ * number AND is not the value of a preceding `--flag`. A missing positional
+ * defaults to 1, which is what the heading has always claimed.
+ */
+const N = (() => {
+  for (let i = 0; i < argv.length; i++) {
+    if (!/^\d+$/.test(argv[i])) continue;
+    if (i > 0 && /^--/.test(argv[i - 1])) continue; // it is a flag's value
+    return Number(argv[i]);
+  }
+  return 1;
+})();
 const RUNS = Number(flag('runs', 1));
 const BASE = flag('url', 'http://127.0.0.1:8099/index.html');
 // A fight that has not ended in this many game-seconds is not a fight, it is

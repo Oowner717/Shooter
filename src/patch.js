@@ -298,3 +298,153 @@ export class Patch {
     ctx.restore();
   }
 }
+
+/**
+ * A STAIN: corrupted ground that takes the pay rather than the health.
+ *
+ * MIRE lays these behind it. It shares Patch's contract and almost nothing
+ * else, which is why it is a second class here rather than an option on the
+ * first. What it reuses is the CONTRACT -- `update(world, dt)`, a `dead` flag,
+ * `draw(ctx, world)`, and `ground` so it paints under the bodies -- and the
+ * module, because "ground that rides in world.effects" is one concept even
+ * though the two are made of different things.
+ *
+ * Why not a Patch with `dps: 0`: that class's own `retire()` docstring records
+ * the trap, and it is a real one. `applyDamage` floors a hit at
+ * `Math.max(1, ...)`, so a patch on zero damage still takes a point off
+ * everything standing in it four times a second -- stopping the damage needs
+ * `next = Infinity`, at which point every one of Patch's damage fields is
+ * inert. And its picture is a spore print: specks seeded by area, a rim band,
+ * a rising mote cloud, two tints of one green. None of that is a stain. A
+ * class whose every field is switched off is not the class you wanted.
+ *
+ * `theirs` is the other half, and it is load-bearing at era 2. `Game.draw`'s
+ * ground pass runs inside `Game.ours`, which clips to below the yard wall --
+ * correct for a SPORE patch, because our mines and rounds may not cross that
+ * line. A stain is THEIRS: MIRE comes through the portal at the rim and the
+ * wall is below it, so a stain laid on the way down would be clipped away for
+ * the first part of every crossing. The flag splits that one pass in two and
+ * adds no `clip` call, which is what build 263's count case asserts.
+ */
+export class Stain {
+  /**
+   * @param opts r, life, tone, eat (reach past `r` at which a drop is taken)
+   *   and `tick` seconds between sweeps. Eating runs on a CLOCK, not on the
+   *   frame: a per-frame walk of `world.drops` per stain is O(stains x drops)
+   *   every frame, and this repo's own rule is that anything continuous runs
+   *   on a clock.
+   */
+  constructor(x, y, opts = {}) {
+    this.x = x;
+    this.y = y;
+    this.r = opts.r ?? 48;
+    this.life = opts.life ?? 7;
+    this.max = this.life;
+    this.tone = opts.tone || '#bc1aa7';
+    this.eat = opts.eat ?? 6;
+    this.tick = opts.tick ?? 0.25;
+    this.next = 0;
+    this.t = 0;
+    this.dead = false;
+    this.ground = true; // under the bodies, like every other kind of ground
+    this.theirs = true; // ...and NOT clipped to our side of the wall
+    /*
+     * What it has eaten, for the case and for the picture -- a stain that has
+     * taken salvage sits a little brighter, so the thing the player is being
+     * charged for is visible on the ground that charged them.
+     */
+    this.ate = 0;
+    this.pale = mixHex(this.tone, '#ffffff', 0.4);
+    this.dark = mixHex(this.tone, '#12040f', 0.5);
+    /*
+     * The grain. Seeded uniformly by AREA (sqrt of a uniform, or it crowds the
+     * centre) -- Patch's lesson, and the only one of its drawing decisions
+     * that transfers. No rim band: a stain has no boundary the player has to
+     * find, because nothing standing in it is being hurt. What it needs to
+     * read as is a spill, so the edge is deliberately soft.
+     */
+    const q = Math.max(0.45, fx.quality || 1);
+    const n = Math.round(58 * q);
+    this.grain = Array.from({ length: n }, () => {
+      const a = rand(0, TAU);
+      const d = Math.sqrt(rand(0, 1));
+      return {
+        dx: Math.cos(a) * d, dy: Math.sin(a) * d, d,
+        r: rand(1.4, 4.2) * (1 - d * 0.4),
+        a: rand(0.18, 0.46),
+        pale: Math.random() < 0.3,
+      };
+    });
+  }
+
+  /**
+   * One sweep of the drops.
+   *
+   * `dead` AND `dissolved`, which is `Enemy.feed`'s pair and not a choice:
+   * `dead` takes it off the field and `dissolved` is the one flag `Game.sweep`
+   * reads to tell being eaten from being destroyed. Without the second, a
+   * stain would BOOK a kill and a codex entry for salvage it removed -- build
+   * 322's LATCH fault, where a rider that ran out of clock was counted.
+   */
+  swallow(world) {
+    const reach = this.r + this.eat;
+    const rr = reach * reach;
+    for (const d of world.drops) {
+      if (d.dead) continue;
+      const dx = d.x - this.x;
+      const dy = d.y - this.y;
+      if (dx * dx + dy * dy > rr) continue;
+      d.dead = true;
+      d.dissolved = true; // eaten, not destroyed: it must not score
+      this.ate += 1;
+      for (let i = 0; i < 3; i++) {
+        spark(d.x, d.y, spread(26), spread(26) - 12, this.tone, 0.34, 2);
+      }
+    }
+  }
+
+  update(world, dt) {
+    this.t += dt;
+    this.life -= dt;
+    if (this.life <= 0) { this.dead = true; return; }
+    this.next -= dt;
+    if (this.next <= 0) {
+      this.next = this.tick;
+      this.swallow(world);
+    }
+  }
+
+  draw(ctx, world) {
+    const left = Math.max(0, this.life / this.max);
+    // Eased so the stain holds most of its weight and then goes quickly,
+    // rather than being faint for most of a seven-second life.
+    const k = Math.min(1, left * 1.8);
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    /*
+     * A low haze rather than a filled disc, for Patch's measured reason: a
+     * filled disc of a saturated colour at this radius is a slab a third of
+     * the screen across, and three of them read as spilled paint over the
+     * field rather than as ground under it.
+     */
+    drawGlow(ctx, 0, 0, this.r * 1.15, this.dark, 0.3 * k);
+    for (const g of this.grain) {
+      ctx.beginPath();
+      ctx.arc(g.dx * this.r, g.dy * this.r, g.r, 0, TAU);
+      ctx.fillStyle = rgba(g.pale ? this.pale : this.tone, g.a * k);
+      ctx.fill();
+    }
+    /*
+     * ...and a stain that has taken something shows it. Additive, so several
+     * overlapping stains ADD rather than scribble -- build 330's rule about
+     * anything that fires in numbers.
+     */
+    if (this.ate > 0) {
+      const lit = Math.min(1, this.ate / 6);
+      ctx.globalCompositeOperation = 'lighter';
+      drawGlow(ctx, 0, 0, this.r * 0.6, this.pale, 0.16 * lit * k);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.restore();
+  }
+}

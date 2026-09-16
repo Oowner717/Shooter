@@ -609,6 +609,22 @@ export const CODEX = [
     line: 'The first hostile down this field that will not come to you. It closes to the far edge of what your gun can see -- ninety per cent of the way out, and no further -- and then simply hangs there, drifting along the line, with more of them in ranks behind the first. They are not coming for the mount and they do not need to: a wave does not end while one is still up there, so every second they hold is a second the next wave is not arriving in. The gun is the answer and the reach is the question -- this is the one body worth buying ARRAY for. Or press PULSE, which does reach them: there is nothing lighter on the field, so one press throws the whole line four hundred units up-field and buys fourteen seconds. And let something heavy through and it will shove one of them onto you, which is the only way they ever arrive.',
   },
   {
+    id: 'mire',
+    name: 'MIRE',
+    line: 'It does not hurt you. It weaves down the field -- the one thing out there whose'
+      + ' path opens WIDER the closer it gets, where everything else narrows onto the'
+      + ' mount -- and it paints the ground behind it as it goes, in a stain that grows'
+      + ' with the weave. Nothing standing in that ground takes a scratch. What the'
+      + ' ground takes is the PAY: salvage that comes to rest in it is swallowed, and'
+      + ' swallowed is not destroyed, so it never counts and never reaches the purse. A'
+      + ' clean kill over clean ground pays. The same kill over its trail pays nothing,'
+      + ' and you will not be told. Kill it early and the trail is short -- that is'
+      + ' literally what it costs, a short trail eats less -- and what it has already'
+      + ' laid fades on its own clock. The mistake is chasing the stain instead of the'
+      + ' source, or standing somewhere you have to fight and letting it choose where'
+      + ' your wreckage falls.',
+  },
+  {
     id: 'quarry',
     name: 'QUARRY',
     line: 'One body that is nine, and the lines it will break along are already drawn on it. Each generation is smaller, faster and thinner-plated than the one it came out of, and nothing it does is aimed at you -- it takes no lane, crosses the field, turns off the walls and spins the whole way. Where you break it is the decision: high and the pieces have the field to spread in, low and they are already on the mount.',

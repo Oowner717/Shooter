@@ -8021,3 +8021,143 @@ came from before believing the other one covers it.
   read; both render now, as two further sections on the card. **A field added
   to a table is a claim that something reads it**, and the cheapest check is
   one grep of the reader.
+
+- **THE ORDINAL HASH COMMAND AS THIS FILE DOCUMENTS IT HAS BEEN MEASURING THE
+  WRONG FIGHT, AND THE FIGURE `-1334607133` IS NOT ORDINAL'S.** `fight.mjs`
+  took its anomaly number as `argv.find((a) => /^\d+$/.test(a))` — the first
+  bare number in the arguments — and the documented invocation is
+  `node scripts/fight.mjs --seed 20260824 --hash 9000`, with no positional at
+  all. So `find` returned **20260824**, the seed's own value, and the probe ran
+  "ANOMALY 20260824" instead of ORDINAL. **It printed that in its own heading
+  every time**, which is how long this can survive when nobody reads the
+  heading.
+  Measured on build 339: the documented command reports `ANOMALY 20260824 ...
+  hash -1334607133` with nine bodies on the field, while `fight.mjs 1` reports
+  `ANOMALY 1` with **39/31/26/10/41** bodies across its five samples and a hash
+  of **1664149562**. The parser is fixed — the positional is now the first bare
+  number that is NOT the value of a preceding `--flag` — and the documented
+  command reads `ANOMALY 1, hash 1664149562`.
+  **It still worked as a DIFFERENTIAL, which is exactly why it survived.** The
+  degenerate number is stable and reproduced across builds 337, 338 and 339, so
+  every "the hash did not move" conclusion in those builds is still TRUE — and
+  the real fight agrees: taken on the fixed probe, build 339 and build 340's
+  working tree both read `1664149562`, and an independent reading of 338 against
+  339 came back identical on all six intermediate marks. **A differential
+  instrument that is measuring the wrong thing still looks like it is working.**
+  What it could not do is see anything that needs a boss on the field, which is
+  most of what the hash is for.
+  Builds 338's and 339's entries above quote the old figure. They are left as
+  written, because the conclusion each drew is sound and rewriting them would
+  hide that this happened; **`1664149562` is the number to compare against from
+  build 340 on**, and a reading that disagrees with it should be checked against
+  the probe's own ANOMALY heading before anything else.
+- **MIRE IS IN FROM BUILD 340, AND IT IS THE NINETEENTH AND LAST OF THE OBJECT
+  GUIDE'S ROSTER.** It does no damage at all; what it takes is the PAY. It
+  weaves down the field — the one lateral in this game that OPENS OUT as it
+  closes — laying ground behind it that grows with the weave, and salvage that
+  comes to rest in that ground is eaten: marked `dead` and `dissolved`, so it
+  never counts and never reaches the purse. Build 339 re-specced it before it
+  was built because all three of its authored payloads measured empty; this is
+  that re-spec built.
+- **THE GAIT IS THE INVERSE OF EVERY ROUTE, AND THAT IS WHY IT NEEDED A WORD.**
+  `routeLateral` scales its offset by `reach = (d / 520k) ** commit` and
+  `closing = (d - 170k) / 210k`, both monotone in `d` and both ZERO at the
+  machine, so every one of the six routes folds in. No combination of
+  `width`/`weave`/`commit` inverts a monotone factor. Measured on one body, the
+  widest offset reached in the top third of the crossing against the bottom
+  third: **15 against 131, a ratio of 8.4**, against **15 against 17 (1.1)**
+  for the same body with `ampFloor` pinned to `ampRim`.
+- **AND THE WEAVE RATE IS DERIVED FROM THE AMPLITUDE, WHICH IS KITE'S LESSON
+  APPLIED IN ADVANCE.** `sway` is the peak speed of the lateral TARGET as a
+  share of the body's own cruise, so `omega = sway * cruise / amp` — a wider
+  weave turns more slowly for the same target speed, which is the correct
+  dependency and the one a fitted constant would hide. **The number was swept,
+  not chosen**: 0.5/1.0/1.6/2.4/3.2 give 1/2/3/4/5 half-cycles across a
+  crossing and widest offsets of 144/187/142/108/85. **1.0 is both ends of the
+  answer at once** — it is where the swing is widest, past which the body can no
+  longer track the target and the lag eats the amplitude, and it is the guide's
+  own cycle count, its illustrative path being `sin(7t)`, which is 7 radians and
+  therefore about 1.1 full cycles. At the 0.5 I authored first, the body
+  completed ONE half-cycle in a 39-second crossing, which reads as a drift.
+- **THE GROUND IS A NEW CLASS AND NOT A `Patch` WITH `dps: 0`, AND THAT CLASS'S
+  OWN DOCSTRING IS WHY.** `Patch.retire()` records the trap: `applyDamage`
+  floors a hit at `Math.max(1, ...)`, so a patch on zero damage **still takes a
+  point off everything standing in it four times a second** — stopping it needs
+  `next = Infinity`, at which point every one of Patch's damage fields is inert.
+  And its picture is a spore print: specks seeded by area, a rim band, a rising
+  mote cloud, two tints of one green. **A class whose every field is switched
+  off is not the class you wanted.** What `Stain` reuses is the CONTRACT —
+  `update`/`dead`/`draw` in `world.effects`, plus `ground` so it paints under
+  the bodies — and the module, because "ground that rides in world.effects" is
+  one concept. Measured: a BULWARK standing four seconds in a stain loses
+  **0**, on bare ground **0**, and in a `Patch` of the same radius **99**.
+- **`theirs` IS THE OTHER HALF OF THE GROUND, AND IT IS LOAD-BEARING AT ERA 2.**
+  `Game.draw`'s ground pass ran inside `Game.ours`, which clips to below the
+  yard wall — correct for a SPORE patch, because our mines and rounds may not
+  cross that line. A stain is THEIRS: MIRE comes through the portal at the rim
+  and the wall is below it, so a stain laid on the way down would have been
+  clipped away for the first part of every crossing — and band 5 at rungs 29-35
+  against an `eraGate` of 28 means era 2 is the ONLY field MIRE is played on.
+  The flag splits that one pass in two, their ground under ours (the stain is
+  the floor; a patch burns on top of it), and it **adds no `clip` call**, which
+  is what build 263's count case asserts.
+- **THE WAVE WAS PRICED BY MEASURING THE ALTERNATIVES.** `[mire 2, bulwark 1,
+  mote 2]` weighs **35.27 against band 5's own mean of 36.30** — a ratio of
+  0.971, inside build 315's ±10% lever. Two MIREs and three SPLITTERs is 26.57
+  (0.73, outside); three MIREs and three MOTEs is 19.10 (0.53). The BULWARK is
+  the combination and not ballast: 676 health behind 0.4 of armour is about
+  fifteen seconds of barrel, so it cannot be rushed, and while those seconds run
+  the stains are being laid and its own salvage falls wherever it happened to
+  die. **You do not get to choose WHEN it dies, so you have to choose WHERE** —
+  which is the object's lesson made unavoidable rather than explained.
+- **THREE FAULTS IN MY OWN NEW CASE, AND ALL THREE WERE CAUGHT BY RUNNING IT
+  STANDALONE FIRST.** (1) The kill-booking arm asserted an absolute zero and
+  read **1** on a working build — the body killed to MAKE the drops is itself a
+  kill and is swept in the same window. It is the difference between the two
+  A/B arms now, which is the only honest form: four eaten drops would show as a
+  difference of four, and both arms read 1. (2) The no-damage arm used the
+  GLITCH FUSE as its instrument and read **0.000 for MIRE and 0.000 for a
+  LURCHER** — a dead control that would have passed, because the glitch timer
+  runs from `Director.update`, which every arm in the case stubs. Replaced with
+  the ground A/B above, whose control reads 99. (3) The weave control asserted
+  the flat run stayed under 1.5x and it read **2.6** — with the amplitude
+  constant the body still reaches wider low down, because it starts at the
+  centre and needs time to build any swing. The two RATIOS are compared against
+  each other now.
+- **THE HIGHLIGHTS ON THE BODY READ AS EYES, AND ONLY RENDERING IT FOUND IT.**
+  Two round pale discs on the dome, meant as specular highlights, turned the one
+  body whose whole subject is corrupted matter into a friendly blob. Nothing
+  could fail for it. A single off-centre crescent says "wet surface" instead,
+  which is what a highlight was for. And the colour is not the guide's
+  `#ff5d8f`, which is BLOOM's body colour at **dE 0.0** — the same collision
+  KITE answered at build 335. Swept across the rose band against all 89 roster
+  tones: `#bc1aa7` is **21.3** from its nearest, inside the 15-23 this repo
+  documents as working. The best-separated colour in that band is a pure red at
+  24.6 and is refused: red is the glitch and alert register and is spoken for by
+  MEANING rather than by distance.
+- **AND TWO GUARDS THE AUDIT FOUND MISSING, ONE OF THEM FOR CODE I HAD JUST
+  WRITTEN.** A `drag` type with no `hurl` or no `tows` block throws on `steer`'s
+  hot path — reproduced: `TypeError: Cannot read properties of undefined
+  (reading 'range')` at `windUp`'s `const H = this.type.hurl`. And it is
+  REACHABLE without a probe, because a `drag` type with no `tows` is not
+  intercepted by `release`'s `if (type.tows) return spawnTow(...)` and falls
+  into the TETHERED trait block, which writes `e.tether` — the second conjunct
+  of both flag-uses. Guarded both ways, and the message names the other thing a
+  second dragger has to know: `spawnTow` takes no type argument and hard-keys
+  `TYPE_BY_ID.tow`. Separately, `stainOf` shipped for an hour with **no caller
+  at build time** while its own docstring said check-build called it for every
+  serpent type — a thrower nothing calls is a promise the code is not keeping,
+  and the first version of the guard was spliced ABOVE its own import and failed
+  with "Cannot access 'stainOf' before initialization".
+- **A FORECAST LEFT IN THE PRESENT TENSE READS AS GUIDANCE, AND MINE WAS
+  TWO-THIRDS WRONG.** Build 338's `NO_ARM` comment predicted that phase 2's
+  `lurch`, `drag` and `wander` would all want the same reader-test exemption.
+  Both words that landed came in with a REAL dispatch arm instead, so `NO_ARM`
+  is still `['march']` and the advice was never taken — and following it would
+  have been the mechanism by which a word slipped the one guard that can see a
+  missing implementation. Worth knowing the OTHER way past that test, which the
+  audit measured rather than reasoned: `case 'wander':` added beside the
+  existing `case 'hover':` on the harmless switch's shared `default:` arm
+  satisfies the dispatch pattern while implementing nothing new. **The pattern
+  can see an ABSENT arm; it cannot see an arm that does nothing, and nothing
+  static can.**

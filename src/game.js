@@ -4121,12 +4121,27 @@ export class Game {
     drawPortal(ctx, w, background.mood, [...throat], (e) => e.draw(ctx, w));
 
     /*
-     * Ground first: anything in effects that declares itself ground (the
-     * SPORE and THORN patches) is part of the floor and draws under every
-     * body, not over them. The rest of the effects stay where they were,
-     * after the bodies, because a blast or a beam IS over the field.
+     * Ground first: anything in effects that declares itself ground is part of
+     * the floor and draws under every body, not over them. The rest of the
+     * effects stay where they were, after the bodies, because a blast or a
+     * beam IS over the field.
+     *
+     * TWO passes, because ground has two owners from build 340. A SPORE or
+     * THORN patch is OURS and goes inside `ours`, which clips to below the
+     * yard wall -- correct, because our mines and rounds may not cross that
+     * line. A MIRE's stain is THEIRS: that body comes through the portal at
+     * the rim and the wall is below it, so a stain laid on the way down would
+     * be clipped away for the first part of every crossing at era 2, which is
+     * the only era MIRE is played on (band 5, rungs 29-35, against an
+     * `eraGate` of 28). Their ground goes UNDER ours, which is the right
+     * order: the stain is the floor and a patch burns on top of it.
+     *
+     * The split adds no `clip` call -- the `ours` scope is still exactly one
+     * and the theirs pass has none -- which is what build 263's count case
+     * asserts.
      */
-    this.ours(ctx, () => { for (const e of w.effects) if (e.ground) e.draw(ctx, w); });
+    for (const e of w.effects) if (e.ground && e.theirs) e.draw(ctx, w);
+    this.ours(ctx, () => { for (const e of w.effects) if (e.ground && !e.theirs) e.draw(ctx, w); });
 
     // Story sits in the quiet upper band, behind every entity, so it can never
     // hide a target — and never competes with the lever for space.

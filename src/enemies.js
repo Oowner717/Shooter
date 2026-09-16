@@ -4,6 +4,7 @@
 
 import { CFG, WAVES, TYPE_BY_ID, ROUTES, GAITS, massOf, kB } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
+import { Stain } from './patch.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep, segClosest, segSeg } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
 import { audio } from './audio.js';
@@ -238,6 +239,7 @@ export function drawSpecimen(ctx, id, r) {
     // the glossary shows the FIRST one: a remnant nobody has killed yet
     case 'anvil': drawAnvil(ctx, r, 0, 0); break;
     case 'kite': drawKite(ctx, r, 0, 0); break;
+    case 'mire': drawMire(ctx, r, 0, 0); break;
     case 'remnant': drawRemnant(ctx, r, 0, 0, false); break;
     default: drawShard(ctx, r);
   }
@@ -1218,6 +1220,63 @@ export class Enemy {
    * @param {object} world
    * @returns {[number, number]} the point to steer at
    */
+  /**
+   * ---- SERPENT: the weave that opens out, and the ground it leaves --------
+   *
+   * Returns the aim point, the way `spreadOn` and `diveOn` do, because the
+   * whole gait is WHERE the body is going: a route's lateral would be added on
+   * top of the weave and then folded away by `routeLateral`'s own two factors,
+   * which is the opposite of what this gait is for.
+   *
+   * THE AMPLITUDE IS THE OBJECT. Every route in this game FOLDS IN -- the
+   * offset is scaled by `reach = (d / 520k) ** commit` and
+   * `closing = (d - 170k) / 210k`, both monotone in `d` and both zero at the
+   * machine -- so "a weave that gets wider the closer it gets" is not a route
+   * with different numbers, it is the inverse. Interpolated on the body's own
+   * DEPTH between the entry line and the mount, as a share of the field's
+   * half-width, so it is scale-invariant across the two eras the way `roll`'s
+   * slant is.
+   *
+   * AND THE RATE IS DERIVED, not authored. `sway` is the peak speed of the
+   * lateral target as a share of this body's own cruise, so
+   * `omega = sway * cruise / amp`: a wider weave turns more slowly for the
+   * same target speed, which is the correct dependency and the one a fitted
+   * constant would hide. KITE paid for the other way round at build 335 --
+   * authoring the rate in radians a second against an amplitude in units gave
+   * a target moving at 72.6 u/s for a body delivering 25.9, i.e. a lag rather
+   * than a weave. Under 1 so the crossing still closes.
+   */
+  serpentOn(world, dt) {
+    const S = CFG.serpent;
+    const rim = entryLine(world, ENTRY_Y);
+    const floor = world.shooter.y;
+    // How far down the column it has come, 0 at the rim and 1 at the mount.
+    const down = clamp((this.y - rim) / Math.max(1, floor - rim), 0, 1);
+    const half = world.width * 0.5;
+    const amp = half * (S.ampRim + (S.ampFloor - S.ampRim) * down);
+    const omega = (S.sway * this.cruise) / Math.max(1, amp);
+    this.weaveT = (this.weaveT || 0) + dt * omega;
+    this.layT = (this.layT || 0) - dt;
+    /*
+     * The ground, laid on the body's own clock and sized off the SAME `down`
+     * the weave uses -- so the two halves of "wider the closer it gets" can
+     * never disagree. Behind it rather than under it: the stain goes where the
+     * body HAS been, which is what makes killing it early leave a short trail.
+     */
+    const st = this.type.stain;
+    if (st && this.layT <= 0) {
+      this.layT = st.every;
+      world.effects.push(new Stain(this.x, this.y - this.r * 0.4, {
+        r: st.rRim + (st.rFloor - st.rRim) * down,
+        life: st.life,
+        eat: st.eat,
+        tick: st.tick,
+        tone: this.type.color,
+      }));
+    }
+    return [world.shooter.x + Math.sin(this.weaveT) * amp, floor];
+  }
+
   standOn(world) {
     const L = lobOf(this.type);
     const s = world.shooter;
@@ -2693,6 +2752,31 @@ export class Enemy {
        * `gait: 'spread'` and would go looking for a column to cover.
        */
       const [px, py] = this.spreadOn(world, ty, d);
+      tx = px;
+      ty = py;
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
+    } else if (!this.staged && this.type.gait === 'serpent' && !this.isDrop) {
+      /*
+       * ---- SERPENT owns the steering, for `spread`'s and `dive`'s reason ---
+       *
+       * The arithmetic is in `serpentOn`; this arm hands over the aim point.
+       * It owns it rather than offsetting the route because the weave IS the
+       * lateral, and `routeLateral`'s two factors would fold it away exactly
+       * where the object wants it widest.
+       *
+       * `!this.staged` is the march in, which every hostile shares: a MIRE
+       * comes down through the mouth like anything else and starts weaving --
+       * and laying -- on the frame it comes loose, so no stain is ever painted
+       * inside the throat. `!this.isDrop` is build 322's guard: `shed` builds
+       * every mote off the parent's type, so a mote off a MIRE carries
+       * `gait: 'serpent'` and would otherwise weave its way to the machine
+       * laying ground that ate the rest of the salvage it fell with.
+       */
+      const [px, py] = this.serpentOn(world, dt);
       tx = px;
       ty = py;
       dx = tx - this.x;
@@ -4201,6 +4285,7 @@ export class Enemy {
       case 'chaff': drawChaff(ctx, this.r, this.phase, world.time); break;
       case 'anvil': drawAnvil(ctx, this.r, this.phase, world.time); break;
       case 'kite': drawKite(ctx, this.r, this.phase, world.time); break;
+      case 'mire': drawMire(ctx, this.r, this.phase, world.time); break;
       case 'remnant': drawRemnant(ctx, this.r, this.phase, world.time, this.cameBack); break;
       case 'drop': drawDrop(ctx, this.r, this.phase, world.time); break;
       default: drawChip(ctx, this.r, this.phase);
@@ -6461,6 +6546,63 @@ function drawAnvil(ctx, r, phase, time) {
  * alive on the screen while it does nothing but hold a line -- ANVIL's
  * rivets, for the same reason and the same two arguments.
  */
+/**
+ * MIRE: a soft shell with the ground running off it.
+ *
+ * The guide's own picture, and the thing it has to read as is WET -- this is
+ * the one body whose payload is the floor behind it, so the silhouette says
+ * "something is coming off this" rather than "this will hurt you". A bell
+ * shell with three drips hanging under it, each on its own clock, and two pale
+ * highlights on the dome so it reads as a surface rather than a hole.
+ *
+ * `upright` on the type, so `Enemy.draw` does not turn it by the spawn roll:
+ * drips that hang sideways are build 310's EMBER-trail fault, and this shape
+ * is the third to need the flag for the same reason.
+ */
+function drawMire(ctx, r, phase, time) {
+  const lw = ctx.lineWidth;
+  // The dome: wide, low and closed, drawn with two curves rather than an arc
+  // so it is not a circle -- every other soft body in this game is one.
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.9, -r * 0.2);
+  ctx.bezierCurveTo(-r * 0.95, -r * 1.1, r * 0.95, -r * 1.1, r * 0.9, -r * 0.2);
+  ctx.bezierCurveTo(r * 0.8, r * 0.8, -r * 0.8, r * 0.8, -r * 0.9, -r * 0.2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Three drips, each falling on its own clock so the body reads as running
+  // rather than as pulsing in step.
+  ctx.lineWidth = Math.max(lw * 0.8, r * 0.055);
+  for (let k = -1; k <= 1; k++) {
+    const x = k * r * 0.42;
+    const drip = r * (0.72 + 0.3 * (0.5 + 0.5 * Math.sin(time * 2 + k * 2.1 + phase)));
+    ctx.beginPath();
+    ctx.moveTo(x, r * 0.46);
+    ctx.lineTo(x, drip);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, drip, r * 0.11, 0, TAU);
+    ctx.fill();
+  }
+  ctx.lineWidth = lw;
+  /*
+   * A SHEEN and not two dots. It was two round pale discs on the dome, meant
+   * as highlights, and rendered it read as a pair of EYES -- which turns the
+   * one body whose whole subject is corrupted matter into a friendly blob.
+   * Nothing could fail for it; the only way to find it is to draw the sheet
+   * and look. A single off-centre crescent along the upper left says "wet
+   * surface" instead, which is what a highlight was for.
+   */
+  const was = ctx.strokeStyle;
+  ctx.strokeStyle = rgba('#ffffff', 0.34);
+  ctx.lineWidth = Math.max(lw, r * 0.07);
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.16, r * 0.58, Math.PI * 1.08, Math.PI * 1.46);
+  ctx.stroke();
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = was;
+}
+
 function drawKite(ctx, r, phase, time) {
   const lw = ctx.lineWidth;
   const rock = Math.sin(time * 0.8 + phase) * 0.12;
@@ -10293,6 +10435,45 @@ export function gaitOf(type) {
       + `There is no default -- got ${JSON.stringify(g)}. See GAITS in config.js.`);
   }
   return g;
+}
+
+/**
+ * The ground a `serpent` type lays, and there is no default.
+ *
+ * Fourth mandatory block after `rides` (322), `respawn` (324) and `bond`
+ * (332), and it exists for the same measured reason: a second type declaring
+ * the gait would otherwise wear MIRE's radius, clock and reach in total
+ * silence, with no field to set and nothing to fail. A number about the GAIT
+ * is shared (`CFG.serpent`, the weave) and a number about the BODY is the
+ * type's.
+ *
+ * Called from `scripts/check-build.mjs` for every serpent type at BUILD time,
+ * which is where a bad declaration should be caught: a throw from inside the
+ * rAF loop is build 288's freeze rather than an error anybody reads.
+ */
+export const STAIN_KEYS = ['every', 'rRim', 'rFloor', 'life', 'eat', 'tick'];
+
+export function stainOf(type) {
+  const st = type && type.stain;
+  if (!st || typeof st !== 'object') {
+    throw new Error(`${type && type.id}: a 'serpent' type must declare stain `
+      + `{${STAIN_KEYS.join(', ')}}. There is no default.`);
+  }
+  for (const k of STAIN_KEYS) {
+    const v = st[k];
+    if (!Number.isFinite(v) || v <= 0) {
+      throw new Error(`${type.id}: stain.${k} must be a number above zero, got ${v}`);
+    }
+  }
+  if (!(st.rFloor > st.rRim)) {
+    throw new Error(`${type.id}: stain.rFloor (${st.rFloor}) must exceed stain.rRim `
+      + `(${st.rRim}) -- the ground gets WIDER the closer it gets, which is the object`);
+  }
+  if (!(st.tick < st.life)) {
+    throw new Error(`${type.id}: stain.tick (${st.tick}) must be under stain.life `
+      + `(${st.life}), or the ground expires before it ever sweeps`);
+  }
+  return st;
 }
 
 export function beadsOf(type) {
