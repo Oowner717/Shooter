@@ -7910,3 +7910,114 @@ came from before believing the other one covers it.
   have destroyed the one useful property of a pure field addition, which is
   that green means nothing but a field arrived: build 284's rule about a rename
   and a rescale in the same build.
+
+- **PHASE 2 IS DONE FROM BUILD 339, AND TWO OF ITS THREE WORDS WERE REFUSED.**
+  The plan named `lurch`, `drag` and `wander`. Two were re-keys that DELETED a
+  field rather than adding a word, which is the shape worth having; one is a
+  second name for a shipped behaviour and one of the guide's other words turns
+  out not to be a gait at all.
+  **`drag` is the re-key.** The mechanism was keyed on `type.hurl`, a field
+  only TOW carried, and build 338 gave that body `march` with a note calling
+  the declaration INCOMPLETE rather than false — true of its own path, silent
+  about `steer` calling `windUp` for it every frame and about what it drives
+  being a SECOND body. Exactly TWO of the five `type.hurl` reads are
+  FLAG-USES — `steer`'s decision to wind and the death path's decision to let
+  go — and only those moved; the other three reach into the block for its
+  values, and `type.hurl` STAYS as the block. That is the shape
+  `rides`/`respawn`/`bond`/`lob` already have: a gait word saying WHAT the
+  body does, and a block saying with what numbers. Proved identical over the
+  roster (exactly one type carried the field, exactly that type declares the
+  word) and the hash came back `-1334607133`.
+  **The word is the HEAD's, and the guide uses it both ways** — its own table
+  gives TOW `standoff · drag` and MASS `drag → tumble`. The roster's
+  convention settles it: `ride` is on the rider and not the host, `chain` on
+  the beads and not on what they follow. And giving it to the MASS would be
+  worse than imprecise: both flag-uses are `gait === 'drag' && this.tether`
+  and a MASS HAS a tether, so it would start calling `windUp`, which is the
+  head's method reading the head's block.
+  **A mote off a TOW carries `drag` and cannot use it, and that door was
+  already shut** — measured, not asserted: 5 motes shed, all with
+  `gait: 'drag'`, **0 with a tether and 0 that ever wound** over three
+  seconds. `this.tether` is the second conjunct and `shed` never sets one.
+  Build 332's LOOM `beam` finding again, and the better outcome — but only
+  knowable by checking.
+- **`wander` IS REFUSED, AND THE GUIDE'S OWN ENTRY SAYS WHY: `who: 'nothing,
+  now'`.** DRIFT owned it until build 298 and `hover` has been the word since;
+  the `wander()` METHOD is what implements `hover`, at the harmless switch's
+  `case 'hover': default:` arm. So a `wander` row would be a second name for a
+  shipped behaviour with NO type declaring it — the `kind: 'works'` fault, a
+  table entry making a promise the code is not keeping. The method keeps its
+  name because it is a good one; the vocabulary does not need two words for
+  one gait.
+- **`thrown` IS REFUSED TOO, AND IT IS THE MORE INTERESTING REFUSAL.** The
+  guide's vocabulary lists it (`who: 'MASS, and every knockback'`) and it is
+  genuinely "already in the game", which is exactly what makes it tempting. It
+  cannot be a gait for a STRUCTURAL reason: a gait is a property of the TYPE,
+  and `thrown` is a per-body COUNTDOWN — `this.thrown = 0` in the constructor,
+  written to 0.2 by an ability, 0.4–0.5 by four boss sites and 2.2 by a TOW's
+  release, decremented in `drive`'s second early return, and **no type
+  declares it or could**. What it describes is a state a body passes through,
+  not what it does when nothing has happened to it. A MASS spends 2.2 seconds
+  of its life thrown and the rest marching on a tether, which makes `thrown`
+  the loudest second of its life and not its gait. **"Already in the game" is
+  an argument for a word only if what is already there is a property of the
+  type.**
+- **MIRE IS RE-SPECced AT BUILD 339, AND ALL THREE OF ITS PAYLOAD CLAUSES
+  MEASURED EMPTY.** It is the one object of the nineteen that is not built and
+  the guide says it wants a re-spec first. The body, the gait and the counter
+  are kept; the payload is replaced. This is GYRE's method (331) and KITE's
+  bolt's (336) a third time.
+  - **"a mine takes twice as long to arm"** — `CFG.mines.inPlay` false since
+    build 289. A payload on a system with no door, which is what GYRE was
+    withdrawn for.
+  - **"a DECOY decays"** — the DECOY is in `LOCKABLE.abilities`, so it is a
+    purchase, and `life` 9 against a cooldown of 24 is **37.5% duty** for a
+    player pressing it the instant it recharges and **0%** for one who never
+    bought it. GYRE's clause verbatim.
+  - **"the intake pulls at half rate" has THREE readings and all three are
+    dead**, which is why the ambiguity was worth resolving rather than
+    guessing. `intakeRate()` reads `world.attackers.size` and nothing else, and
+    a body at range cannot be in that set. `world.up.intake` banks a drop that
+    TOUCHES the machine. And `CFG.energy.pull` — the 26 u/s² `collectData`
+    applies — is **measurably inert**, because drops are STEERED as well as
+    pulled (`physicsStep` calls `steer` on `world.drops`) and a mote's own
+    `accel` 300 does essentially all the work. Measured, mean distance closed
+    in three seconds over eight bodies' salvage: **268.1 at the full pull,
+    248.5 at half, and 265.9 at ZERO.** Turning it off entirely changes
+    nothing, and the half reading is BELOW the zero reading — three draws
+    inside each other's noise.
+- **WHAT REPLACED IT IS SALVAGE, AND THE PRIMITIVE IS SHIPPED.** A ground
+  effect needs a channel that is always on, needs no purchase, has no duty
+  cycle and costs no health — that last one because "it does no damage at all"
+  is the object's core rather than a detail. `Enemy.feed` is it: a GLUT walking
+  `world.drops`, marking each one `dead` and `dissolved` under the comment
+  "eaten, not destroyed: it must not score", paying nothing. MIRE's ground is
+  that at a different site, and it makes the counter LITERALLY true — a short
+  trail eats less.
+- **THE GAIT IS GENUINELY NEW, AND MY FIRST READING WAS WRONG.** `ROUTES`
+  already contains a `serpentine` (width 250, weave 0.55), so "grep for the
+  mechanism that already does it" looked like it had an answer. It does not:
+  `routeLateral` scales its offset by `reach = (d / 520k) ** commit` and
+  `closing = (d - 170k) / 210k`, **both of which go to zero as the body
+  closes**, so every route in the game FOLDS IN — and `serpent`'s whole
+  picture is an amplitude that GROWS with depth. No combination of
+  `width`/`weave`/`commit` can invert a monotone factor. Caught before it was
+  written down, which is the only reason it is a note rather than a bug.
+- **AND BAND 6 DOES NOT EXIST, SO THE SPEC'S BAND AND THREAT BOTH MOVED.**
+  `perBand` is 7 against a `ceiling` of 49, so the five authored bands cover
+  rungs 1–35 and everything above CLAMPS to band 5 — and build 332's rule is
+  that a band wants a roster, not a member. MIRE is band 5 (rungs 29–35), and
+  band 5's mean threat is **36.30**, so its wave has to weigh **32.67–39.93**
+  to stay inside build 315's ±10% lever. Its authored `threat: 7` became 5,
+  because `threatOf` is `hp / threatPerHp` = 160/30 = **5.33** and the budget
+  cannot see a payload — the same blind spot FLINT's armour, LATCH's host,
+  CHAFF's assist, LOOM's thread and KITE's station all sit in.
+- **AND THE RE-SPEC NEARLY SHIPPED AS TWO DEAD FIELDS IN THE ONE DOCUMENT
+  THAT IS ABOUT DEAD FIELDS.** The prose went into the data as `respec` and
+  `notes`, and the plate renderer reads exactly seventeen keys —
+  `name band levels threat fam r hp speed accel armor drops gait count
+  counter what harmless mods` — and neither of those. Caught by grepping the
+  renderer for what it actually reads rather than assuming a data file is
+  read; both render now, as two further sections on the card. **A field added
+  to a table is a claim that something reads it**, and the cheapest check is
+  one grep of the reader.

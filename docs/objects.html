@@ -1141,10 +1141,12 @@
         }
       } },
 
-    { name: 'MIRE', band: 6, levels: '36–42', threat: 7, fam: 'volatile', r: 24, hp: 160, speed: 30, accel: 100, armor: 0, drops: 4,
-      gait: 'serpent', count: 'one or two',
-      what: 'Weaves down the field painting corrupted ground behind it, wider the closer it gets. Standing in it, a mine takes twice as long to arm, a DECOY decays, and the intake pulls at half rate. It does no damage at all.',
-      counter: 'Kill it early and the trail is short. The ground it has already laid fades on its own clock, so the mistake is chasing the stain instead of the source.',
+    { name: 'MIRE', band: 5, levels: '29–35', threat: 5, fam: 'volatile', r: 24, hp: 160, speed: 30, accel: 100, armor: 0, drops: 4,
+      gait: 'serpent', count: 'a proportion, not a count',
+      respec: 'Build 339. The body, the gait and the counter are kept; the PAYLOAD was measured empty in all three of its clauses and is replaced. (1) "a mine takes twice as long to arm" — CFG.mines.inPlay has been false since build 289, so it is a payload on a system with no door, which is what GYRE was withdrawn for. (2) "a DECOY decays" — the DECOY is in LOCKABLE.abilities, so it is a purchase, and life 9 against cooldown 24 is 37.5% duty for a player pressing it the instant it recharges and 0% for one who never bought it: GYRE\'s clause verbatim. (3) "the intake pulls at half rate" has three readings and all three are dead. intakeRate() reads world.attackers.size and nothing else, and a body at range cannot be in that set; world.up.intake banks a drop that TOUCHES the machine; and CFG.energy.pull, the acceleration collectData applies, is measurably inert — drops are STEERED as well as pulled (physicsStep calls steer on world.drops), and a mote\'s own accel 300 does essentially all the work. Measured over eight bodies\' salvage, mean distance closed in three seconds: 268.1 at the full pull of 26, 248.5 at half, and 265.9 at ZERO. Turning it off entirely changes nothing.',
+      what: 'Weaves down the field painting corrupted ground behind it, wider the closer it gets. It does no damage at all — what it takes is the PAY: salvage that comes to rest in the stain is eaten by it, dissolved rather than destroyed, so it never reaches the purse. A clean kill over clean ground pays; the same kill over its trail pays nothing.',
+      counter: 'Kill it early and the trail is short, which is now literally what it costs — a short trail eats less. The ground it has already laid fades on its own clock, so the mistake is chasing the stain instead of the source. And nothing you own has to be bought for this to work: the answer is the gun and where you let bodies die.',
+      notes: 'Why salvage: it is the one channel a ground effect can reach that is always on, needs no purchase, has no duty cycle, and costs no health — which keeps "it does no damage at all", the object\'s core. The primitive is shipped: Enemy.feed (a GLUT eating world.drops) marks each one dead and dissolved under the comment "eaten, not destroyed: it must not score", and pays nothing. MIRE\'s ground is that at a different site. The gait is genuinely new and no route can express it: routeLateral scales its offset by reach = (d/520k)^commit and closing = (d-170k)/210k, both of which go to ZERO as the body closes, so every route FOLDS IN — and serpent\'s whole picture is an amplitude that GROWS with depth. ROUTES already has a "serpentine" (width 250, weave 0.55), which is the thing to not mistake it for. Band 6 does not exist: perBand is 7 against a ceiling of 49, so the five authored bands cover rungs 1–35 and everything above clamps to band 5 — and a band wants a roster, not a member. Band 5\'s mean threat is 36.30, so MIRE\'s wave has to weigh 32.67–39.93 to stay inside the ±10% lever. threat is 5 and not 7 because threatOf is hp/threatPerHp = 160/30 = 5.33; the budget cannot see a payload, which is the same blind spot FLINT\'s armour, LATCH\'s host, CHAFF\'s assist, LOOM\'s thread and KITE\'s station all sit in.',
       view: 40, viewAct: 76,
       draw: function (c, R, t, act) {
         if (act) {
@@ -1684,7 +1686,17 @@
 
       var blurb = document.createElement('div');
       blurb.className = 'blurb';
-      blurb.innerHTML = '<p>' + s.what + '</p><p class="counter"><b>Answer</b>' + s.counter + '</p>';
+      /*
+       * `respec` and `notes` are rendered rather than left in the data,
+       * because a field this renderer does not read is the `kind: 'works'`
+       * fault -- a table entry making a promise the code is not keeping --
+       * and it would be a poor place to commit it, this page being where that
+       * pattern is documented. Both are optional; only MIRE carries them
+       * today.
+       */
+      blurb.innerHTML = '<p>' + s.what + '</p><p class="counter"><b>Answer</b>' + s.counter + '</p>'
+        + (s.respec ? '<p class="counter"><b>Re-spec</b>' + s.respec + '</p>' : '')
+        + (s.notes ? '<p class="counter"><b>Why</b>' + s.notes + '</p>' : '');
       left.appendChild(blurb);
 
       var dl = document.createElement('dl');

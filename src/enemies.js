@@ -2172,7 +2172,14 @@ export class Enemy {
   steer(world, dt) {
     this.shoveFade(dt);
     this.drive(world, dt);
-    if (this.type.hurl && this.tether) this.windUp(world, dt);
+    /*
+     * The wind-up, keyed on the GAIT from build 339 rather than on a
+     * `type.hurl` field only this type carried. One source of truth, and it
+     * gives `drag` its dispatch arm. `this.tether` is what tells the HEAD
+     * from the load it drags: both halves have one, and only the head
+     * declares `drag`.
+     */
+    if (this.type.gait === 'drag' && this.tether) this.windUp(world, dt);
     this.face(dt, world);
   }
 
@@ -3600,7 +3607,9 @@ export class Enemy {
      * its own release, with its own clearing shove, rather than being scattered
      * by whatever else this death is about to do.
      */
-    if (t.hurl && this.tether) {
+    // ...and the same gait test, for the same reason. `t.hurl.wind` below is
+    // a VALUE read and stays: the block is still the block.
+    if (t.gait === 'drag' && this.tether) {
       this.release(world, (this.wind || 0) / t.hurl.wind);
     }
 

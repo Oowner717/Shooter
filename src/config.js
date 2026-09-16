@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '338';
+export const BUILD = '339';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '338';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'd951dd3';
+export const REV = 'a90395c';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -6664,18 +6664,37 @@ export const ENEMY_TYPES = [
     opens: kB(3400),
     name: 'TOW',
     /*
-     * MARCH, and unlike the MASS it drags this really is this body's own path:
-     * nothing excludes the head from the route branch, and `windUp` only
-     * BLEEDS its wind when out of range rather than holding it, so it keeps
-     * closing and winds once inside `hurl.range`. What `march` is silent
-     * about is that `steer` calls `windUp` for it every frame, keyed on
-     * `type.hurl` -- a separate field, the way `lurch` was until build 338 --
-     * and that the thing that drives is a SECOND body. The guide's word for
-     * it is `drag`; the part of `drag` that is not a march belongs to the
-     * pair rather than to this body's path, which is why the declaration is
-     * incomplete rather than false.
+     * ---- DRAG, re-keyed off `type.hurl` in build 339 --------------------
+     *
+     * This is phase 2's second word and it went in the same way `lurch` did:
+     * the mechanism was keyed on a FIELD only this type carried, so the word
+     * and the behaviour could get out of step. Build 338 gave this body
+     * `march` and wrote a note saying the declaration was INCOMPLETE rather
+     * than false -- true of this body's own path, and silent about the fact
+     * that `steer` calls `windUp` for it every frame and that what it drives
+     * is a SECOND body. `drag` says both.
+     *
+     * A MODIFIER, not a replacer: `steer` is `drive` then `windUp`, so the
+     * route branch still runs and this body arrives by its own arc like
+     * anything else -- the same shape as `lurch`, `paired` and `cartwheel`.
+     *
+     * `type.hurl` STAYS, as the BLOCK it always was (range, wind, speed,
+     * holdWind, partial, clear, shock, shockFor), read for its values at
+     * three sites. Only the two FLAG-USES moved -- `steer`'s decision to wind
+     * and the death path's decision to let go -- which is the shape
+     * `rides`/`respawn`/`bond`/`lob` already have: a gait word that says
+     * WHAT this body does, and a block that says with what numbers.
+     *
+     * The word is the HEAD's, and docs/objects.html uses it both ways (its
+     * own table gives TOW `standoff . drag` and MASS `drag -> tumble`). The
+     * roster's convention settles it: `ride` is on the RIDER and not the
+     * host, `chain` on the beads and not on what they follow. `drag` is on
+     * the body that does the dragging. Giving it to the MASS would be worse
+     * than imprecise -- both flag-uses are `gait === 'drag' && this.tether`
+     * and a MASS has a tether, so it would start calling `windUp`, which is
+     * the head's method and reads the head's block.
      */
-    gait: 'march',
+    gait: 'drag',
     shape: 'tow',
     r: 18,
     hp: 135,
@@ -8036,17 +8055,41 @@ export const WAVES = [
  *   the word it needs no vocabulary exemption either, because `drive` now
  *   dispatches on it.
  *
- * So the route branch at the foot of the chain is reached by march, by the two
- * modifiers, and by a handed-back hop -- NOT by march alone. A function table
- * keyed one-per-gait cannot say that, and turning the chain into one would
- * change what those three bodies do. Phase 2 (naming lurch, drag and wander)
- * and phase 3 (a route allow-list per type) both land inside this shape, and
- * whichever build takes them owes this paragraph a re-read. `lurch` was one
- * of phase 2's three and arrived here instead, because re-keying it DELETED a
- * field rather than adding a word; `drag` and `wander` are still to come and
- * neither is a one-liner -- `drag` has no single field to re-key (the
- * mechanism is a `tether` plus the head's `hurl`) and `wander` is what the
- * harmless switch's default arm already does.
+ * So the route branch at the foot of the chain is reached by march, by the
+ * three modifiers, and by a handed-back hop -- NOT by march alone. A function
+ * table keyed one-per-gait cannot say that, and turning the chain into one
+ * would change what those bodies do. Phase 3 (a route allow-list per type)
+ * lands inside this shape and owes this paragraph a re-read.
+ *
+ * ---- PHASE 2 IS DONE, AND TWO OF ITS THREE WORDS WERE REFUSED -----------
+ *
+ * The plan named `lurch`, `drag` and `wander`. Two of them were re-keys that
+ * DELETED a field rather than adding a word, which is the shape worth having:
+ * `lurch` (build 338, off `lurch: true`) and `drag` (build 339, off the
+ * flag-use of `type.hurl`). Both were proved identical over the roster --
+ * exactly one type carried the old field and exactly that type declares the
+ * new word -- and neither moved the ORDINAL hash.
+ *
+ * `wander` IS REFUSED, and the guide says why in its own entry: `who:
+ * 'nothing, now'`. DRIFT owned it until build 298 and `hover` has been the
+ * word since; the `wander()` METHOD is what implements `hover`, at the
+ * harmless switch's `case 'hover': default:` arm. So a `wander` row would be
+ * a second name for a shipped behaviour with NO type declaring it, which is
+ * the `kind: 'works'` fault -- a table entry making a promise the code is not
+ * keeping. The method keeps its name because it is a good one; the vocabulary
+ * does not need two words for one gait.
+ *
+ * `thrown` IS REFUSED TOO, and it is the more interesting refusal, because
+ * the guide's vocabulary lists it (`who: 'MASS, and every knockback'`) and it
+ * is genuinely "already in the game". It cannot be a gait for a reason that
+ * is structural rather than a matter of taste: a gait is a property of the
+ * TYPE, and `thrown` is a per-body COUNTDOWN. `this.thrown = 0` in the
+ * constructor, written to 0.2 by an ability, 0.4-0.5 by four boss sites and
+ * 2.2 by a TOW's release, and decremented in `drive`'s second early return --
+ * NO type declares it, and none could, because what it describes is a state a
+ * body passes through rather than what it does when nothing has happened to
+ * it. A MASS spends 2.2 seconds of its life thrown and the rest marching on a
+ * tether; that makes `thrown` the loudest second of its life, not its gait.
  */
 export const GAITS = {
   march: 'the default and the base the rest are named against: one of six routes, swung wide at range and folded in as the body closes, with a heading wobble on top',
@@ -8056,6 +8099,7 @@ export const GAITS = {
   chain: 'follow the leader -- each body steers at the one ahead, so a cut leaves two snakes',
   roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
   flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
+  drag: 'the ordinary march, plus a load on a tether that it winds and throws -- the word is the HEAD\'s, the thing doing the dragging, and the route branch still runs',
   lurch: 'the ordinary march, plus a shove forward every second or two instead of a glide -- the route branch still runs',
   cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
   paired: 'two bodies on a rigid link, turning about their midpoint while the midpoint advances -- held at a fixed length by a YOKE, walked apart by a LOOM',
