@@ -805,53 +805,133 @@ console.log(`routes: ${ROUTES.length} march routes; ${pinned.length} types name 
   + `(${REPLACERS.join(' ')})`);
 
 /*
- * ---- THE DIFFERENTIAL INSTRUMENT HAS TO SAY WHICH TREE IT READ ----------
+ * ---- EVERY DIFFERENTIAL INSTRUMENT HAS TO SAY WHICH TREE IT READ --------
  *
- * Build 344. `fight.mjs --url` is how a hash differential is taken against an
- * old commit, and build 343 took three readings that were silently of the
- * LIVE tree: this container's `http-server` serves its own CWD and ignores a
+ * Build 344 wrote this for `fight.mjs` alone and named the other four `--url`
+ * probes as sharing the exposure and lacking the check. Build 345 closes
+ * that, and the reason it is ONE helper rather than five copies is the rule
+ * this repo keeps paying for: five copies is a hand-kept list, and this guard
+ * would then have to name five sites and go stale at the sixth.
+ *
+ * The fault: this container's `http-server` serves its own CWD and ignores a
  * trailing path, so pointing it at a worktree from the repo directory serves
- * the repo. The reading looks perfect and is of the wrong code, which is the
- * exact shape of build 340's positional-parser fault.
- *
- * `fight.mjs` fetches the served `config.js` and prints the BUILD and REV it
- * is really talking to, and `--expect NNN` refuses a mismatch. That is the
- * only part of this that cannot be skim-read past, so it is the part worth
- * guarding: a `console.log` in a guard script is not a guard (build 329), and
- * a verification nothing asserts is a verification somebody deletes.
+ * the repo. The reading looks perfect and is of the wrong code -- the exact
+ * shape of build 340's positional-parser fault. `served.mjs` fetches the
+ * served `config.js`, prints the BUILD and REV, and `--expect NNN` refuses a
+ * mismatch: the refusal is the only part that cannot be skim-read past, so it
+ * is the part worth guarding. A `console.log` in a guard script is not a
+ * guard (build 329), and a verification nothing asserts is one somebody
+ * deletes.
  *
  * Read off the source rather than pinned to a value, the way the `formable()`
- * call sites are -- so the guard survives the message being reworded and
- * fails if the fetch or the refusal goes.
+ * call sites are, so a reworded message survives and a removed fetch does
+ * not. And the PROBE LIST is derived by asking the directory which files take
+ * `--url` -- `world.apertures` sized 8 against 9 anomalies is what a written
+ * list costs.
  */
-const fightSrc = readFileSync(new URL('../scripts/fight.mjs', import.meta.url), 'utf8');
-const fightNeeds = [
-  ["reads the served tree", /fetch\(`\$\{root\}\/src\/config\.js`\)/],
-  ["parses the served BUILD", /export const BUILD = '\(\[\^'\]\*\)'/],
-  ["prints which tree it read", /console\.log\(`\\nserving \$\{BASE\}/],
-  ["refuses a mismatch with --expect", /process\.exit\(1\)/],
-  ["names the cwd remedy in the refusal", /cd <worktree> && http-server/],
+const servedSrc = readFileSync(new URL('../scripts/served.mjs', import.meta.url), 'utf8');
+const servedNeeds = [
+  ['reads the served tree', /fetch\(`\$\{root\}\/src\/config\.js`\)/],
+  ['parses the served BUILD', /export const BUILD = '\(\[\^'\]\*\)'/],
+  ['prints which tree it read', /console\.log\(`\\nserving \$\{base\}/],
+  ['warns when it cannot read one', /UNKNOWN tree/],
+  ['refuses an --expect mismatch', /abort: true/],
+  ['names the cwd remedy in the refusal', /cd <worktree> && http-server/],
 ];
-const fightBad = fightNeeds.filter(([, re]) => !re.test(fightSrc)).map(([what]) => what);
-if (fightBad.length) {
-  console.error(`fight.mjs: the served-tree verification is incomplete -- missing: `
-    + `${fightBad.join('; ')}. Build 343 took three hash readings of the wrong tree `
+const servedBad = servedNeeds.filter(([, re]) => !re.test(servedSrc)).map(([w]) => w);
+if (servedBad.length) {
+  console.error(`served.mjs: the served-tree verification is incomplete -- missing: `
+    + `${servedBad.join('; ')}. Build 343 took three hash readings of the wrong tree `
     + `because http-server serves its CWD and ignores a trailing path; the fetch and `
     + `the --expect refusal are what make that visible.`);
   process.exit(1);
 }
+const probeDir = new URL('../scripts/', import.meta.url);
+const urlProbes = readdirSync(probeDir)
+  .filter((f) => f.endsWith('.mjs') && f !== 'served.mjs')
+  .filter((f) => /flag\('url'/.test(readFileSync(new URL(f, probeDir), 'utf8')))
+  .sort();
+if (!urlProbes.length) {
+  console.error('served.mjs: no probe takes --url, so this guard is asserting nothing -- '
+    + 'the detection (a `flag(\'url\'` call) has drifted, not the exposure');
+  process.exit(1);
+}
+const probeBad = [];
+for (const f of urlProbes) {
+  const s = readFileSync(new URL(f, probeDir), 'utf8');
+  if (!/import \{ checkServed \} from '\.\/served\.mjs'/.test(s)) {
+    probeBad.push(`${f} takes --url and does not import checkServed`);
+  } else if (!/await checkServed\(/.test(s)) {
+    probeBad.push(`${f} imports checkServed and never calls it`);
+  } else if (!/if \(wrongTree\) process\.exit\(1\)/.test(s)) {
+    probeBad.push(`${f} calls checkServed and does not exit on its verdict, `
+      + 'so the refusal is a print');
+  }
+}
+if (probeBad.length) {
+  for (const line of probeBad) console.error(`served: ${line}`);
+  console.error('served: a probe that takes --url can be pointed at a worktree, and this '
+    + "container's http-server serves its own CWD -- so without the check its "
+    + 'differential can read the live tree twice and report "identical either side".');
+  process.exit(1);
+}
+console.log(`served: all ${urlProbes.length} --url probe(s) (${urlProbes.join(' ')}) read, `
+  + `print and refuse on the served BUILD via served.mjs`);
+
 /*
- * ...and the other four probes that take `--url` share the exposure and do
- * NOT have this yet. Named rather than guarded, because adding the check to
- * them is its own change and failing the build for it now would be failing it
- * for something this commit deliberately did not do.
+ * ---- AND A POSITIONAL HAS TO BE A POSITIONAL ---------------------------
+ *
+ * The same family as the block above -- an instrument confidently measuring
+ * the wrong thing -- and this is the THIRD place the parser has been written.
+ *
+ * Build 340 found `fight.mjs` taking its anomaly number as
+ * `argv.find((a) => /^\d+$/.test(a))`, so the documented
+ * `--seed 20260824 --hash 9000` ran "ANOMALY 20260824" and every hash that
+ * probe had ever printed was of a degenerate fight. It fixed the one file.
+ * `dps.mjs` and `variance.mjs` carried the identical line until build 345,
+ * and the fault needed no new flag to be reachable: `variance.mjs --runs 3`
+ * ran anomaly 3. Adding the numeric `--expect` is what made it obvious --
+ * measured, `dps.mjs --expect 345` printed `ANOMALY 345` and carried on.
+ *
+ * So the rule, derived rather than listed: any probe that reads a bare-number
+ * positional out of its own arguments must skip a token that is a preceding
+ * flag's VALUE. The `find`-the-first-number form is refused outright, because
+ * it cannot do that by construction.
  */
-const urlProbes = ['contact.mjs', 'dps.mjs', 'tiers.mjs', 'variance.mjs']
-  .filter((f) => /flag\('url'/.test(
-    readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8')));
-console.log(`fight.mjs: reads and prints the served BUILD/REV and refuses on --expect `
-  + `mismatch; ${urlProbes.length} other --url probe(s) (${urlProbes.join(' ')}) share the `
-  + `http-server-serves-its-CWD exposure and are unguarded`);
+const POSNAL = /(?:args|argv)\.find\(\(a\) => \/\^\\d\+\$\/\.test\(a\)\)/;
+const POSOK = /\/\^\\d\+\$\/\.test\((?:args|argv)\[i\]\)/;
+const SELF = import.meta.url.split('/').pop();
+const posProbes = readdirSync(probeDir)
+  // ...skipping THIS file, because the guard's own regex source contains the
+  // pattern it is searching for and it matched itself on the first run. Derived
+  // from `import.meta.url` rather than written out: an exemption list of one
+  // is still a list, and `pgrep -f` matching its own shell is the same fault
+  // in a different costume -- three times in this repo's history.
+  .filter((f) => f.endsWith('.mjs') && f !== SELF)
+  .map((f) => [f, readFileSync(new URL(f, probeDir), 'utf8')])
+  .filter(([, s]) => POSNAL.test(s) || POSOK.test(s))
+  .sort();
+if (!posProbes.length) {
+  console.error('positional: no probe reads a bare-number positional, so this guard is '
+    + 'asserting nothing -- the detection has drifted, not the exposure');
+  process.exit(1);
+}
+const posBad = [];
+for (const [f, s] of posProbes) {
+  if (POSNAL.test(s)) {
+    posBad.push(`${f} takes its positional as the FIRST bare number in its arguments, `
+      + "so a numeric flag's value (--expect 345, --runs 3) is read as the positional -- "
+      + 'build 340\'s fault, which made every hash that probe printed a different fight');
+  } else if (!/if \(i > 0 && \/\^--\/\.test\((?:args|argv)\[i - 1\]\)\) continue;/.test(s)) {
+    posBad.push(`${f} reads a bare-number positional and does not skip a flag's value`);
+  }
+}
+if (posBad.length) {
+  for (const line of posBad) console.error(`positional: ${line}`);
+  process.exit(1);
+}
+console.log(`positional: all ${posProbes.length} probe(s) with a bare-number positional `
+  + `(${posProbes.map(([f]) => f).join(' ')}) skip a flag's value`);
 
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];

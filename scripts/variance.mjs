@@ -51,12 +51,13 @@
  * the shortest, converted into seconds, term by term. That is the whole point:
  * the gap stops being a hypothesis and becomes a line in a table.
  *
- *   node scripts/variance.mjs 1 [--runs 7] [--cap 900] [--url ...]
+ *   node scripts/variance.mjs 1 [--runs 7] [--cap 900] [--url ...] [--expect NNN]
  */
 
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+import { checkServed } from './served.mjs';
 const { chromium } = require('playwright');
 
 const args = process.argv.slice(2);
@@ -64,10 +65,42 @@ const flag = (name, def) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : def;
 };
-const N = Number(args.find((a) => /^\d+$/.test(a)) || 1);
+/*
+ * The positional is read as a positional: the first token that is a bare
+ * number AND is not the value of a preceding `--flag`.
+ *
+ * Build 345, and it is build 340's fault verbatim -- that build found
+ * `fight.mjs` taking its anomaly as `argv.find(/^\d+$/)`, so the documented
+ * `--seed 20260824 --hash 9000` ran "ANOMALY 20260824" and every hash it had
+ * ever reported was of a degenerate fight. It fixed the one probe. This one
+ * and `variance.mjs` had the identical line, and the fault is reachable
+ * without any new flag: `variance.mjs --runs 3` runs anomaly 3. Adding the numeric
+ * `--expect` is what made it obvious -- measured, `variance.mjs --expect 345`
+ * printed `ANOMALY 345` and carried on.
+ *
+ * `check-build.mjs` derives the set of probes that take a bare-number
+ * positional and fails the build for one whose parser does not skip a flag's
+ * value, because this is now the third place it has been written.
+ */
+const N = (() => {
+  for (let i = 0; i < args.length; i++) {
+    if (!/^\d+$/.test(args[i])) continue;
+    if (i > 0 && /^--/.test(args[i - 1])) continue; // it is a flag's value
+    return Number(args[i]);
+  }
+  return 1;
+})();
 const RUNS = Number(flag('runs', 7));
 const CAP = Number(flag('cap', 900));
 const URL = flag('url', 'http://127.0.0.1:8099/index.html');
+// Which tree is this reading? `scripts/served.mjs` carries the whole
+// finding; the short version is that this container's http-server serves
+// its own CWD and ignores a trailing path, so a `--url` differential can
+// silently read the live tree twice. The heading names the served BUILD
+// every run and `--expect NNN` refuses a mismatch, because printing is not
+// guarding. Called before the browser launches, so `abort` is a plain exit.
+const { abort: wrongTree } = await checkServed(URL, flag('expect', null), 'variance.mjs');
+if (wrongTree) process.exit(1);
 
 const browser = await chromium.launch();
 const runs = [];

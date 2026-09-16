@@ -8603,3 +8603,130 @@ came from before believing the other one covers it.
   a route allow-list cannot reach it. **That is the shape to aim for -- a
   differential is worth most when it CONFIRMS an argument you could already
   make, and worth least when it is the only thing holding the claim up.**
+
+- **BUILD 345 RE-TAKES THE TWO AT-RISK HASH DIFFERENTIALS AND BOTH CLAIMS
+  HOLD, WHICH IS THE OUTCOME THAT WAS LEAST INFORMATIVE AND STILL WORTH
+  HAVING.** Build 344's own recorded debt was that builds 332 and 333 both
+  reported "`-1334607133` either side" through a second server, and that by
+  344's own tell a NO-MOVE reading is exactly what a stale serve produces and
+  cannot be told apart from it -- with a second, independent reason to void
+  them, which is that both predate 340's positional-parser fix and so were
+  reading the degenerate "ANOMALY 20260824" fight rather than ORDINAL.
+  Re-taken properly -- `cd <worktree> && http-server` with no path, the
+  CURRENT `fight.mjs`, and `--expect NNN` confirming the served BUILD in the
+  probe's own heading every run -- **builds 331 through 338 all read
+  `1664149562`, with all six intermediate marks, all six body counts and the
+  final hash identical to the digit.** So build 332's new door in
+  `resolveSegment` (the one place a round is tested against anything, on
+  `fight.mjs`'s own hot path) and build 333's new condition on `applyDamage`
+  (the door every hit in a boss fight comes through) both provably touched no
+  existing body, and 337's removal of a branch from `updateProjectiles` and
+  338's mandatory `gait` field read eleven times per body per frame did too.
+  **The conclusions were all sound and none of the readings were**, which is
+  the distinction worth keeping: a differential instrument measuring the wrong
+  thing still looks like it is working, and the only way to find out is to
+  make it say which tree it read.
+  **Measure the whole window rather than its ends.** The cheap version of this
+  was 331 against 332 and 332 against 333, and it would have left 334-338
+  resting on the degenerate figure with 339 established only by 340's own
+  reading. Eight builds at ~40 seconds each closes it outright, and agreeing
+  on SIX MARKS across eight builds is a stronger claim than agreeing on the
+  final hash, which could in principle hide two offsetting moves. The
+  unbroken run is now 331 -> 343, where the wobble fix moved it to
+  `-954811922`.
+  Rolled through ONE worktree with `git checkout` between runs rather than
+  eight worktrees and eight servers -- `-c-1` disables caching, so the server
+  serves whatever is on disk, and `--expect` is what confirms each checkout
+  took. That is also what kept the container clean: build 344's session left
+  seven strays because they could not be killed by pattern.
+- **THE SERVED-TREE CHECK IS ONE HELPER FROM BUILD 345, NOT FIVE COPIES.**
+  344 wrote it inside `fight.mjs` and NAMED the other four `--url` probes as
+  sharing the exposure and lacking it (`contact.mjs`, `dps.mjs`, `tiers.mjs`,
+  `variance.mjs`) -- deliberately, because adding it was its own change. All
+  five read it out of `scripts/served.mjs` now, called immediately after the
+  `--url` flag resolves and BEFORE any browser launches, so `abort` is a
+  plain exit and the helper never has to know what the caller opened.
+  **Five copies would have been the hand-kept-list fault, and the guard is
+  where it would have bitten**: `check-build` would have had to name five
+  sites and would have gone stale at the sixth. It asks the DIRECTORY instead
+  -- every `scripts/*.mjs` containing a `flag('url'` call must import
+  `checkServed`, call it, and exit on its verdict -- which is the
+  `formable()` idiom and `ANOMALIES.length`'s. Proved in five directions
+  against a scratch copy: a probe losing the import, importing and never
+  calling, calling and not exiting, `served.mjs` losing its fetch, and the
+  VACUITY arm, where renaming `flag('url'` away makes the probe list empty
+  and the guard fails rather than passing with nothing to assert.
+  Both live paths proved on all five probes as well, because a guard on the
+  source says nothing about the runtime: pointed at build 338 with
+  `--expect 344` each one refuses, names itself and quotes the `cd`-first
+  remedy, and exits before launching a browser; pointed at the live tree with
+  `--expect 344` none refuses and each prints `build 344`. And an unreachable
+  server warns that the reading is of an UNKNOWN tree rather than claiming
+  one.
+- **`contact.mjs` GETS THE CHECK TOO, AND IT IS THE ONE THAT NEEDS IT
+  LEAST.** It has no assertion and exits 0 whatever it draws, so a sheet of
+  the wrong tree's marks is not a false measurement in the way a hash is.
+  It is in because the guard asks the directory: an exemption would be a
+  hand-kept list of one, and the next probe to arrive would inherit the
+  argument for being left out. **A derived guard is worth a little
+  over-coverage.**
+- **AND ADDING A NUMERIC FLAG EXPOSED BUILD 340'S POSITIONAL FAULT IN TWO
+  MORE PROBES, WHERE IT HAD BEEN REACHABLE ALL ALONG.** 340 found
+  `fight.mjs` reading its anomaly number as
+  `argv.find((a) => /^\d+$/.test(a))`, so the documented
+  `--seed 20260824 --hash 9000` ran "ANOMALY 20260824" -- and fixed the one
+  file. `dps.mjs` and `variance.mjs` carried the identical line, and
+  **`--runs 3` was enough to trigger it**: with no positional the first bare
+  number in the arguments is the flag's value, so `variance.mjs --runs 3` ran
+  anomaly 3 and said so in a heading nobody reads. Measured on the shipped
+  code before the fix, `dps.mjs --expect 345` printed **`ANOMALY 345`** and
+  carried on. After it: no positional gives ANOMALY 1 on both, `dps.mjs 5
+  --expect 345` gives 5.
+  **The new flag did not create the fault, it made it obvious** -- which is
+  the argument for adding one: `--expect` is a numeric flag on five probes,
+  so any probe that confuses a flag value for a positional now does it on the
+  very invocation a careful differential uses. A latent fault reachable only
+  by a combination nobody types is a fault that waits; make the common
+  invocation hit it.
+  `check-build` derives the probes that read a bare-number positional and
+  refuses the `find`-the-first-number form outright (it cannot skip a flag's
+  value by construction) as well as a loop missing the skip. Three revert
+  proofs plus the vacuity arm. **This is the third place that parser has been
+  written**, which is why the guard derives the set rather than naming it.
+- **THE GUARD'S OWN REGEX SOURCE MATCHED THE GUARD'S OWN FILE, WHICH IS
+  `pgrep -f` IN A FOURTH COSTUME.** `check-build.mjs` searches every
+  `scripts/*.mjs` for the broken parser's pattern -- and its own source
+  contains that pattern as a regex literal, so the first run failed the build
+  naming `check-build.mjs` itself. This repo has recorded the same self-match
+  three times on the process side (`pgrep -f` matching its own shell and
+  looking like a respawning process, `pkill -f` ending the turn's command at
+  exit 144, and a heredoc whose CONTENT carried the pattern). A sweep over
+  source has it too. The skip is `import.meta.url.split('/').pop()` rather
+  than the filename written out, because an exemption list of one is still a
+  list. **Any sweep that greps for a pattern has to exclude the file
+  containing the pattern, and the honest way to do that is to derive which
+  file that is.**
+- **REMAINING DEBT, NOT TAKEN AT 345: build 287's `tiers.mjs`
+  differential.** It compared build 283 on :8098 against 287 on :8099 across
+  the byte migration and reported `buys` identical at all twenty rungs and
+  the tier-20 loadout identical to the id. That is a NO-MOVE reading taken
+  through a second server, so by 344's own tell it cannot be told apart from
+  a stale serve -- and the currency magnitudes differ by x1000 between those
+  two builds, so a stale serve would have produced exactly the reported
+  agreement. `tiers.mjs` has the `--expect` refusal now, so re-taking it is
+  mechanical; what makes it a separate build is the cost, two full
+  twenty-rung runs, against a claim that is about affordability rather than
+  about physics. Flagged rather than spent, which is the rule about a request
+  that will blow the budget.
+- **THE CURRENT ORDINAL FIGURE IS `-954811922`, and build 340's note saying
+  `1664149562` "is the number to compare against from build 340 on" went
+  stale three builds later.** That number was right for 340 through 342 and
+  is the unbroken figure for 331-338 measured at 345; build 343's wobble fix
+  moved it, which 343's own entry records. Measured on the shipping 345 tree
+  through the extracted helper, with the served BUILD confirmed in the
+  heading: **`-954811922`**, marks `-549790228 / 2055604435 / -1731762476 /
+  355215982 / 437007875`. This build changes no `src/` file but the BUILD
+  literal, so the reading is there to say the extraction did not break the
+  probe rather than to clear a change -- and it is build 329's rule arriving
+  on this file's own prose: a derived number quoted in a note is a copy, and
+  when it moves, grep for who was quoting it.

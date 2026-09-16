@@ -21,7 +21,7 @@
  * on, and the machine rendered nine times -- bare, each part alone at full
  * levels, and everything.
  *
- *   node scripts/contact.mjs [--out DIR] [--url URL]
+ *   node scripts/contact.mjs [--out DIR] [--url URL] [--expect NNN]
  *
  * Needs the static server for the rig half (the marks half is pure node).
  * Writes contact-sheet.html, self-contained: the renders go in as data URIs.
@@ -34,6 +34,7 @@ import { join } from 'node:path';
 import { NODES } from '../src/tree.js';
 
 const require = createRequire(import.meta.url);
+import { checkServed } from './served.mjs';
 const { chromium } = require('playwright');
 
 const argv = process.argv.slice(2);
@@ -43,6 +44,14 @@ const flag = (name, dflt) => {
 };
 const OUT = flag('out', join(tmpdir(), 'sim7749-contact'));
 const URL = flag('url', 'http://127.0.0.1:8099/index.html');
+// Which tree is this reading? `scripts/served.mjs` carries the whole
+// finding; the short version is that this container's http-server serves
+// its own CWD and ignores a trailing path, so a `--url` differential can
+// silently read the live tree twice. The heading names the served BUILD
+// every run and `--expect NNN` refuses a mismatch, because printing is not
+// guarding. Called before the browser launches, so `abort` is a plain exit.
+const { abort: wrongTree } = await checkServed(URL, flag('expect', null), 'contact.mjs');
+if (wrongTree) process.exit(1);
 
 /** Where a node hangs, as a path of names. '' for the roots. */
 const branchOf = (n) => {

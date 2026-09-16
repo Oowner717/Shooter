@@ -58,7 +58,7 @@
  * for exactly the same reason.
  *
  *   node scripts/tiers.mjs [--from 1] [--to 16] [--runs 3] [--cap 45]
- *                          [--range 300] [--spend N] [--url ...]
+ *                          [--range 300] [--spend N] [--url ...] [--expect NNN]
  */
 
 import { createRequire } from 'node:module';
@@ -66,6 +66,7 @@ import { WAVES, ENEMY_TYPES, CFG, kB, fmtBytes, fmtRate } from '../src/config.js
 import { NODES, priceOf } from '../src/tree.js';
 
 const require = createRequire(import.meta.url);
+import { checkServed } from './served.mjs';
 const { chromium } = require('playwright');
 
 const args = process.argv.slice(2);
@@ -99,6 +100,14 @@ const WAVECAP = Number(flag('wavecap', 120));
 // beside is a flag nobody can use.
 const FIXED = flag('spend', null) === null ? null : kB(Number(flag('spend', 0)));
 const URL = flag('url', 'http://127.0.0.1:8099/index.html');
+// Which tree is this reading? `scripts/served.mjs` carries the whole
+// finding; the short version is that this container's http-server serves
+// its own CWD and ignores a trailing path, so a `--url` differential can
+// silently read the live tree twice. The heading names the served BUILD
+// every run and `--expect NNN` refuses a mismatch, because printing is not
+// guarding. Called before the browser launches, so `abort` is a plain exit.
+const { abort: wrongTree } = await checkServed(URL, flag('expect', null), 'tiers.mjs');
+if (wrongTree) process.exit(1);
 
 // ---- the money ------------------------------------------------------------
 
