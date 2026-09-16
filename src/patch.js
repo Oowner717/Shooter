@@ -427,7 +427,16 @@ export class Stain {
      * the screen across, and three of them read as spilled paint over the
      * field rather than as ground under it.
      */
-    drawGlow(ctx, 0, 0, this.r * 1.15, this.dark, 0.3 * k);
+    /*
+     * `drawGlow(ctx, COLOUR, x, y, r, alpha)` -- the colour is the SECOND
+     * argument. This was `drawGlow(ctx, 0, 0, r, this.dark, ...)`, which makes
+     * the colour `0` and takes `rgba` straight into `hex.slice is not a
+     * function`. Build 309's misordered-argument fault (a DRIFT specimen drawn
+     * with three arguments against a four-argument signature) except that one
+     * was SILENT -- canvas draws nothing for a non-finite path -- and this one
+     * throws inside the rAF loop, which is build 288's freeze. Loud is better.
+     */
+    drawGlow(ctx, this.dark, 0, 0, this.r * 1.15, 0.3 * k);
     for (const g of this.grain) {
       ctx.beginPath();
       ctx.arc(g.dx * this.r, g.dy * this.r, g.r, 0, TAU);
@@ -442,7 +451,7 @@ export class Stain {
     if (this.ate > 0) {
       const lit = Math.min(1, this.ate / 6);
       ctx.globalCompositeOperation = 'lighter';
-      drawGlow(ctx, 0, 0, this.r * 0.6, this.pale, 0.16 * lit * k);
+      drawGlow(ctx, this.pale, 0, 0, this.r * 0.6, 0.16 * lit * k);
       ctx.globalCompositeOperation = 'source-over';
     }
     ctx.restore();

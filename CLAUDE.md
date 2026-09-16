@@ -8161,3 +8161,55 @@ came from before believing the other one covers it.
   satisfies the dispatch pattern while implementing nothing new. **The pattern
   can see an ABSENT arm; it cannot see an arm that does nothing, and nothing
   static can.**
+
+- **BUILD 341 IS 340'S SUITE RUN, AND ONE MISORDERED ARGUMENT TOOK OUT A CASE
+  NINETY-SIX CASES LATER.** 754 of 757 with a page error, and the three
+  failures were two faults, not three.
+  **`drawGlow(ctx, COLOUR, x, y, r, alpha)` takes the colour SECOND**, and
+  `Stain.draw` passed it fifth at both of its calls -- so the colour was `0`
+  and `rgba` went straight into `hex.slice is not a function`. That is build
+  309's misordered-argument fault (a DRIFT specimen drawn with three arguments
+  against a four-argument signature) with the opposite failure mode: 309's was
+  SILENT, because canvas draws nothing for a non-finite path, and this one
+  throws.
+  **And the throw is why an unrelated layout case failed.** It fired at case
+  #5, the subsystem drive that spawns every `ENEMY_TYPE` -- so MIRE laid a
+  stain, the stain drew, and the throw killed the rAF LOOP. Case #101, "a
+  fight takes the rail out of the bar", then read the QUIET state in both of
+  its arms: `rail 44px, boss at 0, alerts 76` against `rail 0px, boss at 76,
+  alerts 140` on builds 338 and 339, which is the fight state never applying
+  at all. Build 288 records the mechanism -- "a throw inside the rAF loop kills
+  the loop, the last painted frame stays on the glass, and the report is the
+  boss screen freezes" -- and what is new is the DIAGNOSTIC shape: **one throw
+  in a draw path degrades every later case that depends on the loop rather
+  than on synthetic steps**, so a failure list is not a list of independent
+  faults. Check the earliest page error before reading anything below it, and
+  diff the detail against a previous run's `--json` to see which arms simply
+  stopped being driven.
+- **AND MY OWN WEAVE ARM SPAWNED AT AN ABSOLUTE `y`, WHICH IS A CLAIM ABOUT
+  THE ERA.** It read 15 -> 131 standalone and 5 -> 20 in the suite, and the
+  suite leaves the world at era 2: there the portal's rim is BELOW 240, so the
+  body started above it, `serpentOn`'s `down` clamped to 0 for the whole first
+  stretch, and the amplitude sat pinned at `ampRim`. The gait derives its depth
+  from `entryLine`, so the arm releases relative to the same line now -- 27 ->
+  193 against the control's 8 -> 24.
+  **The assertion moved with it, from a within-run ratio to a between-run
+  comparison at the SAME DEPTH.** Widest in the bottom third against widest in
+  the bottom third is what the switch actually changes, and the switch is one
+  config value with the same body, spawn, route and speed either side:
+  measured 193/24, 131/17 and 137/17, i.e. 5x to 8x. The within-run ratio is
+  the noisier reading and is reported rather than bounded tightly -- the
+  control still carries `ampRim` of amplitude, and how wide it gets low down
+  depends on where in the sine the body happens to be, measured at 0.67, 1.13,
+  2.6 and 3.0 for the same code. **A tight ceiling on that is a threshold on a
+  draw**, and the first version had one at 1.5.
+  **The suite already had the right instrument and it worked**, which is worth
+  saying plainly: case #5 drives the REAL rAF loop with every `ENEMY_TYPE` on
+  the field and reported the page error on its first run. What was missing was
+  running it before pushing. Every standalone probe used for MIRE stepped the
+  world with synthetic `g.update` calls and drew nothing, so none of them could
+  see a fault in a draw path -- the same blindness build 288 recorded when six
+  hundred boss cases drove `g.update` and none painted. **A new draw routine
+  owes one probe that lets the page's own loop paint it**, and the cheap form
+  is: spawn every type, wait two seconds of wall clock, open a boss, and assert
+  `world.time` advanced and no `pageerror` fired.

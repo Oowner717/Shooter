@@ -38987,6 +38987,11 @@ if (MINE_LINE) {
       w.up.damage = 1;
     };
     const st = stainOf(TYPE_BY_ID.mire);
+    // The rim the gait measures its own depth from, so nothing here is an
+    // absolute claim about the era or the viewport.
+    const { entryLine } = await import('../src/portal.js');
+    const { ENTRY_Y } = await import('../src/enemies.js');
+    const ENTRY = entryLine(w, ENTRY_Y);
 
     // ---- 1. the stain EATS the pay, and without it the pay survives -------
     const salvage = (withStain) => {
@@ -39026,12 +39031,24 @@ if (MINE_LINE) {
       clean();
       const was = CFG.serpent.ampFloor;
       if (!open) CFG.serpent.ampFloor = CFG.serpent.ampRim;
-      const e = g.debugSpawn('mire', w.width * 0.5, 240);
+      /*
+       * Released just BELOW the entry line, not at an absolute y.
+       *
+       * The first version spawned at a literal 240 and read 15 -> 131 alone
+       * and 5 -> 20 in the suite, which is the suite leaving the world at era
+       * 2: there the portal's rim is lower than 240, so the body started
+       * ABOVE it, `serpentOn`'s `down` clamped to 0 for the whole first
+       * stretch, and the amplitude sat pinned at `ampRim`. The gait derives
+       * its depth from `entryLine`, so the case has to release relative to the
+       * same line -- an absolute y is a claim about the era and the viewport
+       * that this arm was not making.
+       */
+      const e = g.debugSpawn('mire', w.width * 0.5, ENTRY + 20);
       e.staged = false; e.spawnIn = 0;
       const s = w.shooter;
       const top = [];
       const low = [];
-      const rim = e.y;
+      const rim = ENTRY;
       for (let f = 0; f < 60 * 120; f++) {
         g.update(1 / 60);
         if (e.dead || e.y > s.y - 60) break;
@@ -39051,7 +39068,7 @@ if (MINE_LINE) {
     // ---- 4. the GROUND gets wider with it, off the same `down` ------------
     clean();
     {
-      const e = g.debugSpawn('mire', w.width * 0.5, 240);
+      const e = g.debugSpawn('mire', w.width * 0.5, ENTRY + 20);
       e.staged = false; e.spawnIn = 0;
       const s = w.shooter;
       const radii = [];
@@ -39162,9 +39179,23 @@ if (MINE_LINE) {
      * control straddled the truth. The opening-out run reads 16 against 134, a
      * ratio of 8.4, which is 3.2x the control's; the bound is 2x.
      */
-    openR > flatR * 2
-    // ...and the mechanism really is what differs, or the ratio is a draw
-    && openR > 4 && flatR < 4
+    /*
+     * The two runs compared AT THE SAME DEPTH -- widest in the bottom third
+     * against widest in the bottom third -- because that is what the switch
+     * actually changes, and the switch is one config value with the same body,
+     * spawn, route and speed either side. Measured 193 against 24, and 131/17,
+     * 137/17 across runs: 5x to 8x, so a bound of 3 has at least 1.7x on the
+     * worst draw.
+     *
+     * The WITHIN-run ratios are reported and only loosely bounded. They are
+     * the noisier reading: the control still has `ampRim` of amplitude, and
+     * how wide it happens to get low down depends on where in the sine the
+     * body is when it gets there -- measured 0.67, 1.13, 2.6 and 3.0 for the
+     * same code. A tight ceiling on that is a threshold on a draw.
+     */
+    r.open.low > r.flat.low * 3
+    // ...and the opening-out run really does open out, as a liveness floor
+    && openR > 2.5
     // ...and both runs actually crossed, or neither measured anything
     && r.open.n > 200 && r.flat.n > 200,
     `open: widest ${r.open.top} in the top third against ${r.open.low} in the bottom `
