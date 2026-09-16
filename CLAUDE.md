@@ -8307,14 +8307,14 @@ came from before believing the other one covers it.
 - **PHASE 4a IS IN FROM BUILD 343, AND IT IS ONE ROW OF THE GUIDE'S TEN.**
   NEEDLE takes `straight`; five of the other nine are REFUSED and four are
   deferred, each for a reason measured or read rather than argued. The ORDINAL
-  hash does not move -- and getting to that statement cost a false conclusion
-  of mine, recorded below under the instrument note, because the figure this
-  build opened with could not be reproduced an hour later on either tree.
-  What is sound is the back-to-back pair: **342 and 343 both read
-  `-954811922` with all six intermediate marks identical**, measured minutes
-  apart with 342 served from a `git worktree` on :8096. That is the assertion
-  a new arm in `drive`'s if/else chain owes -- provably an identity for every
-  body on that field.
+  hash MOVES, `1664149562` -> `-954811922`, and the cause is the wobble fix
+  and nothing else -- see build 344, which is the reading this build owed and
+  got wrong twice before getting it right. The `straight` arm and the NEEDLE
+  re-gaiting are identities for that fight: build 343 with ONLY `?? 1`
+  reverted to `|| 1` reads `1664149562` to the bit, which is build 342's own
+  figure. **Every sentence in this build's own commit message about the hash
+  drifting, and the instrument note that was appended below it, is WRONG and
+  is corrected under build 344.**
 - **`straight` AND `creep` DIFFER IN EXACTLY ONE THING, AND IT IS A CLAIM
   RATHER THAN A MECHANISM.** Both aim at the machine and add no lateral --
   `tx, ty` already hold the mount and both arms only decline to offset it.
@@ -8524,50 +8524,73 @@ came from before believing the other one covers it.
   that ships is what the rule actually asks for. Killed BY PID (`kill 2003`),
   never `pkill -f`, which this file records matching its own shell three
   times over.
-- **THE DIFFERENTIAL HAS TO BE TAKEN BACK TO BACK, AND "SAME CONTAINER, SAME
-  SESSION" IS NOT ENOUGH -- WHICH THIS BUILD LEARNED BY GETTING IT WRONG.**
-  The header above says to take the before yourself in the session you are
-  working in, because a written-down hash is not reproducible across
-  containers. Build 343 did exactly that: it read **`1664149562`** on its own
-  tree partway through, matching what build 342 had recorded. An hour and two
-  suite runs later the same tree read **`-954811922`** -- and so did the
-  COMMITTED 342 tree, served from a worktree, with all six intermediate marks
-  identical. So the two figures are two readings of the same code, and the
-  "before" I took in this session was no more valid than one from another
-  container.
-  **What I concluded from the move was wrong, and the wrongness is the
-  useful part.** I predicted the hash WOULD move and named the channel in
-  advance: a mote off ORDINAL or TALLY carries `type.wobble: 0` with `isDrop`
-  true, skips every gait guard and the harmless `return`, and so reaches
-  `wob` -- so straightening those salvage paths should change when the purse
-  banks. The prediction was mechanically correct about the code (verified by
-  reading every guard) and the move was not the wobble fix at all: reverting
-  ONLY `?? 1` back to `|| 1` in a served copy gives **`-954811922` to the
-  bit**. Five readings agree on it -- 343 live three times, 343 with the fix
-  reverted, and committed 342 -- against one earlier reading of the old
-  figure.
-  **The channel was NOT run down and the candidates that were eliminated are
-  worth recording** so the next person starts past them. It is not the seed:
-  `fight.mjs` installs an xorshift32 over `Math.random` in an init script
-  before any module evaluates, stubs rAF so nothing but the fixed 1/60 steps
-  advances the game, and voids `AudioContext` (whose noise buffer is fifty
-  thousand draws) -- and `Number(SEED) + i` has `i === 0` at `RUNS === 1`, so
-  the seed is exactly what is typed. It is not non-determinism: four
-  consecutive runs on one tree agree to the bit. It is not the BUILD literal
-  drifting between the two files (both read 342 at the first reading and 343
-  at the second, so `askServer` never reloaded), and it is not the REV stamp,
-  which nothing behavioural reads.
-  **The one environmental event between the two readings is that the :8099
-  static server was killed by an audit agent and restarted by me**, and the
-  restart specified `-c-1` where the original's flags are unknown. A served
-  copy behind a caching server is the shape that would do this, and it would
-  mean the readings recorded for builds 338 to 342 were taken against a
-  possibly stale tree -- which is exactly why those builds all reported the
-  hash "unmoved". Not established, and stated as a candidate rather than a
-  finding.
-  **The rule to carry: a hash claim needs both sides read back to back, in
-  one sitting, with nothing else run in between** -- serve the old side from
-  a `git worktree` (`fight.mjs --url`) rather than reading a number you took
-  earlier in the same session. And **check the served tree is the tree you
-  think it is**: `curl -s .../src/enemies.js | grep` for the line you changed
-  takes one command and is the only thing that proves it.
+- **BUILD 344 IS THE READING BUILD 343 OWED, AND 343 GOT IT WRONG TWICE
+  BEFORE GETTING IT RIGHT.** `http-server` IN THIS CONTAINER SERVES ITS OWN
+  CWD AND IGNORES A TRAILING PATH ARGUMENT.** That is the whole of it, and it
+  is the same class of fault as build 340's positional parser: an instrument
+  confidently measuring the wrong thing.
+  `--url` exists so a differential can be taken properly -- serve the old
+  commit from a `git worktree`, read both sides back to back. Build 343 did
+  that and every "old build" reading was the LIVE TREE, because
+  `http-server -p 8096 -c-1 --silent /tmp/w342` launched from the repo serves
+  the repo. Proved off `/proc` rather than guessed: every one of those
+  processes has an **empty cmdline** (so `ps | grep -- "-p 8096"` matches
+  nothing, which is also why none of them could be killed) and
+  `cwd=/home/user/Shooter`. The ONE that worked had `cwd=/tmp/w343`, because
+  that command happened to `cd` first.
+  **The invocation that actually serves a worktree is
+  `cd <worktree> && http-server -p N -c-1 --silent` with NO path.**
+- **SO THE CHAIN OF WRONG CONCLUSIONS RAN: right prediction, wrong
+  refutation, wrong instrument story -- and the prediction was right all
+  along.** 343 predicted the hash would move and named the channel in advance
+  (a mote off ORDINAL or TALLY carries `type.wobble: 0`, is `isDrop`, so it
+  skips every gait guard AND the harmless `return`, and reaches `wob`; those
+  salvage paths straighten and change when the purse banks). Then a
+  path-argument server "refuted" it. Then, finding that even build 342 read
+  the new figure, I wrote a note claiming the instrument drifts within a
+  session and that builds 338-342's readings were suspect. **All of that was
+  one bug.** Measured properly: 342 served with the cwd right reads
+  `1664149562` with all six marks matching its record, and 343 with only
+  `?? 1` reverted reads `1664149562` too. The move is real, it is the wobble
+  fix, and no other part of 343 touches that fight.
+- **AND THE CURL CHECK THAT SHOULD HAVE CAUGHT IT PASSED, BECAUSE IT DID NOT
+  DISCRIMINATE.** I did verify the served tree -- `curl .../src/enemies.js |
+  grep -c "wobble || 1"` returned 1, which I read as "the revert is being
+  served". The live tree returned 1 as well, because **the build's own new
+  comment quotes that string in prose**. A verification that a comment can
+  satisfy is not a verification. Parse the EXPRESSION
+  (`grep -oE 'this\.type\.wobble (\|\||\?\?) 1'`) or read a constant, never
+  match a string that documentation can also contain -- which is the same
+  rule as a detail string being a declaration, on the instrument side.
+- **`fight.mjs` NOW SAYS WHICH TREE IT READ, AND `--expect NNN` REFUSES A
+  MISMATCH.** It fetches the served `config.js`, parses BUILD and REV and
+  prints them in the heading every run; with `--expect` a disagreement exits
+  1 and the message names the `cd`-first remedy. Printing alone is build
+  329's rule ("a `console.log` in a guard script is not a guard"), so the
+  refusal is the load-bearing half. `check-build.mjs` reads `fight.mjs`'s
+  source and fails the build if the fetch, the print or the refusal goes --
+  the `formable()` idiom, so it survives a reword -- and it is revert-proved:
+  stubbing the fetch out exits 1 with "missing: reads the served tree".
+- **WHICH RECORDED DIFFERENTIALS ARE AT RISK, AND THE TELL THAT SEPARATES
+  THEM.** Five probes take `--url` (`fight`, `tiers`, `dps`, `variance`,
+  `contact`) and the other four are still unguarded -- named in
+  `check-build`'s readout rather than failed, because adding the check to
+  them is its own change. Builds 287, 329, 332 and 333 all recorded
+  worktree-served differentials, and whether each was valid depends on a
+  command nobody wrote down. **The tell is the direction of the result: a
+  `--url` differential that reports a MOVE proves the two trees really
+  differed and is sound; one that reports NO MOVE is exactly what a stale
+  serve produces and cannot be distinguished from it.** So build 329's
+  bisect is safe (its file swap produced two different hashes) and every
+  "identical either side" reading taken through a second server is worth
+  re-taking with `--expect`.
+  **Build 342 is the worked example and it survives, but not on its
+  measurement.** Its message says "1664149562 either side", and a correctly
+  served 342 does read `1664149562` -- confirmed here. But if its OTHER side
+  was served the compromised way it was reading the live 342 tree, so the two
+  figures would have agreed BY ARTEFACT. The conclusion holds anyway because
+  it rests on a structural argument rather than on the number: only ORDINAL,
+  TALLY and DIGIT are on that field and none of them names a route subset, so
+  a route allow-list cannot reach it. **That is the shape to aim for -- a
+  differential is worth most when it CONFIRMS an argument you could already
+  make, and worth least when it is the only thing holding the claim up.**

@@ -285,6 +285,68 @@ async function hashRun(page, frames) {
   return { hash: r, hashOnly: true };
 }
 
+/*
+ * ---- WHICH TREE IS THIS ACTUALLY READING? -------------------------------
+ *
+ * Build 344, and it is the same class of fault as build 340's positional
+ * parser: an instrument that is confidently measuring the wrong thing.
+ *
+ * `--url` exists so a differential can be taken properly -- serve the old
+ * commit from a `git worktree`, read both sides back to back. Build 343 did
+ * that and got it wrong, because **this container's `http-server` serves its
+ * own CWD and ignores a trailing path argument**. So
+ * `http-server -p 8096 -c-1 --silent /tmp/w342`, launched from the repo,
+ * served the LIVE TREE on 8096 -- and three "old build" readings in one
+ * session were all the current code. Verified off `/proc`: every one of those
+ * processes has an empty cmdline and `cwd=/home/user/Shooter`. The one that
+ * worked had been launched by a command that happened to `cd` first.
+ *
+ * The invocation that actually serves a worktree is
+ * `cd <worktree> && http-server -p N -c-1 --silent` with NO path.
+ *
+ * A comment is not enough, because the failure is silent and the reading
+ * looks perfect -- so this fetches the served `config.js` and prints the
+ * BUILD and REV it is really talking to, in the heading, every time. And
+ * `--expect NNN` turns that into a refusal, which is the only form that
+ * cannot be skim-read past: build 329's rule that a `console.log` in a guard
+ * script is not a guard.
+ *
+ * Note the check has to read something that DISCRIMINATES. Build 343's did
+ * not: it grepped the served source for `wobble || 1`, and the build's own
+ * new comment quoted that string, so the check passed against a tree with
+ * `?? 1` in the code. Parse the expression or read a constant -- never match
+ * a string that prose can also contain.
+ */
+const EXPECT = flag('expect', null);
+const servedAt = async () => {
+  const root = BASE.replace(/\/[^/]*$/, '');
+  try {
+    const res = await fetch(`${root}/src/config.js`);
+    if (!res.ok) return { err: `HTTP ${res.status}` };
+    const src = await res.text();
+    const b = src.match(/export const BUILD = '([^']*)'/);
+    const r = src.match(/export const REV = '([^']*)'/);
+    return { build: b && b[1], rev: r && r[1] };
+  } catch (e) {
+    return { err: String(e && e.message || e) };
+  }
+};
+const served = await servedAt();
+if (served.err) {
+  console.log(`\n  ! could not read the served tree (${served.err}) -- `
+    + `the reading below is of an UNKNOWN tree`);
+} else {
+  console.log(`\nserving ${BASE}\n  build ${served.build}  rev ${served.rev}`);
+}
+if (EXPECT !== null && String(served.build) !== String(EXPECT)) {
+  console.error(`\nfight.mjs: --expect ${EXPECT} but the server at ${BASE} is `
+    + `serving build ${served.build}. This container's http-server serves its own `
+    + `CWD and ignores a trailing path, so launch it as `
+    + `\`cd <worktree> && http-server -p N -c-1 --silent\` with no path argument.`);
+  await browser.close();
+  process.exit(1);
+}
+
 const runs = [];
 for (let i = 0; i < RUNS; i++) {
   /*

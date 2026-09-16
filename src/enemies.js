@@ -2951,6 +2951,17 @@ export class Enemy {
      * was gone and was blind to the WANDER. The reading that sees a wander
      * is the heading deviation, and nothing had taken it.
      *
+     * **AND IT MOVES THE ORDINAL HASH, `1664149562` -> `-954811922`**, which
+     * is the one part of this that reaches a boss fight. Not through a
+     * hostile: TALLY and ORDINAL are `fixed` and return on `drive`'s first
+     * statement, and DIGIT declares 1.8. It is their SALVAGE -- `shed` builds
+     * every mote from the parent's type, so a mote off either carries
+     * `wobble: 0`, and `isDrop` skips every gait guard AND the harmless
+     * `return` above, so it reaches this line. Straightening those paths
+     * changes when the purse banks, and the hash mixes the purse. Attributed
+     * rather than assumed: build 343 with only this expression put back reads
+     * `1664149562` to the bit, which is 342's figure.
+     *
      * The harmless types that declare 0 (DRIFT, SEED, EMBER, HUSK, LANTERN,
      * FILAMENT, BELL) never reach this line -- the harmless switch returns
      * above it -- and CHAFF reaches it only on a hand-back that build 343

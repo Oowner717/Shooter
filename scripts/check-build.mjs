@@ -804,6 +804,55 @@ console.log(`routes: ${ROUTES.length} march routes; ${pinned.length} types name 
   + `${ROUTES.length}. ${REPLACERS.length} gaits replace the route and may not name any `
   + `(${REPLACERS.join(' ')})`);
 
+/*
+ * ---- THE DIFFERENTIAL INSTRUMENT HAS TO SAY WHICH TREE IT READ ----------
+ *
+ * Build 344. `fight.mjs --url` is how a hash differential is taken against an
+ * old commit, and build 343 took three readings that were silently of the
+ * LIVE tree: this container's `http-server` serves its own CWD and ignores a
+ * trailing path, so pointing it at a worktree from the repo directory serves
+ * the repo. The reading looks perfect and is of the wrong code, which is the
+ * exact shape of build 340's positional-parser fault.
+ *
+ * `fight.mjs` fetches the served `config.js` and prints the BUILD and REV it
+ * is really talking to, and `--expect NNN` refuses a mismatch. That is the
+ * only part of this that cannot be skim-read past, so it is the part worth
+ * guarding: a `console.log` in a guard script is not a guard (build 329), and
+ * a verification nothing asserts is a verification somebody deletes.
+ *
+ * Read off the source rather than pinned to a value, the way the `formable()`
+ * call sites are -- so the guard survives the message being reworded and
+ * fails if the fetch or the refusal goes.
+ */
+const fightSrc = readFileSync(new URL('../scripts/fight.mjs', import.meta.url), 'utf8');
+const fightNeeds = [
+  ["reads the served tree", /fetch\(`\$\{root\}\/src\/config\.js`\)/],
+  ["parses the served BUILD", /export const BUILD = '\(\[\^'\]\*\)'/],
+  ["prints which tree it read", /console\.log\(`\\nserving \$\{BASE\}/],
+  ["refuses a mismatch with --expect", /process\.exit\(1\)/],
+  ["names the cwd remedy in the refusal", /cd <worktree> && http-server/],
+];
+const fightBad = fightNeeds.filter(([, re]) => !re.test(fightSrc)).map(([what]) => what);
+if (fightBad.length) {
+  console.error(`fight.mjs: the served-tree verification is incomplete -- missing: `
+    + `${fightBad.join('; ')}. Build 343 took three hash readings of the wrong tree `
+    + `because http-server serves its CWD and ignores a trailing path; the fetch and `
+    + `the --expect refusal are what make that visible.`);
+  process.exit(1);
+}
+/*
+ * ...and the other four probes that take `--url` share the exposure and do
+ * NOT have this yet. Named rather than guarded, because adding the check to
+ * them is its own change and failing the build for it now would be failing it
+ * for something this commit deliberately did not do.
+ */
+const urlProbes = ['contact.mjs', 'dps.mjs', 'tiers.mjs', 'variance.mjs']
+  .filter((f) => /flag\('url'/.test(
+    readFileSync(new URL(`../scripts/${f}`, import.meta.url), 'utf8')));
+console.log(`fight.mjs: reads and prints the served BUILD/REV and refuses on --expect `
+  + `mismatch; ${urlProbes.length} other --url probe(s) (${urlProbes.join(' ')}) share the `
+  + `http-server-serves-its-CWD exposure and are unguarded`);
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {
