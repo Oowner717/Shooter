@@ -511,7 +511,15 @@ export class Enemy {
     this.lastHit = null;
     this.lastHitT = -1;
     // Every object picks its own way across the field.
-    this.route = opts.route || weightedPick(ROUTES);
+    /*
+     * The route, from whatever pool the TYPE allows -- phase 3, build 342.
+     * `routesOf` is all six unless the type names a subset; `weightedPick`
+     * preserves the relative weights of whatever it is handed, so a subset
+     * needs no re-normalising. `routeSide` and `routeScale` below are still
+     * per body, which is what keeps a single-route type from arriving as one
+     * identical arc: it varies by side and by 0.7 to 1.25 of the width.
+     */
+    this.route = opts.route || weightedPick(routesOf(type));
     this.routeSide = Math.random() < 0.5 ? -1 : 1;
     this.routeScale = rand(0.7, 1.25);
     this.wanderAngle = rand(0, TAU);
@@ -10452,6 +10460,57 @@ export function gaitOf(type) {
  * rAF loop is build 288's freeze rather than an error anybody reads.
  */
 export const STAIN_KEYS = ['every', 'rRim', 'rFloor', 'life', 'eat', 'tick'];
+
+/**
+ * Which march ROUTES a type may draw from -- phase 3 of the gait plan.
+ *
+ * Every body used to roll from all six, which is why a BULWARK serpentined
+ * and a NEEDLE bowed: the route is the only part of the approach that was
+ * never a property of the type. A type may now name a subset.
+ *
+ * `weightedPick` needs no re-normalising for a subset, which is worth knowing
+ * rather than assuming -- it sums the weights of whatever it is handed, so the
+ * relative weights inside the subset are preserved by construction, and a
+ * one-element list returns that element. An EMPTY list would return
+ * `undefined` off its last line, which is why the guard refuses one.
+ *
+ * ---- AND THE FIELD IS OPTIONAL, WHICH IS NOT BUILD 324 AGAIN --------------
+ *
+ * Build 338 made `gait` MANDATORY on the rule that a value inherited in
+ * silence is indistinguishable from one that was chosen, and overturned build
+ * 324's contrary ruling to do it. This is deliberately the other way, and the
+ * distinction is what absence MEANS. An omitted `gait` meant a specific
+ * behaviour -- the march -- that the author may never have considered, so the
+ * silence could hide a body doing something nobody chose. An omitted `routes`
+ * means all six, which is the STATUS QUO: a type that should have been
+ * restricted and was not behaves exactly as it does today. There is no state
+ * the silence can hide, only a restriction not yet made.
+ *
+ * What a DECLARED list still owes is validation, and that is where the
+ * precedents apply: every id has to exist, the list cannot be empty or hold
+ * duplicates, and a type whose gait REPLACES the route may not declare one at
+ * all -- that is a field nothing reads, the `kind: 'works'` fault, and it is
+ * the same shape as check-build's `stain` and `hurl` guards.
+ */
+export function routesOf(type) {
+  const ids = type && type.routes;
+  if (ids === undefined) return ROUTES;
+  if (!Array.isArray(ids) || !ids.length) {
+    throw new Error(`${type && type.id}: routes must be a non-empty array of route ids, `
+      + `or absent for all ${ROUTES.length}. An empty list makes weightedPick return undefined.`);
+  }
+  const out = [];
+  for (const id of ids) {
+    const r = ROUTES.find((x) => x.id === id);
+    if (!r) {
+      throw new Error(`${type.id}: routes names '${id}', which is not a route. `
+        + `They are [${ROUTES.map((x) => x.id).join(' ')}].`);
+    }
+    if (out.includes(r)) throw new Error(`${type.id}: routes names '${id}' twice`);
+    out.push(r);
+  }
+  return out;
+}
 
 export function stainOf(type) {
   const st = type && type.stain;

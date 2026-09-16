@@ -220,7 +220,7 @@ console.log(`all ${ALL_UPGRADES.length - repeats.length} capped upgrades write t
  * little of it there is. The grey itself sits at 0.21, so 0.28 leaves room
  * either side of the line.
  */
-const { ENEMY_TYPES, CFG, TYPE_BY_ID, GAITS } = await import(new URL('../src/config.js', import.meta.url));
+const { ENEMY_TYPES, CFG, TYPE_BY_ID, GAITS, ROUTES } = await import(new URL('../src/config.js', import.meta.url));
 const chroma = (hex) => {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;
@@ -728,7 +728,7 @@ console.log(`multiplicity: ${multi.length + 1} type(s) are more than one body, o
 console.log(`rise: ${risers.length} type(s) author a clock (${risers.map((t) => `${t.id} ${t.climb}s`).join(' ')}), `
   + `nominal speeds agree on a column of ${lo}-${hi}`);
 
-const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, lobOf, stainOf, STAIN_KEYS, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
+const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, lobOf, stainOf, STAIN_KEYS, routesOf, threatOf, formable } = await import(new URL('../src/enemies.js', import.meta.url));
 
 /*
  * ---- a SERPENT type declares its own ground, and there is no default -----
@@ -745,6 +745,65 @@ const { fractureDepth, fractureFactor, barOf, pairOf, respawnOf, lobOf, stainOf,
  * `stain` block on a type that does not declare `serpent` is a block nothing
  * reads.
  */
+/*
+ * ---- a ROUTES allow-list, and who is allowed to have one -----------------
+ *
+ * Phase 3. The field is OPTIONAL and absence means all six, which is
+ * deliberately not build 338's ruling about `gait` -- see `routesOf` for why
+ * the two cases differ (an omitted `gait` meant a behaviour the author might
+ * not have chosen; an omitted `routes` means the status quo).
+ *
+ * What a DECLARED list owes: every id exists, non-empty, no duplicates --
+ * `routesOf` throws for all three and is called here at build time, because a
+ * throw from the Enemy CONSTRUCTOR is a throw on the spawn path.
+ *
+ * And the other direction, which is the `stain`/`hurl` shape: a type whose
+ * gait REPLACES the route may not declare one, because nothing would read it.
+ * The replacer set is DERIVED from `drive`'s own if/else chain rather than
+ * written out -- the arms are `gait === 'x'` inside a `!this.staged` test, and
+ * the route branch is the `else if (!this.staged)` at the foot -- so moving an
+ * arm in or out of that chain moves this guard with it.
+ */
+const routeSrc = readFileSync(new URL('../src/enemies.js', import.meta.url), 'utf8');
+const driveFrom = routeSrc.indexOf('drive(world, dt) {');
+const driveTo = routeSrc.indexOf('const wob = Math.sin(', driveFrom);
+if (driveFrom < 0 || driveTo < 0) throw new Error('check-build: cannot find drive\'s route chain');
+const chain = routeSrc.slice(driveFrom, driveTo);
+/*
+ * `(?:else )?if` and not `else if`: the FIRST arm of that chain is a bare
+ * `if (!this.staged && this.type.gait === 'roll' ...)` and every later one is
+ * an `else if`, so matching only the second form derived six replacers and
+ * silently dropped `roll` -- caught by reading the guard's own readout rather
+ * than trusting it, which is the only way a derivation that is too NARROW
+ * shows itself. A derivation that comes back short is worse than a written-out
+ * list, because it looks derived.
+ */
+const REPLACERS = [...new Set([...chain.matchAll(/(?:else )?if \(!this\.staged && this\.type\.gait === '([a-z]+)'/g)]
+  .map((m) => m[1]))];
+if (REPLACERS.length < 4) {
+  throw new Error(`check-build: derived only ${REPLACERS.length} route replacers from drive `
+    + `[${REPLACERS.join(' ')}] -- the slice found nothing and this guard would be vacuous`);
+}
+const routeBad = [];
+for (const t of ENEMY_TYPES) {
+  if (t.routes === undefined) continue;
+  try { routesOf(t); } catch (e) { routeBad.push(e.message); continue; }
+  if (REPLACERS.includes(t.gait)) {
+    routeBad.push(`${t.id} declares routes and its gait '${t.gait}' REPLACES the route, `
+      + 'so nothing reads them -- the kind:\'works\' fault');
+  }
+  if (t.fixed) routeBad.push(`${t.id} is fixed and declares routes -- it does not drive`);
+}
+if (routeBad.length) {
+  for (const line of routeBad) console.error(`routes: ${line}`);
+  process.exit(1);
+}
+const pinned = ENEMY_TYPES.filter((t) => t.routes);
+console.log(`routes: ${ROUTES.length} march routes; ${pinned.length} types name a subset `
+  + `(${pinned.map((t) => `${t.id}=${t.routes.join('/')}`).join(' ')}), the rest draw from all `
+  + `${ROUTES.length}. ${REPLACERS.length} gaits replace the route and may not name any `
+  + `(${REPLACERS.join(' ')})`);
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {

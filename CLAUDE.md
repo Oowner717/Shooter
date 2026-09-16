@@ -8213,3 +8213,93 @@ came from before believing the other one covers it.
   owes one probe that lets the page's own loop paint it**, and the cheap form
   is: spawn every type, wait two seconds of wall clock, open a boss, and assert
   `world.time` advanced and no `pageerror` fired.
+
+- **PHASE 3 IS IN FROM BUILD 342: A TYPE NAMES WHICH MARCH ROUTES IT MAY DRAW
+  FROM.** The route was the only part of the approach that was never a property
+  of the type -- every body rolled from all six, which is why a BULWARK
+  serpentined and a NEEDLE bowed. `routesOf(type)` is the pool, `weightedPick`
+  takes it, and three types name a subset, which is the guide's own content for
+  this phase: SPLITTER `wide`, WARDEN `hook`, SCION `loiter`.
+- **WHAT AN ALLOW-LIST REMOVES IS VARIANCE, NOT TIME, and that reframing is
+  the finding.** Measured, every type on all six routes, crossing time and
+  widest lateral offset, then weighted by the routes' OWN weights:
+
+  | type | weighted mean | sd | range | pinned | delta | sd after |
+  |---|---|---|---|---|---|---|
+  | SPLITTER | 16.5s | 2.73 | 14.9-24.4 | 17.3s | +5% | 0 |
+  | WARDEN | 18.8s | 2.43 | 16.1-24.3 | 20.8s | +11% | 0 |
+  | SCION | 36.2s | 3.33 | 32.5-43.8 | 43.8s | +21% | 0 |
+
+  So a SPLITTER was anywhere from 14.9 to 24.4 seconds depending on a roll and
+  is now always 17.3. The widest offset is the other half of it and moves the
+  right way for the two the guide describes as flanking: SPLITTER 88 -> 205
+  ("comes in from the flank"), WARDEN 76 -> 133 ("comes round the side").
+- **SCION IS THE ONE RESTRICTION WITH A REAL COST, AND ITS LATERAL IS NOT WHAT
+  IT BUYS.** `loiter` is the only route in the table with a `dawdle` (0.55),
+  which `drive` applies to the local cruise beyond 260 units -- so "hangs back
+  at mid range before committing" is delivered by that and nothing else. Its
+  widest offset on `loiter` is **18**, against 166 on `wide`, because
+  `loiter`'s width is 180: this route gives a body this slow almost no arc at
+  all. What it gives is **+21% on the slowest body in the game**, and
+  `Director.standing` counts a SCION until it dies, so its waves run about
+  seven seconds longer. Bounded by `solo: true` (build 313) -- one at a time,
+  authored at 1 or 2 across three band-4 waves -- and recorded as the price of
+  the guide's rationale rather than tuned, because inventing a balance answer
+  in a build whose content is a mechanism is build 304's mistake.
+- **THE FIELD IS OPTIONAL, AND THAT IS NOT BUILD 324 AGAIN.** Build 338 made
+  `gait` mandatory on the rule that a value inherited in silence is
+  indistinguishable from one that was chosen, and overturned 324 to do it. This
+  goes the other way deliberately, and the distinction is what ABSENCE MEANS.
+  An omitted `gait` meant a specific behaviour -- the march -- that the author
+  may never have considered, so the silence could hide a body doing something
+  nobody chose. An omitted `routes` means all six, which is the STATUS QUO: a
+  type that should have been restricted and was not behaves exactly as it does
+  today. There is no state the silence can hide, only a restriction not yet
+  made. What a DECLARED list still owes is validation, and it gets the
+  precedents' treatment: every id exists, non-empty, no duplicates, and not on
+  a type whose gait replaces the route.
+- **`weightedPick` NEEDS NO RE-NORMALISING FOR A SUBSET, and an empty list
+  returns `undefined`.** It sums the weights of whatever it is handed, so the
+  relative weights inside a subset are preserved by construction and a
+  one-element list returns that element -- asserted as an identity (a
+  one-route subset's total equals that route's own weight) rather than by
+  sampling. The empty case falls off its last line as `items[items.length - 1]`
+  and is why the guard refuses one.
+- **AND A SINGLE-ROUTE TYPE STILL VARIES, WHICH IS WHAT MAKES ONE ROUTE
+  SURVIVABLE.** `routeSide` is a per-body coin flip and `routeScale` is
+  `rand(0.7, 1.25)`, both rolled in the constructor independently of the route
+  -- so three SPLITTERs on `wide` split left and right and differ by up to
+  1.8x in amplitude. Checked before choosing single-route restrictions, because
+  if side and scale had been properties of the ROUTE the guide's three would
+  have arrived as identical arcs.
+- **THE DERIVED REPLACER SET CAME BACK SHORT, AND ONLY READING THE READOUT
+  SHOWED IT.** The guard refuses a `routes` list on a type whose gait replaces
+  the route, and derives that set from `drive`'s own chain rather than
+  restating it. The first regex was `else if \(!this\.staged && ...gait ===
+  'x'\)` and derived **six** -- silently dropping `roll`, whose arm is the
+  FIRST of the chain and therefore a bare `if (`. It reads seven now. **A
+  derivation that comes back short is worse than a written-out list, because it
+  looks derived**, and the only thing that shows it is reading the number the
+  guard prints. Both slice anchors also throw rather than deriving an empty
+  set, so the guard cannot go vacuous.
+- **THE HASH DID NOT MOVE, AND THE GUIDE SAID IT WOULD.** `1664149562` either
+  side. docs/objects.html's phase 3 row reads "it is the one that will move the
+  hash for a real reason", and that is the structural blindness builds 300,
+  301, 307 and 314 recorded and 318 corrected: `fight.mjs` opens from
+  `openBoss` with the director frozen, so the only types on that field are
+  ORDINAL, TALLY and DIGIT, none of which names a subset. And `weightedPick`
+  makes exactly ONE `Math.random()` call whichever pool it is handed, so the
+  stream is untouched and even a body that DID restrict would not shift
+  anything downstream of it. The right instrument is the crossing table above.
+  **The guide's prose for this phase also names two effects its own table
+  achieves in phase 4** -- "a BULWARK stops serpentining, a NEEDLE stops
+  bowing" -- and both of those rows are re-gaitings (`creep` and `straight`),
+  not route restrictions. Corrected on the page.
+- **AND THE SAME INVERTED try/catch AS BUILD 340, ONE BUILD LATER.** The new
+  case collected what `routesOf` LET THROUGH into a field called `refused` and
+  asserted `refused.length === 3` -- demanding three failures, passing only on
+  a broken build, reading `[]` on a working one. Build 340's MIRE case had the
+  identical fault. **Twice in two builds is not a slip, it is a shape I reach
+  for**: a try/catch whose non-throwing path returns a value reads as "collect
+  the successes" and collects the opposite. The fix both times was the NAME --
+  `missed`, asserted at zero, with the count caught reported beside it.

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '341';
+export const BUILD = '342';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '341';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '4a71847';
+export const REV = 'c07312c';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4861,6 +4861,19 @@ export const ENEMY_TYPES = [
     opens: kB(500),
     name: 'SPLITTER',
     gait: 'march',
+    /*
+     * ONE ROUTE, NOT SIX -- phase 3, and the guide's own words: "it comes in
+     * from the flank, and its four MOTEs inherit a flock." `wide` is width 480
+     * and commit 0.35, the widest arc and the slowest fold-in in the table.
+     *
+     * Measured across all six, crossing time and widest offset: direct 15.3s
+     * /34, sweep 14.9/130, wide 17.3/205, serpentine 15.8/33, hook 15.5/92,
+     * loiter 24.4/37. So the restriction costs 0.1s against the old mean of
+     * 17.2 and more than doubles the widest offset, 88 to 205. What it really
+     * removes is VARIANCE: a SPLITTER was 14.9 to 24.4 seconds depending on a
+     * roll and is now always 17.3.
+     */
+    routes: ['wide'],
     shape: 'blob',
     r: 29,
     hp: 159,
@@ -4923,6 +4936,17 @@ export const ENEMY_TYPES = [
     opens: kB(1700),
     name: 'WARDEN',
     gait: 'march',
+    /*
+     * `hook`, phase 3. The guide: "comes round the side shedding plates, which
+     * is what a hook is for." It is commit 1.9, the highest in the table, so
+     * the arc holds its offset late instead of folding in early.
+     *
+     * Measured: direct 17.8s/16, sweep 17.1/98, wide 20.3/151, serpentine
+     * 16.1/27, hook 20.8/133, loiter 24.3/32. It is the second-slowest route
+     * for this body -- 20.8 against an old mean of 19.4, 7% -- and it takes
+     * the widest offset from a mean of 76 to 133.
+     */
+    routes: ['hook'],
     shape: 'warden',
     r: 22,
     hp: 153,
@@ -4990,6 +5014,31 @@ export const ENEMY_TYPES = [
     opens: kB(2000),
     name: 'SCION',
     gait: 'march',
+    /*
+     * `loiter`, phase 3, and this is the ONE restriction with a real cost, so
+     * the number is here rather than left to be discovered.
+     *
+     * The guide: "solo and deliberate: it hangs back at mid range before
+     * committing, which its three seeds already imply." That is the DAWDLE and
+     * nothing else -- `loiter` is the only route in the table that has one
+     * (0.55), and `drive` applies it to the local cruise beyond 260 units.
+     *
+     * Measured: direct 38.2s/1, sweep 34.3/86, wide 36.9/166, serpentine
+     * 33.1/16, hook 32.5/99, loiter 43.8/18. So it is 43.8 against an old mean
+     * of 36.5 -- **20% slower on the slowest body in the game** -- and its
+     * widest offset is only 18, because `loiter`'s width is 180 against
+     * `wide`'s 480. "Hangs back" is delivered by the dawdle; the lateral is
+     * not what this route gives a body this slow.
+     *
+     * `Director.standing` counts a SCION until it dies, so its waves get
+     * about seven seconds longer. It is authored at 1 or 2 in three band-4
+     * waves and carries `solo: true`, so that is one body at a time and the
+     * cost does not multiply. Recorded as the price of the guide's rationale
+     * rather than tuned here: inventing a balance answer in a build whose
+     * content is a mechanism is the mistake build 304 deliberately did not
+     * make.
+     */
+    routes: ['loiter'],
     shape: 'scion',
     r: 34,
     hp: 390,

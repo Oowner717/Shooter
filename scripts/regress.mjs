@@ -39233,6 +39233,120 @@ if (MINE_LINE) {
     + 'is asserted so the zero is not a zero over nothing');
 }
 
+/*
+ * ---- PHASE 3: A TYPE NAMES WHICH MARCH ROUTES IT MAY DRAW FROM -----------
+ *
+ * Build 342. Every body used to roll from all six, which is why the route was
+ * the only part of the approach that was never a property of the type. Three
+ * types name a subset -- SPLITTER `wide`, WARDEN `hook`, SCION `loiter` --
+ * and the rest still draw from all six.
+ *
+ * The claim worth asserting is NOT "it is slower": what an allow-list removes
+ * is VARIANCE. Measured across all six routes, weighted by the routes' own
+ * weights: a SPLITTER was 16.5s with a standard deviation of 2.73 and a range
+ * of 14.9 to 24.4, and is now always 17.3. So the arms are (1) a pinned type
+ * draws ONE route over many rolls, (2) an unpinned one draws several, and
+ * (3) the pool really is the type's rather than a coincidence of weights.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ENEMY_TYPES, TYPE_BY_ID, ROUTES } = await import('../src/config.js');
+    const { routesOf } = await import('../src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+    const out = {};
+
+    /*
+     * Rolled through the real constructor, which is the door under test --
+     * `routesOf` on its own would only be testing the helper. `debugSpawn`
+     * goes through `spawnOne` -> `new Enemy`, and the route is rolled there.
+     */
+    const draw = (id, n) => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      w.director.traits = [];
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      const seen = {};
+      for (let i = 0; i < n; i++) {
+        const e = g.debugSpawn(id, 100 + (i % 7) * 60, 300);
+        if (!e) continue;
+        seen[e.route.id] = (seen[e.route.id] || 0) + 1;
+        e.dead = true;
+      }
+      return seen;
+    };
+
+    const N = 160;
+    out.pinned = ENEMY_TYPES.filter((t) => t.routes).map((t) => ({
+      id: t.id, want: t.routes.slice(), got: draw(t.id, N),
+    }));
+    // ...and a type that names nothing still draws widely, which is the
+    // control: without it "one route" could be a body that only ever spawns
+    // one way for some unrelated reason.
+    out.loose = { id: 'mote', got: draw('mote', N) };
+
+    // the helper's own arithmetic, and that a subset keeps its weights
+    out.helper = {
+      all: routesOf(TYPE_BY_ID.mote).length,
+      one: routesOf(TYPE_BY_ID.splitter).map((x) => x.id),
+      // weightedPick sums whatever it is handed, so a subset needs no
+      // re-normalising -- asserted as the identity rather than by sampling
+      subsetTotal: routesOf(TYPE_BY_ID.scion).reduce((a, x) => a + x.weight, 0),
+      loiterWeight: ROUTES.find((x) => x.id === 'loiter').weight,
+      /*
+       * `missed`, not `refused`, and the name is the whole point. Each entry
+       * returns a STRING when the call did NOT throw, so the list holds what
+       * the helper LET THROUGH and an empty list is the pass.
+       *
+       * Named `refused` in the first draft and asserted at `=== 3`, which
+       * demands three failures and passes only on a broken build. That is the
+       * SECOND time in two builds -- build 340's MIRE case had the identical
+       * inversion -- so it is not a slip, it is a shape I reach for: a
+       * try/catch that returns a value on the non-throwing path reads as
+       * "collect the successes" and collects the opposite. The fix both times
+       * was the name.
+       */
+      missed: [
+        (() => { try { routesOf({ id: 'z', routes: [] }); return 'an empty list'; } catch (e) { return null; } })(),
+        (() => { try { routesOf({ id: 'z', routes: ['flank'] }); return 'an unknown id'; } catch (e) { return null; } })(),
+        (() => { try { routesOf({ id: 'z', routes: ['wide', 'wide'] }); return 'a duplicate'; } catch (e) { return null; } })(),
+      ].filter(Boolean),
+      absentIsAll: routesOf({ id: 'z' }).length === ROUTES.length,
+    };
+    return out;
+  });
+
+  const oneEach = r.pinned.every((p) => {
+    const got = Object.keys(p.got);
+    return got.length === p.want.length && got.every((k) => p.want.includes(k));
+  });
+  check('a type that names its routes draws from those and no others',
+    // every pinned type drew only what it names, over 160 rolls each...
+    r.pinned.length >= 3 && oneEach
+    // ...and each actually rolled, or "no others" is a claim about nothing
+    && r.pinned.every((p) => Object.values(p.got).reduce((a, b) => a + b, 0) > 100)
+    // ...against a type that names nothing, which still draws widely -- the
+    // control, or "one route" could be an unrelated spawn quirk
+    && Object.keys(r.loose.got).length >= 4
+    // ...and the helper refuses all three malformations while absence is all
+    && r.helper.missed.length === 0 && r.helper.absentIsAll
+    // ...and a subset keeps the weights it came with, by identity
+    && r.helper.subsetTotal === r.helper.loiterWeight,
+    r.pinned.map((p) => `${p.id} names [${p.want.join(' ')}] and drew `
+      + `{${Object.entries(p.got).map(([k, v]) => `${k} x${v}`).join(' ')}}`).join('; ')
+    + `; a MOTE names nothing and drew {${Object.entries(r.loose.got)
+      .map(([k, v]) => `${k} x${v}`).join(' ')}} across ${r.helper.all} routes. `
+    + `routesOf caught ${3 - r.helper.missed.length} of 3 malformations`
+    + `${r.helper.missed.length ? ` -- LET THROUGH: ${r.helper.missed.join('; ')}` : ''}`
+    + `, answers all `
+    + `${r.helper.all} for an absent field ${r.helper.absentIsAll}, and a one-route `
+    + `subset totals ${r.helper.subsetTotal} against that route's own weight of `
+    + `${r.helper.loiterWeight} -- so weightedPick needs no re-normalising`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
