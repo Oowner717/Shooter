@@ -39347,6 +39347,294 @@ if (MINE_LINE) {
     + `${r.helper.loiterWeight} -- so weightedPick needs no re-normalising`);
 }
 
+/*
+ * ---- STRAIGHT: the path stops depending on the route ---------------------
+ *
+ * Phase 4a, build 343. NEEDLE was `march` with `wobble: 0.8` and all six
+ * routes; the guide's reason is that the fast body should not also wander.
+ *
+ * The claim is about the PATH and not the clock, so the reading is path
+ * length over chord -- intrinsic, needing no knowledge of where `drive`
+ * aims, which is build 328's correction to measuring "straight" against a
+ * line you build yourself. Measured before the change the ratio ran 1.0081
+ * to 1.2107 across the six routes; after it, 1.0127 to 1.0161.
+ *
+ * Three things this case is careful about:
+ *
+ * The CONTROL is the same body on the same six routes with the gait put
+ * back to `march`, because a flat ratio means nothing unless the instrument
+ * has been shown to read a bent one -- and it is the same six draws, so the
+ * comparison cannot be about which routes were sampled.
+ *
+ * The DAWDLE is asserted separately. `straight` is in `OWN_SPEED`, and that
+ * set gates the route's `dawdle` rather than the compensation: without it a
+ * NEEDLE that rolled `loiter` crossed in 14.45s against 7.67 on `direct`,
+ * one body in ten at nearly half speed on a spawn roll (build 318).
+ *
+ * And the SPEED is asserted to be UNcompensated, which is the whole reason
+ * `straight` and `creep` are two words. `creep` grosses the cruise up so the
+ * body arrives at the number its type names; this one does not, so the
+ * delivered figure is `speed * k / (k + damping)`. Asserting that is what
+ * would catch somebody "fixing" this arm into a copy of creep's -- which
+ * would be a silent +17% on the fastest body in the game.
+ *
+ * The residual TIME spread is the constructor's own `rand(0.86, 1.14)`
+ * speedScale roll (1.33x), which `straight` deliberately keeps because it
+ * writes no cruise at all -- the object is one line, not one speed. So the
+ * time is reported and the RATIO is what carries the claim.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ROUTES, CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { entryLine, ENTRY_Y } = await import('../src/portal.js');
+    const g = window.__sim;
+    const w = g.world;
+
+    const setup = () => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      // ARMORED discards the first hit each second and a stray trait would
+      // reach every body spawned after it (build 332); nothing here is a hit,
+      // but SWARM halves health and MENDING heals, and both change a crossing.
+      w.director.traits = [];
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.timeScale = 1;
+      for (const k of ['projectiles', 'mines', 'effects', 'drops', 'debris']) w[k].length = 0;
+    };
+
+    // One body, one route, from the rim to the mount. The chord is taken to
+    // where it ACTUALLY stopped, not to the mount: a body halts a radius
+    // short, and dividing by the longer chord reads under 1.
+    const run = (gait, routeId) => {
+      setup();
+      const rim = entryLine(w, ENTRY_Y);
+      const e = g.debugSpawn('needle', w.width * 0.25, rim + 10);
+      if (!e) return null;
+      e.staged = false;
+      // the gait is the SWITCH and nothing else differs -- the same type, the
+      // same spawn, the same pinned route, side and scale
+      e.type = Object.assign(Object.create(Object.getPrototypeOf(e.type)), e.type, { gait });
+      e.route = ROUTES.find((x) => x.id === routeId);
+      e.routeSide = 1;
+      e.routeScale = 1;
+      const x0 = e.x;
+      const y0 = e.y;
+      const mx = w.shooter.x;
+      const my = w.shooter.y;
+      let px = e.x;
+      let py = e.y;
+      let path = 0;
+      let t = 0;
+      let widest = 0;
+      let mid = 0;
+      let midN = 0;
+      let arrived = false;
+      for (let f = 0; f < 6000; f++) {
+        g.update(1 / 60);
+        t += 1 / 60;
+        if (e.dead) break;
+        path += Math.hypot(e.x - px, e.y - py);
+        px = e.x;
+        py = e.y;
+        const ax = mx - x0;
+        const ay = my - y0;
+        const L = Math.hypot(ax, ay) || 1;
+        const off = Math.abs(((e.x - x0) * ay - (e.y - y0) * ax) / L);
+        if (off > widest) widest = off;
+        // mid-field speed, clear of the standing start and of the mount
+        const frac = (e.y - y0) / ((my - y0) || 1);
+        if (frac > 0.3 && frac < 0.7) { mid += Math.hypot(e.vx, e.vy); midN += 1; }
+        if (Math.hypot(e.x - mx, e.y - my) <= e.r + w.shooter.r + 4) { arrived = true; break; }
+      }
+      const chord = Math.hypot(e.x - x0, e.y - y0) || 1;
+      return { route: routeId, gait, arrived,
+        t: +t.toFixed(2), ratio: +(path / chord).toFixed(4),
+        widest: +widest.toFixed(0), mid: +(mid / Math.max(1, midN)).toFixed(1) };
+    };
+
+    const ids = ROUTES.map((x) => x.id);
+    const straight = ids.map((id) => run('straight', id));
+    const march = ids.map((id) => run('march', id));
+    const t = TYPE_BY_ID.needle;
+    const k = Math.max(0.01, t.accel / 100);
+    return {
+      gait: t.gait,
+      wobble: t.wobble,
+      routes: t.routes || null,
+      straight,
+      march,
+      // what an UNcompensated blend delivers, and what creep's gross-up would
+      predict: +(t.speed * k / (k + CFG.physics.linearDamping)).toFixed(1),
+      asked: t.speed,
+      span: +(Math.max(...straight.map((x) => x.ratio))
+        - Math.min(...straight.map((x) => x.ratio))).toFixed(4),
+      marchSpan: +(Math.max(...march.map((x) => x.ratio))
+        - Math.min(...march.map((x) => x.ratio))).toFixed(4),
+    };
+  });
+
+  const sWorst = Math.max(...r.straight.map((x) => x.ratio));
+  const mWorst = Math.max(...r.march.map((x) => x.ratio));
+  const midMean = r.straight.reduce((a, x) => a + x.mid, 0) / r.straight.length;
+  const dawdle = r.straight.find((x) => x.route === 'loiter');
+  const direct = r.straight.find((x) => x.route === 'direct');
+  check('a NEEDLE commits to one line, at the speed it already had',
+    // the gait is declared, and the wobble it excludes is written out at 0
+    r.gait === 'straight' && r.wobble === 0
+    // ...and it names no routes, because a replacer reads none
+    && r.routes === null
+    // every body arrived, or a ratio is a claim about a journey that stopped
+    && r.straight.every((x) => x && x.arrived) && r.march.every((x) => x && x.arrived)
+    // THE CLAIM: the path no longer depends on the route. 1.05 against a
+    // measured worst of 1.0161 (3x clear) and a march worst of 1.21.
+    && sWorst < 1.05
+    // ...and the CONTROL is bent, or a flat reading proves nothing: the same
+    // six draws on `march` spread 20x wider across the ratio
+    && mWorst > 1.15 && r.marchSpan > r.span * 5
+    // THE DAWDLE: `loiter` is the one route with one, and OWN_SPEED means it
+    // no longer costs the fast body half its speed. Within 25% of `direct`
+    // against a measured 1.88x before.
+    && Math.abs(dawdle.t / direct.t - 1) < 0.25
+    // THE SPEED IS NOT COMPENSATED, which is why this is not `creep`: the
+    // delivered mid-field figure sits at the blend's own steady state and
+    // nowhere near the number the type asks for.
+    && Math.abs(midMean / r.predict - 1) < 0.15
+    && midMean < r.asked * 0.97,
+    `straight ratio ${r.straight.map((x) => x.ratio.toFixed(3)).join('/')} `
+    + `(span ${r.span}, widest ${r.straight.map((x) => x.widest).join('/')}) `
+    + `against march ${r.march.map((x) => x.ratio.toFixed(3)).join('/')} `
+    + `(span ${r.marchSpan}, widest ${r.march.map((x) => x.widest).join('/')}); `
+    + `loiter ${dawdle.t}s against direct ${direct.t}s `
+    + `(${(dawdle.t / direct.t).toFixed(2)}x, was 1.88x); delivered ${midMean.toFixed(1)} `
+    + `u/s against a blend prediction of ${r.predict} and an asked ${r.asked} `
+    // DERIVED, not declared: build 324's rule is that a detail string
+    // asserting its own conclusion cannot report a failure, and the first
+    // version of this line printed "uncompensated" as literal text -- which
+    // it duly did while revert B measured the arm delivering the asked 104.
+    + `-- reads as ${Math.abs(midMean / r.predict - 1) < 0.15 ? 'UNCOMPENSATED'
+      : Math.abs(midMean / r.asked - 1) < 0.05 ? 'COMPENSATED (this is creep, not straight)'
+        : 'NEITHER'}`);
+}
+
+/*
+ * ---- A DECLARED `wobble: 0` MEANS ZERO ----------------------------------
+ *
+ * Build 343. `drive` read `(this.type.wobble || 1)`, and `0` is falsy -- so
+ * three shipped types that DECLARED the wobble off (ANVIL, LATCH, MIRE) got
+ * the fallback meant for a type that declares nothing. ANVIL's own docstring
+ * says "the wobble goes with the arc... and the type authors 0".
+ *
+ * The fallback had no legitimate consumer: ZERO of the loose types omit the
+ * field, so `|| 1` could only ever overwrite a chosen zero. That is the
+ * derivation this case carries, because it is what says the fix cannot break
+ * anything -- not a measurement of the day's roster but a claim about the
+ * partition, asserted in both directions.
+ *
+ * And the reading is the HEADING DEVIATION and not the path, which is why
+ * build 328's instrument missed this: a symmetric sine wander adds under 1%
+ * of path length, so path-length-over-chord proved the LATERAL was gone and
+ * was blind to the WANDER. The control is a type that declares a non-zero
+ * wobble, or a zero is a zero from an instrument that has never read a one.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ENEMY_TYPES, TYPE_BY_ID } = await import('../src/config.js');
+    const { entryLine, ENTRY_Y } = await import('../src/portal.js');
+    const g = window.__sim;
+    const w = g.world;
+
+    // The heading's deviation from the true bearing to the mount, which is
+    // the quantity the wobble actually moves.
+    const dev = (id) => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      w.director.traits = [];
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      for (const k of ['projectiles', 'mines', 'effects', 'drops', 'debris']) w[k].length = 0;
+      const rim = entryLine(w, ENTRY_Y);
+      const e = g.debugSpawn(id, w.width * 0.25, rim + 10);
+      if (!e) return null;
+      e.staged = false;
+      e.routeSide = 1;
+      e.routeScale = 1;
+      const mx = w.shooter.x;
+      const my = w.shooter.y;
+      let sum = 0;
+      let worst = 0;
+      let n = 0;
+      for (let f = 0; f < 3000; f++) {
+        g.update(1 / 60);
+        if (e.dead) break;
+        if (Math.hypot(e.vx, e.vy) > 5) {
+          const want = Math.atan2(my - e.y, mx - e.x);
+          const got = Math.atan2(e.vy, e.vx);
+          let d = Math.abs(got - want);
+          if (d > Math.PI) d = 2 * Math.PI - d;
+          sum += d;
+          if (d > worst) worst = d;
+          n += 1;
+        }
+        if (Math.hypot(e.x - mx, e.y - my) <= e.r + w.shooter.r + 4) break;
+      }
+      const deg = (x) => +(x * 180 / Math.PI).toFixed(2);
+      return { id, declared: e.type.wobble, samples: n,
+        mean: deg(sum / Math.max(1, n)), worst: deg(worst) };
+    };
+
+    const loose = ENEMY_TYPES.filter((t) => !t.fixed);
+    return {
+      // the partition: nothing relies on the fallback, in both directions
+      omit: loose.filter((t) => t.wobble === undefined).map((t) => t.id),
+      zeros: loose.filter((t) => t.wobble === 0).map((t) => t.id),
+      // ...and the expression itself, which is the one character that moved
+      nullish: (0 ?? 1) === 0,
+      falsy: (0 || 1) === 1,
+      // ANVIL is the type whose docstring made the claim; NEEDLE is build
+      // 343's own, and the two arrive by different gaits (`creep`/`straight`)
+      anvil: dev('anvil'),
+      needle: dev('needle'),
+      // the control: a declared NON-zero, so the reading is shown to move
+      lurcher: dev('lurcher'),
+      lurcherDeclared: TYPE_BY_ID.lurcher.wobble,
+    };
+  });
+
+  check('a type that declares its wobble off actually has none',
+    // the two zero-declarers wander by nothing at all -- an absolute, because
+    // `wob` multiplies a sine by the factor and 0 kills the term outright
+    r.anvil.worst === 0 && r.needle.worst === 0
+    && r.anvil.mean === 0 && r.needle.mean === 0
+    // ...both actually declare it, or the zeroes are about the wrong bodies
+    && r.anvil.declared === 0 && r.needle.declared === 0
+    // ...and each ran long enough to have wandered
+    && r.anvil.samples > 200 && r.needle.samples > 200
+    // THE CONTROL: a declared non-zero still wanders, so a zero means
+    // something. Measured 20.75 degrees mean on a LURCHER at 0.9.
+    && r.lurcherDeclared > 0 && r.lurcher.worst > 5
+    // THE DERIVATION: the `?? 1` fallback is unreachable, so correcting it
+    // cannot have changed a body that was relying on it
+    && r.omit.length === 0 && r.zeros.length > 0
+    // ...and the one character, stated rather than assumed
+    && r.nullish && r.falsy,
+    `anvil declares ${r.anvil.declared} and wanders ${r.anvil.mean}/${r.anvil.worst} deg `
+    + `(mean/worst over ${r.anvil.samples} samples, was 6.59/12.37 under \`|| 1\`); `
+    + `needle ${r.needle.declared} -> ${r.needle.mean}/${r.needle.worst}; `
+    + `control lurcher declares ${r.lurcherDeclared} and wanders `
+    + `${r.lurcher.mean}/${r.lurcher.worst}. ${r.zeros.length} loose types declare 0 `
+    + `(${r.zeros.join(' ')}) and ${r.omit.length} omit the field, so the fallback `
+    + `is unreachable${r.omit.length ? ` -- BUT ${r.omit.join(' ')} rely on it` : ''}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

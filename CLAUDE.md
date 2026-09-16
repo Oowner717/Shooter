@@ -8303,3 +8303,271 @@ came from before believing the other one covers it.
   for**: a try/catch whose non-throwing path returns a value reads as "collect
   the successes" and collects the opposite. The fix both times was the NAME --
   `missed`, asserted at zero, with the count caught reported beside it.
+
+- **PHASE 4a IS IN FROM BUILD 343, AND IT IS ONE ROW OF THE GUIDE'S TEN.**
+  NEEDLE takes `straight`; five of the other nine are REFUSED and four are
+  deferred, each for a reason measured or read rather than argued. The ORDINAL
+  hash does not move -- and getting to that statement cost a false conclusion
+  of mine, recorded below under the instrument note, because the figure this
+  build opened with could not be reproduced an hour later on either tree.
+  What is sound is the back-to-back pair: **342 and 343 both read
+  `-954811922` with all six intermediate marks identical**, measured minutes
+  apart with 342 served from a `git worktree` on :8096. That is the assertion
+  a new arm in `drive`'s if/else chain owes -- provably an identity for every
+  body on that field.
+- **`straight` AND `creep` DIFFER IN EXACTLY ONE THING, AND IT IS A CLAIM
+  RATHER THAN A MECHANISM.** Both aim at the machine and add no lateral --
+  `tx, ty` already hold the mount and both arms only decline to offset it.
+  `creep` GROSSES THE CRUISE UP so the body arrives at the number its type
+  names, because ANVIL's crossing time is quoted to the player. Nothing about
+  NEEDLE is a clock -- the guide calls it "the fast one" and names no seconds
+  -- so `straight` writes no cruise at all. **So `type.speed` means
+  "delivered" for a marcher and "asked" for a compensated gait, and which of
+  the two a body gets is now a word rather than an accident.**
+- **A MARCH BODY HAS NEVER DELIVERED ITS AUTHORED `speed`, SO RE-GAITING ONE
+  ONTO A COMPENSATED GAIT IS A SILENT SPEED-UP OF ITS OWN PER-BODY FACTOR.**
+  The blend against `linearDamping` gives `speed * k / (k + 0.55)` with
+  `k = accel / 100`, and the factor VARIES by body -- measured across the
+  phase-4 roster: NEEDLE **1.167x**, MOTE and PLATE 1.289, TOW 1.314, PRISM
+  1.324, HERALD 1.367, BLOOM 1.500, GLUT 1.524, **BULWARK 1.611**, steepest
+  on the slowest bodies. So the guide's "STRAIGHT, TUMBLE and CREEP first,
+  they remove behaviour and cannot surprise" is true of STRAIGHT and false of
+  CREEP: BLOOM -> `creep` is a 1.50x speed buff and BULWARK -> `creep` a
+  1.61x one, on the two heaviest bodies, arriving inside what that row calls
+  a change that cannot surprise. Both are deferred as BALANCE decisions.
+  **Before re-gaiting anything onto `creep`, `dive` or `standoff`, compute
+  that body's own factor** -- it is not a uniform buff and it is not visible
+  in the diff.
+- **`OWN_SPEED` GATES THE DAWDLE AND NOT THE COMPENSATION, which is why
+  `straight` is in it while writing no cruise.** The compensation is written
+  inline per arm; the set's one job is `route.dawdle`. Without it a NEEDLE
+  that rolled `loiter` -- one body in ten -- crossed in **14.45s against 7.67
+  on `direct`**, so the body whose entire identity is being fast was nearly
+  half speed on a spawn roll. Build 318 recorded this shape for `dive` and
+  noted `roll` and `flock` inherit it too; for them it is a slower approach,
+  and for NEEDLE it was a broken claim. **And the set gates the MULTIPLIER
+  only**: `this.route.dawdle` is the first term of that guard, so it is
+  dereferenced for every gait in the set -- a replacer still needs a route
+  OBJECT, and an empty pool throws there as well as in `routeLateral`, which
+  is the second reason `routesOf` refuses an empty list.
+- **THE CLAIM IS THE PATH AND THE READING IS INTRINSIC.** Path length over
+  chord needs no knowledge of where `drive` aims, which is build 328's
+  correction to measuring "straight" against a line you build yourself.
+  Measured on the same body, same spawn, same pinned route/side/scale, the
+  GAIT as the only switch: **straight 1.013-1.016 (span 0.002) against march
+  1.014-1.268 (span 0.255)** -- a hundredfold tighter -- and the widest
+  lateral offset 20-47 against 26-231. The control is the SAME SIX DRAWS with
+  the gait put back, so the comparison cannot be about which routes were
+  sampled, and a flat reading means nothing unless the instrument has been
+  shown to read a bent one.
+- **THE RESIDUAL TIME SPREAD IS THE CONSTRUCTOR'S OWN ROLL, AND `straight`
+  KEEPS IT DELIBERATELY.** After the change the crossing still runs 7.45 to
+  9.23s (1.24x), which sits inside `rand(0.86, 1.14)` = 1.33x -- the per-body
+  `speedScale`. `creep` overwrites `cruise` outright and therefore DROPS that
+  roll (ANVIL reads 15.65/15.67 on two routes); `straight` writes no cruise,
+  so the roll survives. **The object is one line, not one speed**, so the
+  ratio carries the claim and the time is reported.
+- **BOTH REVERT PROOFS FIRE AND EACH ON ITS OWN CONJUNCT, which is what says
+  the case is measuring two things rather than one.** Taking `straight` out of
+  `OWN_SPEED` reads loiter **12.78s against direct 9.43 (1.36x)** and fails
+  the dawdle arm with the ratio still flat -- correctly, because a dawdle is a
+  speed and not a path. Giving the arm creep's gross-up reads **103.8 u/s
+  against an asked 104** and fails the speed arm alone. So the case would
+  catch somebody "fixing" this arm into a copy of creep's, which is the +17%
+  above.
+- **AND MY DETAIL STRING ASSERTED ITS OWN CONCLUSION, FOR THE FOURTH TIME IN
+  THIS FILE'S HISTORY.** It printed "-- uncompensated, which is what makes it
+  straight and not creep" as LITERAL TEXT, so revert B's FAIL line said
+  "uncompensated" while showing 103.8 against a prediction of 89.1. Build
+  319's "still flocking", build 324's "-- monotone in both" and build 323's
+  "CROSSED" are the same fault; it is derived now. **A detail string is a
+  declaration and it has to be computed like any other assertion** -- and
+  writing it a fourth time immediately after fixing the third is the sharper
+  half: diagnosing a fault does not inoculate you against writing it.
+- **FIVE OF THE NINE ARE REFUSED, AND FOUR OF THE FIVE ARE STRUCTURAL.**
+  - **PLATE -> `tumble`** and **MASS -> `tumble`**: `tumble` is in
+    `OWN_SPAWN`, so a tumble type PLACES ITSELF from a side wall instead of
+    coming through the portal -- and build 312 already measured that a hostile
+    which coasts to a halt rests outside `autoTarget`'s cone for ever, which
+    is the whole reason `roll` exists as a fifth word rather than a second
+    meaning for `tumble`.
+  - **TOW -> `standoff . drag`** and **MASS -> `drag -> tumble`**: `gaitOf`
+    returns ONE string and there is no handover mechanism. Two gaits in one
+    life is a feature to build, not a re-gaiting.
+  - **BULWARK -> `creep . planted`**: `planted` is refused for a second type
+    by an explicit guard whose own message names what has to move first
+    (build 328), and `creep` alone is the 1.61x above.
+  - **PRISM -> `cartwheel`** is the interesting one, because it is BUILDABLE
+    and its rationale is false. The capsule hit profile keys on `type.bar`
+    and not on the gait (`hitCircleAt` returns `this` for a body with no
+    bar), so a spinning PRISM stays a disc -- but `incidence` is `depth / R`
+    off the impact parameter with **no angular term anywhere**, so PRISM's
+    reflection is rotationally symmetric and turning the body cannot make the
+    mechanic visible. The guide's reason is "Its reflection depends on the
+    angle a round meets its face. Turning the body makes the mechanic
+    visible"; the first half is about WHERE on the disc the round lands and
+    the second half does not follow. A spin that advertises a rule the body
+    does not have is build 319's readout of nothing, so the row is refused
+    until the mechanic reads the angle -- which is a balance change of its
+    own.
+- **AND THE FOUR DEFERRED ONES EACH NEED A MECHANISM RATHER THAN A WORD.**
+  BLOOM and BULWARK -> `creep` are the speed factors above. **MOTE ->
+  `flock`** needs a per-release SERIAL: `flockOn` groups by `e.shoal !==
+  this.shoal` and the only writer of `shoal` is `spawnSchool`, so
+  `undefined === undefined` means a serial-less MOTE would flock with EVERY
+  un-serialled body on the field -- steering at the centroid of the whole
+  wave and separating off a BULWARK. Giving MOTE a `school` field instead
+  changes `release`'s dispatch, `threatOf`'s `many` factor, `formable` and
+  build 314's one-school-per-wave ceiling. **HERALD -> `standoff`** needs its
+  own `lob` block (the shared-block rule) plus the 1.37x, and the guide
+  itself asks for a measured before-and-after clear. **GLUT -> `forage`** is
+  a new word and a new steering target.
+- **AND `straight` IS NOW THE UNCOMPENSATED OPTION THOSE ROWS WANT, WHICH IS
+  THE ACTIONABLE HALF OF THIS BUILD.** The guide asks for BULWARK to lose its
+  lateral and wobble ("a 2.7-density body should not have a lateral or a
+  wobble. It arrives") and reaches for `creep` to do it -- which buys a 1.61x
+  speed-up nobody asked for. `straight` is that request with no speed change
+  at all, and the same holds for BLOOM. **It is still a balance change and
+  still not this build's**, because removing the lateral SHORTENS the path and
+  therefore the crossing: NEEDLE's mean fell when its lateral went, and doing
+  that to band 5's heaviest body moves a clear time the 120s cap already
+  fails at four of seven rungs (build 306). What the next build needs is the
+  clear table either side, not another gait word.
+- **AND A REFUTED ALARM OF MY OWN, WHICH IS THE MOST USEFUL THING IN THIS
+  BUILD.** Chasing a fan-out claim that CHAFF spends 80% of its run WALKING,
+  I measured a chaff released at the rim with the gun off: the hand-back
+  fired **zero** times on four independent columns, the body settled ~180
+  units BELOW the mount, spent **96%** of its life there and was picked by
+  `autoTarget` on **1.2%** of frames. That is build 312's cone ruling, live,
+  in a shipped object -- and it is not real. Measured through the DOOR
+  instead, with the gun on: the chaff is picked on **97.5%** of frames and is
+  **dead at frame 158**, never going below the mount, against a LURCHER at
+  147 and a MOTE at 72. **The below-the-mount drift is a property of a probe
+  with the gun switched off, which is a state the game never produces**, and
+  my own cone arithmetic was the wrong instrument where `g.autoTarget(w)` was
+  available. Build 322's rule from the other side: a case for a rescue
+  mechanism has to be set up in the state that needs it, and I set up a state
+  that needs nothing and read a catastrophe out of it.
+  **What survives is narrower and worth keeping.** The walk radius is
+  `r + s.r + grabPad + walkPad + span` = 13 + 26 + 2 + 8 + 111.8 = **160.8**,
+  against a measured closest approach of **183** -- so the branch is live
+  with 22 units to spare and is not taken on any natural approach, because
+  the body passes the machine rather than closing on it. `hopOn`'s docstring
+  says it hands back "for the last stretch in front of the machine", which
+  describes a path measured at zero on every column and one the body is dead
+  long before reaching anyway. **A comment that describes a branch as routine
+  owes the same measurement a threshold owes its floor.**
+  And the fan-out's own figure (3847 of 4800 frames) reproduced nowhere: 0 of
+  24,000 on four columns. **A fan-out's finding is a pointer to the right
+  file; the mechanism is still yours to measure** -- and this run is the
+  clearest instance yet, because the pointer was right (the comment IS wrong)
+  and the number was wrong and my own first reading of the same file was
+  wrong in a third direction.
+- **The phase-3 audit returned NO blockers, nothing silent and nothing
+  refuted**, and independently reproduced the readers enumeration, the
+  `weightedPick` subset identity and the hash blindness. Three of its four
+  lenses died on a session limit, so it is one lens's sweep rather than a
+  panel -- worth saying, because "the audit found nothing" reads as four
+  agreements and is one.
+- **A DECLARED `wobble: 0` WAS DISCARDED BY `|| 1`, AND THAT IS THE SIXTH
+  INSTANCE OF THIS SHAPE -- FOUND IN MY OWN BUILD'S PATH.** `drive` read
+  `(this.type.wobble || 1)` and `0` is falsy, so a type that EXPLICITLY
+  declared the wobble off got the fallback meant for one that declares
+  nothing. This is worse than `levels ?? 3` or an omitted `band` reading as
+  band 1: there the silence hid an unconsidered value, and here a value
+  somebody chose and wrote out was overwritten one layer down.
+  **The fallback had no legitimate consumer at all.** Measured: **ZERO of the
+  44 loose types omit the field**, so `|| 1` could only ever overwrite a
+  chosen zero -- which is the derivation that says correcting it cannot have
+  changed a body relying on it, and the case asserts that partition in both
+  directions rather than sampling the day's roster.
+  **Three shipped types were affected and each has a docstring saying the
+  wobble is off**: ANVIL (`creep` -- "the wobble goes with the arc... and the
+  type authors 0", build 328), LATCH (`ride`) and MIRE (`serpent`), all three
+  reaching the line because their gait arms are `else if`s in the chain
+  rather than returns. The other nine zero-declarers are safe for a reason
+  worth knowing: the seven HARMLESS ones (DRIFT, SEED, EMBER, HUSK, LANTERN,
+  FILAMENT, BELL) hit `if (this.harmless ...)`, whose switch ends in
+  `return;` twenty lines above the wobble; and CHAFF reaches it only on a
+  hand-back this same build measured at zero.
+  What they were getting is not a corner value: the declared range across the
+  loose hostiles is **0.03 (SHRIKE) to 2.6 (LURCHER)**, so a factor of 1 sits
+  mid-table between BULWARK's 0.9 and TOW's 1.1.
+- **AND BUILD 328'S OWN INSTRUMENT COULD NOT SEE IT, WHICH IS THE HALF WORTH
+  KEEPING.** That build proved `creep` straight with path length over chord
+  -- 1.0089 against a routed LURCHER's 1.085 to 1.190 -- and a SYMMETRIC sine
+  wander adds under 1% of path length, so the ratio proved the LATERAL was
+  gone and was **blind to the WANDER**. Measured on ANVIL either side, mean
+  and worst heading deviation from the true bearing to the mount:
+  **6.59 / 12.37 degrees against 0.00 / 0.00**, with the ratio 1.0084 ->
+  1.0000 exactly and the crossing 15.65s -> 15.42s. So the fault was inside
+  the thing a green case had already measured, and the reading that sees it is
+  the heading deviation, which nothing had ever taken. **Ask what quantity a
+  passing measurement is insensitive to** -- the same rule as build 320's
+  figure dump, one level in.
+- **IT WAS FOUND BY GREPPING THE READERS OF A FIELD I HAD JUST AUTHORED, NOT
+  BY A TEST.** Build 343 wrote `wobble: 0` onto NEEDLE with a comment saying
+  the word excludes the wander, and one `grep -rn "\.wobble" src/` to confirm
+  the field had a single reader showed `|| 1` in that reader. **Without it
+  this build would have shipped NEEDLE's wobble going 0.8 -> 1, i.e. MORE
+  wander, under a comment claiming it was off** -- a regression wearing a
+  removal's clothes. The discipline that caught it is the cheap one this file
+  already asks for: when you author a value, read its reader.
+  The fix is one character (`??`), it is a CORRECTNESS fix rather than a
+  balance choice because every affected type's own docstring states the
+  intent, and its cost is 1.5% of ANVIL's crossing -- inside the spread that
+  type's own note already records.
+- **THE SUITE WAS KILLED SIX MINUTES IN RATHER THAN LET FINISH, DELIBERATELY.**
+  A run validates the tree it is running against, and that tree was about to
+  change in a way that moves the very numbers the new case measures. Killing
+  it cost six minutes and saved a second full run; one green run on the tree
+  that ships is what the rule actually asks for. Killed BY PID (`kill 2003`),
+  never `pkill -f`, which this file records matching its own shell three
+  times over.
+- **THE DIFFERENTIAL HAS TO BE TAKEN BACK TO BACK, AND "SAME CONTAINER, SAME
+  SESSION" IS NOT ENOUGH -- WHICH THIS BUILD LEARNED BY GETTING IT WRONG.**
+  The header above says to take the before yourself in the session you are
+  working in, because a written-down hash is not reproducible across
+  containers. Build 343 did exactly that: it read **`1664149562`** on its own
+  tree partway through, matching what build 342 had recorded. An hour and two
+  suite runs later the same tree read **`-954811922`** -- and so did the
+  COMMITTED 342 tree, served from a worktree, with all six intermediate marks
+  identical. So the two figures are two readings of the same code, and the
+  "before" I took in this session was no more valid than one from another
+  container.
+  **What I concluded from the move was wrong, and the wrongness is the
+  useful part.** I predicted the hash WOULD move and named the channel in
+  advance: a mote off ORDINAL or TALLY carries `type.wobble: 0` with `isDrop`
+  true, skips every gait guard and the harmless `return`, and so reaches
+  `wob` -- so straightening those salvage paths should change when the purse
+  banks. The prediction was mechanically correct about the code (verified by
+  reading every guard) and the move was not the wobble fix at all: reverting
+  ONLY `?? 1` back to `|| 1` in a served copy gives **`-954811922` to the
+  bit**. Five readings agree on it -- 343 live three times, 343 with the fix
+  reverted, and committed 342 -- against one earlier reading of the old
+  figure.
+  **The channel was NOT run down and the candidates that were eliminated are
+  worth recording** so the next person starts past them. It is not the seed:
+  `fight.mjs` installs an xorshift32 over `Math.random` in an init script
+  before any module evaluates, stubs rAF so nothing but the fixed 1/60 steps
+  advances the game, and voids `AudioContext` (whose noise buffer is fifty
+  thousand draws) -- and `Number(SEED) + i` has `i === 0` at `RUNS === 1`, so
+  the seed is exactly what is typed. It is not non-determinism: four
+  consecutive runs on one tree agree to the bit. It is not the BUILD literal
+  drifting between the two files (both read 342 at the first reading and 343
+  at the second, so `askServer` never reloaded), and it is not the REV stamp,
+  which nothing behavioural reads.
+  **The one environmental event between the two readings is that the :8099
+  static server was killed by an audit agent and restarted by me**, and the
+  restart specified `-c-1` where the original's flags are unknown. A served
+  copy behind a caching server is the shape that would do this, and it would
+  mean the readings recorded for builds 338 to 342 were taken against a
+  possibly stale tree -- which is exactly why those builds all reported the
+  hash "unmoved". Not established, and stated as a candidate rather than a
+  finding.
+  **The rule to carry: a hash claim needs both sides read back to back, in
+  one sitting, with nothing else run in between** -- serve the old side from
+  a `git worktree` (`fight.mjs --url`) rather than reading a number you took
+  earlier in the same session. And **check the served tree is the tree you
+  think it is**: `curl -s .../src/enemies.js | grep` for the line you changed
+  takes one command and is the only thing that proves it.

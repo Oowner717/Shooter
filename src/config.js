@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '342';
+export const BUILD = '343';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '342';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'c07312c';
+export const REV = 'c438a14';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4800,7 +4800,25 @@ export const ENEMY_TYPES = [
     id: 'needle',
     opens: 0,
     name: 'NEEDLE',
-    gait: 'march',
+    /*
+     * ONE LINE -- phase 4a, and the only one of the guide's ten re-gaitings
+     * that removes behaviour and cannot surprise. It was `march` with
+     * `wobble: 0.8` and six routes; the guide's reason is "Commits to one
+     * line at the rim. It is the fast one; it should not also wander."
+     *
+     * Measured across all six routes before the change, crossing time and
+     * widest lateral offset from its own start-to-mount line: direct
+     * 7.67s/22, sweep 9.52/161, wide 11.30/220, serpentine 8.30/72, hook
+     * 8.63/159, loiter 14.45/78. So the FAST body was anywhere from 7.67 to
+     * 14.45 seconds depending on a roll -- a factor of 1.88 -- and the 14.45
+     * is the `loiter` dawdle it inherited from a route it barely used.
+     *
+     * What the word removes: the lateral (220 -> ~22), the wobble, and that
+     * dawdle. What it does NOT remove is any speed -- `straight` is not
+     * compensated, so the delivered 89.1 u/s is what it always was. See the
+     * arm in enemies.js for why the pair `straight`/`creep` exists at all.
+     */
+    gait: 'straight',
     shape: 'needle',
     // Leads with the point: the heading follows the travel bearing rather
     // than tumbling. See Enemy.face().
@@ -4811,7 +4829,7 @@ export const ENEMY_TYPES = [
     speed: 104, // the quick one
     accel: 330,
     restitution: 0.5,
-    wobble: 0.8,
+    wobble: 0, // the word excludes it; written out per build 224
     color: '#ffd166',
     glow: '#ff9f1c',
     weight: 18,
@@ -8322,6 +8340,7 @@ export const GAITS = {
   ride: 'beelines at the biggest body on the field and rides it -- the thing to shoot is no longer the thing in front',
   hop: 'quantised: sits still, then crosses a hundred units sideways in three frames, leaving a copy of itself where it was',
   creep: 'the straight line and nothing else: no lane, no wobble, and no impulse in the game turns it',
+  straight: 'one line, chosen at the rim and never revised: no lane and no wobble, at whatever the body\'s own blend delivers -- `creep` is this plus a speed the type NAMES, which is a different claim',
   serpent: 'weaves down the field, and the weave OPENS OUT as it closes -- the one lateral in the game that does not fold in, painting ground behind it that gets wider with it',
   spread: 'goes wide before it comes down, taking the emptiest lane it can find -- it is covering ground, not coming for you',
   standoff: 'closes to the far edge of what the assist can reach and holds it, sliding sideways -- it will not come to you',

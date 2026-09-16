@@ -2511,10 +2511,25 @@ export class Enemy {
      *
      * And it owns the VELOCITY rather than offering a target, so it returns
      * here instead of joining the `tx`/`ty` chain below -- except when
-     * `hopOn` hands the body back, which it does for the last stretch in
-     * front of the machine. That is the one gait in the game that stops being
-     * itself: see the `walk` guard, which is derived from the fact that
-     * landing a 2,200 u/s leap on a static turret is fatal.
+     * `hopOn` hands the body back, which it does inside the `walk` guard's
+     * radius. That is the one gait in the game that stops being itself: the
+     * guard is derived from the fact that landing a 2,200 u/s leap on a
+     * static turret is fatal.
+     *
+     * **AND THAT HAND-BACK IS MEASURED AT ZERO ON EVERY NATURAL APPROACH**,
+     * which this paragraph claimed was "the last stretch in front of the
+     * machine" until build 343 measured it. The radius is
+     * `r + s.r + grabPad + walkPad + span` = 13 + 26 + 2 + 8 + 111.8 =
+     * **160.8**, and a chaff released at the rim with nothing shooting it
+     * closes to **183** and no nearer -- it passes the machine and settles
+     * below it rather than converging -- so the guard is live with 22 units
+     * to spare and is never reached. 0 hand-backs of 24,000 substeps across
+     * four independent columns. With the gun ON it is moot: the body is
+     * picked on 97.5% of frames and dead at frame 158, against a LURCHER's
+     * 147, so it never gets the chance. The guard stays because build 323
+     * measured the landing as fatal and the case tests it by construction;
+     * what was wrong was a comment describing a branch as routine. A comment
+     * that does that owes the same measurement a threshold owes its floor.
      */
     if (this.type.gait === 'hop' && !this.staged && !this.isDrop
       && this.hopOn(world, dt)) {
@@ -2743,6 +2758,47 @@ export class Enemy {
       const nd = Math.hypot(dx, dy) || 1;
       dx /= nd;
       dy /= nd;
+    } else if (!this.staged && this.type.gait === 'straight' && !this.isDrop) {
+      /*
+       * ---- STRAIGHT: creep's line, at the speed the body actually has ----
+       *
+       * Phase 4a. The guide: "One line, chosen at the rim and never revised.
+       * No lateral, no wobble, fast." The steering is `creep`'s to the
+       * statement -- `tx, ty` already hold the machine and this branch only
+       * declines to add the route's offset -- and the two words differ in
+       * exactly one thing, which is the whole reason there are two.
+       *
+       * `creep` GROSSES THE CRUISE UP so the body arrives at the number its
+       * type names, because ANVIL's crossing time is quoted to the player and
+       * a clock cannot be 14% either side of itself. Nothing about NEEDLE is
+       * a clock: the guide calls it "the fast one" and names no seconds. So
+       * this arm writes no cruise at all and the body delivers
+       * `speed * k / (k + damping)` = 104 x 3.3 / 3.85 = **89.1 u/s**, which
+       * is what it has always delivered as a marcher. Re-gaiting it onto
+       * `creep` instead would have been a silent **+17%** on the fastest body
+       * in the game -- see the table in CLAUDE.md, where the same factor runs
+       * to 1.61x on a BULWARK, steepest on the slowest bodies.
+       *
+       * So the rule this pair states: **`type.speed` means "delivered" for a
+       * marcher and "asked" for a compensated gait**, and which of the two a
+       * body gets is now a word rather than an accident.
+       *
+       * It IS in `OWN_SPEED`, which is a separate question from the gross-up:
+       * that set gates the route's `dawdle` alone. Without it a NEEDLE that
+       * rolled `loiter` -- one body in ten -- crossed in 14.45s against 7.67
+       * on `direct`, so the body whose entire identity is being fast was
+       * nearly half speed on a spawn roll. Build 318's finding, and this is
+       * the one gait where it was a broken claim rather than a slow approach.
+       *
+       * The wobble goes with the lateral: `drive`'s heading wander is applied
+       * below off `this.type.wobble` and the type authors 0, written out
+       * rather than omitted for build 224's reason.
+       */
+      dx = tx - this.x;
+      dy = ty - this.y;
+      const nd = Math.hypot(dx, dy) || 1;
+      dx /= nd;
+      dy /= nd;
     } else if (!this.staged && this.type.gait === 'spread' && !this.isDrop) {
       /*
        * ---- SPREAD owns the steering, for `roll`'s and `dive`'s reason ----
@@ -2871,7 +2927,38 @@ export class Enemy {
       dy /= nd;
     }
 
-    const wob = Math.sin(t * (0.7 + this.phase * 0.11) + this.phase) * (this.type.wobble || 1);
+    /*
+     * ---- `?? 1` AND NOT `|| 1`, BECAUSE `0` IS FALSY -------------------
+     *
+     * Build 343. This read `(this.type.wobble || 1)`, so a type that
+     * DECLARED `wobble: 0` got a factor of **1** -- the explicit value
+     * discarded and replaced by the fallback meant for an absent one. And
+     * the fallback has no legitimate consumer at all: measured, **zero** of
+     * the 44 loose types omit the field, so the only thing `|| 1` ever did
+     * was overwrite a chosen zero.
+     *
+     * Three shipped types were affected and each has a docstring saying the
+     * wobble is off: ANVIL (`creep` -- "the wobble goes with the arc... the
+     * type authors 0"), LATCH and MIRE. Measured on ANVIL either side, mean
+     * and worst heading deviation from the true bearing to the mount:
+     * **6.59 / 12.37 degrees against 0.00 / 0.00**, with the path ratio
+     * 1.0084 -> 1.0000 exactly and the crossing 15.65s -> 15.42s.
+     *
+     * **And build 328's own instrument could not see it**, which is the part
+     * worth keeping: it proved `creep` straight with path-length-over-chord
+     * at 1.0089 against a routed LURCHER's 1.085-1.190, and a SYMMETRIC sine
+     * wander adds under 1% of path length -- so the ratio proved the LATERAL
+     * was gone and was blind to the WANDER. The reading that sees a wander
+     * is the heading deviation, and nothing had taken it.
+     *
+     * The harmless types that declare 0 (DRIFT, SEED, EMBER, HUSK, LANTERN,
+     * FILAMENT, BELL) never reach this line -- the harmless switch returns
+     * above it -- and CHAFF reaches it only on a hand-back that build 343
+     * measured at zero. Same family as the `[hidden]` trap and the `export
+     * let` snapshot: a property set, and silently overwritten one layer
+     * down.
+     */
+    const wob = Math.sin(t * (0.7 + this.phase * 0.11) + this.phase) * (this.type.wobble ?? 1);
     // clumsy: the heading wanders around the true bearing
     const ang = Math.atan2(dy, dx) + wob * 0.24;
     dx = Math.cos(ang);
@@ -10350,12 +10437,22 @@ const FACES_TRAVEL = new Set(['flock', 'dive']);
  * whose whole claim is that it stands at a derived distance and drifts,
  * drifting at 0.55 of that on the one body in ten that rolls a `loiter`.
  *
+ * `straight` is the fourth, and it is here for the CLAIM rather than for an
+ * authored number -- which is the distinction this set has always been
+ * about. It does not gross its cruise up (see the arm), so what a dawdle
+ * would scale is the one thing NEEDLE is: measured, a rolled `loiter` took
+ * it to 14.45s across the field against 7.67s on `direct`, and "the fast
+ * one" cannot be a spawn roll. Note the set gates the MULTIPLIER only --
+ * `this.route.dawdle` is the first term of that guard and is dereferenced
+ * for every gait in here, so a replacer still needs a route OBJECT and an
+ * empty pool throws there as well as in `routeLateral`.
+ *
  * `roll` and `flock` also replace the route's STEERING and still inherit its
  * dawdle. That is left alone deliberately -- neither authors a speed, so for
  * them the modifier is just a slower approach, and changing it is a balance
  * decision rather than a correctness one.
  */
-const OWN_SPEED = new Set(['dive', 'creep', 'standoff']);
+const OWN_SPEED = new Set(['dive', 'creep', 'standoff', 'straight']);
 
 /**
  * How many bodies a chain is, and there is no default.
