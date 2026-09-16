@@ -8376,12 +8376,39 @@ if (!GUN_LINE) {
      * roll that makes the case pass is what this case's six-build history is
      * a catalogue of.
      */
-    const TRIES = 3;
+    /*
+     * TRIES was 3 and the budget was priced off p = 2/3, measured from three
+     * trials. Build 348 pooled those with six more attempts read out of three
+     * builds' `--json` dumps (345/346/347, whose src differs only in the
+     * BUILD literal): **9 attempts, 5 of them clearing the floor, p = 0.556**
+     * -- so three attempts leave 8.8% of spurious red rather than the 4% the
+     * paragraph above predicted, and this session's three runs needed 3, 1
+     * and 2 of them. Five attempts is 1.7% for 0.127 of an extra window on
+     * average (1.769 against 1.642), which is the cheapest end of the curve;
+     * six buys 0.8% for almost nothing more and is not worth the wall clock.
+     *
+     * Note the criterion above -- "if it ever starts needing all three every
+     * run, re-site it" -- is the right shape and the wrong number: at
+     * p = 0.556 a run legitimately needs all three 8.8% of the time, so the
+     * signal to re-site is the floor's own clear rate falling, not the budget
+     * being spent once.
+     *
+     * And the floor is ONE constant now. It was written twice -- the loop's
+     * break and the assertion's `held > 10` -- so tuning one would have left
+     * the retry stopping on a hold the check rejects, spending none of the
+     * remaining budget and reporting "attempt 1 of 5" for a scenario that had
+     * four more goes. Same for the printed denominator, which was a literal
+     * `3` beside a `TRIES` it could not see.
+     */
+    const TRIES = 5;
+    const HOLD_FLOOR = 10;
+    out.fuseMax = TRIES;
+    out.fuseFloor = HOLD_FLOOR;
     out.fuseTries = [];
     for (let k = 0; k < TRIES; k++) {
       out.fuseOn = play(true, false, out.fuseSecs, out.fuseRung);
       out.fuseTries.push(out.fuseOn.held);
-      if (out.fuseOn.held > 10) break;
+      if (out.fuseOn.held > HOLD_FLOOR) break;
     }
     out.fuseOff = play(false, false, out.fuseSecs, out.fuseRung);
     // What those seconds are WORTH, off the config rather than off a
@@ -8555,7 +8582,7 @@ if (!GUN_LINE) {
    */
   check('...and the wait FILLS THE FUSE, which is the thing that rescues the run',
     // it ran at all...
-    r.fuseOn.held > 10 && r.fuseOn.waves >= 2
+    r.fuseOn.held > r.fuseFloor && r.fuseOn.waves >= 2
     // ...the fuse rose by exactly what those seconds are worth...
     && Math.abs(r.fuseOn.rose - r.want) < r.want * 0.1
     // ...mostly BECAUSE of the wait, which is the half the report denied...
@@ -8563,7 +8590,7 @@ if (!GUN_LINE) {
     // ...and contact on its own does not get there.
     && r.fuseOff.gPeak < 0.5,
     `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of ${r.fuseSecs} on attempt `
-    + `${r.fuseTries.length} of 3 (holds ${r.fuseTries.join(', ')}): the fuse rose `
+    + `${r.fuseTries.length} of ${r.fuseMax} (holds ${r.fuseTries.join(', ')}): the fuse rose `
     + `${r.fuseOn.rose} against the ${r.want.toFixed(3)} that ${r.fuseOn.crowdS}s of WAIT `
     + `and ${r.fuseOn.contactS}s of contact are worth at crowd ${r.crowd} over a fuse of `
     + `${r.fuse}, peaked at ${r.fuseOn.gPeak} and blew ${r.fuseOn.fired} times over `

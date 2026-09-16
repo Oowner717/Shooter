@@ -8904,3 +8904,97 @@ came from before believing the other one covers it.
   because a value the probe refuses on and a value it PRINTS in the sheet
   ought to be the same read. Two reads of one constant is the shape that lets
   a heading disagree with a guard.
+
+- **BUILD 348 IS THE AUDIT BUILD 323 ASKED FOR, RUN OFF DUMPS ALREADY IN
+  HAND, AND ITS FIRST RESULT IS REASSURING.** 323 recorded "147 of 706 arms
+  move... the next audit starts from the dumps rather than from a blind
+  re-run". Builds 345, 346 and 347 each shipped a green `--json` dump, and
+  all three changed **nothing in `src/` but the BUILD literal** -- so the
+  three together are a "nothing changed" population across three BUILDS
+  rather than three runs of one, which is stronger: it also measures whether
+  the script-side changes reached the game. They did not. **599 of 760 arms
+  are numerically identical across all three**, 3 change the SHAPE of their
+  message and 158 have figures that move, with 0 failures in each run. That
+  is the claim builds 346 and 347 each made from inspection ("no src change
+  but the build literal"), measured.
+- **AND THE THREE SHAPE-CHANGERS ARE ALL BENIGN AND ALL SELF-EXPLAINING**,
+  which is worth knowing because a shape change is the one thing a numeric
+  diff cannot rank: the fuse arm's retry list (`holds 5, 3.1, 40` against
+  `holds 38.5`), the LATCH ring arm's ring list (7 latches against **14**,
+  which is SWARM doubling the count and visible in its own message), and the
+  hop arm printing `dy 50` against `dy 50/50.01`. None is a defect and each
+  says why in the line itself.
+- **THE FUSE ARM'S RETRY BUDGET WAS PRICED OFF THREE TRIALS AND IS
+  MEASURABLY THIN, WHICH THE DUMPS SETTLE FOR FREE.** Build 338 set
+  `TRIES = 3` from p = 2/3 and predicted "about a 4% chance of a spurious
+  red". Pooling its three trials (25.9 / 3.7 / 23.9) with the six attempts
+  the three dumps print (5, 3.1, 40 | 38.5 | 2.5, 18.2) gives **9 attempts,
+  5 clearing the `held > 10` floor, p = 0.556** -- so three attempts are
+  **8.8%** spurious, not 4%, and this session's three runs needed 3, 1 and 2
+  attempts. `TRIES = 5` is **1.7%** for 0.127 of an extra window on average
+  (1.769 against 1.642); six would be 0.8% and is not worth the wall clock.
+  **Confirmed on this build's own run**, which is the tenth attempt in the
+  pool: it cleared first time at 47.2s, taking the pool to 6 of 10 and
+  p = 0.60, and it printed "attempt 1 of 5" -- so the denominator really is
+  read off `TRIES` rather than from the literal it replaced.
+  **A retry budget is a fitted margin like any other**, and the figures to
+  fit it to were sitting in three dumps nobody had subtracted.
+- **...AND 338'S OWN RE-SITE CRITERION IS THE RIGHT SHAPE WITH THE WRONG
+  NUMBER.** It says to re-site if the case "ever starts needing all three
+  every run" -- at p = 0.556 a run legitimately needs all three 8.8% of the
+  time, so spending the whole budget once is not a signal at all. The signal
+  is the FLOOR'S OWN CLEAR RATE falling; the budget is downstream of it.
+- **AND THE FLOOR WAS WRITTEN TWICE, WHICH WOULD HAVE FAILED IN A CONFUSING
+  DIRECTION.** The retry loop broke on `held > 10` and the assertion tested
+  `r.fuseOn.held > 10` -- two copies, so tuning one leaves the retry
+  stopping on a hold the check then rejects, with the remaining budget
+  UNSPENT and the message reporting "attempt 1 of 5" for a scenario that had
+  four more goes. One `HOLD_FLOOR`, read by both. The printed denominator was
+  the same shape in three characters (`of 3` beside a `TRIES` it could not
+  see) and is `r.fuseMax` now.
+- **RECORDED AND DELIBERATELY NOT RE-TUNED: the release-gate FIELD arm's
+  separation is proportional to how long the release was held, and its own
+  message has been printing both numbers all along.** Across four dumps:
+  hold **171.5s -> separation 0.508**, **117.8s -> 0.767**, **81.6s -> 0.807**,
+  **53.7s -> 0.855** -- monotone inverse on all FOUR, against a 0.95 ceiling,
+  so the worst draw has **10% of headroom** and the trend points AT the
+  ceiling rather than away from it. Pooled with build 322's three (0.530,
+  0.585, 0.626) that is seven readings spanning 0.508 to 0.855.
+  **And its liveness floor cannot protect it, which is the sharp end.** The
+  arm accepts any `held > 3` -- three seconds -- while the four observed
+  per-run holds are 53.7 to 171.5s, so the floor sits eighteen times below the
+  smallest hold ever measured and has never once bound. The regime those four
+  points extrapolate into is exactly the one it admits. Its sibling the fuse
+  arm floors the same quantity at 10 AND retries for it; this one floors at 3
+  and pools three runs, which averages the regime in rather than refusing it.
+  This is the shape build
+  305 fixed for the FUSE arm ("when a reading has a ceiling, divide by the
+  thing that drives it") arriving on the field arm, and nothing in this file
+  had connected the two numbers for it.
+  Not acted on, and each candidate refused for a stated reason: **tightening**
+  is refused by build 320's ruling that headroom beats sensitivity on the one
+  case with the worst history; **pinning `runSeed`** is refused by build 338's
+  ruling that choosing a roll is what six builds of re-siting were made of;
+  **pooling more than three runs an arm** costs a 240-second window each and
+  four builds of three-run pools already span 0.508 to 0.855, so it would not
+  collapse. What this note buys is the next failure's diagnosis and the fix to
+  reach for: when it draws 0.96, read the HOLD in the same line before
+  touching the rung, and the candidate is the SIBLING'S shape -- a floor that
+  makes a four-second hold inadmissible rather than a ceiling loosened to
+  survive one. Left for its own build, because changing what this case admits
+  is a change to what it measures, and four points with 10% of headroom is a
+  reason to write the mechanism down rather than to re-site the case a seventh
+  time in the same session that found it.
+- **AND THE RANKING METHOD HAS TWO FAULTS WORTH NOT REPEATING, both found by
+  reading its output rather than by it failing.** Pairing a moving figure
+  against any `x.y` literal in the same message ranks **measured values
+  against their own printed copies** -- eighteen arms at "0.0 spread-widths",
+  every one of them a figure beside itself. The fix is in the data and needs
+  no regex opinion: across runs of an unchanged tree a position that HOLDS
+  STILL is a candidate constant and one that MOVES is a measurement, so pair
+  movers against stills. And **a comma thousands separator breaks numeric
+  tokenising** -- `20,075` reads as `20` and `075`, which is how "SPORE
+  clears 20,075 of band-5 health" was ranked as an 18..22 range against a
+  held 20. Even corrected the ranking is a READING AID: build 320 said "rank
+  with the script, decide with your eyes", and of the twenty it put at the top
+  here, two were real.
