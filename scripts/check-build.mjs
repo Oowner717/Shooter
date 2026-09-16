@@ -2503,6 +2503,67 @@ if (badGate.length) {
   }
 }
 
+/*
+ * A WAVE MAY BE BEGUN FROM EXACTLY ONE PLACE, AND THAT PLACE IS BEHIND THE
+ * THINNESS GATE.
+ *
+ * Build 291's release gate is a refusal inside `Director.update`: while the
+ * field is thicker than the last wave was required to leave it, the hold
+ * accumulates and the function RETURNS, so `begin` is never reached. The one
+ * thing that can quietly undo that is a SECOND DOOR -- another path that
+ * starts a wave without consulting `lastThin` -- and this repo has paid for
+ * that shape repeatedly: `setTier` stepping past a gate `climbTo` had just
+ * answered, `Director.restore` writing `tier` and `peak` by hand, and build
+ * 272's era ceiling walking over itself for the same reason ("a ceiling needs
+ * all three doors").
+ *
+ * The runtime case cannot see it. It measures the field's mean against a
+ * gate-off arm, and a second door would only weaken that separation slightly
+ * -- inside the run-to-run spread the case already has to tolerate. So the
+ * structural half is here, where it costs a millisecond instead of six
+ * 240-second windows, and the runtime half measures what the gate BUYS.
+ *
+ * The gate's own shape is pinned with it rather than only the call count: the
+ * `return` is the refusal, `hostileCount` is deliberately not `standing`
+ * (build 291's note -- a wave ENDS on its own bodies and the next one WAITS
+ * on the field), and a hold that did not accumulate would leave the fuse with
+ * nothing to read.
+ */
+{
+  const defs = (routeSrc.match(/\n {2}begin\(world\) \{/g) || []).length;
+  const calls = [];
+  const re = /\.begin\(/g;
+  let m;
+  while ((m = re.exec(routeSrc))) calls.push(m.index);
+  const bad = [];
+  // Vacuity first: a rename makes every assertion below empty rather than
+  // false, which is how a guard goes quietly green.
+  if (defs !== 1) bad.push(`Director.begin is declared ${defs} times, not once`);
+  if (calls.length !== 1) {
+    bad.push(`a wave is begun from ${calls.length} places in src/enemies.js, not one`
+      + ' -- a second door has to consult `lastThin` or the release gate has'
+      + ' one refusal and two ways past it');
+  }
+  for (const at of calls) {
+    const before = routeSrc.slice(Math.max(0, at - 400), at);
+    const missing = [
+      ['the hold', /this\.holdFor \+= dt;/],
+      ['the refusal', /this\.holdFor \+= dt;\s*\n\s*return;/],
+      ['the field test', /hostileCount\(world\) > this\.lastThin/],
+    ].filter(([, r2]) => !r2.test(before)).map(([n]) => n);
+    if (missing.length) {
+      bad.push(`the wave begun at offset ${at} is not behind the thinness gate`
+        + ` (missing: ${missing.join(', ')})`);
+    }
+  }
+  if (bad.length) {
+    console.error(`release gate: ${bad.join('; ')}`);
+    process.exit(1);
+  }
+  console.log(`release gate: ${calls.length} site begins a wave and it is behind the`
+    + ' thinness gate (hold, return, hostileCount vs lastThin)');
+}
+
 const built = ANOMALIES.filter((a) => a.built);
 const panels = CFG.ordinal.rings.reduce((n, r) => n + r.per * 4, 0);
 console.log(`${built.length} of ${ANOMALIES.length} anomalies built, each standing on its own rung (`

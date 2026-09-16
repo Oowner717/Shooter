@@ -8998,3 +8998,123 @@ came from before believing the other one covers it.
   held 20. Even corrected the ranking is a READING AID: build 320 said "rank
   with the script, decide with your eyes", and of the twenty it put at the top
   here, two were real.
+
+- **BUILD 349 TAKES THE CEILINGS OFF THE RELEASE-GATE FIELD ARM, BECAUSE A
+  SEPARATION PROPORTIONAL TO THE HOLD IS A BOUND ON HOW MUCH TROUBLE THE RUN
+  HAPPENED TO BE IN.** Build 348's audit found both of that arm's channels
+  tracking the hold monotonically across four consecutive dumps -- held
+  171.5s -> separation 0.508 and pinned ratio 0.06, 117.8 -> 0.767 / 0.45,
+  81.6 -> 0.807 / 0.50, 53.7 -> 0.855 / 0.80 -- against ceilings of 0.95 and
+  0.85. So the shortest hold left 10% of headroom on the mean and **six per
+  cent on the pinned share**, with the trend pointing AT both rather than away
+  from them. The reading is a product of how hard the gate worked and how long
+  it worked for, and only the second term was ever in the bound. Loosening a
+  number like that buys one build.
+- **MEASURED AT BOTH ENDS, WHICH NEITHER CEILING EVER WAS -- AND THE TWO WAYS
+  OF BREAKING IT SEPARATE ON TWO DIFFERENT CONJUNCTS.** Three populations,
+  240s runs at rung 32, pooled in threes the way the arm pools:
+
+  | | duty | (1 - sep) / duty | (1 - pin) / duty |
+  |---|---|---|---|
+  | working (4 dumps + 2 fresh pools) | 0.22-0.71 | 0.475 to 0.745 | 0.893 to 1.471 |
+  | the hold recorded, the wave let out anyway | 0.58-0.64 | 0.013 to 0.045 | 0.059 to 0.170 |
+  | the `return` deleted | **0.000** | held **0.0s in 6 of 6** | -- |
+
+  Delete the gate's refusal and `held` is ZERO, so the LIVENESS floor catches
+  it. Record the hold and release anyway and the duty is as large as ever
+  while the effect is gone, so the OUTCOME floor catches it. Neither conjunct
+  can see the other's failure, which is why the arm needs both -- and why a
+  single ceiling on the separation was covering half the ground it looked like
+  it covered.
+- **THE FLOOR BUILD 348 CALLED "NEVER BOUND" WAS THE STRONG DISCRIMINATOR ALL
+  ALONG, AND NEVER-BOUND IS WHAT A THREE-ORDER MARGIN LOOKS LIKE.** It read
+  `held > 3` against working holds of 53.7 to 171.5 -- eighteen times below
+  the smallest ever measured -- and 348's note treated that as the fault. It
+  is the fact: the broken population reads 0.0, so the floor separates the two
+  by three orders of magnitude and is the one conjunct in the arm that could
+  never be a draw. It is 20s now, which is 2.7x under the worst working pool
+  and still unreachable from the broken one. **A conjunct that has never bound
+  is either vacuous or enormous, and which one it is comes off the broken
+  end** -- not off the working distribution, which is all build 348 had.
+- **AND BOTH CANDIDATE FIXES I HAD IN HAND WERE REFUTED BY MEASURING THEM,
+  WHICH IS THE WHOLE VALUE OF HAVING WRITTEN THEM DOWN.** Build 348
+  recommended the SIBLING'S shape -- the fuse arm's floor-and-retry, "a floor
+  that makes a four-second hold inadmissible rather than a ceiling loosened to
+  survive one". Applied here it selects on effect size: all four observed holds
+  are runs where the gate DID act, so a floor high enough to help (about 60s)
+  rejects the 53.7s run, which is the one with the worst separation. That is
+  choosing the roll that makes the case pass, which build 338 refused by name.
+  And my own answer -- build 305's rule, divide by the thing that drives it,
+  `(1 - sep) / duty` -- is build 320's exploding relative-spread fault in a
+  second costume: the denominator legitimately reaches zero on the build the
+  bound exists to catch, and the gateless population prints **4,000,000** for
+  a quantity whose working range is 0.475 to 0.745. The product form
+  `1 - sep >= 0.2 * duty` is the same claim and is finite everywhere.
+  **A quotient and a product are the same rule only where the denominator
+  cannot vanish, and a guard's denominator vanishes exactly on the broken
+  build.**
+- **...AND THE PRODUCT SUBSUMES THE CEILINGS RATHER THAN DROPPING THEM.** At
+  the observed duties it implies a separation under 0.88 at duty 0.62 and
+  under 0.96 at duty 0.22 -- so it sits about where the old 0.95 was exactly
+  where that ceiling was thinnest, and much tighter wherever the gate did
+  more. A ceiling that tightens with the evidence is not one somebody has to
+  keep loosening. The raw ratios are still PRINTED, so build 348's dump
+  subtraction keeps working across the change.
+- **A WAVE MAY BE BEGUN FROM ONE PLACE AND THAT PLACE IS BEHIND THE GATE, AND
+  THE GUARD FOR IT BELONGS IN `check-build` RATHER THAN IN A 240-SECOND ARM.**
+  The gate is a refusal inside `Director.update`: while the field is thicker
+  than the last wave was required to leave it, `holdFor` accumulates and the
+  function RETURNS, so `begin` is never reached. The thing that quietly undoes
+  that is a SECOND DOOR, which is this repo's most expensive recurring shape
+  (`setTier` stepping past the gate `climbTo` had just answered,
+  `Director.restore` writing `tier` and `peak` by hand, build 272's era
+  ceiling walking over itself) -- and **the runtime arm cannot see one**: a
+  second door would weaken the field separation slightly, inside the spread
+  the arm already tolerates. So it is static, it costs a millisecond instead
+  of six 240-second windows, and it pins the gate's SHAPE as well as the call
+  count: the `return` is the refusal, and `hostileCount` is deliberately not
+  `standing` (build 291's rule that a wave ENDS on its own bodies and the next
+  one WAITS on the field). Four revert proofs plus the vacuity arm, whose
+  baseline was printed first for build 346's reason.
+  Worth knowing it is a TAUTOLOGY today -- `begin` has exactly one caller and
+  it is the gate -- and that is the point: it is a guard against the second
+  door, not a measurement, and it says so.
+- **THE HARNESS FOR A REWRITTEN ASSERTION IS THE ASSERTION ITSELF, SLICED OUT
+  OF THE FILE.** There is no way to run one case of this suite, so a rewritten
+  expression is normally read twice and then waited on for thirteen minutes --
+  and a hand-copied harness is a copy that can disagree with what ships, which
+  is the `HERO_GAITS`/`HERO_COL` fault and the one I wrote into my own case at
+  build 338. The check's text and the three derived figures are `indexOf`-cut
+  out of `regress.mjs` and run through `new Function` against the ten measured
+  pools, with `check` a spy. Six working pools PASS, four broken FAIL, and the
+  message is printed so the FAIL line can be read before anything is pushed.
+  Cost: seconds, and it is what caught the printed quotient reading
+  "4,000,000 a unit of duty" on the exact population the arm is meant to fail.
+- **AND THE PER-RUN HOLDS ARE PRINTED NOW, WHICH IS WHERE THE SPREAD WAS
+  HIDING.** This build's own green run reads `held 102.8s a run [179.8 86.2
+  42.3]` -- a **4.3x spread inside one suite run**, on the quantity the whole
+  arm turns out to be proportional to. Build 348's audit had one (hold,
+  separation) pair a run out of an arm that already ran three, so the four
+  points it could subtract cost four builds to accumulate; the arm printed
+  three a run all along and averaged them away. That reading is the seventh
+  working pool and it sits at the top of the range: duty 0.428, thinned 0.319
+  = **0.745 a unit of duty** against the 0.2 floor, unpinned 0.541 = 1.264
+  against 0.35. **If a case pools N runs, print the N figures** -- the pooled
+  one is the assertion and the N are the next reader's population.
+- **AND MY FIRST BROKEN SIMULATION WAS UNFAITHFUL AND TURNED OUT TO BE THE
+  MORE USEFUL OF THE TWO.** To break the gate from a probe it forces
+  `d.begin(w)` on the frames the gate would have held -- and the real path
+  zeroes `holdFor` on the line ABOVE `begin`, which the patch does not, so the
+  hold accumulated monotonically and the duty read 0.75 instead of the ~0 a
+  real build with the `return` deleted gives. That is the wrong simulation of
+  the fault I meant and the RIGHT simulation of a different one, and it is the
+  population that prices the outcome floor: without it the only broken reading
+  is duty 0, which the liveness floor already catches and which says nothing
+  about what the hold has to buy. Both are measured now (`broken` and
+  `broken0` in the probe). **When a simulated fault does not behave as
+  predicted, find out which fault you actually built before discarding it.**
+- **Not run and why: the ORDINAL hash.** This build changes
+  `scripts/regress.mjs`, `scripts/check-build.mjs` and the BUILD literal, and
+  nothing executable in `src/` -- so there is no change for it to measure, the
+  way builds 345 to 348 had none. What had something to say is the suite and
+  the ten-population harness above, and both are green.

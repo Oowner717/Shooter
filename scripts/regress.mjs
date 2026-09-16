@@ -8306,14 +8306,19 @@ if (!GUN_LINE) {
      * rather than inferring it from a single number.
      */
     out.fieldRung = 32;
+    out.fieldSecs = 240;
     const pool = (gated) => {
       const runs = [];
-      for (let t = 0; t < 3; t++) runs.push(play(gated, true, 240, out.fieldRung));
+      for (let t = 0; t < 3; t++) runs.push(play(gated, true, out.fieldSecs, out.fieldRung));
       const avg = (k) => +(runs.reduce((a, r) => a + r[k], 0) / runs.length).toFixed(3);
       return {
         mean: avg('mean'), pinned: avg('pinned'), held: avg('held'), waves: avg('waves'),
         max: Math.max(...runs.map((r) => r.max)),
         means: runs.map((r) => r.mean), pins: runs.map((r) => +(r.pinned * 100).toFixed(0)),
+        // The per-run HOLDS, because the pooled one on its own is what left
+        // build 348's audit with one (hold, separation) pair a suite run
+        // where the same three runs already held three.
+        helds: runs.map((r) => r.held),
         tier: runs.every((r) => r.tier === out.fieldRung) ? out.fieldRung : -1,
         drifted: runs.reduce((a, r) => a + r.drifted, 0),
         auto: runs.every((r) => r.auto),
@@ -8324,6 +8329,20 @@ if (!GUN_LINE) {
     };
     out.drowning = pool(true);
     out.loose = pool(false);
+    /*
+     * ---- AND THE OUTCOME IS READ AGAINST THE GATE'S OWN DUTY ------------
+     *
+     * See the note above the arm: the separation is PROPORTIONAL to how long
+     * the release was actually held, so a bare ceiling on it is a bound on
+     * how much trouble the run happened to be in. `duty` is the share of the
+     * window the gate spent refusing; `thinned` and `unpinned` are what it
+     * bought on each channel. Both are asserted as a PRODUCT rather than a
+     * quotient, because a quotient explodes as the duty goes to zero -- and
+     * a duty of zero is exactly what a build with the gate deleted reads.
+     */
+    out.duty = +(out.drowning.held / out.fieldSecs).toFixed(3);
+    out.thinned = +(1 - out.drowning.mean / out.loose.mean).toFixed(3);
+    out.unpinned = +(1 - out.drowning.pinned / Math.max(1e-9, out.loose.pinned)).toFixed(3);
     /*
      * ...and the fuse, with it let run.
      *
@@ -8474,40 +8493,118 @@ if (!GUN_LINE) {
    *
    * ...and build 303 found why those margins were as tight as 1.07x at all:
    * THE RUNG WAS NOT HELD. See the note in `play`. With it pinned the same
-   * two channels read mean 0.542 / 0.329 and pinned 0.01 / 0.079, so the
-   * ceilings above are now 1.8x to 2.9x clear of the worst measured rather
-   * than 7% clear of it. They are deliberately NOT tightened onto the new
-   * numbers: this case has been re-sited on five consecutive builds and
-   * headroom is worth more here than sensitivity, with the `held` floor and
-   * the wave counts guarding against a vacuous pass. The rung is asserted
-   * too, so the two arms can never silently compare rungs again.
+   * two channels read mean 0.542 / 0.329 and pinned 0.01 / 0.079, so those
+   * ceilings went from 7% clear of the worst measured to 1.8x-2.9x clear of
+   * it. The rung is asserted as well, so the two arms can never silently
+   * compare rungs again.
    *
-   * The `held` floor is 3s rather than 10 because the hold itself is the
-   * noisy half: with the fuse pinned it measured 9.3s to 120.3s across nine
-   * runs. It is a liveness guard and not the claim.
+   * ---- AND THE CEILINGS THEMSELVES WENT AT BUILD 349, BECAUSE THE
+   * ---- SEPARATION IS PROPORTIONAL TO THE HOLD -- SO A BARE CEILING ON IT
+   * ---- IS A BOUND ON HOW MUCH TROUBLE THE RUN HAPPENED TO BE IN --------
+   *
+   * Build 348's audit subtracted four consecutive `--json` dumps, three of
+   * them from builds whose only `src/` change was the BUILD literal, and
+   * both channels tracked the hold on all four, monotonically:
+   *
+   *   held 171.5s -> separation 0.508, pinned ratio 0.06
+   *   held 117.8s -> 0.767, 0.45
+   *   held  81.6s -> 0.807, 0.50
+   *   held  53.7s -> 0.855, 0.80
+   *
+   * against ceilings of 0.95 and 0.85. The shortest hold left 10% of
+   * headroom on the mean and SIX PER CENT on the pinned share, with the
+   * trend pointing AT both rather than away. That is not a number to
+   * loosen: the reading is a product of how hard the gate worked and how
+   * long it worked for, and only the second term was ever in the bound.
+   *
+   * MEASURED AT BOTH ENDS, which neither ceiling ever was. Three
+   * populations, 240s runs at rung 32, pooled in threes the way this arm
+   * pools, the working column being the four dumps plus two fresh pools:
+   *
+   *   working                        duty 0.22-0.71
+   *                                  (1 - sep) / duty   0.475 to 0.745
+   *                                  (1 - pin) / duty   0.894 to 1.470
+   *   the hold recorded and the wave let out anyway
+   *                                  duty 0.58-0.64
+   *                                  (1 - sep) / duty   0.013 to 0.045
+   *                                  (1 - pin) / duty   0.059 to 0.170
+   *   the `return` deleted -- the faithful copy, since the real path zeroes
+   *   `holdFor` on the line above `begin`, so the hold cannot accumulate
+   *                                  duty 0.000, held 0.0s in 6 of 6 runs
+   *
+   * THE TWO WAYS OF BREAKING IT SEPARATE ON TWO DIFFERENT CONJUNCTS, which
+   * is why both are needed. Delete the gate and `held` is ZERO -- so the
+   * liveness floor, which build 348 noted had never bound at 3s against
+   * holds of 53.7 to 171.5, is the strong discriminator and always was. It
+   * is 20s now: 2.7x under the worst working pool and unreachable from the
+   * broken one. Record the hold and release anyway and the duty is as large
+   * as ever while the effect is gone -- so what the hold BOUGHT is asserted
+   * per unit of duty, 0.2 on the mean (2.4x under the worst working reading
+   * and 4.4x over the best broken one) and 0.35 on the pinned share
+   * (2.6x / 2.1x).
+   *
+   * Written as a PRODUCT and not a quotient. `(1 - sep) / duty` is build
+   * 320's exploding relative-spread fault in a second costume: the
+   * denominator legitimately reaches zero on the build the bound exists to
+   * catch, and 0.004 / 0.000 is not a small number. `1 - sep >= 0.2 * duty`
+   * is the same claim and is finite everywhere.
+   *
+   * ...and it SUBSUMES the old ceilings rather than dropping them. At the
+   * observed duties the product implies a separation under 0.88 at duty
+   * 0.62 and under 0.96 at duty 0.22 -- so it is about where the old 0.95
+   * was exactly where that ceiling was thinnest, and much tighter wherever
+   * the gate did more. A ceiling that tightens with the evidence is not one
+   * somebody has to keep loosening.
+   *
+   * THE FLOOR IS NOT RETRIED, unlike the fuse arm's below. That one needs
+   * its scenario to ARISE and clears on about 56% of attempts; this one has
+   * cleared 20s on six of six pooled readings with a worst of 53.7, so a
+   * retry would be three more 240s windows spent on a scenario that
+   * reproduces. If it ever starts needing one, the signal is this floor's
+   * own clear rate -- not the day it first fails.
+   *
+   * Reported and deliberately not asserted: both raw ratios, the per-run
+   * field means and the per-run HOLDS. Build 348's audit had one
+   * (hold, separation) pair a suite run out of an arm already running three.
    */
+  const GATE_HELD = 20;
+  const GATE_THIN = 0.2;
+  const GATE_PIN = 0.35;
+  // The ASSERTION is the product; this is only the report. A quotient is
+  // what the product form exists to avoid, and at a duty of zero -- which
+  // is what a build with the gate deleted reads -- it is 4,000,000 rather
+  // than a small number, so it says so instead of printing one.
+  const perDuty = (x) => (r.duty > 0 ? (x / r.duty).toFixed(3) : 'n/a, nothing was held');
   check('a run that cannot clear the field is not sent another wave',
-    r.drowning.auto && r.drowning.held > 3
+    r.drowning.auto && r.drowning.held >= GATE_HELD
     && r.drowning.tier === r.fieldRung && r.loose.tier === r.fieldRung
     // ...on the SAME ammunition and over the SAME waves, or the difference
     // between the two arms carries two draws as well as the gate
     && r.drowning.round === 'standard' && r.loose.round === 'standard'
     && r.drowning.played > 0 && r.loose.played > 0
     && r.drowning.rot === r.loose.rot && r.drowning.rot.length > 0
-    && r.drowning.mean < r.loose.mean * 0.95
-    && r.drowning.pinned < r.loose.pinned * 0.85
+    // ...and what the hold BOUGHT, per unit of hold, on both channels
+    && r.thinned >= GATE_THIN * r.duty
+    && r.unpinned >= GATE_PIN * r.duty
     && r.loose.mean >= 12 && r.loose.pinned > 0.1,
-    `at rung ${r.fieldRung} on BOLT with FLINCH and DEADBOLT owned (${r.drowning.auto}), `
-    + `three 240s runs an arm: the release was held ${r.drowning.held}s a run and the `
-    + `field averaged ${r.drowning.mean} standing [${r.drowning.means.join(' ')}] against `
-    + `${r.loose.mean} [${r.loose.means.join(' ')}] with the gate off -- a separation of `
-    + `${(r.drowning.mean / r.loose.mean).toFixed(3)} against a 0.95 ceiling. It spent `
-    + `${(r.drowning.pinned * 100).toFixed(0)}% of its samples at the cap `
+    `at rung ${r.fieldRung} on BOLT with FLINCH and DEADBOLT owned `
+    + `(${r.drowning.auto}), three ${r.fieldSecs}s runs an arm: the release was held `
+    + `${r.drowning.held}s a run [${r.drowning.helds.join(' ')}] against a ${GATE_HELD}s `
+    + `floor, a duty of ${r.duty} of the window -- a build with the gate's refusal `
+    + `deleted reads 0.0 there. The field averaged ${r.drowning.mean} standing `
+    + `[${r.drowning.means.join(' ')}] against ${r.loose.mean} [${r.loose.means.join(' ')}] `
+    + `with the gate off, a separation of `
+    + `${(r.drowning.mean / r.loose.mean).toFixed(3)}: thinned by ${r.thinned}, which is `
+    + `${perDuty(r.thinned)} a unit of duty against a floor of ${GATE_THIN} (a gate that `
+    + `holds and releases anyway measured 0.013 to 0.045). `
+    + `It spent ${(r.drowning.pinned * 100).toFixed(0)}% of its samples at the cap `
     + `[${r.drowning.pins.join(' ')}%] against ${(r.loose.pinned * 100).toFixed(0)}% `
-    + `[${r.loose.pins.join(' ')}%] (worst peaks ${r.drowning.max} and ${r.loose.max}, `
-    + `which overlap run to run, which is why neither channel is a peak). `
-    + `${r.drowning.waves} waves scored against ${r.loose.waves}, which is the gate's `
-    + `own effect and was the confound: the rung held at ${r.drowning.tier}/`
+    + `[${r.loose.pins.join(' ')}%], unpinned by ${r.unpinned} = `
+    + `${perDuty(r.unpinned)} a unit of duty against `
+    + `${GATE_PIN} (broken 0.059 to 0.170). Worst peaks ${r.drowning.max} and `
+    + `${r.loose.max}, which overlap run to run, which is why neither channel is a `
+    + `peak. ${r.drowning.waves} waves scored against ${r.loose.waves}, which is the `
+    + `gate's own effect and was the confound: the rung held at ${r.drowning.tier}/`
     + `${r.loose.tier} against ${r.drowning.drifted}/${r.loose.drifted} corrections, `
     + `both arms on ${r.drowning.round}/${r.loose.round} ammunition and handed the `
     + `same rotation [${r.drowning.rot}]`);
