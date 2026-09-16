@@ -324,7 +324,17 @@ check(`every round, mine, ability and object type runs (${rounds.length} rounds,
   subsystems, errors.slice(0, 3).join(' / '));
 
 const ghosts = await page.evaluate(() => [...(window.__ghosts || new Map())]);
-check('nothing reads a field that does not exist', ghosts.length === 0,
+/*
+ * ...ON `world` AND `world.up`, which is the whole domain: the Proxy is
+ * installed over those two objects and nothing else, so a TYPE's fields are
+ * outside it. That matters because `this.type.gait` was an undefined-property
+ * read on 43 of the 61 types until build 338 made the field mandatory, and
+ * this case -- whose name is exactly about undefined-property reads -- could
+ * not see one of them. Wrapping `TYPE_BY_ID`'s values is the real coverage
+ * and is its own piece of work. Build 325's rule: ask what a guard's domain
+ * is before reading its green as coverage.
+ */
+check('nothing reads a field that does not exist on world or world.up', ghosts.length === 0,
   ghosts.map(([k, n]) => `${k} x${n}`).join(', '));
 
 // --- the save ---------------------------------------------------------------
@@ -8317,7 +8327,53 @@ if (!GUN_LINE) {
      */
     out.fuseRung = 28;
     out.fuseSecs = 300;
-    out.fuseOn = play(true, false, out.fuseSecs, out.fuseRung);
+    /*
+     * ---- THE LIVENESS FLOOR IS THE ONE CONJUNCT HERE THAT WAS NEVER
+     *      POOLED, AND IT HAS NOW DRAWN A ZERO TWICE ----------------------
+     *
+     * Build 336's own note asked for this in as many words: "the next person
+     * to touch it should pin the seed and pool three runs... and should note
+     * that a liveness floor is the one conjunct in it that has never been
+     * pooled". It drew `held: 0` on 336 and again on 338 -- two builds whose
+     * executable content cannot reach it -- against a recorded distribution
+     * of 0, 0, 1.4, 13.6, 15.7, 25.4, 29.1, 37.5, 39.4, 42.5, 50.8, 54.3 and
+     * up to 154.4 seconds. A floor of 10 on ONE draw of that is a coin toss.
+     *
+     * MEASURED rather than inferred, three trials of this exact scenario on
+     * one tree with nothing else changed: **held 25.9, 3.7 and 23.9 seconds**
+     * -- one in three under the floor. The two that held read a rise of 1.057
+     * and 1.054, i.e. the fuse filling more than once over, and the one that
+     * did not also had `contactS` 6.0 against `crowdS` 3.7, so it would have
+     * failed the CAUSE conjunct as well. A retry covers both, because what it
+     * retries is the scenario arising. At one in three, three attempts leave
+     * about a 4% chance of a spurious red and cost 1.5 windows on average.
+     *
+     * POOLED BY RETRY rather than by averaging, and the distinction matters:
+     * this conjunct asks whether the scenario ARISES, not how often. A
+     * 300-second window in which the release was never held is a window in
+     * which the mechanism never ran -- not evidence against it -- so the
+     * honest form is to attempt the scenario up to `TRIES` times and measure
+     * the first attempt that produced one. Averaging the holds would answer a
+     * question nobody asked and would pay for three windows every run.
+     *
+     * What keeps that honest is REPORTING the attempts: it costs nothing when
+     * the first one holds, and if it ever starts needing all three every run
+     * then the scenario has stopped reproducing and that is the signal to
+     * re-site it rather than to raise TRIES. The remaining unpinned confound
+     * is the TRAIT ROLL -- `traitsFor` is seeded off `world.runSeed`, which
+     * `restart()` re-rolls, and at rung 28 whether the field drowns at all
+     * turns on SWARM and MENDING. Pinning the seed was the other candidate
+     * and is refused: pinning a seed is CHOOSING a roll, and choosing the
+     * roll that makes the case pass is what this case's six-build history is
+     * a catalogue of.
+     */
+    const TRIES = 3;
+    out.fuseTries = [];
+    for (let k = 0; k < TRIES; k++) {
+      out.fuseOn = play(true, false, out.fuseSecs, out.fuseRung);
+      out.fuseTries.push(out.fuseOn.held);
+      if (out.fuseOn.held > 10) break;
+    }
     out.fuseOff = play(false, false, out.fuseSecs, out.fuseRung);
     // What those seconds are WORTH, off the config rather than off a
     // measurement: a crowd frame is `crowd / fuse` a second and a contact
@@ -8497,7 +8553,8 @@ if (!GUN_LINE) {
     && r.fuseOn.crowdS > r.fuseOn.contactS
     // ...and contact on its own does not get there.
     && r.fuseOff.gPeak < 0.5,
-    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of ${r.fuseSecs}: the fuse rose `
+    `at rung ${r.fuseRung}, held ${r.fuseOn.held}s of ${r.fuseSecs} on attempt `
+    + `${r.fuseTries.length} of 3 (holds ${r.fuseTries.join(', ')}): the fuse rose `
     + `${r.fuseOn.rose} against the ${r.want.toFixed(3)} that ${r.fuseOn.crowdS}s of WAIT `
     + `and ${r.fuseOn.contactS}s of contact are worth at crowd ${r.crowd} over a fuse of `
     + `${r.fuse}, peaked at ${r.fuseOn.gPeak} and blew ${r.fuseOn.fired} times over `
@@ -29116,9 +29173,15 @@ if (MINE_LINE) {
  * the run nothing.
  *
  * Four arms, and each carries a control that reads the opposite on a body
- * without the gait, because "it went up" and "it went away" are both true of
- * a working build and of one where the gait dispatch fell through to the
- * march. A gait is a property of the type and not a roll at spawn, so the
+ * whose gait is `march`, because "it went up" and "it went away" are both
+ * true of a working build and of one where the gait dispatch fell through to
+ * the march. (It said "a body WITHOUT the gait" until build 338 made the
+ * field mandatory, at which point no such body exists and the distinction the
+ * sentence drew -- a declared gait against a fall-through -- is the one that
+ * change deletes. The arms did not move: every control the suite uses is a
+ * MOTE, a LURCHER or a DRIFT, and the first two gained `march`, which is the
+ * steering they already took.) A gait is a property of the type and not a
+ * roll at spawn, so the
  * first two arms measure a POPULATION of eight and assert the mean -- one
  * draw of one body cannot tell a rule from a route.
  */
@@ -38765,6 +38828,119 @@ if (MINE_LINE) {
     + `(hintsAllowed ${r.off.allowed}); pref restored ${r.restored}. Reverting the `
     + 'gate reads 2 with hints off, so this arm discriminates. All 7 sayOnce sites '
     + 'in game.js now carry the gate');
+}
+
+/*
+ * ---- EVERY LOOSE TYPE DECLARES A GAIT, AND NO FIXED ONE DOES ------------
+ *
+ * Build 338. `gait` was optional and 43 of the 61 types declared nothing, the
+ * absence MEANING march -- so a type nobody had asked about and a type
+ * deliberately chosen to march were the same text. That is `u.levels ?? 3`
+ * (eight nodes sold three times), an omitted `band` (9 kB against 4 MB), and
+ * the five shared-block faults, all over again.
+ *
+ * `check-build.mjs` is where the rule is ENFORCED -- it walks every type
+ * through `gaitOf` at build time, which is the right place for a static
+ * property of a table, and a throw from inside the rAF loop is build 288's
+ * freeze rather than an error anybody reads. This arm is the SECOND guard, the
+ * same way `regress.mjs` pins the upgrade level total behind check-build's own
+ * `levelsOf`: it asserts the PARTITION IS TOTAL rather than pinning a count,
+ * because a count of the roster is the maintenance trap this file has already
+ * paid for twice (the stroke-floor sweep failed when a ninth anomaly arrived
+ * without one stroke changing).
+ *
+ * The three counts are PRINTED and not asserted, for the same reason.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ENEMY_TYPES, GAITS } = await import('../src/config.js');
+    const { gaitOf } = await import('../src/enemies.js');
+    const g = { gaitOf };
+    const T = ENEMY_TYPES;
+    const words = Object.keys(GAITS);
+    const HARMLESS_OK = ['rise', 'tumble', 'chain', 'hover', 'ride', 'hop'];
+    const loose = T.filter((t) => !t.fixed);
+    const held = T.filter((t) => t.fixed);
+    return {
+      total: T.length,
+      words,
+      // every loose type names a word in the vocabulary
+      undeclared: loose.filter((t) => typeof t.gait !== 'string').map((t) => t.id),
+      unknown: loose.filter((t) => typeof t.gait === 'string' && !words.includes(t.gait)).map((t) => t.id),
+      // ...and no fixed type names one, because `fixed` already answers it
+      overdeclared: held.filter((t) => t.gait !== undefined).map((t) => t.id),
+      // the partition is total: nothing is in both and nothing is in neither
+      unclassified: T.filter((t) => !loose.includes(t) && !held.includes(t)).map((t) => t.id),
+      /*
+       * A harmless type may only name a word `drive` honours BEFORE the route
+       * branch, or the harmless switch's `default:` arm eats it and the body
+       * silently gets the hover band.
+       *
+       * ONE copy of the list, read by the filter and by the message. The first
+       * version had it three times -- here, inline inside `eaten`, and again
+       * in check-build -- and the message printed THIS copy while the
+       * assertion ran against the INLINE one, so editing either would make the
+       * case report a legal set it had not tested against, with nothing to
+       * read back. That is exactly `HERO_GAITS`/`HERO_COL` in
+       * docs/objects.html, two parallel arrays read at the same index, which
+       * this same build fixed after build 331 shifted one of them.
+       * `check-build` DERIVES its copy from `drive`'s own source -- the switch's
+       * `case` labels plus the words whose branch sits above it -- which is
+       * the better guard and is where a derivation over source belongs.
+       */
+      HARMLESS_OK,
+      eaten: T.filter((t) => t.harmless && !t.fixed
+        && !HARMLESS_OK.includes(t.gait)).map((t) => t.id),
+      counts: { loose: loose.length, held: held.length,
+        march: T.filter((t) => t.gait === 'march').length,
+        harmless: T.filter((t) => t.harmless && !t.fixed).length },
+      /*
+       * The thrower, shown able to refuse in all three directions -- BOTH as a
+       * count of what it caught and as a list of what it let through, because
+       * the first version of this arm collected the MISSES into a field called
+       * `refused` and then asserted `refused.length === 3`, i.e. it demanded
+       * three failures and passed only on a broken build. A detail string is a
+       * declaration and so is a field name; caught by running the arm before
+       * the suite, which is thirteen minutes cheaper than after it.
+       */
+      missed: [
+        (() => { try { g.gaitOf({ id: 'z' }); return 'no gait at all'; } catch (e) { return null; } })(),
+        (() => { try { g.gaitOf({ id: 'z', gait: 'saunter' }); return 'an unknown word'; } catch (e) { return null; } })(),
+        (() => { try { g.gaitOf({ id: 'z', fixed: true, gait: 'march' }); return 'a fixed type declaring one'; } catch (e) { return null; } })(),
+      ].filter(Boolean),
+      /*
+       * ...and able to ACCEPT, which is what makes the empty `missed` mean
+       * something: a function that threw unconditionally would also miss
+       * nothing. These two are the liveness half and they also prove the
+       * try/catch wrapper reports a NON-throw, so neither direction of the
+       * instrument is assumed.
+       */
+      accepts: (() => { try { return g.gaitOf({ id: 'z', gait: 'march' }) === 'march'; } catch (e) { return false; } })(),
+      fixedNull: (() => { try { return g.gaitOf({ id: 'z', fixed: true }) === null; } catch (e) { return false; } })(),
+    };
+  });
+
+  check('every loose type declares a gait and no fixed one does',
+    r.undeclared.length === 0 && r.unknown.length === 0 && r.overdeclared.length === 0
+    && r.unclassified.length === 0 && r.eaten.length === 0
+    // the thrower is an instrument: it lets none of the three through...
+    && r.missed.length === 0
+    // ...and accepts a good one, or it is simply a function that throws
+    && r.accepts && r.fixedNull
+    // vacuity: there is a roster on both sides of the partition and a
+    // vocabulary to name, or the five zeroes above are zeroes over nothing
+    && r.counts.loose > 30 && r.counts.held > 10 && r.counts.harmless > 0
+    && r.words.length > 10,
+    `${r.total} types: ${r.counts.loose} loose, all declaring one of `
+    + `${r.words.length} words (${r.counts.march} march); ${r.counts.held} fixed, `
+    + `none declaring one; ${r.counts.harmless} harmless, all inside `
+    + `[${r.HARMLESS_OK.join(' ')}]. undeclared ${r.undeclared.length}, unknown `
+    + `${r.unknown.length}, over-declared ${r.overdeclared.length}, unclassified `
+    + `${r.unclassified.length}, swallowed ${r.eaten.length}. gaitOf caught `
+    + `${3 - r.missed.length} of 3 malformations`
+    + `${r.missed.length ? ` -- LET THROUGH: ${r.missed.join('; ')}` : ''}`
+    + `, and accepted a good one ${r.accepts}, answering null for a fixed type `
+    + `${r.fixedNull} -- so the three zeroes are an instrument's and not a stub's`);
 }
 
 // --- report -----------------------------------------------------------------

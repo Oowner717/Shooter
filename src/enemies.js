@@ -2,7 +2,7 @@
 // and a hand-drawn look. Nothing here knows about the rest of the game beyond
 // the `world` handle it is given.
 
-import { CFG, WAVES, TYPE_BY_ID, ROUTES, massOf, kB } from './config.js';
+import { CFG, WAVES, TYPE_BY_ID, ROUTES, GAITS, massOf, kB } from './config.js';
 import { traitsFor, traitAt, has as hasTrait, TRAIT_BY_ID } from './traits.js';
 import { TAU, clamp, rand, spread, pick, weightedPick, rgba, drawGlow, smoothstep, segClosest, segSeg } from './util.js';
 import { explode, hitBurst, impactFx, deathFx, spark, dot, shard as fxShard, ring, ripple, haul, edgeHit } from './fx.js';
@@ -2471,22 +2471,32 @@ export class Enemy {
       /*
        * ...and WHICH walk is the TYPE's, from build 307. `hover` is the
        * band-and-bob `wander` has been since build 298 and is what anything
-       * harmless with no declared gait still gets; `rise` and `tumble` are
+       * harmless body that declares `hover` gets; `rise` and `tumble` are
        * the two that leave the field. See GAITS in config.js -- the gait is a
        * property of the type and never a roll at spawn, which is the whole
        * distinction from `route`.
+       *
+       * `default:` is now UNREACHABLE from the roster and is a trap rather
+       * than a default: build 338 made the field mandatory, so the only way
+       * here is a harmless type declaring a word this switch does not handle,
+       * which silently gets the hover band. `check-build` refuses exactly
+       * that -- see HARMLESS_OK -- and it had to, because `gait: 'march'` on
+       * a harmless body looks like the most ordinary declaration in the file
+       * and is the one value that cannot be true of it.
        */
       switch (this.type.gait) {
         case 'rise': this.rise(world, dt); break;
         case 'tumble': this.tumble(world, dt); break;
         case 'chain': this.chain(world, dt); break;
         /*
-         * `hover` IS the default arm, written out rather than implied: it is
-         * what DRIFT has done since build 298 and what anything harmless
-         * that has not declared a gait still gets. Named because
-         * check-build.mjs requires every word in the vocabulary to be read
-         * by name -- an entry with no reader is a promise the table is
-         * making and the code is not keeping.
+         * `hover` shares the default arm, written out rather than implied:
+         * it is what DRIFT has done since build 298 and what BELL declares.
+         * Named because check-build.mjs requires every word in the vocabulary
+         * to have a dispatch arm -- `gait === 'x'` or `case 'x':`, narrowed
+         * from a bare string match in build 338 after a revert proof showed
+         * the old form could not see `dive`'s or `flock`'s entire
+         * implementation deleted. An entry with no arm is a promise the table
+         * is making and the code is not keeping.
          */
         case 'hover':
         default: this.wander(world, dt); break;
@@ -2858,8 +2868,16 @@ export class Enemy {
       this.vy *= f;
     }
 
-    // Lurchers shove themselves forward in bursts instead of gliding.
-    if (this.type.lurch) {
+    /*
+     * Lurchers shove themselves forward in bursts instead of gliding.
+     *
+     * Keyed on the GAIT from build 338, not on a `lurch: true` field only
+     * this type carried -- one source of truth, and it gives the word a
+     * dispatch arm so `check-build`'s vocabulary guard covers it. It sits
+     * BELOW `drive`, so the route branch still runs and `lurch` is a
+     * modifier in the same sense `paired` and `cartwheel` are.
+     */
+    if (this.type.gait === 'lurch') {
       this.lurchTimer -= dt;
       if (this.lurchTimer <= 0 && !this.frozen(world)) {
         this.lurchTimer = rand(1.1, 2.4);
@@ -10228,6 +10246,44 @@ export function ridesOf(type) {
       + '-- a rider with no clock, no reach or no health is not a rider');
   }
   return rd;
+}
+
+/**
+ * A type's GAIT, and there is no default.
+ *
+ * It was `type.gait` read raw, absent on 43 of the 61 types, with the absence
+ * MEANING march -- so a type nobody had thought about and a type deliberately
+ * chosen to march were the same text. Build 224 removed `u.levels ?? 3` for
+ * that reason after eight nodes shipped sold three times, build 303 removed
+ * the band default after an omitted band read as band 1, and builds 319, 322,
+ * 324, 328 and 330 each refused a second type inheriting a shared block in
+ * silence. The fix is never a better comment; it is making the omission
+ * impossible to write.
+ *
+ * `fixed` types are exempt and the exemption is the point rather than a hole:
+ * `drive`'s first statement returns for one with the velocity zeroed, so
+ * `fixed` already answers what a gait would answer and a declaration would be
+ * a second source of truth for the same fact. See GAITS in config.js.
+ *
+ * Callers: `scripts/check-build.mjs` walks every type through it at build
+ * time, which is where a bad declaration should be caught -- a throw from the
+ * rAF loop is build 288's freeze rather than an error anybody reads.
+ */
+export function gaitOf(type) {
+  if (!type || typeof type.id !== 'string') throw new Error('gaitOf: not a type');
+  if (type.fixed) {
+    if (type.gait !== undefined) {
+      throw new Error(`${type.id}: a fixed type must NOT declare a gait -- it does not `
+        + 'drive at all, and a gait would be a second source of truth for `fixed`');
+    }
+    return null;
+  }
+  const g = type.gait;
+  if (typeof g !== 'string' || !Object.prototype.hasOwnProperty.call(GAITS, g)) {
+    throw new Error(`${type.id}: gait must be one of [${Object.keys(GAITS).join(' ')}]. `
+      + `There is no default -- got ${JSON.stringify(g)}. See GAITS in config.js.`);
+  }
+  return g;
 }
 
 export function beadsOf(type) {

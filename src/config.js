@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '337';
+export const BUILD = '338';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '337';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8fe096c';
+export const REV = 'd951dd3';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4702,6 +4702,7 @@ export const ENEMY_TYPES = [
     id: 'mote',
     opens: 0,
     name: 'MOTE',
+    gait: 'march',
     shape: 'shard',
     r: 12,
     hp: 31,
@@ -4719,6 +4720,7 @@ export const ENEMY_TYPES = [
     id: 'needle',
     opens: 0,
     name: 'NEEDLE',
+    gait: 'march',
     shape: 'needle',
     // Leads with the point: the heading follows the travel bearing rather
     // than tumbling. See Enemy.face().
@@ -4739,6 +4741,28 @@ export const ENEMY_TYPES = [
     id: 'lurcher',
     opens: kB(200),
     name: 'LURCHER',
+    /*
+     * ---- LURCH, re-keyed off `lurch: true` in build 338 -----------------
+     *
+     * It declared `march` for one afternoon and that was the weakest
+     * declaration in the roster. The march is the SMALLER half of what this
+     * body does: its own steady closing speed is `speed * k / (k + damping)`
+     * = 38 x 1.2 / 1.75 = 26.1 u/s, against a burst whose mean is 65 arriving
+     * every 1.1-2.4s -- two and a half times the whole cruise, up to 3.4x. So
+     * `march` named the quieter component and was silent about the louder one,
+     * on the one type docs/objects.html calls "the only type that already
+     * owned its motion".
+     *
+     * The convention it now follows is the roster's own: a MODIFIER whose
+     * route branch still runs is declared as the gait, which is what YOKE
+     * (`paired`) and SPINDLE (`cartwheel`) already do. And it REMOVES a
+     * second source of truth rather than adding one -- the burst was keyed on
+     * a `lurch: true` field that only this type carried, so the word and the
+     * behaviour could get out of step; `drive` reads the gait now and the
+     * field is gone. Behaviourally identical, and the ORDINAL hash is what
+     * says so rather than this sentence.
+     */
+    gait: 'lurch',
     shape: 'hex',
     r: 24,
     hp: 185,
@@ -4747,7 +4771,6 @@ export const ENEMY_TYPES = [
     accel: 120,
     restitution: 0.52,
     wobble: 2.6,
-    lurch: true,
     color: '#b98cff',
     glow: '#8b5cf6',
     weight: 12,
@@ -4757,6 +4780,7 @@ export const ENEMY_TYPES = [
     id: 'splitter',
     opens: kB(500),
     name: 'SPLITTER',
+    gait: 'march',
     shape: 'blob',
     r: 29,
     hp: 159,
@@ -4775,6 +4799,7 @@ export const ENEMY_TYPES = [
     id: 'bloom',
     opens: kB(700),
     name: 'BLOOM',
+    gait: 'march',
     shape: 'bloom',
     r: 33,
     hp: 247,
@@ -4794,6 +4819,7 @@ export const ENEMY_TYPES = [
     id: 'bulwark',
     opens: kB(2800),
     name: 'BULWARK',
+    gait: 'march',
     shape: 'plated',
     r: 45,
     hp: 676,
@@ -4816,6 +4842,7 @@ export const ENEMY_TYPES = [
     id: 'warden',
     opens: kB(1700),
     name: 'WARDEN',
+    gait: 'march',
     shape: 'warden',
     r: 22,
     hp: 153,
@@ -4847,6 +4874,7 @@ export const ENEMY_TYPES = [
     id: 'plate',
     opens: 0,
     name: 'PLATE',
+    gait: 'march',
     shape: 'plate',
     r: 11,
     hp: 44,
@@ -4881,6 +4909,7 @@ export const ENEMY_TYPES = [
     id: 'scion',
     opens: kB(2000),
     name: 'SCION',
+    gait: 'march',
     shape: 'scion',
     r: 34,
     hp: 390,
@@ -5874,6 +5903,7 @@ export const ENEMY_TYPES = [
     id: 'flint',
     opens: 0,
     name: 'FLINT',
+    gait: 'march',
     shape: 'flint',
     plated: true, // see CFG.flint -- the armour is on the front face only
     r: 16,
@@ -6152,22 +6182,47 @@ export const ENEMY_TYPES = [
     id: 'remnant',
     opens: 0,
     name: 'REMNANT',
+    gait: 'march',
     shape: 'remnant',
     /*
-     * NO GAIT FIELD, and that is the correct absence rather than an omission.
+     * MARCH, written out -- and build 338 OVERTURNED build 324's ruling here
+     * deliberately, so the argument is worth keeping.
      *
-     * REMNANT is the first of the twenty since HUSK that needs no new gait:
+     * REMNANT is the first of the objects since HUSK that needs no new gait:
      * the whole object happens at its death and after it, so the body walks
-     * in like anything else. The first draft wrote `gait: 'march'` out on
-     * build 224's reasoning -- that a defaulted value indistinguishable from
-     * a chosen one is the shape this repo keeps paying for -- and
-     * `check-build` correctly refused the build: `GAITS` is the vocabulary of
-     * gaits that REPLACE the march, `march` is not a word in it, and a type
-     * naming a gait nothing implements gets exactly the march it was trying
-     * not to take. Every ordinary body in the roster declares nothing here.
-     * So the rule is narrower than the first draft had it: write out a value
-     * that could have been different, and do not invent a name for the
-     * default.
+     * in like anything else. Build 324's first draft wrote `gait: 'march'` out
+     * on build 224's reasoning -- a defaulted value indistinguishable from a
+     * chosen one is the shape this repo keeps paying for -- `check-build`
+     * refused it, and the rule was narrowed to "write out a value that could
+     * have been different, and do not invent a name for the default".
+     *
+     * Both halves of that are answered rather than ignored.
+     *
+     * The refusal was CIRCULAR: the guard refused `march` because it was not
+     * in `GAITS`, and it was not in `GAITS` because the guard refused it. It
+     * is a row now, exempt from the reader test with the test's own argument
+     * (a type naming march and getting the march is correct), and held by the
+     * stronger rule instead -- every loose type declares one and `gaitOf`
+     * throws for one that does not.
+     *
+     * And `march` is not an INVENTED name: this file already uses the word
+     * fifteen times in prose -- "the ordinary march", "the closing march",
+     * "this body does not march" -- so it was the name of the thing all
+     * along and simply was not a value. What settles it is the cost of the
+     * absence, which this paragraph WAS: fifteen lines at one site saying
+     * "the correct absence rather than an omission", and nothing like it at
+     * the other twenty-four, so a reader could not tell a FLINT that was
+     * considered and found to march from one nobody had asked about. A rule
+     * that needs a paragraph per site to distinguish a chosen absence from an
+     * oversight is a rule making the omission expensive instead of
+     * impossible -- which is exactly what build 220 tried for `levels` before
+     * 224 removed the default.
+     *
+     * The precedent is two fields along, on this same roster: LATCH's and
+     * CHAFF's `wobble: 0` are "written out at 0 rather than omitted so the
+     * value is a statement and not an absence". Same field shape, same
+     * majority default, opposite ruling -- and the only thing that had made
+     * `gait` different was a guard.
      */
     /*
      * The picture is a ring with pieces missing, at fixed bearings, so the
@@ -6564,6 +6619,7 @@ export const ENEMY_TYPES = [
     id: 'herald',
     opens: kB(1400),
     name: 'HERALD',
+    gait: 'march',
     shape: 'herald',
     r: 19,
     hp: 99,
@@ -6585,6 +6641,7 @@ export const ENEMY_TYPES = [
     id: 'glut',
     opens: kB(1100),
     name: 'GLUT',
+    gait: 'march',
     shape: 'glut',
     r: 16,
     hp: 117,
@@ -6606,6 +6663,19 @@ export const ENEMY_TYPES = [
     id: 'tow',
     opens: kB(3400),
     name: 'TOW',
+    /*
+     * MARCH, and unlike the MASS it drags this really is this body's own path:
+     * nothing excludes the head from the route branch, and `windUp` only
+     * BLEEDS its wind when out of range rather than holding it, so it keeps
+     * closing and winds once inside `hurl.range`. What `march` is silent
+     * about is that `steer` calls `windUp` for it every frame, keyed on
+     * `type.hurl` -- a separate field, the way `lurch` was until build 338 --
+     * and that the thing that drives is a SECOND body. The guide's word for
+     * it is `drag`; the part of `drag` that is not a march belongs to the
+     * pair rather than to this body's path, which is why the declaration is
+     * incomplete rather than false.
+     */
+    gait: 'march',
     shape: 'tow',
     r: 18,
     hp: 135,
@@ -6690,6 +6760,32 @@ export const ENEMY_TYPES = [
     id: 'towMass',
     opens: 0,
     name: 'MASS',
+    /*
+     * MARCH -- and it is the WEAKEST declaration on the roster, so what it
+     * leaves out is written down rather than left to be rediscovered. Phase
+     * 2's `drag` is the truthful word and it is not a one-liner here: unlike
+     * LURCHER, which had a `lurch: true` field to re-key, this body has no
+     * motion field of its own, because it is the OBJECT of the TOW's
+     * mechanism rather than the owner of one. FOUR things author its position
+     * above its own steering:
+     *
+     *   Its own march delivers `speed * k / (k + damping)` = 26 x 0.6 / 1.15
+     *   = 13.6 u/s, against the head's 39.6 -- so the cable drags it at 2.9
+     *   times its own walking pace and the march is almost never what is
+     *   moving it.
+     *
+     *   `solveTethers` writes its POSITION and its velocity every frame
+     *   (`e.x += dx * push * (e.invMass / inv)`), the cable being a hard
+     *   constraint at `tows.length` 132.
+     *
+     *   Inside `hurl.range` the head's `windUp` drives it sideways at 900
+     *   u/s^2 directly, which is authorship and not steering.
+     *
+     *   And after `release` it is set to `hurl.speed` 620 with `thrown` 2.2,
+     *   which is `drive`'s SECOND early return -- so for those 2.2 seconds
+     *   the gait is not consulted at all.
+     */
+    gait: 'march',
     shape: 'mass',
     r: 27,
     hp: 280,
@@ -6780,6 +6876,7 @@ export const ENEMY_TYPES = [
     id: 'digit',
     opens: 0,
     name: 'DIGIT',
+    gait: 'march',
     shape: 'digit',
     r: 11,
     hp: 82,
@@ -6853,6 +6950,7 @@ export const ENEMY_TYPES = [
     id: 'second',
     opens: 0,
     name: 'SECOND',
+    gait: 'march',
     shape: 'second',
     r: 10,
     hp: 76,
@@ -6879,6 +6977,7 @@ export const ENEMY_TYPES = [
     id: 'mite',
     opens: 0,
     name: 'MITE',
+    gait: 'march',
     shape: 'mite',
     r: 13,
     hp: 100,
@@ -6997,6 +7096,7 @@ export const ENEMY_TYPES = [
     id: 'droplet',
     opens: 0,
     name: 'DROPLET',
+    gait: 'march',
     shape: 'droplet',
     r: 10,
     hp: 88,
@@ -7084,6 +7184,7 @@ export const ENEMY_TYPES = [
     id: 'ion',
     opens: 0,
     name: 'ION',
+    gait: 'march',
     shape: 'ion',
     r: 10,
     hp: 92,
@@ -7153,6 +7254,7 @@ export const ENEMY_TYPES = [
     id: 'echo',
     opens: 0,
     name: 'ECHO',
+    gait: 'march',
     shape: 'echo',
     r: 11,
     hp: 90,
@@ -7263,6 +7365,7 @@ export const ENEMY_TYPES = [
     id: 'shard',
     opens: 0,
     name: 'SHARD',
+    gait: 'march',
     shape: 'shard',
     r: 10,
     hp: 78,
@@ -7334,6 +7437,7 @@ export const ENEMY_TYPES = [
     id: 'lemma',
     opens: 0,
     name: 'LEMMA',
+    gait: 'march',
     shape: 'lemma',
     r: 11,
     hp: 96,
@@ -7377,6 +7481,7 @@ export const ENEMY_TYPES = [
     id: 'limit',
     opens: 0,
     name: 'LIMIT',
+    gait: 'march',
     shape: 'limit',
     r: 12,
     hp: 105,
@@ -7394,6 +7499,7 @@ export const ENEMY_TYPES = [
     id: 'prism',
     opens: kB(900),
     name: 'PRISM',
+    gait: 'march',
     shape: 'prism',
     r: 20,
     hp: 88,
@@ -7858,9 +7964,13 @@ export const WAVES = [
  * ---- what a body does when nothing has happened to it yet ---------------
  *
  * A GAIT, in the sense docs/objects.html means it: a property of the TYPE and
- * not a roll at spawn. Thirty-six field bodies currently draw their approach
- * from the same six march routes, which is why they all read as one crowd
- * walking downhill; this is the vocabulary that lets a type say otherwise.
+ * not a roll at spawn. Twenty-eight of the thirty-six loose bodies still draw
+ * their approach from the same six march routes, which is why they read as one
+ * crowd walking downhill; this is the vocabulary that lets a type say
+ * otherwise. (It was thirty-six of thirty-six when this paragraph was
+ * written, and the eight that have left are the objects of builds 307-335.
+ * Derived: `ENEMY_TYPES.filter((t) => !t.fixed && !t.harmless)` is 36, and 8
+ * of those declare a gait that replaces or offsets the route.)
  *
  * Only the ones with a live reader are in here. An entry with no reader is a
  * promise the table is making and the code is not keeping -- which is the
@@ -7868,19 +7978,85 @@ export const WAVES = [
  * every id below to be read by name in src/enemies.js, and requires every
  * `gait` declared on a type to be one of these.
  *
- * MARCH is the absence of a declaration rather than an entry: it is what
- * `drive` does for everything that does not say otherwise, and the full
- * table the object guide proposes -- with march as one row of it and eleven
- * re-gaitings on top -- is NOT shipped. These three are the three the field
- * can currently express.
+ * ---- THE FIELD IS MANDATORY FROM BUILD 338, AND THERE IS NO DEFAULT ------
+ *
+ * It was optional, and 43 of the 61 types declared nothing: `march` was the
+ * ABSENCE of a declaration, so a type that had never been thought about and a
+ * type deliberately chosen to march were THE SAME TEXT. That is the fifth
+ * instance of one fault in this repo -- `u.levels ?? 3` sold eight upgrade
+ * nodes three times, an omitted `band` read as band 1 (9 kB against 4 MB), a
+ * second `plated` type would have worn `CFG.flint`'s arc, a second `ride`
+ * type `CFG.graft`'s growth -- and every one of them was fixed the same way:
+ * not with a better comment, but by making the omission impossible to write.
+ * `gaitOf` in enemies.js throws for a type that declares none or declares a
+ * word not in here, and check-build fails the build for one.
+ *
+ * `fixed` TYPES ARE EXEMPT, and that is a decision rather than an oversight.
+ * `drive`'s first statement is
+ * `if (this.type.fixed && !this.isDrop) { vx = 0; vy = 0; return; }` -- a boss
+ * core and its structure do not go anywhere, their position being the boss's
+ * business -- so `fixed` ALREADY answers the question a gait would answer,
+ * and declaring one would be a second source of truth for the same fact that
+ * can get out of step with it. Eighteen types are fixed and none of them
+ * declares a gait; the guard holds exactly that partition in both directions.
+ *
+ * ---- AND `march` IS EXEMPT FROM THE READER TEST, WITH THE REASON ---------
+ *
+ * The reader test exists because a type naming a gait nothing implements gets
+ * the march it was trying not to take. That argument does not apply to march
+ * itself: a type declaring march and getting the march is CORRECT, so there is
+ * no site that needs to name it and adding one to satisfy a grep would be
+ * exactly the dead field the test is there to catch. What holds march instead
+ * is the mandatory rule above, which is the stronger guard -- every non-fixed
+ * type declares a word, and march's implementation is the route branch at the
+ * foot of `drive`'s chain.
+ *
+ * ---- THREE KINDS OF WORD LIVE IN THIS ONE TABLE -------------------------
+ *
+ * Worth knowing before phase 2, because docs/objects.html's plan does not
+ * express it. That plan says each entry should be "a function with the
+ * signature `drive` already has" and `march` "the present code moved
+ * verbatim" -- which assumes every gait REPLACES the whole of `drive`. Read
+ * against the code, the fourteen words below are three different things:
+ *
+ *   REPLACERS own the steering outright and the route branch never runs for
+ *   them: roll, dive, creep, spread, standoff, flock, and hop while it is
+ *   leaping. Each has its own arm in `drive`'s if/else chain.
+ *
+ *   WALKERS return from `drive` before the chain is reached at all: rise,
+ *   tumble, chain and hover (the harmless switch), and ride (a rider goes for
+ *   its host). These never touch a route.
+ *
+ *   MODIFIERS hold something on TOP of an ordinary march and the route branch
+ *   still runs: paired, cartwheel and lurch, all three of which say so at
+ *   their own site. `lurch` was a `lurch: true` FIELD until build 338 and is
+ *   the reason this paragraph exists -- a modifier keyed on its own field
+ *   rather than on the word is a second source of truth, and the type then
+ *   declared `march`, naming the quieter half of what it does. Re-keyed onto
+ *   the word it needs no vocabulary exemption either, because `drive` now
+ *   dispatches on it.
+ *
+ * So the route branch at the foot of the chain is reached by march, by the two
+ * modifiers, and by a handed-back hop -- NOT by march alone. A function table
+ * keyed one-per-gait cannot say that, and turning the chain into one would
+ * change what those three bodies do. Phase 2 (naming lurch, drag and wander)
+ * and phase 3 (a route allow-list per type) both land inside this shape, and
+ * whichever build takes them owes this paragraph a re-read. `lurch` was one
+ * of phase 2's three and arrived here instead, because re-keying it DELETED a
+ * field rather than adding a word; `drag` and `wander` are still to come and
+ * neither is a one-liner -- `drag` has no single field to re-key (the
+ * mechanism is a `tether` plus the head's `hurl`) and `wander` is what the
+ * harmless switch's default arm already does.
  */
 export const GAITS = {
+  march: 'the default and the base the rest are named against: one of six routes, swung wide at range and folded in as the body closes, with a heading wobble on top',
   hover: 'comes down to a band across the middle of the field and bobs there',
   rise: 'up-field, away from the machine, toward the rim -- ignore it and it leaves',
   tumble: 'thrown rather than steered: an arc, a spin, and no opinion about the machine',
   chain: 'follow the leader -- each body steers at the one ahead, so a cut leaves two snakes',
   roll: 'takes no lane at all: across the field, off the side walls, spinning as it comes',
   flock: 'no leader: each body steers at the school\'s own mean and off its nearest neighbour',
+  lurch: 'the ordinary march, plus a shove forward every second or two instead of a glide -- the route branch still runs',
   cartwheel: 'comes down an ordinary lane end over end, so its profile against the barrel turns with it',
   paired: 'two bodies on a rigid link, turning about their midpoint while the midpoint advances -- held at a fixed length by a YOKE, walked apart by a LOOM',
   dive: 'holds height across the top, then runs down the edge of the machine and climbs back for another',

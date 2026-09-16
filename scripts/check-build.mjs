@@ -244,18 +244,173 @@ const chroma = (hex) => {
  * lots carried that field for eighteen builds while `buildGun` checked only
  * that a lot existed. So each id has to appear BY NAME in src/enemies.js.
  */
+/*
+ * ---- and the FIELD IS MANDATORY from build 338 --------------------------
+ *
+ * `gait` was optional and 43 of the 61 types declared nothing, with the
+ * absence MEANING march -- so a type nobody had thought about and a type
+ * deliberately chosen to march were the same text. That is `u.levels ?? 3`
+ * (eight nodes sold three times), an omitted `band` (9 kB against 4 MB), and
+ * the `plated`/`rides`/`respawn`/`planted`/`bar` shared blocks, all over
+ * again. `gaitOf` is the thrower and this is where it is called, at BUILD
+ * time: a throw from inside the rAF loop is build 288's freeze rather than an
+ * error anybody reads.
+ *
+ * It holds the `fixed` partition in BOTH directions -- a fixed type must
+ * declare nothing, because `drive` returns for one on its first statement and
+ * a gait would be a second source of truth for `fixed` -- so a nineteenth
+ * fixed type is covered by existing and so is a type that stops being fixed.
+ */
+const { gaitOf } = await import(new URL('../src/enemies.js', import.meta.url));
 const gaitSrc = readFileSync(new URL('../src/enemies.js', import.meta.url), 'utf8');
 const gaitWords = Object.keys(GAITS);
-const badGait = ENEMY_TYPES.filter((t) => t.gait && !gaitWords.includes(t.gait))
-  .map((t) => `${t.id} declares gait '${t.gait}', which is not in GAITS`);
-const mute = gaitWords.filter((g) => !new RegExp(`'${g}'`).test(gaitSrc))
-  .map((g) => `GAITS.${g} is read by nothing in src/enemies.js`);
+const badGait = [];
+for (const t of ENEMY_TYPES) {
+  try { gaitOf(t); } catch (e) { badGait.push(e.message); }
+}
+/*
+ * ---- the reader test wants a DISPATCH ARM, not the string anywhere ------
+ *
+ * It was `new RegExp(\`'${g}'\`).test(gaitSrc)` over the whole file, and that
+ * is two holes rather than one:
+ *
+ *   A word named only in a COMMENT satisfied it, which is the opposite of what
+ *   the test is for -- the thing being guarded against is a word with a
+ *   description and no implementation, and a description is a comment. Latent
+ *   rather than live: measured on the tree this went in on, all fourteen
+ *   existing words had a genuine code reader.
+ *
+ *   And a word named in a MEMBERSHIP SET satisfied it too. `OWN_SPAWN`,
+ *   `OWN_SPEED` and `FACES_TRAVEL` are not steering arms, and `'dive'` has
+ *   seven code occurrences of which four are the unrelated `divePhase`
+ *   machinery. Proved by revert: replacing `dive`'s ONE real arm
+ *   (`gait === 'dive'`) and `flock`'s with `else if (false)` left the old
+ *   predicate reporting nothing muted in both cases -- the guard could not see
+ *   a gait whose entire implementation had been deleted.
+ *
+ * So the pattern is narrowed rather than the corpus widened: a word has to
+ * appear as `gait === 'x'` or as `case 'x':`, which are the only two forms
+ * `drive` and the constructor dispatch in. Measured against this tree, that is
+ * exactly one arm for each of the fourteen and zero for march.
+ *
+ * MARCH IS EXEMPT, and the reason is the test's own argument: the test exists
+ * because a type naming a gait nothing implements gets the march it was trying
+ * not to take, and a type naming MARCH and getting the march is correct. There
+ * is no site that needs to name it -- `'march'` appears zero times in
+ * enemies.js, comments included -- and adding one to satisfy a grep would be
+ * exactly the dead field this hunts. What holds march instead is the mandatory
+ * rule above, which is the stronger guard.
+ *
+ * The exemption is SELF-POLICING, because a hand-kept exemption list is how
+ * `world.apertures` came to be sized 8 against 9 anomalies: an exempt word
+ * that turns out to HAVE a dispatch arm fails the build, so the list cannot
+ * quietly outlive its reason and each addition stays a deliberate edit with a
+ * reason written beside it. Phase 2's `lurch`, `drag` and `wander` are all
+ * fall-throughs or on-top modifiers and will want the same exemption; if that
+ * list reaches three or four, mark the fall-through words in GAITS itself and
+ * have this guard ask the structure instead.
+ */
+const gaitCode = gaitSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+const NO_ARM = ['march'];
+const dispatches = (g) => new RegExp(`gait === '${g}'|case '${g}':`).test(gaitCode);
+const mute = gaitWords.filter((g) => !NO_ARM.includes(g) && !dispatches(g))
+  .map((g) => `GAITS.${g} has no dispatch arm in src/enemies.js -- `
+    + `no \`gait === '${g}'\` and no \`case '${g}':\`, so a type naming it gets `
+    + 'the march it was trying not to take');
+const staleExempt = NO_ARM.filter((g) => dispatches(g))
+  .map((g) => `GAITS.${g} is in check-build's NO_ARM exemption and now HAS a `
+    + 'dispatch arm -- take it out of the list so the guard covers it again');
+mute.push(...staleExempt);
+const notAWord = NO_ARM.filter((g) => !gaitWords.includes(g))
+  .map((g) => `check-build's NO_ARM names '${g}', which is not in GAITS`);
+mute.push(...notAWord);
 if (badGait.length || mute.length) {
   for (const line of [...badGait, ...mute]) console.error(`gaits: ${line}`);
   process.exit(1);
 }
+/*
+ * ---- and a HARMLESS type may not declare a word the harmless branch eats -
+ *
+ * `drive`'s early returns are ORDERED, and a harmless body reaches its own
+ * switch before the route branch is ever considered. That switch handles
+ * `rise`, `tumble`, `chain` and `hover`, and its `default:` arm is
+ * `wander` -- so a harmless type declaring any OTHER word silently gets the
+ * hover band, with both gait guards above passing and nothing to read back.
+ * That is the `shape`-with-no-case fault: five shapes fell through to
+ * `drawChip` for fourteen builds.
+ *
+ * It matters specifically because build 338 made `march` a legal word. Before
+ * that, a harmless type could only reach the default arm by naming a
+ * replacer, which is visibly wrong at the site; `gait: 'march'` on a harmless
+ * body looks like the most ordinary declaration in the file and is the one
+ * value that cannot possibly be true of it.
+ *
+ * The legal set is DERIVED from the branch order rather than chosen: the two
+ * branches ABOVE the harmless one also return, so `ride` (a rider goes for
+ * its host -- SEED is harmless and rides) and `hop` reach their own code
+ * first. `hop` is admitted and flagged rather than refused: `hopOn` hands the
+ * body back for the last stretch, at which point a harmless hopper WOULD fall
+ * to the hover band, so it is half-honoured -- legal, and worth knowing about
+ * before something declares it.
+ */
+/*
+ * DERIVED from `drive`'s own source, not restated. The legal set is the
+ * `case 'x':` labels inside the harmless switch, plus the words whose branch
+ * sits ABOVE that switch and returns -- which is exactly the two gait tests
+ * appearing before `if (this.harmless` in `drive`. So a seventh case added to
+ * the switch, or a branch moved above or below the harmless one, is covered by
+ * existing.
+ *
+ * It was a hand-written list of six for one afternoon and the review caught
+ * it: written out in check-build AND twice in one object literal in
+ * regress.mjs, the message printing one copy while the assertion ran against
+ * the other. That is `HERO_GAITS`/`HERO_COL` in docs/objects.html, which the
+ * same build fixed for the identical reason -- two parallel copies read at the
+ * same index, one of them edited. Ask the structure, never restate it.
+ */
+const driveSrc = gaitCode.slice(gaitCode.indexOf('drive(world, dt) {'));
+const harmlessAt = driveSrc.indexOf('if (this.harmless');
+if (harmlessAt < 0) throw new Error('check-build: cannot find drive\'s harmless branch');
+const switchAt = driveSrc.indexOf('switch (this.type.gait)', harmlessAt);
+if (switchAt < 0) throw new Error('check-build: cannot find the harmless gait switch');
+const preHarmless = driveSrc.slice(0, harmlessAt);
+const above = [...preHarmless.matchAll(/gait === '([a-z]+)'/g)].map((m) => m[1]);
+/*
+ * ...and a branch keyed on a CAPABILITY field has to be traced back to the
+ * line that derives it, or the set comes out short. `drive`'s rider branch
+ * tests `this.rides`, which the constructor sets from `type.gait === 'ride'`
+ * -- so the word is legal for a harmless body (SEED is harmless and rides)
+ * and a slice of `drive` alone cannot see it. Measured: without this the set
+ * derived as [rise tumble chain hover hop] and the guard failed the build on
+ * SEED. One pattern, `this.X = type.gait === 'y'`, and it is checked against
+ * the branches `drive` actually takes rather than assumed.
+ */
+for (const m of gaitCode.matchAll(/this\.([a-zA-Z]+) = type\.gait === '([a-z]+)'/g)) {
+  if (new RegExp(`this\\.${m[1]}\\b`).test(preHarmless)) above.push(m[2]);
+}
+const inSwitch = [...driveSrc.slice(switchAt, driveSrc.indexOf('\n    }', switchAt))
+  .matchAll(/case '([a-z]+)':/g)].map((m) => m[1]);
+const HARMLESS_OK = [...new Set([...inSwitch, ...above])];
+if (HARMLESS_OK.length < 4) {
+  throw new Error(`check-build: the harmless legal set derived as [${HARMLESS_OK.join(' ')}], `
+    + 'which is too few -- the slice found nothing and the guard would be vacuous');
+}
+const gentle = ENEMY_TYPES.filter((t) => t.harmless && !t.fixed);
+const eaten = gentle.filter((t) => !HARMLESS_OK.includes(t.gait))
+  .map((t) => `${t.id} is harmless and declares '${t.gait}', which `
+    + "drive's harmless switch swallows -- it would get the hover band. "
+    + `A harmless type may only declare [${HARMLESS_OK.join(' ')}]`);
+if (eaten.length) {
+  for (const line of eaten) console.error(`gaits: ${line}`);
+  process.exit(1);
+}
+
+const marchers = ENEMY_TYPES.filter((t) => t.gait === 'march').length;
+const held = ENEMY_TYPES.filter((t) => t.fixed).length;
 console.log(`gaits: ${gaitWords.length} in the vocabulary (${gaitWords.join(' ')}), all read; `
-  + `${ENEMY_TYPES.filter((t) => t.gait).length} types declare one, the rest march`);
+  + `every one of ${ENEMY_TYPES.length - held} loose types declares one (${marchers} march), `
+  + `${held} fixed types declare none; ${gentle.length} harmless types stay inside `
+  + `[${HARMLESS_OK.join(' ')}]`);
 
 /*
  * ---- a RIDE type authors what it GIVES, and there is no default ---------
@@ -330,7 +485,22 @@ for (const t of ENEMY_TYPES) {
  */
 const riders = ENEMY_TYPES.filter((t) => t.gait === 'ride');
 const worstRide = Math.max(0, ...riders.map((t) => t.rides.armor));
-const worstBody = Math.max(0, ...ENEMY_TYPES.filter((t) => !t.fixed && !t.gait).map((t) => t.armor || 0));
+/*
+ * `!t.fixed` alone, and the `&& !t.gait` that used to be here is why: it meant
+ * "an ordinary field body" when the only gait-declarers were the new objects,
+ * and build 338 made the field mandatory -- at which point the filter matches
+ * NOTHING, `worstBody` is 0, and the ceiling is measured against a bare body.
+ * A rule whose selector stops matching reads as a rule that holds.
+ *
+ * It was LATENT and not live, which is worth the sentence: FLINT at 0.55 is
+ * the worst loose body either way, so the term happened never to exclude the
+ * maximum (ANVIL 0.30, QUARRY 0.22 and SPINDLE 0.15 were excluded and are all
+ * under it). And it would have failed LOUDLY rather than silently -- with the
+ * filter empty the ring is 0.60 against a cap of 0.80, so the reachability
+ * arm below fires and exits 1. A ring lands on any loose body; `fixed` is the
+ * only thing it cannot land on, so that is the only term the claim needs.
+ */
+const worstBody = Math.max(0, ...ENEMY_TYPES.filter((t) => !t.fixed).map((t) => t.armor || 0));
 const worstRing = worstBody + worstRide * CFG.graft.stack;
 if (!(CFG.graft.armorCap > 0 && CFG.graft.armorCap < 1)) {
   rideBad.push(`graft.armorCap ${CFG.graft.armorCap} is not inside (0, 1)`);

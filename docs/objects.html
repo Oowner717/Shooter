@@ -1,4 +1,4 @@
-<title>Field Guide to the Twenty</title>
+<title>Field Guide to the Objects</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
@@ -259,18 +259,20 @@
 
 <div class="wrap">
   <header class="mast">
-    <div class="eyebrow">Simulation 7749 &nbsp;·&nbsp; object guide &nbsp;·&nbsp; not scheduled</div>
-    <h1>Field Guide to the Twenty <span class="thin">and how everything moves</span></h1>
-    <p class="standfirst">Twenty new objects for the field, and a gait for every object already on it.
-      Thirty-six field bodies currently draw their approach from the same six routes, which is why
-      they all read as one crowd walking slowly downhill.</p>
+    <div class="eyebrow">Simulation 7749 &nbsp;·&nbsp; object guide &nbsp;·&nbsp;
+      <span id="mastStatus">objects shipped, gaits in progress</span></div>
+    <h1>Field Guide to the Objects <span class="thin">and how everything moves</span></h1>
+    <p class="standfirst"><span id="mastN">Nineteen</span> new objects for the field, and a gait for
+      every object already on it. Twenty-eight of the thirty-six loose bodies still draw their
+      approach from the same six routes, which is why they read as one crowd walking slowly
+      downhill.</p>
   </header>
 
   <div class="sections">
     <section>
-      <h2>The field, with eight gaits on it</h2>
+      <h2>The field, with <span id="heroN">seven</span> gaits on it</h2>
       <div class="field">
-        <canvas id="hero" width="1040" height="420" aria-label="A schematic of the playing field with eight objects each arriving by a different gait"></canvas>
+        <canvas id="hero" width="1040" height="420" aria-label="A schematic of the playing field with one object per gait, each arriving by its own"></canvas>
         <div class="legend" id="heroLegend"></div>
       </div>
       <div class="prose">
@@ -326,9 +328,16 @@
       <h2>The gait catalogue</h2>
       <div class="prose">
         <p>A <strong>gait</strong> answers one question: what is this body doing when nothing has
-          happened to it yet. It is a property of the type, not a roll at spawn. Twenty-two of them,
-          each a few lines of steering, and every body in the game gets exactly one — plus any of
+          happened to it yet. It is a property of the type, not a roll at spawn.
+          <span id="gaitN">Twenty-one</span> of them, each a few lines of steering, and every body in the game gets exactly one — plus any of
           four modifiers stacked on top.</p>
+        <p>Two ways this table and the code have drifted apart, both worth knowing before reading it
+          as a specification. <strong>ROLL is in the code and is not in here</strong> — it was
+          invented at build 312, when TUMBLE turned out to be un-givable to a hostile: a ballistic
+          throw decays to nothing against the engine's damping, and a hostile that coasts to a halt
+          at floor level sits outside the assist's cone for ever. And <strong>the gait field is
+          mandatory from build 338</strong>, so MARCH is a declared word rather than the absence of
+          one — every body names its gait, and a type that names none fails the build.</p>
       </div>
       <div class="gaits" id="gaitGrid"></div>
       <div class="prose">
@@ -1404,9 +1413,9 @@
       'LURCH, DRAG, RIDE, HOVER and WANDER exist as special cases inside <code>drive</code>, <code>wander</code> and the TOW code. Lifting them into the table is a refactor that should not move a number, so it gets the same treatment as phase 1: the hash is the assertion, and per the working notes a refactor that only reorders arithmetic is still a change.'],
     ['Phase 3', 'A route allow-list per type',
       'A type names which march routes it may draw from, instead of every body rolling all six. This is the smallest change with a visible effect — a BULWARK stops serpentining, a NEEDLE stops bowing — and it is the one that will move the hash for a real reason.'],
-    ['Phase 4', 'The eleven re-gaitings',
-      'The table above, in order of risk: STRAIGHT, TUMBLE and CREEP first (they remove behaviour and cannot surprise), then FLOCK, FORAGE and STANDOFF, which each add a steering target that was not there. GLUT\'s forage and HERALD\'s standoff change what those two bodies are for, so each wants a measured before and after of how long a wave takes to clear.'],
-    ['Phase 5', 'The twenty, in family order',
+    ['Phase 4', 'The re-gaitings',
+      'This row said <em>eleven</em> and the table above holds <em>ten</em> bodies that take a new gait word &mdash; MOTE, NEEDLE, PLATE, PRISM, BLOOM, HERALD, GLUT, BULWARK, TOW and MASS &mdash; plus three (SPLITTER, WARDEN, SCION) that keep the march and only lose routes, which is phase 3, and three (SEED, DRIFT, LURCHER) already right. A count written out beside the table that owns it. In order of risk: STRAIGHT, TUMBLE and CREEP first (they remove behaviour and cannot surprise), then FLOCK, FORAGE and STANDOFF, which each add a steering target that was not there. GLUT\'s forage and HERALD\'s standoff change what those two bodies are for, so each wants a measured before and after of how long a wave takes to clear.'],
+    ['Phase 5', 'The objects, in family order',
       'The five inert ones first: they are harmless, so a mistake in them costs a picture rather than a run, and three of the five (EMBER, HUSK, FILAMENT) need no new rule at all. Then the ones whose gait is the whole design — SHOAL, SPINDLE, YOKE, QUARRY — and last the six that teach a rule: ANVIL, VEIL, LOOM, MIRE, KITE, CHAFF.'],
     ['Cases', 'What each gait owes the suite',
       'One case per gait asserting the thing its name claims, with a control that reads the opposite on a body that does not have it: a DIVE body crosses the machine\'s line and comes back, an ORBIT body\'s distance holds while its bearing turns, a CREEP body\'s lateral is exactly zero and its speed is constant to the digit, a FLOCK\'s spread stays inside a bound while its centre advances, a PAIRED pair\'s separation holds. Measure the population, never one draw — and for anything with a mean, assert the mean.']
@@ -1472,10 +1481,30 @@
   FAMS.forEach(function (f) { FAM_HEX[f.id] = f.hex; });
 
   // -- hero
-  // 'orbit' was here until build 331 withdrew GYRE, which was its only
-  // declarer -- a hand-kept list naming a row the table no longer has.
-  var HERO_GAITS = ['dive', 'standoff', 'flock', 'tumble', 'paired', 'rise', 'creep'];
-  var HERO_COL = ['#ffd166', '#c9e84a', '#ff5d8f', '#7ef9ff', '#c9e84a', '#b98cff', '#8fa9c4', '#5d9cff'];
+  /*
+   * ---- a gait and its colour are ONE row, because two arrays desynchronised -
+   *
+   * This was `HERO_GAITS` and `HERO_COL`, two parallel arrays read at the same
+   * index. Build 331 withdrew GYRE and removed 'orbit' from the gait list --
+   * which sat at index 1, the SECOND entry -- and left the colours untouched.
+   * So every colour from index 1 on shifted up by one: standoff took orbit's
+   * #c9e84a, paired took tumble's, the two lanes came out the SAME COLOUR, and
+   * the eighth was orphaned. Nothing could fail for it. Seven lanes are drawn
+   * and seven swatches are drawn, and the legend agreed with the diagram
+   * because both read the same wrong index -- the removal even left a comment
+   * saying the gait had gone, one line above the colours it had gone from.
+   *
+   * The pairing is the fix: a row cannot lose half of itself.
+   */
+  var HERO = [
+    ['dive', '#ffd166'],
+    ['standoff', '#ff5d8f'],
+    ['flock', '#7ef9ff'],
+    ['tumble', '#c9e84a'],
+    ['paired', '#b98cff'],
+    ['rise', '#8fa9c4'],
+    ['creep', '#5d9cff'],
+  ];
   var FREE = { tumble: 1, rise: 1 };   // the two that are not coming for you
   var heroEl = document.getElementById('hero');
   heroEl.removeAttribute('width'); heroEl.removeAttribute('height');
@@ -1484,12 +1513,13 @@
     holder.removeChild(heroEl);
     mk(holder, 1040, 400, true, function (c, w, h, t) {
       var F = drawField(c, w, h, { pad: 18 });
-      HERO_GAITS.forEach(function (gid, i) {
+      HERO.forEach(function (row, i) {
+        var gid = row[0];
         var g = GAIT_BY_ID[gid];
-        var col = HERO_COL[i];
+        var col = row[1];
         var path = g.paths ? g.paths[1] : g.path;
         var n = g.n || 1;
-        var lane = (i + 0.5) / HERO_GAITS.length;
+        var lane = (i + 0.5) / HERO.length;
         var shift = (lane - 0.5) * 0.78;
         function at(u, k) {
           var p = path(u, k);
@@ -1526,11 +1556,39 @@
     });
   })();
   var hl = document.getElementById('heroLegend');
-  HERO_GAITS.forEach(function (gid, i) {
+  HERO.forEach(function (row) {
     var s = document.createElement('span');
-    s.innerHTML = '<i style="background:' + HERO_COL[i] + '"></i>' + GAIT_BY_ID[gid].name;
+    s.innerHTML = '<i style="background:' + row[1] + '"></i>' + GAIT_BY_ID[row[0]].name;
     hl.appendChild(s);
   });
+
+  /*
+   * ---- the counts in the prose are ASKED, not written out ---------------
+   *
+   * "Twenty" was in the title, the standfirst and one step's heading, and
+   * "eight gaits" in a heading and the canvas's aria-label, and every one of
+   * them was a copy of a number an array already owns. Build 331 withdrew
+   * GYRE and the roster went to nineteen; the hero's own list went to seven.
+   * All five copies went on reading as current, which is this repo's oldest
+   * fault -- ask the structure, never restate it.
+   */
+  var WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+    'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen',
+    'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty',
+    'twenty-one', 'twenty-two', 'twenty-three', 'twenty-four', 'twenty-five',
+    'twenty-six', 'twenty-seven', 'twenty-eight', 'twenty-nine', 'thirty'];
+  function word(n, cap) {
+    var w = WORDS[n] || String(n);
+    return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+  }
+  (function () {
+    var a = document.getElementById('mastN');
+    if (a) a.textContent = word(NEW.length, true);
+    var b = document.getElementById('heroN');
+    if (b) b.textContent = word(HERO.length, false);
+    var c = document.getElementById('gaitN');
+    if (c) c.textContent = word(GAITS.length, true);
+  })();
 
   // -- family table
   (function () {

@@ -7624,3 +7624,289 @@ came from before believing the other one covers it.
   falls back to a default swallows a wrong-typed argument in silence** --
   same family as `levels ?? 3` and an omitted `band` reading as band 1, on
   the setter side instead of the author side.
+
+- **PHASE 1 OF THE GAIT PLAN IS IN FROM BUILD 338: `gait` IS MANDATORY AND
+  THERE IS NO DEFAULT.** It was optional and **43 of the 61 types declared
+  nothing**, with the absence MEANING march -- so a type nobody had asked
+  about and a type deliberately chosen to march were THE SAME TEXT. That is
+  the fifth instance of one fault: `u.levels ?? 3` sold eight upgrade nodes
+  three times, an omitted `band` read as band 1 (9 kB against 4 MB), and a
+  second `plated`/`ride`/`respawn`/`planted`/`bar` type would have worn the
+  first one's shared block. Every one was fixed the same way -- not with a
+  better comment, but by making the omission impossible to write. `march` is a
+  row in `GAITS`, `gaitOf` in enemies.js throws for a type declaring none or
+  declaring a word not in the table, and `check-build` walks all 61 through it
+  at build time (a throw from inside the rAF loop is build 288's freeze rather
+  than an error anybody reads).
+  **The ORDINAL hash came back identical to the bit** -- `-1334607133` either
+  side, both readings in this container -- which is the assertion this phase
+  owed and the only instrument that can make it: a field added to all 43 loose
+  types, read eleven times per body per frame on `drive`'s hot path, and
+  provably no body noticed. Verified alongside it that none of the three gait
+  Sets (`OWN_SPAWN`, `OWN_SPEED`, `FACES_TRAVEL`) contains `march`, so
+  `.has(undefined)` and `.has('march')` are both false, and that `laneBusy`'s
+  cohort test pools the 43 the same way either side.
+- **IT OVERTURNS BUILD 324'S RULING, DELIBERATELY, AND THAT REFUSAL WAS
+  CIRCULAR.** REMNANT's first draft wrote `gait: 'march'` out on build 224's
+  reasoning, `check-build` refused it, and the rule was narrowed to *"write out
+  a value that could have been different, and do not invent a name for the
+  default"*. Both halves are answered rather than ignored. The refusal was
+  circular -- the guard refused `march` because it was not in `GAITS`, and it
+  was not in `GAITS` because the guard refused it -- and `march` is not an
+  INVENTED name, the word appearing fifteen times in config.js's own prose
+  ("the ordinary march", "this body does not march") before it was ever a
+  value. What settles it is the COST of the absence, which was that ruling's
+  own paragraph: **fifteen lines at one site** saying "the correct absence
+  rather than an omission", and nothing like it at the other twenty-four, so a
+  reader could not tell a FLINT that was considered and found to march from
+  one nobody had asked about. A rule that needs a paragraph per site to
+  distinguish a chosen absence from an oversight is a rule making the omission
+  expensive instead of impossible, which is what build 220 tried for `levels`
+  before 224 removed the default. The precedent is two fields along on the same
+  roster: LATCH's and CHAFF's `wobble: 0` are "written out at 0 rather than
+  omitted so the value is a statement and not an absence" -- same field shape,
+  same majority default, opposite ruling, and the only thing that had made
+  `gait` different was a guard.
+- **`fixed` TYPES ARE EXEMPT AND THAT IS THE POINT RATHER THAN A HOLE.**
+  `drive`'s first statement is `if (this.type.fixed && !this.isDrop) { vx = 0;
+  vy = 0; return; }` -- a boss core and its structure do not go anywhere --
+  so `fixed` ALREADY answers what a gait would answer, and declaring one would
+  be a second source of truth for the same fact that can get out of step with
+  it. Eighteen types are fixed and `gaitOf` throws for one that declares a
+  gait as well as for a loose one that does not, so the partition is held in
+  BOTH directions and a nineteenth fixed type is covered by existing. 61 = 18
+  fixed + 36 loose hostile + 7 harmless.
+- **THE READER TEST COULD NOT SEE AN IMPLEMENTATION THAT HAD BEEN DELETED, AND
+  THAT IS PROVED BY REVERT.** It was `new RegExp(`'${g}'`).test(gaitSrc)` over
+  the whole of enemies.js, which is two holes: a word named only in a COMMENT
+  satisfied it (the thing being guarded against is a word with a description
+  and no implementation, and a description IS a comment), and a word named in a
+  MEMBERSHIP SET satisfied it too. `'dive'` has seven code occurrences of which
+  four are the unrelated `divePhase` machinery. Measured: replacing `dive`'s
+  ONE real arm and `flock`'s with `else if (false)` left the old predicate
+  reporting **nothing muted in both cases** -- the guard could not see a gait
+  whose entire steering had gone. Narrowed rather than widened: a word must
+  appear as `gait === 'x'` or `case 'x':`, the only two forms anything
+  dispatches in, which is exactly one arm for each of the fourteen and zero for
+  march. Both reverts now fire, and so do a stale exemption and one naming a
+  non-word.
+- **AND THE `march` EXEMPTION IS SELF-POLICING, because a hand-kept exemption
+  list is how `world.apertures` came to be sized 8 against 9 anomalies.**
+  March is exempt by the test's own argument: the test exists because a type
+  naming a gait nothing implements gets the march it was trying not to take,
+  and a type naming MARCH and getting the march is correct -- `'march'` appears
+  zero times in enemies.js, comments included, and adding a site to satisfy a
+  grep would be exactly the dead field the test hunts. So an exempt word that
+  turns out to HAVE a dispatch arm **fails the build**, and one naming a word
+  not in `GAITS` fails too. Phase 2's `lurch`, `drag` and `wander` are all
+  fall-throughs or on-top modifiers and will want the same exemption; if the
+  list reaches three or four, mark the fall-through words in `GAITS` itself and
+  have the guard ask the structure instead of restating it.
+- **THE ARMOUR CEILING SELECTED BODIES BY THE ABSENCE OF A GAIT, AND IT WAS
+  LATENT RATHER THAN LIVE.** `worstBody` filtered `!t.fixed && !t.gait`, which
+  meant "an ordinary field body" when the only declarers were the new objects
+  -- so with the field mandatory the filter matches NOTHING and the ring is
+  measured against a bare body. A rule whose selector stops matching reads as
+  a rule that holds. Two things worth the sentences: it was **latent**, because
+  FLINT at 0.55 is the worst loose body either way and the term happened never
+  to exclude the maximum (it did exclude ANVIL 0.30, QUARRY 0.22 and SPINDLE
+  0.15, all under it); and it would have failed **LOUDLY** rather than
+  silently, since an empty filter gives a ring of 0.60 against a cap of 0.80
+  and the reachability arm fires. `!t.fixed` alone is what the claim needs -- a
+  ring lands on any loose body and `fixed` is the only thing it cannot land on.
+- **THE HARMLESS SWITCH'S `default:` WOULD HAVE SWALLOWED `march`, AND IT IS
+  THE ONE VALUE THAT CANNOT BE TRUE OF A HARMLESS BODY.** `drive`'s early
+  returns are ORDERED and a harmless body reaches its own switch long before
+  the route branch; that switch handles `rise`, `tumble`, `chain` and `hover`,
+  and its `default:` is `wander`. So a harmless type declaring any other word
+  silently gets the hover band with both gait guards passing -- the
+  `shape`-with-no-case fault, where five shapes fell through to `drawChip` for
+  fourteen builds. It matters specifically because `march` is legal now: before
+  that, a harmless type could only reach the default arm by naming a replacer,
+  which is visibly wrong at the site, whereas `gait: 'march'` on a harmless
+  body **looks like the most ordinary declaration in the file**. `check-build`
+  refuses it, and the legal set is DERIVED from the branch order rather than
+  chosen -- the two branches above the harmless one also return, so `ride`
+  (SEED is harmless and rides) and `hop` reach their own code first. `hop` is
+  admitted and flagged rather than refused, because `hopOn` hands the body back
+  for the last stretch and a harmless hopper would fall to the hover band then:
+  half-honoured, legal, and worth knowing before something declares it.
+- **THERE ARE THREE KINDS OF WORD IN THE ONE TABLE, AND THE PLAN'S MODEL DOES
+  NOT FIT THEM.** `docs/objects.html` says each entry should be "a function
+  with the signature `drive` already has" and `march` "the present code moved
+  verbatim", which assumes every gait REPLACES the whole of `drive`. Read
+  against the code the fifteen words are three different things. REPLACERS own
+  the steering and the route branch never runs (roll, dive, creep, spread,
+  standoff, flock, and hop while leaping). WALKERS return before the chain is
+  reached at all (rise, tumble, chain, hover, ride). MODIFIERS hold something
+  on TOP of an ordinary march and the route branch still runs (paired,
+  cartwheel) -- and `type.lurch` is a fourth modifier that is not a gait word
+  at all but its own field applied below the chain, which is why a LURCHER
+  declares `march` and still lurches. **So the route branch at the foot of the
+  chain is reached by march, by the two modifiers and by a handed-back hop, not
+  by march alone**, and a function table keyed one-per-gait cannot say that --
+  turning the chain into one would change what those three bodies do. Phases 2
+  and 3 both land inside this shape.
+- **`nothing reads a field that does not exist` HAS A DOMAIN OF TWO OBJECTS,
+  AND THE FIELD IT COULD NOT SEE IS THIS ONE.** The ghost Proxy is installed
+  over `world` and `world.up` and nothing else, so a TYPE's fields are outside
+  it -- and `this.type.gait` was an undefined-property read on 43 of the 61
+  types for the whole of the field's optional life. The one case whose NAME is
+  exactly about undefined-property reads could not see any of them; had it
+  covered `ENEMY_TYPES` it would have been red the whole time and made this
+  change unnecessary. Its name says the domain now. Wrapping `TYPE_BY_ID`'s
+  values is the real coverage and is its own piece of work. Build 325's rule:
+  **ask what a guard's domain is before reading its green as coverage** -- and
+  note that guard and build 313's key sweep have complementary domains and
+  neither covers a type-level absence read at runtime.
+- **MY OWN NEW CASE HAD ITS DETAIL INVERTED, AND RUNNING IT STANDALONE FIRST IS
+  WHAT CAUGHT IT.** The arm collects what `gaitOf` LET THROUGH and the field
+  was called `refused`, so the assertion read `refused.length === 3` -- it
+  demanded three failures and would have passed only on a broken build. It read
+  `refused: []` on a working one. **A detail string is a declaration and so is
+  a field name** (build 319's "still flocking" printing a count of the living),
+  and thirteen minutes of suite is the price of finding it afterwards instead.
+  It now reports both the count CAUGHT and the list LET THROUGH, plus the two
+  acceptance arms -- a good word accepted and a fixed type answered `null` --
+  because an empty miss list means nothing from a function that throws
+  unconditionally.
+- **THE GUIDE'S HERO DIAGRAM HAD SEVEN LANES DRAWN IN SHIFTED COLOURS, TWO OF
+  THEM IDENTICAL, AND THE REMOVAL THAT DID IT LEFT A COMMENT SAYING SO.**
+  `HERO_GAITS` and `HERO_COL` were two parallel arrays read at the same index.
+  Build 331 withdrew GYRE and removed `'orbit'` from the gait list -- **at
+  index 1, the SECOND entry** -- and left the colours untouched, so every
+  colour from index 1 on shifted up by one: standoff took orbit's `#c9e84a`,
+  paired took tumble's, **the two lanes came out the same colour**, and the
+  eighth was orphaned. Nothing could fail for it -- seven lanes are drawn and
+  seven swatches are drawn, and the legend AGREED with the diagram because both
+  read the same wrong index. They are one array of `[gait, colour]` rows now; a
+  row cannot lose half of itself. Recovered the intended pairing from
+  `git show` of the commit before the removal rather than guessing it.
+- **FIVE COUNTS IN THE GUIDE'S PROSE WERE COPIES OF NUMBERS AN ARRAY ALREADY
+  OWNED.** "Twenty" in the `<title>`, the `<h1>`, the standfirst and one step's
+  heading, and "eight gaits" in a heading and the canvas's `aria-label`, all
+  reading as current after build 331 took the roster to nineteen and the hero's
+  list to seven. `#mastN` and `#heroN` are filled from `NEW.length` and
+  `HERO.length` now, so they cannot rot again. Two more corrected in place:
+  "Thirty-six field bodies currently draw their approach from the same six
+  routes" is **twenty-eight of thirty-six** (the eight that left are the
+  objects of builds 307-335), and the Phase 4 row said **eleven** re-gaitings
+  where the table beside it holds **ten** bodies taking a new gait word -- the
+  other three keep the march and only lose routes, which is phase 3, and three
+  more were already right. A count written out beside the table that owns it.
+- **AND `march` WAS THE WEAKEST DECLARATION ON THE ROSTER FOR ONE TYPE, SO
+  `lurch` ARRIVED HERE INSTEAD OF IN PHASE 2.** A LURCHER's own steady closing
+  speed is `speed * k / (k + damping)` = 38 x 1.2 / 1.75 = **26.1 u/s**,
+  against a burst whose mean is **65** arriving every 1.1-2.4s -- two and a
+  half times the whole cruise, up to 3.4x. So `march` named the quieter
+  component and was silent about the louder one, on the one type
+  docs/objects.html calls "the only type that already owned its motion", while
+  the roster's own convention is that a MODIFIER whose route branch still runs
+  is declared as the gait (YOKE `paired`, SPINDLE `cartwheel`). Re-keying it
+  **deleted a field rather than adding a word** -- the burst was
+  `if (this.type.lurch)` against a `lurch: true` only this type carried, so the
+  word and the behaviour could get out of step -- and it gives `lurch` a real
+  dispatch arm, so it needs no vocabulary exemption. **And the hash cannot see
+  this half of the change, which is worth saying rather than letting
+  `-1334607133` stand as the proof.** `fight.mjs` opens from `openBoss` and
+  `Game.update` is `if (w.boss) {...} else { director.update() }`, so the
+  director never releases and **no LURCHER is ever on that field** -- build
+  318's correction. The hash proves the FIELD addition reached nothing; what
+  proves the re-key is that the two predicates are identical over the roster,
+  which is checkable directly: `lurch: true` was on exactly one type at HEAD
+  (`lurcher`) and `gait: 'lurch'` is on exactly that type now, with zero live
+  `lurch: true` fields left. A LURCHER is genuinely reachable at the rung the
+  suite's release-gate case runs (four band-3/4 waves carry one), so the suite
+  is the instrument for it and the hash is not. `drag` and `wander` are still
+  phase 2's and neither is a one-liner: `drag` has no single field to re-key,
+  and `wander` is what the harmless switch's default
+  arm already does.
+- **WHAT `march` LEAVES OUT IS WRITTEN AT THE TWO SITES WHERE IT LEAVES OUT
+  MOST.** A towed MASS is the weakest declaration left and the note says why,
+  with the figures: its own march delivers **13.6 u/s** against the head's
+  39.6, so the cable drags it at 2.9x its own walking pace; `solveTethers`
+  writes its POSITION every frame; `windUp` drives it sideways at 900 u/s^2
+  inside `hurl.range`, which is authorship and not steering; and after
+  `release` it is `hurl.speed` **620** with `thrown` 2.2, which is `drive`'s
+  SECOND early return -- so for those 2.2 seconds the gait is not consulted at
+  all. The TOW head's march really is its own path (nothing excludes it from
+  the route branch, and `windUp` only BLEEDS its wind out of range rather than
+  holding it), so its note is the narrower one: the declaration is INCOMPLETE
+  rather than false, because the part of `drag` that is not a march belongs to
+  the pair. **A declaration that is true and partial is worth a note; one that
+  is false is worth a different word.**
+- **THE HARMLESS LEGAL SET IS DERIVED FROM `drive`'S OWN SOURCE, and it was a
+  hand-kept list in THREE copies for one afternoon -- two of them parallel, in
+  the object literal of the case I had just written.** The message printed one
+  copy while the assertion ran against the other, so editing either would have
+  made the case report a legal set it had not tested against, with nothing to
+  read back. **That is `HERO_GAITS`/`HERO_COL` exactly, in the same build that
+  fixed it in the guide** -- which is a sharper lesson than either instance:
+  diagnosing a fault does not inoculate you against writing it. `check-build`
+  slices `drive` from its own signature to `if (this.harmless`, harvests the
+  `case 'x':` labels out of the harmless switch and the `gait === 'x'` tests
+  above it, and **traces a branch keyed on a CAPABILITY field back to the line
+  that derives it** -- `this.rides = type.gait === 'ride'` is in the
+  CONSTRUCTOR, so a slice of `drive` alone derived [rise tumble chain hover
+  hop] and failed the build on SEED. Proved in four directions: removing a
+  `case` from the switch, breaking the capability derivation, gutting the
+  switch entirely (it throws rather than deriving an empty set, so the guard
+  cannot go vacuous), and a harmless BELL declaring `march` -- which is the one
+  the dispatch guard cannot catch, because march is exempt from it.
+- **THE READ-ONLY FAN-OUT SCORED SEVERAL THINGS I HAD NOT AND WAS WRONG ABOUT
+  NONE, WHICH IS UNUSUAL ENOUGH TO RECORD.** Four lenses over the gait field's
+  readers, launched before the change and landing during it. Two independently
+  reproduced the three faults I had already found -- one of them by copying the
+  tree to a scratchpad and running check-build against a one-row GAITS -- which
+  is the useful kind of agreement. What they added: the harmless switch's
+  `default:` swallowing `march`; the reader test being satisfiable by a
+  MEMBERSHIP SET, **proved by revert**, since gutting `dive`'s and `flock`'s
+  only dispatch arm left the old predicate reporting nothing muted; the LURCHER
+  and MASS declarations above; the hand-kept list in my own case; and the ghost
+  Proxy's domain. One lens also REFUTED the example my own brief had named as
+  the likely breakage (a regress arm asserting a mote's gait), correctly, on the
+  ground that LATCH declares `ride` at HEAD and still does. The standing rule
+  held anyway: every mechanism above was re-measured here, and one lens's
+  recommendation for the MASS -- a note rather than a word -- is the one I took
+  precisely because it had done the arithmetic for why `drag` is not a
+  one-liner.
+- **THE RELEASE-GATE FUSE ARM'S LIVENESS FLOOR IS A ONE-IN-THREE COIN TOSS,
+  MEASURED, AND IT IS POOLED BY RETRY NOW.** It drew `held: 0` on build 336
+  and again on 338 -- two builds whose executable content cannot reach it --
+  and build 336's note had already asked for exactly this: *"the next person to
+  touch it should pin the seed and pool three runs... and should note that a
+  liveness floor is the one conjunct in it that has never been pooled."*
+  Measured rather than inferred, three trials of the identical scenario on one
+  tree with nothing else changed: **held 25.9, 3.7 and 23.9 seconds**. The two
+  that held read a rise of 1.057 and 1.054, the fuse filling more than once
+  over; the one that did not also had `contactS` 6.0 against `crowdS` 3.7, so
+  it would have failed the CAUSE conjunct as well.
+  **Pooled by RETRY rather than by averaging, and the distinction is the
+  claim.** This conjunct asks whether the scenario ARISES, not how often, so a
+  300-second window in which the release was never held is a window in which
+  the mechanism never ran -- not evidence against it. Averaging the holds
+  answers a question nobody asked and pays for three windows every run;
+  attempting up to three times and measuring the first that produced a hold
+  costs 1.5 windows on average and leaves about a 4% chance of a spurious red.
+  What keeps it honest is REPORTING the attempts in the detail: if it ever
+  starts needing all three every run, the scenario has stopped reproducing and
+  that is the signal to re-site it rather than to raise the count.
+  **Pinning the seed was the other candidate and is refused.** The remaining
+  unpinned confound is genuinely the trait roll -- `traitsFor` is seeded off
+  `world.runSeed`, which `restart()` re-rolls, and at rung 28 whether the field
+  drowns at all turns on SWARM and MENDING -- but pinning a seed is CHOOSING a
+  roll, and choosing the roll that makes the case pass is what this case's
+  six-build history is a catalogue of.
+- **WHAT PHASE 1 DELIBERATELY DID NOT DO.** It adds a field and a guard and
+  moves no behaviour: `drive`'s if/else chain is untouched, which is why the
+  hash can be the assertion. Phase 2 (lifting `lurch`, `drag` and `wander` out
+  of `drive`, `wander` and the TOW code into the table) and phase 3 (a route
+  allow-list per type, still `this.route = opts.route || weightedPick(ROUTES)`
+  with no per-type filter) are separate builds and share phase 1's test. Phase
+  4's ten re-gaitings are a balance change as well as a mechanical one -- the
+  guide asks for a measured before and after of how long a wave takes to clear
+  for GLUT's forage and HERALD's standoff -- and `forage` and `straight` are
+  not words in `GAITS` at all yet. Shipping phase 1 and phase 2 together would
+  have destroyed the one useful property of a pure field addition, which is
+  that green means nothing but a field arrived: build 284's rule about a rename
+  and a rescale in the same build.
