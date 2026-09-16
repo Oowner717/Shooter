@@ -8785,16 +8785,21 @@ came from before believing the other one covers it.
   would have been silent. **A probe reaching back far enough is reading an
   API as well as a tree**, and the loud failure and the silent one live one
   line apart.
-- **A THIRD HOLE, RECORDED AND NOT CLOSED: the probes import the LOCAL tree
-  while driving the SERVED game.** `tiers.mjs:65-66` imports `WAVES`,
+- **A THIRD HOLE, RECORDED AT 346 AND CLOSED AT 347: the probes import the
+  LOCAL tree while driving the SERVED game.** `tiers.mjs:65-66` imports `WAVES`,
   `ENEMY_TYPES`, `CFG`, `kB`, `fmtBytes`, `NODES` and `priceOf` from
   `../src/`, so under `--url` the price table, the wave roster, the type
   roster and every config number are HEAD's and only the GAME is the old
   build. For a differential across a PRICE or CURRENCY change -- which is
   exactly what phase 5 was -- both sides therefore share one price table.
   That is a third reason the 287 reading could not have been about 283's
-  economy, and closing it means fetching the served module graph rather than
-  importing it, which is its own piece of work.
+  economy. **CLOSED AT BUILD 347, and not the way this paragraph guessed**:
+  fetching the served module graph would mean serialising `priceOf` across the
+  boundary, and the true statement is narrower -- such a probe may only be
+  aimed at a tree that IS its own checkout, so it refuses a mismatch and names
+  the worktree remedy. It also reaches only TWO probes, not five: `fight.mjs`,
+  `dps.mjs`, `variance.mjs` and `ladder-probe.mjs` import nothing from
+  `../src/`, which is what makes build 345's re-take sound.
 - **THE DETECTION IS DERIVED AND THE LIST IS DECLARED, because `w` names two
   different objects in one file.** Harvesting the fields from the probe's own
   source was tried first and cannot work: `w.requestAnimationFrame` is the
@@ -8839,3 +8844,63 @@ came from before believing the other one covers it.
   measured the revert; it has measured a guard that is not running** -- so
   print the baseline first and read it, which is the same rule as a zero from
   an instrument never shown to read a one.
+
+- **BUILD 347 CLOSES THE THIRD HOLE, AND THE FIRST THING IT ESTABLISHED IS
+  THAT BUILD 345'S RE-TAKE IS SOUND.** 346 recorded that the probes import
+  their constants from the LOCAL `src/` while driving the SERVED game, and
+  left it open. The obvious worry was that it reached `fight.mjs` and
+  therefore the eight-build hash re-take; measured by grep, **`fight.mjs`
+  imports nothing from `../src/` at all** -- its entire import list is
+  `node:module` and `./served.mjs`, and every figure it prints is read out of
+  the page. So are `dps.mjs`, `variance.mjs` and `ladder-probe.mjs`. The
+  exposure is exactly TWO probes: `tiers.mjs` (`WAVES`, `ENEMY_TYPES`, `CFG`,
+  `kB`, `fmtBytes`, `fmtRate`, `NODES`, `priceOf`) and `contact.mjs`
+  (`NODES`). **Check the blast radius before designing the fix** -- the fix
+  for two probes is not the fix for six, and the answer here turned out to be
+  a dozen lines rather than a refactor.
+- **THE FIX IS A REFUSAL RATHER THAN A REFACTOR, AND THE REFUSAL TEACHES THE
+  METHOD.** Reading the constants out of the page instead would mean
+  serialising `priceOf` -- a FUNCTION -- across the boundary, and would leave
+  the probe silently mixing two trees for every symbol somebody forgot to
+  move. What is actually true is narrower and checkable: for such a probe a
+  differential is sound only when the CHECKOUT IS the served commit, which
+  means running it FROM the worktree (`cd <worktree>/scripts && node
+  tiers.mjs --url ...`). That is exactly how build 346's phase-5
+  reproduction was taken, and why that reproduction was valid where the
+  original was not. `requireSameTree(served, BUILD, who)` compares the served
+  BUILD against the probe's own imported one and refuses a mismatch, reusing
+  the `served` object `checkServed` already fetched rather than asking twice.
+- **AND THE ASYMMETRY IS THE POINT, WHICH IS WHY IT IS DERIVED FROM THE
+  IMPORTS.** The four self-contained probes deliberately do NOT get the
+  refusal -- aiming them at any tree is sound, and saying so is what makes
+  345's re-take a fact rather than luck. `check-build` derives both families
+  from `from '../src/` crossed with aimability and PRINTS BOTH, so a probe
+  that grows its first local import inherits the refusal and one that sheds
+  its last is let out. Four revert proofs plus the vacuity arm, whose message
+  says what to do if it ever fires honestly: if every probe really has become
+  self-contained, delete the guard rather than keep it green.
+- **THE THREE GUARDS NOW ANSWER THREE DIFFERENT QUESTIONS AND NONE OF THEM
+  SUBSTITUTES FOR ANOTHER.** `--expect` (345): which tree was served.
+  `requireWorld` (346): whether the probe can READ that tree. `requireSameTree`
+  (347): whose CONSTANTS the probe is printing. Phase 5's reading was wrong on
+  all three counts at once -- stale serve, a purse it could not read, and a
+  price table from the other tree -- which is why one guard was never going to
+  be enough and why each has its own detection: `flag('url'` for the first,
+  purse-and-aimable for the second, local-import-and-aimable for the third.
+  **A composite failure needs a guard per component**; a single check placed
+  anywhere in that chain would have passed the other two faults through.
+- **A READOUT PREFIX IS A NAMESPACE, AND MINE COLLIDED ON ITS FIRST RUN.**
+  The new block printed under `tree:` -- which `check-build` has already used
+  for the buyable-coverage line ("tree places all 95 buyable things exactly
+  once") since long before. Two unrelated readouts sharing a prefix in a
+  thirty-line block is how build 329's broadphase cell got skim-read past for
+  dozens of builds. Renamed to `constants:`. Cheap to fix and worth fixing at
+  the moment it appears, because the next reader greps the prefix.
+- **AND `contact.mjs` ALREADY IMPORTED `BUILD` DYNAMICALLY, 250 LINES BELOW
+  WHERE THE REFUSAL NEEDED IT.** `const { BUILD } = await import('../src/
+  config.js')` sat just above the render, so a static import at the top was a
+  redeclaration and `node --check` caught it immediately. The dynamic one is
+  gone and the static one serves both readers -- which is strictly better,
+  because a value the probe refuses on and a value it PRINTS in the sheet
+  ought to be the same read. Two reads of one constant is the shape that lets
+  a heading disagree with a guard.

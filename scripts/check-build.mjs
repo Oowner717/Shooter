@@ -1015,6 +1015,76 @@ console.log(`world: all ${pursed.length} purse-reading probe(s) `
   + `(${pursed.map(([f]) => f).join(' ')}) declare their served-world fields and refuse a `
   + `tree without them`);
 
+/*
+ * ---- ...AND WHOSE CONSTANTS IS IT PRINTING? ----------------------------
+ *
+ * Build 347, the third of the three and the last. `--expect` says which tree
+ * was served; `requireWorld` says whether the probe can read it; neither
+ * notices that half a probe's numbers never came from that tree at all.
+ * `tiers.mjs` imports the price table, the wave roster, the type roster and
+ * every config constant from `../src/`, so under `--url` those are the
+ * CHECKOUT's and only the game is the served build -- a third independent
+ * reason build 287's phase-5 reading could not have been about 283's economy,
+ * since the whole subject of that differential was a x1000 price change and
+ * both sides shared one price table.
+ *
+ * A REFUSAL RATHER THAN A REFACTOR, because what is true is narrower than
+ * "read everything out of the page" (which would mean serialising `priceOf`
+ * across the boundary and would still mix trees for any symbol somebody
+ * forgot): for such a probe a differential is sound only when the checkout IS
+ * the served commit, i.e. run it FROM the worktree. That is how build 346's
+ * phase-5 reproduction was taken and why it was valid.
+ *
+ * AND THE ASYMMETRY IS THE POINT. `fight.mjs`, `dps.mjs`, `variance.mjs` and
+ * `ladder-probe.mjs` import nothing from `../src/` -- every figure they print
+ * is read out of the page -- so aiming them anywhere is sound, which is what
+ * makes build 345's eight-build hash re-take valid rather than lucky. Derived
+ * from the imports, so a probe that grows its first local import inherits the
+ * refusal and one that sheds its last is let out.
+ */
+const mixed = readdirSync(probeDir)
+  .filter((f) => f.endsWith('.mjs') && f !== SELF)
+  .map((f) => [f, readFileSync(new URL(f, probeDir), 'utf8')])
+  .filter(([, s]) => !/export const requireSameTree/.test(s))
+  .filter(([, s]) => /from '\.\.\/src\//.test(s) && AIMABLE.test(s))
+  .sort();
+if (!mixed.length) {
+  console.error('constants: no aimable probe imports from ../src/, so this guard is asserting '
+    + 'nothing -- the detection has drifted, not the exposure. If every probe really is '
+    + 'self-contained now, delete the guard and say so.');
+  process.exit(1);
+}
+const mixBad = [];
+for (const [f, s] of mixed) {
+  if (!/import \{[^}]*\brequireSameTree\b[^}]*\} from '\.\/served\.mjs'/.test(s)) {
+    mixBad.push(`${f} imports constants from ../src/ and can be aimed elsewhere, and does `
+      + 'not import requireSameTree');
+  } else if (!/requireSameTree\(served, BUILD,/.test(s)) {
+    mixBad.push(`${f} imports requireSameTree and does not call it with the served info `
+      + "and its own BUILD");
+  } else if (!/if \(abort\) process\.exit\(1\);/.test(s.replace(/^[ \t]+/gm, ''))) {
+    mixBad.push(`${f} calls requireSameTree and does not exit on its verdict, `
+      + 'so the refusal is a print');
+  }
+}
+if (mixBad.length) {
+  for (const line of mixBad) console.error(`constants: ${line}`);
+  console.error('constants: a probe that imports ../src/ prints its OWN constants whatever it is '
+    + 'aimed at, so a differential has to be run FROM the worktree. Without the refusal it '
+    + 'reports one tree\'s prices against another tree\'s game and exits 0.');
+  process.exit(1);
+}
+const selfContained = readdirSync(probeDir)
+  .filter((f) => f.endsWith('.mjs') && f !== SELF && f !== 'served.mjs')
+  .filter((f) => {
+    const s = readFileSync(new URL(f, probeDir), 'utf8');
+    return AIMABLE.test(s) && !/from '\.\.\/src\//.test(s);
+  }).sort();
+console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f).join(' ')}) `
+  + `import ../src/ and refuse a served tree that is not this checkout; `
+  + `${selfContained.length} (${selfContained.join(' ')}) import none and may be aimed `
+  + `anywhere`);
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {

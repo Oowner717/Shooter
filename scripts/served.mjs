@@ -134,3 +134,52 @@ export const requireWorld = async (page, fields, who) => {
   console.log(`  world has ${fields.map((f) => `.${f}`).join(' ')}`);
   return { abort: false, missing };
 };
+
+/*
+ * ...AND A PROBE THAT IMPORTS THE LOCAL TREE MAY ONLY BE AIMED AT ITS OWN.
+ *
+ * Build 347, the third hole and the last of the three. `checkServed` says
+ * which tree was served and `requireWorld` says whether the probe can read
+ * it; neither notices that half the probe's numbers never came from that tree
+ * at all. `tiers.mjs` imports `WAVES`, `ENEMY_TYPES`, `CFG`, the formatters,
+ * `NODES` and `priceOf` from `../src/`, so under `--url` the price table, the
+ * wave roster, the type roster and every config constant are the CHECKOUT's
+ * and only the GAME is the served build.
+ *
+ * That is a third, independent reason build 287's phase-5 reading could not
+ * have been about build 283's economy: the whole point of that differential
+ * was a x1000 price change, and both sides shared one price table.
+ *
+ * THE FIX IS A REFUSAL RATHER THAN A REFACTOR, and the refusal teaches the
+ * method. Reading the constants out of the page instead would mean serialising
+ * `priceOf` -- a function -- across the boundary, and would leave the probe
+ * silently mixing two trees for every symbol somebody forgot. What is
+ * actually true is narrower and checkable: for such a probe a differential is
+ * sound only when the checkout IS the served commit, which means running it
+ * FROM the worktree (`cd /tmp/wNNN/scripts && node tiers.mjs`). That is
+ * exactly how build 346's phase-5 reproduction was taken, and why it was
+ * valid.
+ *
+ * AND IT DELIBERATELY DOES NOT APPLY TO THE OTHER FOUR. `fight.mjs`,
+ * `dps.mjs`, `variance.mjs` and `ladder-probe.mjs` import nothing from
+ * `../src/` -- every figure they print is read out of the page -- so aiming
+ * them at any tree is sound, which is what makes build 345's eight-build hash
+ * re-take valid and is worth saying rather than assuming. `check-build.mjs`
+ * derives the two families from the imports themselves, so a probe that grows
+ * its first local import inherits the refusal.
+ */
+export const requireSameTree = (served, localBuild, who) => {
+  if (served && served.err) return { abort: false, mismatch: false };
+  const there = String(served && served.build);
+  const here = String(localBuild);
+  if (there !== here) {
+    console.error(`\n${who}: serving build ${there} while this checkout is build ${here}, `
+      + `and this probe imports its constants from ../src/ -- the price table, the wave `
+      + `roster and the config would be ${here}'s while only the game is ${there}'s, which `
+      + `is how phase 5 reported a x1000 price change as no change at all. Run it FROM the `
+      + `worktree instead: \`cd <worktree>/scripts && node ${who} --url ...\`.`);
+    return { abort: true, mismatch: true };
+  }
+  console.log(`  checkout is build ${here} too, so its imported constants match`);
+  return { abort: false, mismatch: false };
+};

@@ -32,9 +32,10 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NODES } from '../src/tree.js';
+import { BUILD } from '../src/config.js';
 
 const require = createRequire(import.meta.url);
-import { checkServed } from './served.mjs';
+import { checkServed, requireSameTree } from './served.mjs';
 const { chromium } = require('playwright');
 
 const argv = process.argv.slice(2);
@@ -50,8 +51,15 @@ const URL = flag('url', 'http://127.0.0.1:8099/index.html');
 // silently read the live tree twice. The heading names the served BUILD
 // every run and `--expect NNN` refuses a mismatch, because printing is not
 // guarding. Called before the browser launches, so `abort` is a plain exit.
-const { abort: wrongTree } = await checkServed(URL, flag('expect', null), 'contact.mjs');
+const { abort: wrongTree, served } = await checkServed(URL, flag('expect', null), 'contact.mjs');
 if (wrongTree) process.exit(1);
+// ...and this probe imports its constants from ../src/, so it may only be
+// aimed at a tree that IS this checkout -- otherwise the prices and the wave
+// roster are mine and only the game is theirs. `served.mjs` has the finding.
+{
+  const { abort } = requireSameTree(served, BUILD, 'contact.mjs');
+  if (abort) process.exit(1);
+}
 
 /** Where a node hangs, as a path of names. '' for the roots. */
 const branchOf = (n) => {
@@ -297,7 +305,7 @@ tree calls arms and charges.</p>
 
 /* --------------------------------- go ---------------------------------- */
 
-const { BUILD } = await import('../src/config.js');
+// BUILD is imported statically at the top now, for the served-tree refusal.
 const rig = await renderRig();
 mkdirSync(OUT, { recursive: true });
 /*

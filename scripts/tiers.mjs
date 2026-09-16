@@ -62,11 +62,11 @@
  */
 
 import { createRequire } from 'node:module';
-import { WAVES, ENEMY_TYPES, CFG, kB, fmtBytes, fmtRate } from '../src/config.js';
+import { WAVES, ENEMY_TYPES, CFG, BUILD, kB, fmtBytes, fmtRate } from '../src/config.js';
 import { NODES, priceOf } from '../src/tree.js';
 
 const require = createRequire(import.meta.url);
-import { checkServed, requireWorld } from './served.mjs';
+import { checkServed, requireWorld, requireSameTree } from './served.mjs';
 const { chromium } = require('playwright');
 
 const args = process.argv.slice(2);
@@ -106,8 +106,15 @@ const URL = flag('url', 'http://127.0.0.1:8099/index.html');
 // silently read the live tree twice. The heading names the served BUILD
 // every run and `--expect NNN` refuses a mismatch, because printing is not
 // guarding. Called before the browser launches, so `abort` is a plain exit.
-const { abort: wrongTree } = await checkServed(URL, flag('expect', null), 'tiers.mjs');
+const { abort: wrongTree, served } = await checkServed(URL, flag('expect', null), 'tiers.mjs');
 if (wrongTree) process.exit(1);
+// ...and this probe imports its constants from ../src/, so it may only be
+// aimed at a tree that IS this checkout -- otherwise the prices and the wave
+// roster are mine and only the game is theirs. `served.mjs` has the finding.
+{
+  const { abort } = requireSameTree(served, BUILD, 'tiers.mjs');
+  if (abort) process.exit(1);
+}
 
 // ---- the money ------------------------------------------------------------
 
