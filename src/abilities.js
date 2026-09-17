@@ -1254,9 +1254,22 @@ export const ABILITIES = [
            * a fixed life all thirty-four did it on the SAME frame: thirty-four
            * rings and sixty-eight embers in one tick, and an arc of blasts
            * that appeared and was gone. Twelve per cent of life is enough that
-           * the wall of flak arrives over about a tenth of a second and reads
-           * as a wall rather than as a flicker, and it costs the un-upgraded
-           * fan nothing but a little more scatter at its far edge.
+           * what does reach expiry arrives over about a tenth of a second and
+           * reads as a volley rather than as a flicker, and it costs the
+           * un-upgraded fan nothing but a little more scatter at its far edge.
+           *
+           * NOT at the fan's far edge, though, which is what this note said
+           * until build 357 and what `upgrades.js` said in a different wrong
+           * way. A SIDE EDGE passes `impacted: true` (projectiles.js) so a
+           * pellet that leaves through one bursts THERE; the era-2 yard wall
+           * passes false and absorbs it; the top and bottom of the field pass
+           * false. And a 106-degree fan is wider than the field long before
+           * its reach: measured at 390x844 over six presses, 204 pellets, era
+           * 1 -- 109 reach expiry and 95 go off against a side wall. At era 2,
+           * 55 expire, 94 burst at a side and 55 are swallowed by the wall and
+           * do not go off at all. So about half of it goes off along the two
+           * sides whichever field it is on, and at era 2 a quarter of it is
+           * simply absorbed.
            */
           life: H.life * rand(0.88, 1),
           burst,

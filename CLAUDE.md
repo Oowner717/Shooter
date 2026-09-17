@@ -1644,9 +1644,12 @@ came from before believing the other one covers it.
   reporting them identical, and not erroring. It throws on anything but 'ok'
   or 'here' now, and asserts `world.era` actually moved.
 - **The ASSAY's rig is r 68, larger than every BASE body, so the room that
-  measures damage under-reports anything centred on a surface.** (Only a fully
-  grafted BULWARK, at 72, is bigger; the largest base body is the FRACTAL core
-  at 64.) AIRBURST at
+  measures damage under-reports anything centred on a surface.** (The largest
+  base body is the FRACTAL core at 64 and the largest loose one is ANVIL at 56.
+  GROWN, three of them are bigger than the rig -- a SEED ring is 1.6x, so a
+  grafted ANVIL is 89.6, a VEIL 83.2 and a BULWARK 72, and `MAX_BODY_R` is
+  89.6. This parenthetical said "only a fully grafted BULWARK, at 72" until
+  build 357 and had been stale since 328.) AIRBURST at
   58 measured x1.5 to x1.9 in the field and 1140 -> 1170 in the bench, which is
   zero inside the noise: a player buys the node, takes it to the room whose
   whole job is telling them what a source is worth, and the room says nothing
@@ -10342,3 +10345,122 @@ came from before believing the other one covers it.
   arm given creep's gross-up delivers 23.0 and 33.0 and prints COMPENSATED;
   `straight` out of `OWN_SPEED` reads a spread of 1.579 and a loiter/direct of
   1.579; and the director left stubbed fails `putBack`.
+- **BUILD 357 SWEEPS `audit-266-open.md`'S TEN PROSE CLAIMS, AND THE RATIO IS
+  THE FINDING: EIGHT HAD ALREADY BEEN FIXED BY A LATER BUILD, TWO WERE LIVE,
+  AND THE SWEEP TURNED UP A THIRD FAULT THE LIST COULD NOT HAVE KNOWN.** That
+  section opens "These cost a future session real time; CLAUDE.md is read as
+  fact", which is true and is why it was worth a build -- and every one of the
+  ten was verified against the code rather than taken, because the audit's own
+  "What the review got wrong" heading says 20 of 56 findings were wrong.
+  **A list of prose faults decays about as fast as the prose does**, so the
+  cost of acting on an old one without checking is eight edits to text that is
+  already correct, and the eight that were fixed are now struck with the
+  wording that fixed them.
+- **THE TWO LIVE ONES WERE EACH IN TWO PLACES, AND ONE OF THEM CONTRADICTED
+  ITSELF FOURTEEN LINES LATER.** `CFG.hail.burst`'s docstring said the assay's
+  rig at r 68 is "larger than any body in the game" and then, in the same
+  paragraph, named "a fully grafted BULWARK at 72" as the ceiling 74 was sized
+  to clear. Both sentences were shipped, adjacent, and one refutes the other --
+  build 355's rule verbatim ("check a docstring's sentences against each other,
+  not only against the code"), on a paragraph a reader goes to in order to
+  learn why a blast radius is the number it is.
+- **AND THE OTHER ONE WAS WRONG IN THREE PLACES IN TWO DIFFERENT WAYS, ONE OF
+  THEM THE SITE I HAD JUST CITED AS HOLDING THE ANSWER.** "A wall of flak at
+  the fan's far edge, about 640 units out" is what `abilities.js` and
+  `docs/newform.md` said; `upgrades.js` said "most of the fan exits sideways
+  and never bursts", which I took as the corrected version and which is wrong
+  on its second half. Read out of `projectiles.js` rather than reasoned about:
+  **a SIDE EDGE passes `impacted: true`**, so a pellet that leaves through one
+  BURSTS THERE, and the three endings that are exempt are the top of the field,
+  the bottom, and the era-2 yard wall. The only correct statement of the
+  mechanism anywhere was the audit's own parenthetical.
+  Measured at 390x844 over six presses, 204 pellets, classified on each
+  pellet's last state with a band one frame's travel wide (a narrower one put a
+  quarter of them in an `other` bucket, because a pellet moves up to 32 units a
+  frame at era 2): **era 1, 109 reach expiry and 95 go off against a side wall;
+  era 2, 55 expire, 94 burst at a side and 55 are swallowed by the wall and do
+  not go off at all.** So about half the fan bursts along the two sides on
+  either field -- the arithmetic for why it is half on BOTH is that the reach
+  and the field width both scale by `CFG.scale` -- and at era 2, which is the
+  only field band 5 is played on, a quarter of it is absorbed.
+  **A sibling site that disagrees with the one you are fixing is not
+  automatically the right one**, and the cheap test is the same either way:
+  read the five `endProjectile` call sites, not the three paragraphs about
+  them.
+- **THE THIRD FAULT IS A NUMBER WHOSE JUSTIFICATION WENT STALE IN SILENCE, AND
+  IT IS BUILD 329'S BROADPHASE CELL ARRIVING ON A BLAST RADIUS.**
+  `hail.burst.r` is 74 because 74 was "the smallest number that clears
+  everything it must be able to hurt: the rig at 68, the FRACTAL core at 64 and
+  a fully grafted BULWARK at 72". Build 328 gave ANVIL r 56, and a SEED ring is
+  `1 + rides.grow * graft.stack` = 1.6x -- so `MAX_BODY_R` is **89.6**, a
+  grafted VEIL is 83.2, and the ceiling the argument names is no longer the
+  ceiling. Read off the module rather than counted by hand: the largest BASE
+  radius is FRACTAL's core at 64 (fixed) and ANVIL's 56 (loose), and `GRID_CELL`
+  is 180. Note it is SEED and not LATCH that grows a host (`rides.grow` 0.2
+  against 0), which bounds where this is reachable: SCION is band 4 and these
+  three are band 5, and `bandsFor` draws `[hi - 1, hi]`, so bands 4 and 5 are
+  sent together from rung 29 to the ceiling at 49.
+- **AND I WROTE THAT BOUND AS "RUNGS 29-35 AND NOWHERE ELSE" FIRST, IN THE
+  BUILD WHOSE SUBJECT IS STALE PROSE.** `perBand` is 7 against a `ceiling` of
+  49, so the five authored bands cover rungs 1-35 and rungs 36-49 still draw
+  bands 4-5 -- which `bandsFor`'s own docstring says in as many words, six
+  lines from the return. It cost a suite run to fix, because the wrong sentence
+  was in a served file and build 356's rule is that a `src/` edit during a run
+  makes the validated tree not the shipped one. **The habit that catches this
+  is the one this build is made of: read the function, do not reason about the
+  table it indexes** -- and a band range is exactly the kind of derived fact
+  that reads as obvious and is off by fourteen rungs.
+- **LEFT AT 74, AND THE HALF THAT IS NOT ARITHMETIC IS MEASURED.** Ten presses
+  on a pinned witness, delivered health, burst on against burst off: a clean
+  ANVIL (r 56, the largest loose base body, which did not exist when the radius
+  was chosen) reads **x1.30 to x1.37 over three runs** and a BULWARK **x1.403
+  in all three** -- so the node works on everything the field sends ungrown.
+  The ANVIL figure moved and the BULWARK one did not because the BULWARK arm is
+  always the FIRST run after the page loads and the ANVIL arm's position in the
+  sequence changed between probe versions, which is a reminder that a fan of
+  thirty-four jittered pellets is a draw and one row of a table is one draw. Raising the radius would be a balance
+  change rather than a correction, because a blast is quadratic in what it
+  gives -- BLAST's and KNELL's radii were answered in three builds running
+  (223 capped DEEP CHARGE's levels, 227 took 30% off both base radii, 230 took
+  the other two terms) for exactly that reason. So the decision is recorded at
+  the site with the arithmetic, which is build 304's rule.
+- **AND THE GROWN CASE DID NOT SETTLE IN THREE INSTRUMENTS, AND WHAT THE THIRD
+  ONE WAS DOING IS THE PART WORTH KEEPING.** (1) Spawn, graft, set 400k health,
+  ten presses, read `hp0 - hp`: every grafted row came back with the body DEAD,
+  `took` equal to the whole pool and `r` back at BASE, because `refreshGrafts`
+  recomputes the host's health from the ring and overwrote the assignment.
+  (2) Per-frame delivered health with the host healed after each read (build
+  350's rule): the body survives and `r` is STILL base. (3) Topping the balls
+  up as well, by `b.hp = b.maxHp` and `b.dead = false`: no change.
+  **`e.grafts` holds ball RECORDS and not bodies** --
+  `{a, alive, hp, maxHp, from, grow, tough, armor, regen}` -- so `dead` is a
+  field with no reader and the flag that decides everything is `alive`, which
+  `refreshGrafts` tests on its first line and which nothing but the ball's own
+  death writes. So the heal wrote a real field and a dead one in the same
+  statement, and the probe's own `live` column was
+  `grafts.filter((b) => !b.dead)` -- **a filter on a property the record does
+  not have, which is `filter(() => true)`** and read 3 on every row whatever
+  was aboard. Three readings, one unmeasured count, and my three-instrument
+  narrative was three versions of the same missing field.
+  Traced separately, a graft does grow a BULWARK 45 -> 72 and holds it for
+  sixty frames, so the mechanism is fine and all three readings were the probe.
+  **The weapon under test strips the thing the measurement is about**, so a
+  probe that holds the ring up by hand is measuring a state the press destroys
+  -- and the honest record is that the question is open, not a figure from a
+  scenario that did not happen.
+- **A PROBE'S OWN FIELDS ARE UNGUARDED, WHICH IS WHERE EVERY DEAD-FIELD RULE IN
+  THIS FILE DOES NOT REACH.** `check-build`'s sweep walks keys `ENEMY_TYPES`
+  declares (build 313) and the ghost Proxy covers `world` and `world.up`
+  (build 338); a scratch probe is outside both, and `b.dead` on a plain record
+  is the same silent `undefined` read as `this.type.gait` was for 43 types.
+  The cheap habit is the one this build is made of: before filtering on a
+  field, read the object that has it.
+- **Nothing executable changed, so the suite is the regression guard and not
+  the instrument.** Comment and document edits in `src/config.js`,
+  `src/abilities.js`, `CLAUDE.md`, `docs/newform.md` and
+  `docs/audit-266-open.md`, and no executable line anywhere. What is left open in that document is its three
+  guard holes -- 6 (the AIRBURST field arm's only witness is a LURCHER, so it
+  cannot see the radius regression it narrates), 8 (the pad arm never renders
+  `drawGuns`, which sleeps behind `CFG.gun.inPlay` and wants checking before it
+  is believed either way) and 9 (`#sbEras` has no case and is 10px against an
+  11px floor). 9 is the one with a player-visible half.

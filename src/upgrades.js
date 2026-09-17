@@ -708,12 +708,17 @@ export const UPGRADES = {
      *
      * And a pellet that hits nothing but RUNS OUT goes off too:
      * `endProjectile` bursts on expiry as well as on impact, which is the door
-     * HE already goes through. Only leaving the FIELD is exempt (`impacted`
-     * false) -- and a 106-degree fan is wider than the field long before it is
-     * 640 units out, so on the screens this game runs most of the fan exits
-     * sideways and never bursts. What reaches expiry is the near-vertical part
-     * of it. The lives are jittered so that much arrives over a tenth of a
-     * second rather than in one frame.
+     * HE already goes through. What is exempt is the TOP and BOTTOM of the
+     * field and the era-2 yard wall, all three of which pass `impacted: false`
+     * -- a SIDE EDGE passes true, so a pellet that leaves through one bursts
+     * there. This paragraph said "exits sideways and never bursts" until build
+     * 357 and that is the wrong half of the mechanism. A 106-degree fan is
+     * wider than the field long before its reach, so measured at 390x844 over
+     * six presses (204 pellets): era 1, 109 reach expiry and 95 go off against
+     * a side wall; era 2, 55 expire, 94 burst at a side and 55 are absorbed by
+     * the wall. About half of it goes off along the two sides on either field.
+     * The lives are jittered so what does reach expiry arrives over a tenth of
+     * a second rather than in one frame.
      */
     { id: 'airburst', name: 'AIRBURST', levels: 1,
       line: 'HAIL\'s pellets go off where they land.',

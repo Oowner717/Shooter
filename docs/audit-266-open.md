@@ -39,7 +39,7 @@ file:line so the next reader can see what was claimed against what was found.
   world.
 - `exitSandbox`, the works pill and the purchase flare, all as described below.
 
-## Open — ships-broken
+## Closed — ships-broken (1 struck, 2 fixed in 268)
 
 1. ~~**`exitSandbox` hardcodes `ledger.select(1)` / `soak.select(1)`**, so after an
    ERA II session the menu's LAST SESSION and LIFETIME rows show era 1's — or
@@ -51,7 +51,7 @@ file:line so the next reader can see what was claimed against what was found.
    `styles.css:4487-4490`, `src/sandbox.js:185`. **Not confirmed by screenshot**
    **FIXED 268**, and it was serious: see above.
 
-## Open — wrong but hidden
+## Closed — wrong but hidden (3, 4 fixed in 268; 5 measured and refused in 350)
 
 3. ~~**Every aim press inside a works lot raises a pill, for ever.** The refusal
    uses `hud.alert`, not `sayOnce`, and `pressLot` runs on every canvas
@@ -84,7 +84,7 @@ file:line so the next reader can see what was claimed against what was found.
    fits half of what the governor leaves (85–93 against 139.5). The floor is
    driven through `Game.trackFrame` rather than written down.
 
-## Open — guard holes in the suite
+## Open — guard holes in the suite (6, 8, 9 live; 7 and 10 fixed in 351)
 
 6. **The AIRBURST case's only witness is a LURCHER (r 24)**, so it cannot see
    the radius regression it narrates. 267 added an ASSAY-rig arm, which covers
@@ -109,36 +109,79 @@ file:line so the next reader can see what was claimed against what was found.
     answer: it is measurably NOT colour-blind, and the arm's `> 60` threshold
     turned out to sit inside its own confound. See phase 4.
 
-## Open — false claims in prose
+## Closed — false claims in prose (swept in build 357)
 
 These cost a future session real time; CLAUDE.md is read as fact.
 
-- The SCALED note above `hail.burst.r` says `hail.speed` and `bolt.speed` are
+**All ten verified at build 357, one at a time, against the code rather than
+against this list. EIGHT had already been fixed by a later build and TWO were
+live** -- and the sweep turned up a third fault this list could not have known,
+because it arrived after the audit: build 328's ANVIL took `MAX_BODY_R` to
+89.6, so every claim that the largest grown body is a fully grafted BULWARK at
+72 went stale, including `hail.burst.r`'s own sizing argument. The ratio is the
+thing worth carrying: a list of prose faults decays about as fast as the prose
+does, so **verify each one before spending a session on it.**
+
+- ~~The SCALED note above `hail.burst.r` says `hail.speed` and `bolt.speed` are
   unscaled. `fire()` scales every round's speed by `CFG.scale`
-  (`src/projectiles.js:892`).
-- The HAIL cast is itemised at 31 sparks against PULSE's 40; a press actually
+  (`src/projectiles.js:892`).~~ **ALREADY FIXED** -- the note now gives the
+  mechanism (a speed in the table would be scaled twice) and records in as many
+  words that "an earlier version of this note said `bolt.speed` was unscaled
+  for the same reason and was simply wrong about the mechanism".
+- ~~The HAIL cast is itemised at 31 sparks against PULSE's 40; a press actually
   spawns ~65, and the 34 omitted are the pellets' own muzzle sparks, spawned
-  FIRST — so under budget pressure the authored wedge is what gets dropped.
-- "the assay's rig is r 68 — larger than any body in the game" is false: a
-  fully grafted BULWARK is 72. (The 267 radius of 74 still clears both.)
-- "A wall of flak at the fan's far edge, about 640 units out" is not what
-  happens on the screens the game is tuned for — pellets meet the side edges
-  (`impacted: true`) and the era-2 wall (`impacted: false`) first.
-- CLAUDE.md: "`regress.mjs` pins the name in all THREE places it is written" —
+  FIRST — so under budget pressure the authored wedge is what gets dropped.~~
+  **ALREADY FIXED**, and thoroughly: the itemised row is now labelled "the CAST
+  only", the measured 66 is beside it, and the drop order is stated -- "the
+  pellets go first, so under budget pressure it is the authored wedge that gets
+  dropped and the accident that survives".
+- **LIVE, FIXED 357.** "the assay's rig is r 68 — larger than any body in the
+  game" is false: a fully grafted BULWARK is 72. (The 267 radius of 74 still
+  clears both.) It was in TWO places (`src/config.js`'s AIRBURST docstring and
+  `docs/newform.md`), and `config.js` **contradicted itself fourteen lines
+  later**, where the same paragraph names "a fully grafted BULWARK at 72" as
+  the ceiling 74 was sized to clear. Both now read "larger than every BASE
+  body". And the audit's own correction is stale: `MAX_BODY_R` is **89.6**, so
+  74 clears neither a grafted ANVIL (89.6), a grafted VEIL (83.2) nor a grafted
+  BULWARK (72 against a surface at 75). Left at 74 with the reason and the
+  measurement recorded at the site.
+- **LIVE, FIXED 357.** "A wall of flak at the fan's far edge, about 640 units
+  out" is not what happens on the screens the game is tuned for — pellets meet
+  the side edges (`impacted: true`) and the era-2 wall (`impacted: false`)
+  first. **This parenthetical was the only correct statement of the mechanism
+  anywhere in the tree.** Two of the three sites said "a wall of flak at the
+  fan's far edge" (`src/abilities.js`, `docs/newform.md`) and the third
+  (`src/upgrades.js`) said "most of the fan exits sideways and never bursts",
+  which is wrong on its second half -- a side edge passes `impacted: true` and
+  bursts. All three now carry the measurement: at 390x844 over six presses,
+  204 pellets, era 1 has 109 reaching expiry and 95 bursting against a side
+  wall; era 2 has 55 expire, 94 burst at a side and 55 absorbed by the wall.
+- ~~CLAUDE.md: "`regress.mjs` pins the name in all THREE places it is written" —
   the room's name appears in seven user-visible places; three are pinned.
-  Unpinned: `src/menu.js:374, 385, 437`, `index.html:281`.
-- `setZoom`'s inner comment still says "both bench doors carry the era across by
-  hand" — the mechanism build 262 deleted from that very function.
-- CLAUDE.md states the ASSAY "is entered on the era you are standing in" as an
+  Unpinned: `src/menu.js:374, 385, 437`, `index.html:281`.~~ **ALREADY FIXED**
+  -- it reads "all THREE places it is written FROM A CONSTANT" and names the
+  four that nothing pins, with the instruction to sweep for the string on a
+  fifth rename.
+- ~~`setZoom`'s inner comment still says "both bench doors carry the era across by
+  hand" — the mechanism build 262 deleted from that very function.~~
+  **ALREADY FIXED** -- the phrase is gone from `src/`.
+- ~~CLAUDE.md states the ASSAY "is entered on the era you are standing in" as an
   absolute rule and never records build 264's door picker (which keeps that as
-  the default) or build 266's NEW FORM gate.
-- `docs/newform.md` build 263: "At 58 it clears every body in the game but a
-  BULWARK" — FRACTAL's core is r 64.
-- The AIRBURST node's docstring still quotes the r-58 / damage-11 measurements
-  that build 265 replaced.
-- CLAUDE.md gives HAIL's reverted reach ring as "334 units, the fan's own
+  the default) or build 266's NEW FORM gate.~~ **ALREADY FIXED** -- it reads
+  "by DEFAULT" and the same paragraph records 264's picker, 266's `eraShut` and
+  268's positioning of the room's own row.
+- ~~`docs/newform.md` build 263: "At 58 it clears every body in the game but a
+  BULWARK" — FRACTAL's core is r 64.~~ **ALREADY FIXED** -- the same sentence
+  continues "which was wrong, and build 265 corrected it". Build 357 marked
+  that correction's own figures as build 265's, for the 89.6 above.
+- ~~The AIRBURST node's docstring still quotes the r-58 / damage-11 measurements
+  that build 265 replaced.~~ **ALREADY FIXED** -- it quotes build 265's radius
+  of 74 and keeps 58 as history, in a parenthetical naming it as history.
+- ~~CLAUDE.md gives HAIL's reverted reach ring as "334 units, the fan's own
   `speed * life`" — that formula gives 608–769. `docs/newform.md` states it
-  correctly as `speed * life * 0.55`.
+  correctly as `speed * life * 0.55`.~~ **ALREADY FIXED** -- both sites now
+  give `speed * life * 0.55` and CLAUDE.md quotes the 608–769 as the figure the
+  other formula would have given.
 
 ## What the review got wrong
 

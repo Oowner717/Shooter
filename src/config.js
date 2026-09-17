@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '356';
+export const BUILD = '357';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '356';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '70f6543';
+export const REV = '2e593de';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -2627,9 +2627,9 @@ export const CFG = {
      * the decimal.
      *
      * 58 fixed that for ordinary bodies and left it broken in the ONE PLACE A
-     * PLAYER LOOKS. The assay's rig is r 68 -- larger than any body in the
-     * game, because it is a target and not an attacker -- so a 58-unit burst
-     * on its surface could not reach its centre either, and the room whose
+     * PLAYER LOOKS. The assay's rig is r 68 -- larger than every BASE body,
+     * because it is a target and not an attacker -- so a 58-unit burst on its
+     * surface could not reach its centre either, and the room whose
      * whole job is telling you what a source is worth reported AIRBURST as
      * worth nothing. Measured over twelve presses: 1140 without it and 1170
      * with it, which is zero inside the noise, against x1.5 to x1.9 on the
@@ -2641,6 +2641,37 @@ export const CFG = {
      * for the area, and the field is where it was -- measured at twelve
      * presses, one LURCHER x1.71 -> x1.62, three abreast x1.89 -> x2.03, a
      * BULWARK x1.36 -> x1.40, and the rig x0.98 -> x1.30.
+     *
+     * ---- and that sizing argument went stale at build 328 ----------------
+     *
+     * The ceiling it names is a fully grafted BULWARK at 72, and `MAX_BODY_R`
+     * is **89.6** from the build that gave ANVIL r 56: a SEED ring is
+     * `1 + rides.grow * graft.stack` = 1.6x, so a grafted ANVIL reaches 89.6
+     * and a grafted VEIL 83.2. Neither is inside 74, and neither existed when
+     * the radius was chosen. So the LIST above is history and the sentence
+     * above it is the rule -- the same thing that happened to the broadphase
+     * cell in the same build, and the reason `check-build` pins that one.
+     *
+     * Left at 74 deliberately, and what is measured is the part that is not
+     * arithmetic. On the biggest body the field actually sends, ten presses on
+     * a pinned witness, delivered health, burst on against burst off: a clean
+     * ANVIL (r 56) reads x1.30 to x1.37 over three runs and a BULWARK (r 45)
+     * x1.403 in all three, so the node works on everything ungrown. The GROWN
+     * case did not settle in three instruments and is NOT claimed here: a ring
+     * interacts with the weapon under test -- the press strips it, and the
+     * host's radius is back at base by the time the window closes, so a probe
+     * that holds the ring up by hand is measuring a state the press destroys.
+     * (And `e.grafts` holds ball RECORDS rather than bodies, with their own
+     * `alive` flag that `refreshGrafts` reads and nothing else writes -- so a
+     * probe topping them up by `hp` alone puts nothing back on the ring.)
+     * Raising the
+     * radius to cover it would be a balance change (a blast is quadratic in
+     * what it gives) against a body that needs a full ring, and only SEED
+     * grows a host (`rides.grow` 0.2 against LATCH's 0). SCION is band 4 and
+     * these three are band 5, and `bandsFor` draws `[hi - 1, hi]` with the
+     * authored bands ending at rung 35 -- so bands 4 and 5 are sent together
+     * from rung 29 to the ceiling at 49, which is where a grown one of them
+     * can exist. Measure it before moving the number.
      *
      * What it is FOR is still the neighbours: chip damage that spreads
      * sideways off whatever a pellet found, which a fan of thirty-four cannot

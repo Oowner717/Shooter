@@ -2378,7 +2378,10 @@ large.
 
 At 58 it clears every body in the game but a BULWARK -- which was wrong, and
 build 265 corrected it: FRACTAL's core is r 64 and a fully grafted BULWARK 72,
-so 58 cleared neither, nor the assay's own r-68 rig. What it is really for
+so 58 cleared neither, nor the assay's own r-68 rig. Those are build 265's
+figures and build 328's ANVIL moved them: `MAX_BODY_R` is 89.6 now, so 74 does
+not clear a grown body either -- see the note in `CFG.hail.burst`, which is
+where the decision to leave it there is recorded. What it is really for
 is the neighbours:
 
 | | plain | AIRBURST | |
@@ -2394,10 +2397,24 @@ next door. A share of the total would not say it.
 **And the pellets that hit nothing go off too.** `endProjectile` bursts a round
 on expiry as well as on impact — `if (p.life <= 0) endProjectile(..., true)`,
 the same door HE goes through — so an un-upgraded miss is silent and an
-upgraded one is a wall of flak at about 640 units. At a fixed `life` all
-thirty-four did it on the same frame: thirty-four rings and sixty-eight embers
-in one tick, gone before it read as anything. The pellet lives are jittered 12%
-so it arrives over a tenth of a second.
+upgraded one bursts at about 640 units. At a fixed `life` all thirty-four did
+it on the same frame: thirty-four rings and sixty-eight embers in one tick,
+gone before it read as anything. The pellet lives are jittered 12% so it
+arrives over a tenth of a second.
+
+This page called that "a wall of flak" until build 357 and it is not one on the
+screens the game is tuned for. A **side edge** passes `impacted: true`, so a
+pellet that leaves through one bursts there; the era-2 yard wall and the top and
+bottom of the field pass false. A 106-degree fan is wider than the field long
+before its reach, so measured at 390x844 over six presses (204 pellets):
+
+| | reach expiry | burst at a side | absorbed by the wall |
+|---|---|---|---|
+| era 1 | 109 | 95 | — |
+| era 2 | 55 | 94 | 55 |
+
+About half of it goes off along the two side walls on either field, and at
+era 2 a quarter of it does not go off at all.
 
 ### The emplacements
 
@@ -2525,8 +2542,10 @@ reading rather than by playing.
 the *surface* of whatever the pellet found — so a blast of radius R reaches
 that body's own centre only if R exceeds its radius. Build 263 found that at
 34 and raised it to 58, which fixed every ordinary body and left it broken
-where it matters most: **the assay's rig is r 68**, larger than any body in the
-game because it is a target and not an attacker.
+where it matters most: **the assay's rig is r 68**, larger than every BASE
+body because it is a target and not an attacker. (It said "larger than any
+body in the game" until build 357. A fully grafted BULWARK is 72 and, since
+ANVIL arrived at build 328, `MAX_BODY_R` is 89.6.)
 
 Measured over twelve presses, in the room:
 
