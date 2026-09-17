@@ -17,22 +17,58 @@
  *
  * ---- what it does, and the three places it could lie ----
  *
- * THE MONEY is not measured, it is asserted. `--spend` follows plan C's
- * earned-by-tier targets, interpolated between the anchors the plan names and
+ * THE MONEY is MEASURED from build 362 and was asserted before it. `--spend`
+ * follows the earned-by-rung curve below, interpolated between anchors and
  * capped at what the whole tree costs, because nobody can spend more than
- * that. So this prices the loadout at what the economy is *meant* to hand
- * over, not at what it does -- which is the point: B and C are being tuned
- * against each other and one of them has to be the fixed end.
+ * that; what changed is where the anchors come from. They were plan C's
+ * targets -- what the economy was *meant* to hand over -- on the argument
+ * that B and C were being tuned against each other and one of them had to be
+ * the fixed end. That argument was sound and its cost was that nothing ever
+ * checked the fixed end.
  *
- * **Those targets are known to be about four times too rich.** A stock turret
- * on the assists banks 4,417 in fifteen minutes and settles at tier 7-8; the
- * curve assumes 15,000 by tier 8. So every loadout in the table below is
- * richer than a real run affords, and every TTK is correspondingly optimistic
- * -- the wall is nearer than this says, not further. The `pay/s` column does
- * not rescue it: that measures one heavy wave in isolation with the floor
- * counted as collected, which is roughly eight times a run's real income, and
- * using it to bless the curve is exactly the mistake build 180 made and had to
- * unpick. Fix the curve by driving a measured one in through `--spend`.
+ * **Those targets were 23x too rich at rung 7 and are MEASURED from build
+ * 362.** `scripts/income.mjs` is the probe this paragraph asked for -- "fix
+ * the curve by driving a measured one in" -- and what it found is that the
+ * plan's own income model was close and this instrument was not. Measured
+ * against `docs/rebalance.html`'s model at the seven gate rungs: **500 kB /
+ * 1.89 MB / 5.46 MB / 9.05 MB / 40.6 MB / 95.8 MB** banked by rungs 7 / 14 /
+ * 21 / 28 / 35 / 42, against a modelled 441 kB / 1.81 / 5.67 / 15.20 / 32.47
+ * / 80.10 -- within a factor of 1.25 at six of the six, and the one that is
+ * not (rung 28, 0.60x) is low rather than high. Two methods that share no
+ * arithmetic agreeing to a quarter is the corroboration; the anchors this
+ * probe asserted said **15 MB by rung 8**, and their tail reached **2.02 GB
+ * by rung 28**.
+ *
+ * What that cost is not a subtle bias. `spendAt` clamps at `TREE_TOTAL`, so
+ * the asserted curve bought the WHOLE TREE from about rung 17 of 49 -- every
+ * row past 17 measured a fully bought turret whatever the prices were, which
+ * is what build 303's phase-4 note means when it says this probe cannot see
+ * that phase past rung 17, recorded there as a limitation rather than traced
+ * to its cause.
+ *
+ * The old figure in this paragraph was wrong twice over and both are worth
+ * knowing. "About four times" was taken against the 15,000-by-tier-8 anchor
+ * in POINTS, before build 284 made the game count in bytes and before 303
+ * re-priced the tree. And "a stock turret banks 4,417 in fifteen minutes and
+ * settles at tier 7-8" is 4.9 kB/s against a measured 3.3-3.6 kB/s at rungs
+ * 1-7 -- the same order, which is this instrument agreeing with a
+ * seventeen-build-old reading it was written to replace, and the settling
+ * rung is reproduced exactly: funded with NOTHING, income.mjs's first pass
+ * cannot climb past rung 15 and says so in its own message.
+ *
+ * What the measured curve rests on, stated because the anchors below are only
+ * as good as it. ONE 240-second window a rung a pass, three passes: rungs 7,
+ * 14 and 21 are SETTLED -- spanning 1.25x, 1.19x and 1.01x across the passes
+ * that REACHED them, which is three, three and two: pass 1 funds nothing and
+ * its curve stops at rung 15, so it has no figure above that at all -- and
+ * **28 and up are soft** -- a deep window holds two to five scored waves, and
+ * the rate at rungs 42 and 49 drew 3.94, 8.66, 2.70 and 317 kB/s across the
+ * passes, because what a 240-second window at the top of the ladder contains
+ * is a draw. The INTEGRAL is a model even though both its terms are measured
+ * (rate x dwell, interpolated between eight samples), and the glitch
+ * discharge is counted and NOT modelled, so the dwell is a floor. Pooling the
+ * windows is the next thing this curve wants; `--window` and `--iters` are
+ * how, and the deep rungs are where it would pay.
  *
  * THE LOADOUT is the damage line and nothing else: the purchases a player
  * makes if all they want is to kill the thing in front of them, in a fixed
@@ -131,18 +167,38 @@ const TREE_TOTAL = NODES
   }, 0);
 
 /*
- * docs/pacing.md's earned-by-tier targets, as anchors to interpolate between.
+ * The earned-by-rung curve, MEASURED -- `scripts/income.mjs`, build 362.
  *
- * In BYTES from build 284, which is what the tree is priced in -- the doc
- * records them as points and one point is one kilobyte. Left in points the
- * budget at tier 12 would have been 40,000 B against a cheapest node of
- * 500,000, the buy loop would break on the first `poor` at every tier, and
- * the probe would measure a BARE turret in all twenty rows while exiting 0
- * and printing a plausible table.
+ * Anchors to interpolate between, in bytes, taken with the rung pinned and
+ * the era derived from it, and integrated from two measured terms: what a
+ * rung banks a second off `world.earned`, and how many seconds a rung takes
+ * (the verdict mix, surge +2 / clean +1 / stall 0, over the wave plus its
+ * measured seam). Iterated to a fixed point from BELOW -- the first pass
+ * funds every rung with nothing -- so the curve owes nothing to the asserted
+ * one it replaces. The long note at the top of this file says what it rests
+ * on and where it is a model rather than a measurement; read that before
+ * moving these.
+ *
+ * `check-build.mjs` pins the economy terms the curve is a function of and
+ * fails the build when one of them moves, because a measured constant
+ * describes the day it was taken on and this one is what every affordability
+ * claim in the repo reads through. Re-measure and move the pin together.
  */
-const EARNED = [[0, 0], [2, kB(1000)], [5, kB(5000)], [8, kB(15000)], [12, kB(40000)]];
-/** Past the last anchor, the 8->12 growth carries on: (40/15)^(1/4) a tier. */
-const TAIL = (40000 / 15000) ** 0.25; // a ratio, so it does not move
+const EARNED = [[1, 0], [7, 500014], [14, 1886309], [21, 5456475], [28, 9054201], [35, 40585659], [42, 95804879]];
+/*
+ * Past the last anchor, the growth of the last measured pair carries on.
+ *
+ * DERIVED rather than written down: it was `(40/15) ** 0.25`, a ratio between
+ * two anchors of the asserted curve, and it reached 2.02 GB by rung 28
+ * against a modelled 15.20 MB -- so far past `TREE_TOTAL` that every row past
+ * about rung 17 was measuring a fully bought turret whatever the prices said.
+ * A tail taken off the measured curve's own last pair cannot do that.
+ */
+const TAIL = (() => {
+  const [r0, e0] = EARNED[EARNED.length - 2];
+  const [r1, e1] = EARNED[EARNED.length - 1];
+  return (e1 / e0) ** (1 / (r1 - r0));
+})();
 
 function spendAt(tier) {
   if (FIXED !== null) return FIXED;

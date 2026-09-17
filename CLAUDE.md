@@ -353,6 +353,24 @@ part paints half a line width outside its own geometry (5% fully rigged, 19%
 bare); and the barrel is a rounded rect laid along the aim from `R * 0.16`, so
 its reach is the far CORNER, not the axial tip.
 
+`node scripts/income.mjs [--window 240] [--iters 3] [--rungs 1,7,14,...]` is
+the newest, and it answers a question none of the others can: **what a run has
+BANKED by the rung it meets each slot on.** Every affordability claim in this
+repo reads through `tiers.mjs`'s EARNED anchors, and until build 362 those were
+ASSERTED -- that probe's own header READ "THE MONEY is not measured, it is
+asserted... Fix the curve by driving a measured one in" for seventeen builds,
+and this is that measured one (the paragraph says so in the present tense now,
+which is the other half of the change). Per sampled rung it pins the rung, derives the era from
+`eraGate`, funds the turret with the pass's own figure through `tiers.mjs`'s
+purchase policy, and drives a synthetic window: bytes a second off
+`world.earned` (never the purse, which falls on every purchase), and the
+seconds a rung takes from the verdict mix over the wave plus its measured seam.
+Earned-by-rung is the integral of the two, and the whole curve is iterated to a
+fixed point from BELOW, so the first pass owes nothing to the curve it
+replaces. Thirteen minutes for three passes over eight rungs. Its findings, the
+faults it had first, and what phase 7b still owes are at the foot of this file
+under build 362.
+
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
 builds), the trigger itself, every round/mine/ability/object type running once
@@ -11012,3 +11030,158 @@ came from before believing the other one covers it.
   fight, by inspection. Build 329's rule is that inspection is exactly what
   this repo does not accept: an unchanged hash is what "a reorder on the blast
   path reached nothing already using it" looks like measured.
+
+- **BUILD 362 MEASURES THE INCOME CURVE, AND THE HEADLINE IS THAT THE PLAN'S
+  OWN MODEL WAS CLOSE AND THE INSTRUMENT WAS 23x OUT.** Phase 7b of
+  `docs/rebalance.html` asks for seven boss numbers "measured against the
+  turret each slot actually meets", and build 353's 7a recorded that it "now
+  also owes an income model" for exactly that phrase -- because what turret a
+  slot is met with is a question about what the run has BANKED by that rung,
+  and every affordability figure in this repo traces back to five anchors in
+  `tiers.mjs` that were ASSERTED. That probe's own header has said so for
+  seventeen builds, in as many words: "THE MONEY is not measured, it is
+  asserted... Fix the curve by driving a measured one in through `--spend`."
+  `scripts/income.mjs` is that measured one.
+  Measured at the gate rungs, against the plan's own model and against the
+  anchors being replaced:
+
+  | by rung | measured | the plan model | ratio | tiers.mjs asserted |
+  |---|---|---|---|---|
+  | 7 | **500 kB** | 441 kB | 1.13 | 15 MB by rung 8 |
+  | 14 | **1.89 MB** | 1.81 MB | 1.04 | (tail) |
+  | 21 | **5.46 MB** | 5.67 MB | 0.96 | (tail) |
+  | 28 | **9.05 MB** | 15.20 MB | 0.60 | 2.02 GB |
+  | 35 | **40.6 MB** | 32.47 MB | 1.25 | -- |
+  | 42 | **95.8 MB** | 80.10 MB | 1.20 | -- |
+
+  Six of six inside a factor of 1.25 of a model computed in a document by a
+  method that shares no arithmetic with this one -- and the one furthest out
+  is LOW rather than high. That agreement is the corroboration worth having;
+  the asserted curve is out by 23x at rung 7 and its tail reaches two
+  GIGABYTES by rung 28.
+  What that cost is not a subtle bias: `spendAt` clamps at `TREE_TOTAL`, so
+  **every row past about rung 17 of 49 was measuring a FULLY BOUGHT turret
+  whatever the prices were** -- which is what build 303's own note means when
+  it says `tiers.mjs` cannot see that phase past rung 17, stated there as a
+  limitation rather than traced to its cause.
+- **AND THE CURVE IS APPROACHED FROM BELOW, WHICH IS WHAT MAKES IT A
+  MEASUREMENT RATHER THAN A CALIBRATION.** Income depends on the turret and
+  the turret depends on income, so the probe iterates: pass 1 funds every rung
+  with NOTHING, pass 2 funds each rung with pass 1's answer, and so on. The
+  first pass therefore owes nothing to the curve it replaces -- which matters,
+  because seeding from the asserted curve would have handed every rung a fully
+  bought turret and measured the income of a run that cannot exist. Each pass
+  reaches further up the ladder than the last (rung 15, then 36, then 43), because what
+  stops a curve is a rung whose window scored no climb at all: the dwell there
+  is unbounded and nothing above it is reachable, which the probe says in
+  those words rather than dividing by zero.
+  **And the first pass reproduces `tiers.mjs`'s own recorded figure**, which is
+  the instrument agreeing with a seventeen-build-old measurement it was
+  written to replace: that header says a stock turret "banks 4,417 in fifteen
+  minutes and settles at tier 7-8" -- 4.9 kB/s against a measured 3.3 at rung 1
+  and 3.6 at rung 7, and a first pass that cannot climb past rung 15.
+- **THE TWO TERMS ARE MEASURED AND THE INTEGRAL IS A MODEL, AND THE
+  DISTINCTION IS WORTH KEEPING.** Earned-by-rung is the sum below it of RATE x
+  DWELL. Rate is bytes a second off `world.earned` -- lifetime banked, the one
+  thing `bank()` feeds, and NOT the purse, which falls on every purchase
+  (`ladder-probe.mjs`'s own `energyPerSec` is a purse delta, correct there only
+  because its three profiles buy nothing after setup). Dwell is (wave + seam) /
+  rungs-a-wave, where rungs-a-wave comes from the verdict mix `score()` itself
+  uses -- surge +2, clean +1, stall 0. Both are readings; the integration
+  between eight sampled rungs is interpolation, and the glitch discharge is
+  counted and deliberately NOT modelled, so the dwell is a floor.
+- **THE SEAM IS THE RELEASE GATE AND THE CONFIG CANNOT SEE IT.** The first
+  version read the rest off `CFG.waves.rest` (0.4-1.1s, plus `restPer` a body
+  capped at `restCap`, so 2.5s at worst). Measured, the gap between one wave
+  ending and the next beginning is **1.8s at rung 1 and 6.4 to 14.8s from rung
+  28 up** -- because build 291's gate holds the next release until the field is
+  as thin as the last wave was required to leave it, and against a gun that
+  cannot clear that is the dominant term of the dwell. A term read off the
+  config would have understated a rung's cost by an order of magnitude exactly
+  where the ladder is slowest.
+- **A WINDOW THAT OPENS MID-WAVE CHARGES ITS SECONDS TO NOTHING.** The first
+  version opened wherever the warm-up left it, so the wave already running was
+  never recorded -- and at rung 21, where a bare gun holds the field at the cap
+  and the gate then keeps the next wave back, it saw ONE boundary in 150
+  seconds and reported **zero scored waves** with a rate of 1.36 kB/s beside
+  it. The window opens on the frame a wave BEGINS now, so every second it
+  spends is charged to a wave or to a seam. Same family as the end-of-window
+  trap, at the other end of the window.
+- **THE MEASURED CURVE IS PINNED, BECAUSE A MEASUREMENT DESCRIBES THE DAY IT
+  WAS TAKEN ON.** An asserted constant is wrong from the start and stays
+  wrong; a measured one is right and then goes stale in silence -- build 300
+  moved four slopes at once, 303 re-priced the whole tree, 305 moved the era
+  hold, and any one of them makes this curve a table about a game that is no
+  longer running while every affordability reading downstream keeps exiting 0.
+  That is build 329's broadphase cell exactly, and the answer is the same:
+  `check-build.mjs` digests the 25 economy terms the curve is a function of --
+  what a body pays, what the rung multiplies it by, how many arrive, what the
+  intake keeps, when a wave ends, the verdict windows, and the tree's own
+  total -- and fails the build naming the digest when one moves, with the
+  command to re-measure. Two further arms, because a pin alone is not enough:
+  every term is asserted to resolve to a NUMBER before it is hashed (a renamed
+  CFG path reads `undefined`, hashes stably, and leaves a pin that can never
+  fire again, which is build 328's `SCALED` fault verbatim), and `tiers.mjs`
+  must NAME `income.mjs`, so a hand-edit that puts an asserted curve back is
+  caught rather than pinned.
+- **THE PLAN'S MODEL HAS SEVEN BANDS AND THE GAME HAS FIVE, so the comparison
+  above is only honest to rung 35.** `perBand` is 7 against a `ceiling` of 49,
+  so the authored bands cover rungs 1-35 and rungs 36-49 replay bands 4-5 --
+  build 332 recorded that, and `docs/rebalance.html`'s income model still
+  carries bands 6 and 7 at 45.36 and 90.00 kB/s off rosters worth 10,800 and
+  18,000 a body. Those rows describe bodies the game does not send. Measured
+  at rung 42 a funded run banks **3.94 kB/s**, not 45, and the probe's curve
+  stops below it because no wave there scored a climb at all.
+- **AND THE DWELL IS WHAT INCOME BUYS, WHICH THE RATE COLUMN HIDES.** A rung
+  takes 10.3 to 15.8 seconds at rung 7 and the SAME rung 28 took **180.6
+  seconds funded with 1.91 MB and 35.7 funded with 21.9 MB** -- so the second
+  thing a purse buys is time, and a rate read on its own says the economy is
+  most generous exactly where the ladder has stalled (rung 28 banked 20.6
+  kB/s while standing there for three minutes a rung, against 4.49 kB/s once
+  it could climb). That is why the curve needs both terms, and it is why the
+  fixed point has to be iterated rather than measured once: the under-funded
+  pass does not merely earn less, it earns at a different rate for a
+  different length of time.
+- **The probe imports nothing from `../src/`, deliberately.** The damage line
+  is a COPY of `tiers.mjs`'s LINE rather than a shared import, because
+  build 347's rule is that an aimable probe importing `../src/` prints its own
+  constants whatever tree it is pointed at and must refuse a base that is not
+  its own checkout. Copied, `income.mjs` can be aimed at any build -- which is
+  what a curve measured across a price change will need. All four served-tree
+  guards pick it up by construction and name it in their own readouts.
+- **WHAT PHASE 7b NOW HAS AND WHAT IT STILL OWES.** It has the income model
+  7a said it needed: what a run holds at each of the seven gate rungs, so
+  "the turret each slot actually meets" is a figure rather than a phrase --
+  and the way to get the loadout itself is now one command, `tiers.mjs`
+  reading the measured curve. What it still owes is the seven health numbers
+  and seven patience clocks, and two cautions carry forward from here: the
+  deep anchors are soft, so a boss number tuned against rung 42's 95.8 MB is
+  tuned against a draw; and the curve stops at rung 43, meaning a funded run
+  measured this way cannot climb the last six rungs of its own ladder. That
+  second one is either the top of the ladder being genuinely unclimbable or
+  the window being too short to catch a climb there, and which it is wants
+  one long window at rung 43 before anybody tunes TERMINUS.
+- **THE WHOLE MEASUREMENT IS THIRTEEN MINUTES, WHICH IS WHY IT IS A PROBE
+  AND NOT A BOT RUN.** Three passes over eight rungs at a 240-second window
+  each -- 5,760 game-seconds of ladder -- runs in about the time one suite
+  run takes, because it is synthetic `g.update(1/60)` steps inside one
+  evaluate with rAF stubbed. `ladder-probe.mjs` driving the same ground with
+  real taps advances the game at about 0.4x WALL time (measured: 60 wall
+  seconds bought 23 game seconds and three teach waves), so the same coverage
+  there is four hours. When a question needs tens of game-minutes, the answer
+  is almost always a synthetic loop rather than a longer bot run.
+- **`debugGiveBytes` CREDITS `world.earned` AS WELL AS THE PURSE, WHICH IS
+  EXACTLY RIGHT AND IS A TRAP FOR ANY PROBE THAT FUNDS A RUN.** It is
+  deliberate and says so at its own site -- object types are gated on lifetime
+  banked since build 180, so bytes handed over without it would open the tree
+  and leave a rung-49 window fighting MOTEs. For an income probe it means the
+  funding lands IN the quantity being measured, and the only thing that keeps
+  the reading honest is sampling `earned` after the funding rather than before
+  it. `income.mjs` does, so the delta excludes its own stake -- and the first
+  draft carried a redundant `w.earned = Math.max(w.earned, spend)` beside it
+  whose comment claimed to be what opened the roster. An exact no-op (the
+  purse credit had already done it) under a comment naming itself as the
+  owner, which is the shape build 361's own `lineNext` belt was written down
+  as rather than left to be found. Found by grepping the writers of a field
+  before believing a sentence about it, which is the cheapest check in this
+  repo and has now paid three builds running.

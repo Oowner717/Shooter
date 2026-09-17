@@ -1515,6 +1515,125 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
   + `${selfContained.length} (${selfContained.join(' ')}) import none and may be aimed `
   + `anywhere`);
 
+/*
+ * ---- the income curve is MEASURED, and a measurement goes stale ---------
+ *
+ * `tiers.mjs`'s EARNED anchors are what every affordability claim in this
+ * repo rests on: how much a run has banked by rung N, and therefore what
+ * turret each boss slot is met with. They were ASSERTED from build 145 to
+ * build 362 -- plan C's targets, interpolated -- and that probe's own header
+ * recorded them as "about four times too rich" for seventeen builds without
+ * being able to do anything about it. Build 362 measured them with
+ * `scripts/income.mjs` and drove the measured curve in, which is what that
+ * header asks for in as many words.
+ *
+ * A measured constant is better than an asserted one and it has a failure
+ * mode the asserted one did not: it describes the economy ON THE DAY IT WAS
+ * TAKEN. Build 300 moved four slopes at once, 303 re-priced the whole tree
+ * and 305 moved the era hold; any one of those makes this curve a table about
+ * a game that is no longer running, silently, while every affordability
+ * reading downstream keeps exiting 0. That is build 329's broadphase cell
+ * exactly -- a derived global that was correct, changed for a good reason,
+ * and told nobody -- and the answer there is the same: a PIN, which fails the
+ * build and names the term that moved.
+ *
+ * The digest is over the terms the curve is a function of, and each one is
+ * there for a measured reason rather than for completeness:
+ *
+ *   RATE   what a body pays (`energy.perMass`, `minValue`, `drift`), what the
+ *          rung multiplies it by (`bountyStep`), how many arrive (`popStep`,
+ *          `flow`, `budget`) and what the intake keeps (`tax`, `taxFloor`,
+ *          `taxCap`).
+ *   DWELL  how long a wave lasts and whether it climbs: `hpStep` and
+ *          `threatPerHp` (what has to be killed), `patience` and `thinFrac`
+ *          (when a wave ends), `rest` and `press` (the seam), the verdict
+ *          windows (`surgeWithin`, `cleanWithin`, and the two contact
+ *          ceilings), and `perBand`/`bossEvery`/`ceiling`/`eraGate` (which
+ *          band a rung draws and which field it is played on).
+ *   SPEND  the tree's own total, because what a rung's funding BUYS is what
+ *          decides whether it can clear at all -- and the tree is the one
+ *          term of the three that a price pass moves without touching
+ *          `CFG.waves` or `CFG.energy`.
+ *
+ * Every term is asserted to resolve to a number before it is hashed. A path
+ * that is renamed reads `undefined`, hashes stably, and leaves a pin that can
+ * never fire again -- which is build 328's `SCALED` rename verbatim, where the
+ * guard tested the parent object and passed while the leaf was gone.
+ */
+const INCOME_PIN = '66f2f1478cd7';
+const INCOME_AT = 362;
+const TIER_CFG = CFG.waves.tier;
+const incomeTerms = {
+  'energy.perMass': CFG.energy.perMass,
+  'energy.minValue': CFG.energy.minValue,
+  'energy.drift': CFG.energy.drift,
+  'energy.tax': CFG.energy.tax,
+  'energy.taxFloor': CFG.energy.taxFloor,
+  'energy.taxCap': CFG.energy.taxCap,
+  'tier.bountyStep': TIER_CFG.bountyStep,
+  'tier.hpStep': TIER_CFG.hpStep,
+  'tier.popStep': TIER_CFG.popStep,
+  'tier.flow': TIER_CFG.flow,
+  'tier.budget': TIER_CFG.budget,
+  'tier.perBand': TIER_CFG.perBand,
+  'tier.bossEvery': TIER_CFG.bossEvery,
+  'tier.ceiling': TIER_CFG.ceiling,
+  'tier.eraGate': TIER_CFG.eraGate,
+  'tier.surgeWithin': TIER_CFG.surgeWithin,
+  'tier.surgeContact': TIER_CFG.surgeContact,
+  'tier.cleanWithin': TIER_CFG.cleanWithin,
+  'tier.failContact': TIER_CFG.failContact,
+  'waves.patience': CFG.waves.patience,
+  'waves.thinFrac': CFG.waves.thinFrac,
+  'waves.rest': CFG.waves.rest,
+  'waves.press': CFG.waves.press,
+  'waves.threatPerHp': CFG.waves.threatPerHp,
+  'tree.total': (() => treeMod.NODES.reduce((sum, n) => {
+    if (!n.id || n.repeat || n.dormant || n.currency) return sum;
+    let s2 = 0;
+    for (let i = 0; i < (n.levels || 1); i++) s2 += treeMod.priceOf(n, i);
+    return sum + s2;
+  }, 0))(),
+};
+const incomeFlat = (v) => (Array.isArray(v) ? v
+  : (v && typeof v === 'object') ? Object.keys(v).sort().map((k) => v[k]) : [v]);
+const incomeBlind = [];
+for (const [k, v] of Object.entries(incomeTerms)) {
+  const xs = incomeFlat(v).flatMap(incomeFlat);
+  if (!xs.length || xs.some((x) => typeof x !== 'number' || !Number.isFinite(x))) {
+    incomeBlind.push(k);
+  }
+}
+if (incomeBlind.length) {
+  console.error('income: ' + incomeBlind.join(', ') + ' does not resolve to a number, so it '
+    + 'hashes as undefined and the pin below can never fire for it again. A renamed CFG '
+    + "path is build 328's SCALED fault: the guard tested the parent and passed while "
+    + 'the leaf was gone.');
+  process.exit(1);
+}
+const incomeDigest = createHash('sha256')
+  .update(JSON.stringify(incomeTerms)).digest('hex').slice(0, 12);
+const earnedSrc = readFileSync(new URL('tiers.mjs', probeDir), 'utf8');
+if (!/income\.mjs/.test(earnedSrc)) {
+  console.error('income: tiers.mjs does not name income.mjs anywhere, so its EARNED curve '
+    + 'is asserted again and the pin below is pinning the inputs to a table nobody '
+    + 'measured. Drive a measured curve in, or delete this guard and say why.');
+  process.exit(1);
+}
+if (incomeDigest !== INCOME_PIN) {
+  console.error('income: the economy moved -- digest ' + incomeDigest + ' against a pin of '
+    + INCOME_PIN + ', taken at build ' + INCOME_AT + ". tiers.mjs's EARNED curve was "
+    + 'MEASURED against the terms above and is now a table about a different game, which '
+    + "is exactly how build 145's asserted curve came to be four times too rich without "
+    + 'anything failing. Re-measure it -- serve the tree, then run income.mjs with '
+    + '--window 240 --iters 3 -- paste the anchors into tiers.mjs, and move INCOME_PIN '
+    + 'in the same commit with the reason.');
+  process.exit(1);
+}
+console.log("income: tiers.mjs's EARNED curve is measured (income.mjs) and the "
+  + Object.keys(incomeTerms).length + ' economy terms it is a function of are unmoved at '
+  + incomeDigest);
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {
