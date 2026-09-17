@@ -10794,3 +10794,98 @@ came from before believing the other one covers it.
   are code. Taught it regex literals (including character classes) and both
   cases verified in about forty seconds each, against thirteen minutes of
   suite.
+- **BUILD 360 RUNS THE DEAD-CSS SWEEP AND THE SWEEP IS CLEAN, WHICH IS WHY THE
+  ONE FAULT IT WAS LOOKING FOR IS INTERESTING: `.armRow.sealed` HAS BOTH
+  CLASSES WRITTEN AND IS STILL UNREACHABLE.** Build 186's recipe -- pull every
+  `.class` and `#id` out of styles.css and grep each against `src/*.js` plus
+  index.html -- reports **319 classes and 48 ids with 2 misses, both the
+  documented template shape** (`m_all`/`m_drift`, built as `m_${mode}` in
+  hud.js). So build 220's "no dead selectors beyond the two false-positive
+  shapes" still holds, 140 builds on. What that sweep cannot see is a dead
+  COMBINATION: `armRow` is written (menu.js:874) and `sealed` is written
+  (menu.js:1994 and hud.js:935), so every name has a hit and the pair has no
+  producer. **Ask what a sweep's domain is before reading its green as
+  coverage** -- build 325's rule, on a stylesheet instead of a field table, and
+  the same shape as two guards this file already records a domain for: the
+  `ENEMY_TYPES` key sweep, which cannot see a constructor field, and the ghost
+  Proxy, which covers `world` and `world.up` and not a type.
+- **AND NO STATIC SWEEP CAN SEE IT, WHICH IS WORTH RECORDING RATHER THAN
+  GUARDING BADLY.** styles.css has **113 compound class selectors** with this
+  one gone, and the
+  tractable heuristic -- flag a pair whose two classes are never written in one
+  file -- does not discriminate here: both of these are written in menu.js, so
+  it would have passed. Whether the condition behind a state class can ever be
+  true is a question about the game (`STARTING`, `reset()`, `load()`, and
+  whether anything ever deletes from a Set), not about the stylesheet. Build
+  359's own ruling applied to my own candidate guard: a sweep that cannot fail
+  for the reason it exists is worse than no sweep, because it is counted.
+- **DEAD FROM BUILD 107, STYLED FROM BUILD 41: 252 BUILDS, AND THE REMOVING
+  COMMIT'S OWN DIFF IS THE SWEEP THAT WOULD HAVE FOUND IT.** `git log -S`
+  dates the rule to build 41 and the narrowing to `4ff0c0c`, "Build 107: ...
+  and ARSENAL folds in" -- whose diff replaces `for (const g of
+  ARSENAL_GROUPS) { ... ARSENAL.filter((x) => x.group === g.id)` with
+  `ARSENAL.filter((x) => x.group === 'auto')`. Before it, an `.armRow` was
+  built for every group -- rounds, mines, abilities, most of them locked, which
+  is what the mark was FOR. After it, the two rows are AUTO AIM and AUTO FIRE,
+  both in `STARTING`, which `reset()` and `load()` each seed `unlocked` from
+  with **no `.delete` anywhere in the tree**. That is build 337's pattern
+  verbatim -- a removal pass deletes the producer and leaves what read it --
+  and 337's remedy is one command: `git show <commit> -- <file>` on the
+  removing commit IS the sweep. Run on this one it reports `armGrid` and
+  `armRow` as the only classes 107 stopped writing, both re-written by the new
+  `buildAuto`, so `.armRow.sealed` was the whole of the leftover.
+- **MEASURED BEFORE REMOVING, AND THE MARK WORKED PERFECTLY ON A STATE NOTHING
+  CAN PRODUCE.** `this.cells` is filled at ONE site (`buildAuto`) and holds
+  exactly `['autoAim', 'autoFire']`, both issued, `sealed` false and the
+  `::after` content `none`. Forcing a key out of `unlocked` and clearing the
+  element's own memo puts the class on, paints `" -- locked"`, and renders the
+  row's name at **2.22:1 against its own declared 17.84** -- dim 0.4 with
+  `grayscale(1) brightness(0.7)`, with AUTO FIRE unswitched in the same read as
+  the control. So **had the state been reachable, build 359's group model would
+  have caught it**, in that very panel (the codex sweep reads 80 words and
+  `buildAuto` is called from `buildCodex`). Two halves, both measured: the rule
+  is dead, and the guard for it coming back already exists.
+- **THE COMMENT NAMED A RULE THAT IS ALIVE IN ANOTHER FILE, WHICH IS WHAT MAKES
+  THIS A REMOVAL RATHER THAN A RULE TO RESTORE.** Build 313's ruling is that the
+  fix for a dead field is `git rm` OR the rule, and which one comes off the
+  comment beside it. This one read "most of it starts locked. Listing all
+  eleven with no mark said the turret owned them" -- **eleven**, which is the
+  pre-107 sheet, and that rule is kept: the loadout panel's rows carry
+  `.loadRow.sealed` off `world.unlocked` over the whole arsenal, where build
+  359 measured eight genuinely sealed rows. A comment quoting a count from
+  before a narrowing is the tell that the rule moved and the code did not.
+- **BOTH HALVES GO, BECAUSE HALF A MECHANISM IS WORSE THAN NONE.** The CSS pair
+  and the `sealed` computation, memo and class write in the ARSENAL sync loop --
+  removing only the CSS would leave a class nothing styles, and removing only
+  the JS would leave a rule nothing produces; either way the next author
+  inherits an invisible half. The `on` half stays and is live: measured, the two
+  rows track `world.autoAim`/`autoFire` one each way (`[true,false]` then
+  `[false,true]`), and after the removal the forced unlocked-delete does
+  nothing at all -- 17.84 with no mark, against 2.22 with it.
+- **THE GUARD IS ON THE REASON, NOT ON THE ABSENCE OF THE RULE.** Pinning "no
+  `.armRow.sealed` in styles.css" would fail for the wrong reason the day
+  somebody legitimately makes those rows sealable. `check-build` asserts instead
+  that every key `buildAuto` builds a row for is in `STARTING` -- derived from
+  `ARSENAL` and `STARTING` rather than a written-out list of two, so a third
+  reference row is covered by existing -- plus the structural term that
+  `this.cells.set` has exactly one site and it is inside `buildAuto`, because the
+  loop walks the WHOLE arsenal and is held to the issued pair only by that map.
+  Its message names the mark to bring back and the live shape to copy. Three
+  revert proofs, each on its own conjunct with its own message (a key out of
+  `STARTING`; a second `cells.set`; the `auto` group emptied, which reports "the
+  detection has drifted, not the exposure"), and the refusal is a real
+  `process.exit(1)` -- verified on a stamped tree, where the clean run exits 0
+  and the revert exits 1 with the guard's line last.
+- **A GUARD IS STATIC HERE BECAUSE THE CLAIM IS STRUCTURAL.** Build 349's split:
+  a second door is a `check-build` question and a measurement is a case
+  question. "Nothing this loop can reach is sealable" is a fact about two
+  tables, costs a millisecond, and cannot go quiet the way a runtime arm can if
+  the panel stops being built. The runtime half -- that a dimmed row would fail
+  a contrast floor -- is already the four contrast sweeps' job as of 359.
+- **THE HASH WAS NOT RUN AND IS NOT OWED -- WHICH IS TWO CLAIMS, AND ONLY ONE
+  OF THEM WOULD HAVE BEEN A MEASUREMENT.** This build changes `styles.css`, the
+  codex panel's sync loop and `check-build.mjs`; no `src/` file on any body,
+  payout or targeting path is touched, so there is nothing for the ORDINAL
+  probe to measure and the reading would be a formality rather than a proof --
+  the same call builds 345 to 349 made. What had something to say is the suite,
+  the sweep's own output and the before/after pair above.

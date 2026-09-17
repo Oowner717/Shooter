@@ -1304,6 +1304,65 @@ if (doorBad.length || sayWriters < 3) {
   console.log(`contrast: all ${anchors.length} contrast sweeps accumulate the opacity AND filter `
     + 'chains, so neither way of dimming text can pass one');
 }
+/*
+ * ---- the codex panel's two reference rows cannot be sealed ------------------
+ *
+ * `.armRow.sealed` was styled from build 41 and unreachable from build 107,
+ * which narrowed `buildAuto` from an `.armRow` per ARSENAL group -- rounds,
+ * mines and abilities, most of them locked -- to the `auto` pair alone. Both of
+ * those are in `STARTING`, `unlocked` is seeded from it by `reset()` and
+ * `load()` and has no `delete` anywhere, so the mark could never come on. The
+ * build-186 selector sweep cannot see this: both `armRow` and `sealed` are
+ * written, and what is dead is the COMBINATION. Nor can any static sweep --
+ * whether the condition behind a state class can ever be true is a question
+ * about the game, not about the stylesheet.
+ *
+ * So the guard is on the REASON rather than on the absence of the rule: if a
+ * row `buildAuto` builds is ever not issued, the mark has to come back, and
+ * this says so by name. Two structural terms, because the loop that would put
+ * the class on walks the WHOLE arsenal and is held to the issued pair only by
+ * `this.cells` being filled in one place.
+ */
+{
+  const { ARSENAL } = await import(new URL('../src/arsenal.js', import.meta.url));
+  const { STARTING } = await import(new URL('../src/tutorial.js', import.meta.url));
+  const menuSrc = readFileSync(new URL('../src/menu.js', import.meta.url), 'utf8');
+  const auto = ARSENAL.filter((x) => x.group === 'auto');
+  const issued = new Set(STARTING);
+  const notIssued = auto.filter((a) => !issued.has(a.key)).map((a) => a.key);
+  // One `cells.set` site, and it is inside buildAuto -- otherwise the sync
+  // loop could reach a key the tree does sell.
+  const sets = [...menuSrc.matchAll(/this\.cells\.set\(/g)].length;
+  const buildAt = menuSrc.indexOf('buildAuto(p) {');
+  const setAt = menuSrc.indexOf('this.cells.set(');
+  const inBuildAuto = buildAt >= 0 && setAt > buildAt
+    && setAt < menuSrc.indexOf('\n  }', buildAt);
+  if (!auto.length || !STARTING.length) {
+    console.error('armRow: no ARSENAL rows in the `auto` group (or STARTING is '
+      + 'empty), so this guard is asserting nothing. The detection has drifted, '
+      + 'not the exposure.');
+    process.exit(1);
+  } else if (notIssued.length) {
+    console.error(`armRow: ${notIssued.join(', ')} is built as an .armRow in the `
+      + 'codex panel and is NOT in STARTING, so that row can be sealed -- and '
+      + 'nothing marks it. Build 41 styled `.armRow.sealed` for exactly this '
+      + 'and build 360 removed it as dead. Put the mark back (the live shape is '
+      + '`.loadRow.sealed` in styles.css, off `world.unlocked`) along with the '
+      + 'class write in the ARSENAL loop at the foot of menu.js.');
+    process.exit(1);
+  } else if (sets !== 1 || !inBuildAuto) {
+    console.error(`armRow: found ${sets} \`this.cells.set\` site(s) in menu.js `
+      + `(inside buildAuto: ${inBuildAuto}). The ARSENAL sync loop walks every `
+      + 'entry, so it is held to the issued pair only by that map being filled '
+      + 'in one place. A second site can reach a key the tree sells, which '
+      + 'needs the seal mark back.');
+    process.exit(1);
+  } else {
+    console.log(`armRow: ${auto.map((a) => a.key).join(' + ')} are issued, so `
+      + 'nothing in the codex panel can be sealed');
+  }
+}
+
 const capTexts = caps.reduce((a, c) => a + c.texts.length, 0);
 console.log(`captions: ${sayWriters} legitimate writer(s); all ${capTexts} text(s) across ${caps.length} site(s) `
   + `(${caps.filter((c) => c.kind === 'script').length} scripted, `

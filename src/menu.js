@@ -1979,19 +1979,36 @@ export class Menu {
     // ...and the emplacement tab's lock, which opens on a purchase made on the
     // FIELD rather than in here -- so nothing else in this sync would notice.
     this.setLock('guns', (world.guns || []).length > 0);
+    /*
+     * `this.cells` is filled in `buildAuto` and nowhere else, so the only keys
+     * this loop can reach are AUTO AIM and AUTO FIRE -- and both are in
+     * `STARTING`, which `reset()` and `load()` each seed `unlocked` from, with
+     * no `delete` anywhere. So the seal this used to write could never come on.
+     *
+     * It was correct until build 107: before ARSENAL folded into UPGRADES this
+     * built an `.armRow` for every group, most of them locked, and the mark was
+     * the whole point -- "listing all eleven with no mark said the turret owned
+     * them". 107 narrowed the rows to the issued pair and left the mark behind,
+     * in the JS and in a `.armRow.sealed` rule in styles.css, for 252 builds.
+     * Measured before removing: forcing a key out of `unlocked` really did put
+     * the class on and paint " -- locked", at 2.22:1 against the row's own
+     * 17.84 -- so it worked, on a state nothing can produce.
+     *
+     * The rule it was keeping is alive elsewhere and that is why this is a
+     * removal rather than something to restore: the loadout panel's own rows
+     * carry `.loadRow.sealed` off `world.unlocked` over the WHOLE arsenal,
+     * where eight rows are genuinely sealed. `check-build` fails the build if
+     * anything `buildAuto` puts here is ever not issued, and names the mark
+     * that has to come back with it.
+     */
     for (const a of ARSENAL) {
       const on = a.kind === 'round' ? world.round === a.key
         : a.kind === 'mine' ? world.mine === a.key
           : !!world[a.key];
-      // The sheet is the record of what the turret has, and most of it starts
-      // locked. Listing all eleven with no mark said the turret owned them.
-      const sealed = !world.unlocked.has(a.key);
       const el = this.cells.get(a.key);
-      if (!el || (el._on === on && el._sealed === sealed)) continue;
+      if (!el || el._on === on) continue;
       el._on = on;
-      el._sealed = sealed;
       el.classList.toggle('on', on);
-      el.classList.toggle('sealed', sealed);
     }
   }
 }

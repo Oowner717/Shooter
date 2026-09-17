@@ -799,15 +799,6 @@ html, body {
   70% { transform: translateX(2px); }
 }
 
-/* A row in the ARSENAL sheet for something not bought yet. */
-.armRow.sealed { opacity: 0.4; filter: grayscale(1) brightness(0.7); }
-.armRow.sealed .codexName::after {
-  content: ' — locked';
-  font-size: 0.82em;
-  letter-spacing: 0.1em;
-  color: var(--dim);
-}
-
 .alert.fade { opacity: 0.55; }
 
 @keyframes alertIn {
