@@ -39922,6 +39922,28 @@ if (MINE_LINE) {
       e.route = ROUTES.find((x) => x.id === routeId);
       e.routeSide = 1;
       e.routeScale = 1;
+      /*
+       * ...AND THE SPEED ROLL, which is the one thing this setup pinned three
+       * of four of and left the fourth.
+       *
+       * `this.cruise = type.speed * (opts.speedScale || rand(0.86, 1.14))` in
+       * the constructor, so the crossing time of two independently spawned
+       * bodies is a ratio of two draws from that range and spans 1.14/0.86 =
+       * 1.326x on a perfectly working build. The dawdle arm below bounds it
+       * at 1.25, i.e. INSIDE its own working distribution, and it duly failed
+       * at 1.26 on build 352 -- whose content cannot reach a NEEDLE. Measured
+       * across six green dumps the ratio read 0.85, 1.04, 1.10, 0.92 and
+       * 0.89, so about one run in six was over.
+       *
+       * Pinning `cruise` is enough HERE and is not enough in general: build
+       * 321 records that `drive` multiplies its own local copy by the
+       * dawdle and never reads the field back, so pinning the field cannot
+       * remove a ROUTE roll -- and the route is already pinned explicitly one
+       * line above. With both gone the two arms differ in nothing but the
+       * route's own `dawdle`, which is the term under test, and the arm
+       * becomes an absolute rather than a margin.
+       */
+      e.cruise = e.type.speed;
       const x0 = e.x;
       const y0 = e.y;
       const mx = w.shooter.x;
@@ -39997,9 +40019,14 @@ if (MINE_LINE) {
     // six draws on `march` spread 20x wider across the ratio
     && mWorst > 1.15 && r.marchSpan > r.span * 5
     // THE DAWDLE: `loiter` is the one route with one, and OWN_SPEED means it
-    // no longer costs the fast body half its speed. Within 25% of `direct`
-    // against a measured 1.88x before.
-    && Math.abs(dawdle.t / direct.t - 1) < 0.25
+    // no longer costs the fast body half its speed. An ABSOLUTE now that the
+    // speed roll is pinned above -- the two arms differ in the dawdle and
+    // nothing else, so they cross in the same time to within a frame or two.
+    // 5% against a measured 1.000 (three runs, to three decimals) and a
+    // measured 1.563x with `straight` taken out of OWN_SPEED -- an 11x
+    // separation rather than a margin. Build 343's 1.88x was the same revert
+    // read UNPINNED, so it carried a speed roll as well as the dawdle.
+    && Math.abs(dawdle.t / direct.t - 1) < 0.05
     // THE SPEED IS NOT COMPENSATED, which is why this is not `creep`: the
     // delivered mid-field figure sits at the blend's own steady state and
     // nowhere near the number the type asks for.
@@ -40010,7 +40037,8 @@ if (MINE_LINE) {
     + `against march ${r.march.map((x) => x.ratio.toFixed(3)).join('/')} `
     + `(span ${r.marchSpan}, widest ${r.march.map((x) => x.widest).join('/')}); `
     + `loiter ${dawdle.t}s against direct ${direct.t}s `
-    + `(${(dawdle.t / direct.t).toFixed(2)}x, was 1.88x); delivered ${midMean.toFixed(1)} `
+    + `(${(dawdle.t / direct.t).toFixed(3)}x with the speed roll pinned, `
+    + `1.563x with straight out of OWN_SPEED); delivered ${midMean.toFixed(1)} `
     + `u/s against a blend prediction of ${r.predict} and an asked ${r.asked} `
     // DERIVED, not declared: build 324's rule is that a detail string
     // asserting its own conclusion cannot report a failure, and the first

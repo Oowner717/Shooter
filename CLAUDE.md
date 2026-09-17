@@ -9409,3 +9409,139 @@ came from before believing the other one covers it.
   the same ratio to corroborate it. **When a case fails on a build that
   cannot plausibly reach it, diff the dumps before writing a probe**; a
   whole-run signature is visible there that no single-case probe would show.
+
+- **BUILD 352 ADJUDICATES THE THREE PASSES OF BUILD 220'S AUDIT THAT NEVER
+  RAN, AND THE RATIO IS WORTH KNOWING BEFORE ANYBODY SPENDS A SESSION ON AN
+  OLD ONE: three of thirty-four leads were real and live, eight had been
+  fixed by a later build, and twenty-three are about the mine line, which has
+  had no door since 289.** The heading's own warning ("several are certainly
+  wrong") held. Nothing was taken on a lead's word and every verdict in
+  `docs/audit-220-open.md` is now a measurement or a named site, with the
+  leads left underneath so nobody re-reports one.
+- **A LEAD FILED `[cosmetic]` BECAUSE THE AUTHOR COULD NOT REACH THE FAULT IS
+  A LEAD MEASURED ON ONE VIEWPORT.** `Front.update` -- PILE's wave -- carried
+  `staged` in a guard that also holds `dead`, `harmless`, `spent` and
+  `fizzle`, four marks its docstring justifies one by one and a fifth it
+  never mentioned. The audit filed it as unreachable. The margin is the
+  mount-to-rim column against the front's own reach and it is a **SCREEN-SIZE
+  quantity**, because `world.floorY` is derived from the bar heights and the
+  window while `CFG.pile.r` is not: at 390x844 the column is **752.6 against
+  240**, so a body would need r 256 to be both staged and inside and nothing
+  in the game reaches that, and at **320x568 it is 307.4** -- and the front
+  reaches a body whose EDGE it has met, so anything from **r 33.7** up is
+  inside on the last frames of its march. Measured there, same body, same
+  place, `staged` the only switch: a BULWARK took **0 against 6** and an
+  ANVIL **0 against 6.4**. That is the rule this file states three times
+  (`spent` is what may be SHOT, `staged` is what may be CHOSEN) breached in a
+  fifth place, and the reachability was decided by the phone. Era 2 needs no
+  fix: `shielded` refuses everything above the yard wall, which is the
+  correct guard. **Before believing "the guard cannot be taken", ask which
+  viewport the two terms were measured at** -- one of them is almost always
+  derived from the screen.
+- **A FIX APPLIED TO THE CHILD AND NOT TO THE PARENT, AND THE PARENT'S
+  DOCSTRING IS WHERE THE FAULT IS EXPLAINED.** Build 223 sized SLIVER's
+  FRAGMENT ignore window off the body it is inside, at both `fire` sites,
+  with a paragraph naming the symptom ("each re-hit spending a pierce inside
+  the body it was already in"). The PARENT's own pierce kept a flat 0.06 --
+  and `ignoreT -= dt` clears on the frame AFTER it goes under, so the real
+  window is four frames and **104 units** at SPINE's 1560 u/s, not the 93.6
+  the constant looks like. Against a chord of `2 * (e.r + p.r)` that is 96.8
+  for a BULWARK -- a **3.4% margin** -- and short from about **r 48.6** up.
+  Measured, one dart at one pinned body: r 45 one hit, r 60 two, r 72 two,
+  r 90 two, the second taking 39.9 where it should take 22.4. Reachable in
+  ordinary play: ANVIL at 56, the FRACTAL core at 64, a fully grafted BULWARK
+  at 72, and `MAX_BODY_R` counts graft out to 89.6. **A window expressed in
+  SECONDS against a distance is frame-quantised, so compute what it is worth
+  in UNITS before calling it adequate.**
+- **...AND THE A/B FOR IT NEEDED NO SECOND BUILD: WRITE THE OLD VALUE BACK
+  FROM OUTSIDE, EVERY FRAME.** The case clamps `p.ignoreT` to 0.06 on each
+  step, which is exactly what the site used to assign, and reads the same
+  dart against the same body -- so the control is the shipped mechanism with
+  one number held, rather than a worktree, a second server and the whole
+  served-tree apparatus builds 344 to 347 had to build for a genuine
+  cross-build differential. **When the thing you want to revert is a single
+  value a probe can reach, hold it from the probe.**
+- **A CHOOSER INSIDE A DAMAGE PATH, AND THE REASON NOT TO WAS ALREADY WRITTEN
+  DOWN IN THIS CODEBASE.** ARC's chain picks the nearest body inside
+  `jumpRange`, which is a CHOICE, and every other chooser in the game honours
+  the DRIFT rule. `Front.update`'s own docstring gives the argument, about the
+  other automatic sweep: "an automatic thing that vaporised DRIFT would
+  undercut SIEVE and break the promise the colour rule makes". Four jumps the
+  player did not aim is exactly as automatic as a wave through the floor.
+  Measured before the guard, one dart into three hostiles and three drifters
+  interleaved: **two of the four jumps landed on grey and 43.5 of the round's
+  91.9 delivered damage -- 47%** -- went into bodies `autoTarget` would not
+  have aimed at. Fixed as the ASSIST'S OWN RULE rather than the flat refusal
+  the lead proposed, because SIEVE is a node somebody bought: at `field` the
+  chain skips grey, at `drift` or `all` it reaches it the way the barrel does.
+  `world.aimMode` is never written 'off' (`setAim` keeps the last real
+  position), so the default arm is the honest one. It deliberately does NOT
+  take the other half of `consider` -- refusing HOSTILES at `drift` -- because
+  a chain is a spread from where the round landed and not a statement about
+  what to hunt.
+- **THE AUDIT'S OWN FIX HAD BEEN APPLIED AND HAD ROTTED TWICE MORE, WHICH IS
+  BUILD 329'S RULE ABOUT A NUMBER QUOTED IN PROSE ARRIVING AT ITS THIRD
+  ITERATION.** The lead said `gunScale`'s header read "1.25 a level" and
+  should read 1.5. It read 1.5 -- somebody applied it -- and then build 229
+  took HOLLOWPOINT to 5 levels at 1.32 and 302 to 8 at 1.26. So the paragraph
+  the next person reads before touching boss scaling was wrong in the
+  per-level value AND the level count, for the second time, in the one place
+  the argument for the whole mechanism lives. **And the stale figure was
+  hiding a property**: measured, the node alone is x6.353 and a fully bought
+  gun returns **8.823 against `CFG.boss.temper` 4.2**, so the ceiling binds at
+  a little over half of ONE node's ladder and every deeper purchase is
+  invisible to a boss. With CORE owned the product is about 29, seven times
+  the clamp. So `temper` and not this product is the live quantity above that
+  point, and a change to the damage line moves the RUNG at which the clamp
+  starts binding rather than the difficulty of any boss met after it. The
+  build-215 fight table is marked as dated rather than deleted: seven
+  anomalies against nine, and a damage line half as steep per level and nearly
+  twice as long, so its ratios are not reproducible.
+- **`setViewportSize` DOES NOT RESIZE THE GAME, AND THE CASE THAT EXISTS TO
+  CORRECT A ONE-VIEWPORT READING WAS ITSELF TAKING ONE.** The page handles the
+  resize on its own schedule and `world.floorY` is only re-derived inside
+  `Game.resize()`, so the PILE case read **752.6 at both sizes** -- the launch
+  viewport's value, twice, with a `for` loop over two sizes making it look
+  measured. `g.resize()` at the top of the evaluate and again after each
+  `restart()`, plus a tick after the viewport call. The existing cases that do
+  this get away with it because they call `g.start()` inside; anything reading
+  a DERIVED geometry has to resize explicitly. Same family as the governor
+  note (the backing store is only sized inside `resize()`).
+- **AND THE OTHER PROBE'S GEOMETRY DECIDED ITS ANSWER.** The ARC case aimed
+  across its own interleaved crowd, so the dart clipped a drifter for exactly
+  its own 11 damage -- which reads as a jump that should not have happened, on
+  a build where the guard works. The bodies are on ONE line at 0.4 of
+  `jumpRange` now, with the dart's target at the far end and nothing on the
+  line to it, so the round's own hit is on a known hostile and anything grey
+  can only have been reached by a jump. **When a case is about what a
+  mechanism CHOSE, make sure nothing else could have delivered the damage** --
+  and the spacing is 0.4 of the reach so every neighbour is one step away and
+  every second one is two, which is what makes the chain choose rather than
+  take the only thing it can reach (the same rule as the chain bench needing
+  two bodies, and TESSERA's re-lay arm needing the whole slab).
+- **AND THE SUITE RUN TURNED UP A SIXTH SINGLE-DRAW RATIO, IN A CASE THAT HAD
+  PINNED THREE OF THE FOUR ROLLS IT DEPENDS ON.** Build 343's `straight` case
+  bounded `loiter`'s crossing within 25% of `direct`'s -- two INDEPENDENTLY
+  SPAWNED bodies, and `this.cruise = type.speed * (opts.speedScale ||
+  rand(0.86, 1.14))` in the constructor, so the ratio spans **1.14/0.86 =
+  1.326x** on a perfectly working build and the bound sits inside its own
+  working distribution. It read 1.26 on build 352, whose content cannot reach
+  a NEEDLE; subtracted from six dumps the population is **0.85, 1.04, 1.10,
+  0.92, 0.89 and 1.26**, so about one run in six was over. The setup pinned
+  the route, the side and the scale and left the speed -- which is the tell
+  worth remembering: **a setup that pins three rolls has told you it knows
+  the quantity is rolled, so ask which one it missed.**
+  Pinned (`e.cruise = e.type.speed`), the arm becomes an ABSOLUTE: 1.000x to
+  three decimals on three runs, against **1.563x** with `straight` taken out
+  of `OWN_SPEED`, an 11x separation on a 0.05 bound. And the same roll was
+  absorbing the tolerance on the arm beside it -- the delivered mid-field
+  speed now reads **89.1 against a prediction of 89.1**, where the 0.15
+  tolerance existed to cover 84.4 to 91.7.
+  Two riders. Build 343's own recorded revert figure of 1.88x was measured
+  UNPINNED, so it carried a speed roll as well as the dawdle and is corrected
+  to 1.563 at the site -- **a figure quoted from a revert taken under
+  different pinning is a figure about a different experiment.** And pinning
+  `cruise` is enough only because the route is pinned explicitly one line
+  above: build 321 records that `drive` multiplies its own local copy by the
+  dawdle and never reads the field back, so pinning the field can never
+  remove a ROUTE roll.
