@@ -82,6 +82,8 @@ const URL = flag('url', 'http://127.0.0.1:8099/index.html');
 const { abort: wrongTree } = await checkServed(URL, flag('expect', null), 'dps.mjs');
 if (wrongTree) process.exit(1);
 
+// Which field the run was fought on -- see the note beside the setEra call.
+let SLOT = { era: null, power: null };
 const browser = await chromium.launch();
 const runs = [];
 
@@ -119,6 +121,7 @@ for (let r = 0; r < RUNS; r++) {
 
   await page.evaluate(async (n) => {
     const { CFG } = await import('../src/config.js');
+    const { anomalyEra } = await import('../src/boss.js');
     const g = window.__sim;
     const w = g.world;
     const S = 1 / 60;
@@ -128,6 +131,32 @@ for (let r = 0; r < RUNS; r++) {
     w.autoAim = true;
     w.autoFire = true;
     w.bytes = 0;
+    /*
+     * The era the anomaly is actually MET on, derived from its gate rung and
+     * never written out, so a change to `eraGate` or the gate table moves it
+     * here too. Before `openBoss`, because `setEra` runs `takeField` and the
+     * boss has to arrive onto the field it is going to be fought on -- and
+     * `setEra` refuses a switch to the era it is already in, which is why the
+     * opposite is written first (build 305's note, on the same function).
+     *
+     * Until build 353 NO probe did this, so DYNAMO, PARITY and TERMINUS -- the
+     * three anomalies gated above `eraGate` -- were measured on era 1 by every
+     * one of them. Measured on DYNAMO, three runs a side in one container:
+     * 250.0s on era 1 against 188.1s on its own field, populations disjoint
+     * (243.7-259.3 against 187.5-192.3). The era moves `CFG.power` 1 -> 1.3,
+     * the column 753 -> 1158 and the width 629 -> 968, and only the FIRST of
+     * those reaches a boss fight: 1 / 1.3 is -23.1% against a measured -24.8%,
+     * so the longer column costs a boss nothing, which is what a standoff
+     * fight should look like.
+     */
+    const era = anomalyEra(n);
+    if (w.era !== era) { w.era = era === 1 ? 2 : 1; g.setEra(era); }
+    /*
+     * Reported because a table that does not say which field a row was
+     * measured on cannot be read six builds later -- which is what left
+     * DYNAMO, PARITY and TERMINUS measured on era 1 here until build 353.
+     */
+    window.__slot = { era, power: CFG.power };
     w.apertures[n] = 1;
     g.openBoss(n);
 
@@ -172,6 +201,7 @@ for (let r = 0; r < RUNS; r++) {
     };
     window.__d = rec;
   }, N);
+  SLOT = await page.evaluate(() => window.__slot);
 
   let done = false;
   let guard = 0;
@@ -283,6 +313,7 @@ const keys = [...new Set(runs.flatMap((r) => Object.keys(r.stages)))].sort();
 const name = (k) => (k === '0' ? 'arrive' : k === '-1' ? 'after' : `stage ${k}`);
 
 console.log(`\nANOMALY ${N} — ${RUNS} run${RUNS > 1 ? 's' : ''}, where the output goes`);
+console.log(`  era ${SLOT.era} (derived from the gate) · gun power ${SLOT.power}`);
 console.log(`  cone ±${runs[0].cone.toFixed(2)} rad (${Math.round((runs[0].cone * 180) / Math.PI)}°`
   + ` either side of up) · assist slew ${runs[0].slew} rad/s\n`);
 

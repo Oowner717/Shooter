@@ -91,6 +91,36 @@ if (wrongTree) process.exit(1);
 // a wall -- report it as one rather than hanging.
 const CAP = Number(flag('cap', 900));
 /*
+ * ---- THE SLOT: THE FIELD THE ANOMALY IS ACTUALLY MET ON -----------------
+ *
+ * `--era N` overrides; the default is DERIVED from `anomalyEra(n)`, which is
+ * the same function `Game.debugBoss` sets the era off. Never written out
+ * here: the gate table moved at build 299 and the hold rung at 305, and a
+ * copy of either in a probe is build 329's stale-derived-number shape.
+ *
+ * Until build 353 this probe set NO era, so every run was on era 1 -- and
+ * `anomalyEra` puts DYNAMO, PARITY and TERMINUS on era 2 from build 305. So
+ * three of the seven had never been measured on the field they are met on,
+ * which is build 305's own `tiers.mjs` finding ("the one instrument pointed
+ * at the ordinary field was measuring band 5 on a field the game no longer
+ * sends it to") arriving in the boss instrument.
+ *
+ * Measured, the era moves three things and NOT the boss: `CFG.power` 1 ->
+ * 1.3 (it keys off `CFG.scale`, so it follows the era's zoom), the closing
+ * column 753 -> 1158 and the width 629 -> 968. A boss's own health is
+ * era-independent -- two draws of DYNAMO's core read 3979 and 4190, which is
+ * the constructor's `rand(0.92, 1.1)` and not a scaling.
+ *
+ * THE RUNG IS DELIBERATELY NOT SET, and that is measured rather than
+ * assumed. Every boss body is `fixed` and so is every minion, so
+ * `scaleToTier` returns on its first line for all of them: ORDINAL's core
+ * reads 1788 at rung 1 and 1787 at rung 7, and its TALLYs 171 and 172. The
+ * player's own `gunScale` is 1 at stock either way. So a boss fight has no
+ * rung channel at all and rung 1 is the honest place to measure one -- which
+ * is why the gate rung is PRINTED as the slot's label and not applied.
+ */
+const ERA = flag('era', null);
+/*
  * `--seed N` makes the whole session deterministic: the PRNG below replaces
  * Math.random before a single line of the game has run, so two trees that
  * behave identically produce byte-identical reports.
@@ -117,6 +147,16 @@ const CHUNK = 900; // steps per round trip: 15 game-seconds
 
 const browser = await chromium.launch();
 const errors = [];
+/*
+ * The slot the last run was fought in: the rung the anomaly is gated at, the
+ * era it was met on, and the three things the era moves. It is recorded here
+ * rather than folded into the per-run report because it is a property of the
+ * SETUP and is identical across `--runs`, and because a table of fight lengths
+ * that does not say which field a row was measured on cannot be read six
+ * builds later -- which is exactly what `tiers.mjs` had to be corrected for at
+ * build 305, and what left builds 5, 6 and 7 measured on era 1 here.
+ */
+let lastSlot = null;
 
 /** One fight, driven end to end. Returns the report the page built. */
 async function fight(page) {
@@ -161,14 +201,56 @@ async function fight(page) {
     window.__fight = rec;
   });
 
-  await page.evaluate((n) => {
+  const slot = await page.evaluate(async ({ n, want }) => {
+    const { anomalyEra } = await import('../src/boss.js');
+    const { CFG } = await import('../src/config.js');
+    const { entryLine } = await import('../src/portal.js');
+    const T = CFG.waves.tier;
     const g = window.__sim;
     const w = g.world;
+    const era = want === null ? anomalyEra(n) : want;
+    /*
+     * `setEra` refuses a switch to the era it is already in, so the opposite
+     * is written first -- build 305's note, on the same function. Before
+     * `openBoss`, because `setEra` runs `takeField` and the boss has to
+     * arrive onto the field it is going to be fought on.
+     */
+    if (w.era !== era) { w.era = era === 1 ? 2 : 1; g.setEra(era); }
     if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
-    g.openBoss(n);
-  }, N);
+    const opened = g.openBoss(n);
+    const core = w.boss && w.boss.core;
+    return {
+      era: w.era,
+      derived: anomalyEra(n),
+      rung: (T.gates || [])[n - 1] ?? null,
+      opened: !!opened && !!w.boss,
+      power: +CFG.power.toFixed(3),
+      column: Math.round(w.shooter.y - entryLine(w, 0)),
+      width: Math.round(w.width),
+      coreHp: core ? Math.round(core.maxHp) : null,
+      hard: w.boss ? +(w.boss.hard || 0).toFixed(3) : null,
+    };
+  }, { n: N, want: ERA === null ? null : Number(ERA) });
+  if (!slot.opened) throw new Error(`anomaly ${N} did not open`);
+  // Above the hash branch, so the hash report says which field it read too.
+  lastSlot = slot;
 
-  if (HASH !== null) return hashRun(page, Number(HASH));
+  if (HASH !== null) {
+    /*
+     * The hash is a rung-1 ERA-1 number and the whole recorded history of it
+     * is taken there, so re-siting it would void every comparison in
+     * CLAUDE.md. `anomalyEra(1)` is 1, so the documented command is
+     * unaffected -- this refuses the combination rather than silently
+     * producing a figure nothing can be compared against.
+     */
+    if (slot.era !== 1) {
+      console.error(`fight.mjs: --hash is an era-1 instrument and anomaly ${N} `
+        + `is met on era ${slot.era}. Pass --era 1 to say so deliberately; the `
+        + `recorded hash history is all era 1 and a era-2 figure compares to nothing.`);
+      process.exit(1);
+    }
+    return hashRun(page, Number(HASH));
+  }
 
   let done = false;
   let steps = 0;
@@ -375,11 +457,28 @@ for (let i = 0; i < RUNS; i++) {
 if (HASH !== null) {
   const r = runs[0].hash;
   console.log(`\nANOMALY ${N} — ${HASH} frames, seed ${SEED === null ? '(none — not reproducible)' : SEED}\n`);
+  for (const ln of slotLines(lastSlot)) console.log(ln);
+  console.log('');
   for (const m of r.marks) console.log(`  ${m}`);
   console.log(`\n  hash  ${r.hash}`);
   console.log(`  ${r.alive ? 'still standing' : 'over'}, ${r.remainder} remainder\n`);
   await browser.close();
   process.exit(errors.length ? 1 : 0);
+}
+
+/*
+ * Which field the numbers below were measured on. `derived` is what
+ * `anomalyEra` says the slot is, so a forced `--era` is visible as a
+ * disagreement rather than as a silently different row.
+ */
+function slotLines(sl) {
+  if (!sl) return [];
+  const forced = sl.era !== sl.derived;
+  const out = [`  slot           rung ${sl.rung === null ? '(ungated)' : sl.rung}`
+    + `, era ${sl.era}${forced ? ` (FORCED -- derived ${sl.derived})` : ' (derived)'}`];
+  out.push(`  field          power ${sl.power}, column ${sl.column}, width ${sl.width}`);
+  out.push(`  core           ${sl.coreHp}hp, hard ${sl.hard}`);
+  return out;
 }
 
 const num = (x) => (Math.round(x * 10) / 10).toFixed(1);
@@ -389,6 +488,8 @@ const med = (xs) => {
 };
 
 console.log(`\nANOMALY ${N} — ${RUNS} run${RUNS > 1 ? 's' : ''}, assists only, nothing bought\n`);
+for (const ln of slotLines(lastSlot)) console.log(ln);
+console.log('');
 
 const total = runs.map((r) => r.ended || r.t);
 console.log(`  fight          ${num(med(total))}s`

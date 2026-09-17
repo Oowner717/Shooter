@@ -498,6 +498,21 @@ function sliverOn(world, e, x, y, p, dirx, diry, sp) {
  * seven of them gated, and the damage line is half as steep per level and
  * nearly twice as long -- so the ratios above are not reproducible.
  *
+ * AND THE STOCK COLUMN NEVER SEPARATED THE BOSSES FROM ONE ANOTHER, which is
+ * a stronger caveat than the one above and was measured at build 353. Those
+ * seven figures are one run each, and a fight length is a single draw from a
+ * wide distribution: five stock ORDINAL runs read 258.9, 287.7, 230.7, 269.8
+ * and 236.4 -- extremes 1.25x apart, +-11% about the median -- so 227.0
+ * against 223.7 is noise and nothing else. (The spread is per boss, not
+ * global: DYNAMO's three runs span 2.6%, which is the boss that re-forms its
+ * own frame against the one that does not.) Three of the seven were also
+ * measured on the wrong FIELD: `fight.mjs` set no era until 353, and DYNAMO,
+ * PARITY and TERMINUS are gated above `eraGate`, so they were fought against
+ * a gun with `CFG.power` 1 instead of 1.3 -- measured, DYNAMO 250.0s on era 1
+ * against 188.1s on its own field, populations disjoint. What survives of the
+ * paragraph above is the ~5x bought-against-stock RATIO, which is far outside
+ * either error.
+ *
  * A HANDFUL OF NODES CARRY ALL OF IT, and they cost a few thousand of the
  * tree's hundred-odd: HOLLOWPOINT, SALVO's every Nth shot, and what is left
  * of FEED. Resetting them alone returns a fully-bought fight to nearly its

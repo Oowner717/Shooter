@@ -938,6 +938,68 @@ if (posBad.length) {
 }
 console.log(`positional: all ${posProbes.length} probe(s) with a bare-number positional `
   + `(${posProbes.map(([f]) => f).join(' ')}) skip a flag's value`);
+
+/*
+ * ---- AND A BOSS HAS TO BE MEASURED ON THE FIELD IT IS MET ON -----------
+ *
+ * Build 353, and the same family again: an instrument confidently measuring
+ * something adjacent to the thing it names. `anomalyEra` derives the era an
+ * anomaly is met on from its gate rung against `eraGate`, and DYNAMO, PARITY
+ * and TERMINUS are all gated above it -- so a probe that opens one without
+ * setting the era fights it on era 1, which is not a field the game ever
+ * sends those three to.
+ *
+ * It is not cosmetic and it is not small. Measured on DYNAMO, three runs a
+ * side in one container: 250.0s on era 1 against 188.1s on its own field,
+ * with the populations disjoint (243.7-259.3 against 187.5-192.3). The era
+ * moves `CFG.power` 1 -> 1.3, the column 753 -> 1158 and the width 629 ->
+ * 968, and only the first of those reaches a standoff fight -- 1 / 1.3 is
+ * -23.1% against a measured -24.8%. So every recorded figure for those three
+ * was of a gun 30% weaker than the one that meets them.
+ *
+ * The SET is derived rather than listed, and the derivation is the one the
+ * block above already computes: a probe that takes the anomaly as a
+ * bare-number POSITIONAL is a probe whose subject IS that anomaly, and it
+ * owes that anomaly its own field. `regress.mjs` is out by that fact rather
+ * than by an exemption -- it opens bosses inside cases at fixed indices, for
+ * mechanism claims (marks, deaths, teardown) that are era-independent, and
+ * it takes no anomaly argument.
+ *
+ * Three claims, because deriving it and not applying it looks identical in a
+ * diff to not deriving it at all: the probe DERIVES the era, it APPLIES it,
+ * and it applies it BEFORE `openBoss` -- `setEra` runs `takeField`, so an era
+ * written afterwards throws the boss's own arrival off the field.
+ */
+const eraBad = [];
+for (const [f, src] of posProbes) {
+  if (!/\bopenBoss\(/.test(src)) continue;
+  const at = src.indexOf('openBoss(');
+  if (!/anomalyEra\(/.test(src)) {
+    eraBad.push(`${f} opens an anomaly it was handed and never asks anomalyEra() which `
+      + 'field that anomaly is met on, so bosses gated above eraGate are fought on era 1');
+  } else if (!/setEra\(/.test(src)) {
+    eraBad.push(`${f} derives the era with anomalyEra() and never calls setEra(), so the `
+      + 'derivation is a value nothing applies');
+  } else if (src.indexOf('setEra(') > at) {
+    eraBad.push(`${f} calls setEra() AFTER openBoss(); setEra runs takeField, so the boss `
+      + 'has to arrive onto the field it will be fought on');
+  } else if (/setEra\(\s*\d/.test(src)) {
+    eraBad.push(`${f} passes a written-out era to setEra(); it has to come from `
+      + 'anomalyEra(n), or a change to eraGate or the gate table leaves it behind');
+  }
+}
+if (eraBad.length) {
+  for (const line of eraBad) console.error(`era: ${line}`);
+  process.exit(1);
+}
+const eraProbes = posProbes.filter(([, src]) => /\bopenBoss\(/.test(src)).map(([f]) => f);
+if (!eraProbes.length) {
+  console.error('era: no probe takes an anomaly positional and opens it, so this guard is '
+    + 'asserting nothing -- the detection has drifted, not the exposure');
+  process.exit(1);
+}
+console.log(`era: all ${eraProbes.length} anomaly probe(s) (${eraProbes.join(' ')}) derive the `
+  + 'era from anomalyEra() and set it before openBoss()');
 /*
  * ---- AND THE PROBE HAS TO BE ABLE TO READ THE TREE IT WAS POINTED AT ----
  *

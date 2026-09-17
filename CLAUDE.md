@@ -3074,6 +3074,14 @@ came from before believing the other one covers it.
   authored per slot) and not a fault. Worth knowing that a real run meets them
   with a BOUGHT tree as well as the 1.3, so the discount in play is larger
   than the probe's.
+  **BOTH READINGS ARE STRUCK AND THE CAUSAL STORY WAS IMPOSSIBLE -- see build
+  353.** The magnitudes (8.6% and 1.7%) are single draws inside a per-boss
+  noise band measured at 25%, and `fight.mjs` set NO ERA until build 353, so
+  both sides of that differential were fought on era 1 with `CFG.power` 1 --
+  the one term the paragraph names as the cause was never applied on either
+  side. Measured properly, three runs a side: DYNAMO is 250.0s on era 1
+  against **188.1s** on its own field, populations disjoint, which is -24.8%
+  and not -8.6%.
 - **A literal pinning a derived string has now been red three times and never
   once because the thing it describes was wrong.** The debug panel's era
   string was `'111111122'` until build 299 truncated the gate table,
@@ -9556,3 +9564,171 @@ came from before believing the other one covers it.
   this repo as not accepting. An unchanged hash is what "a change on the
   projectile sweep provably did not reach anything already using it" looks
   like measured, and it is the same claim builds 315, 332 and 333 made.
+
+- **PHASE 7a IS THE BOSS INSTRUMENT FROM BUILD 353, AND IT SHIPS NO TABLE
+  BECAUSE THE INSTRUMENT COULD NOT HAVE MEASURED ONE.** `docs/rebalance.html`
+  asks for "seven numbers and seven patience clocks, measured against the
+  turret each slot actually meets". Three readings taken before writing any of
+  them found that none of the seven could have been trusted, and the third is
+  the one that decides how the phase has to be done at all.
+- **THE RUNG IS NOT A CHANNEL FOR A BOSS FIGHT, so `fight.mjs` measuring at
+  rung 1 was right all along.** `spawnOne` applies `scaleToTier` behind
+  `!type.fixed`, every boss body is `fixed` -- and so is every minion, which
+  is the half worth checking rather than assuming, because a longer fight
+  means more of them. Measured: ORDINAL's core is **1788 at rung 1 against
+  1787 at rung 7** and its TALLYs **171 against 172**, both the
+  `rand(0.92, 1.1)` roll. So a gate rung is a LABEL for which turret a slot is
+  met with and never a multiplier on the boss, and phase 7's "per slot" is a
+  statement about the tree and not about the ladder.
+- **THE ERA *IS* A CHANNEL FOR THREE OF THE SEVEN, AND NO PROBE SET IT.**
+  `anomalyEra` puts DYNAMO(5), PARITY(6) and TERMINUS(7) above `eraGate`, and
+  `Game.openBoss` only calls `openAperture` -- it has never set the era, and
+  neither had `fight.mjs`, `dps.mjs` or `variance.mjs`. So every recorded
+  figure for those three was of a fight on era 1: **`CFG.power` 1 instead of
+  1.3, the column 753 instead of 1158, the width 629 instead of 968.** That is
+  build 305's `tiers.mjs` fault ("NEVER SET THE ERA... measuring band 5 on a
+  field the game no longer sends it to") arriving in the boss instrument, by
+  the same mechanism, eighteen builds after it was written down for the other
+  one.
+  Priced rather than asserted, DYNAMO at three runs a side in one container:
+  **250.0s on era 1 (259.3 / 243.7 / 250.0) against 188.1s on its own field
+  (187.5 / 188.1 / 192.3)** -- the populations do not overlap, the gap between
+  the nearest pair being 51 seconds.
+  **And only ONE of the era's three terms reaches a boss fight**, which is the
+  finding rather than the correction: `1 / 1.3` is -23.1% against a measured
+  -24.8%, so the 405 units of extra column cost a boss essentially nothing.
+  That is what a standoff fight should look like -- the boss does not traverse
+  the field, so a deeper field is only a longer walk for its minions -- and it
+  means the era discount on those three slots is the damage multiplier and
+  nothing else. Stage shares corroborate it: 16/20/32/21 against 15/18/27/21,
+  i.e. the whole fight scaled, which is what a flat multiplier does.
+- **A FIGHT LENGTH IS A SINGLE DRAW FROM A WIDE DISTRIBUTION, AND EVERY
+  RECORDED BOSS FIGURE IN THIS REPO WAS TAKEN AT ONE RUN.** Five stock ORDINAL
+  runs: **258.9, 287.7, 230.7, 269.8, 236.4** -- extremes **1.25x** apart,
+  +-11% about the median. `fight.mjs` has medianed and printed the population
+  since it was written and DEFAULTS TO `--runs 1`, so the default is the one
+  setting that cannot see this.
+  **The spread is per boss and not global**, which is worth knowing before
+  pricing anything: DYNAMO's three runs span **2.6%** against ORDINAL's 25%.
+  Build 305's `variance.mjs` finding already names the mechanism from the
+  other side -- "the boss generates a different amount of work... ORDINAL puts
+  back 11.9k of health on a short run and 13.1k on a long one and spawns 8.3k
+  of DIGITs against 9.3k" -- so a boss that re-forms its own structure is the
+  noisy one and a boss that does not is nearly deterministic. **A length claim
+  needs `--runs 3` on ORDINAL, GNOMON and anything else that regrows, and can
+  survive on fewer elsewhere; which it is, is a property of the boss.**
+- **SO TWO RECORDED CLAIMS ARE STRUCK, one of them for two independent
+  reasons.** Build 305's "DYNAMO 275.8 -> 252.1 and PARITY 242.1 -> 237.9,
+  both got SHORTER" is 8.6% and 1.7% inside a 25% band AND was taken with both
+  sides on era 1, so the `era2Power` it names as the cause was never applied
+  to either -- struck in place above. And `gunScale`'s build-215 stock column
+  (227.0, 227.3, 245.0, 223.7, 236.3, 216.0, 212.6) does not separate the
+  bosses from one another at all: 227.0 against 223.7 is a coin toss, and
+  three of the seven were on the wrong field. What survives is the ~5x
+  bought-against-stock RATIO, which is far outside either error -- **the
+  ratio survives because it is an order of magnitude and the differences
+  between bosses never were.**
+- **THE FIX IS THREE COPIES OF FOUR LINES AND A DERIVED GUARD, because an
+  evaluate body cannot import a node-side helper.** Same shape as the three
+  literal copies of `(k + damping) / k` build 318 deliberately did not
+  extract. What makes it one rule rather than three hopes is that
+  `check-build` derives WHO owes it: **a probe that takes the anomaly as a
+  bare-number POSITIONAL is a probe whose subject IS that anomaly, and it owes
+  that anomaly its own field** -- which is exactly the set build 345's
+  positional guard already computes (`dps.mjs fight.mjs variance.mjs`).
+  `regress.mjs` is out BY THAT FACT rather than by an exemption: it opens
+  bosses at fixed indices inside cases, for mechanism claims (marks, deaths,
+  teardown) that are era-independent, and it takes no anomaly argument.
+  Three conjuncts, because deriving it and not applying it looks identical in
+  a diff to not deriving it at all: it DERIVES (`anomalyEra`), it APPLIES
+  (`setEra`), and it applies BEFORE `openBoss` -- `setEra` runs `takeField`,
+  so an era written afterwards throws the boss's own arrival off the field.
+  Plus a refusal of a written-out era, and a vacuity arm. **All five proved
+  able to fail**, each on its own conjunct.
+- **...AND THE REVERT HARNESS USED `git checkout --`, WHICH RESTORED TO A HEAD
+  THAT PREDATED THE FIX.** So proof A's revert silently leaked into B, C and
+  D: every case after the first reported the same message, C's anchor
+  assertion failed outright, and read quickly it looks like four proofs firing.
+  Snapshot the files with `cp` and restore from the snapshot -- `git checkout`
+  is only a restore when the thing you are reverting is committed, and in a
+  build in progress it never is. **The tell is four proofs printing the same
+  message**, which is the same read as build 346's rule about a revert whose
+  baseline prints nothing.
+- **AND `window.__slot = slot` IN NODE SCOPE IS A `ReferenceError` THAT ONLY
+  FIRES AT RUNTIME.** `node --check` passed, the patch looked complete, and
+  both differential runs died after the served-tree banner with `window is not
+  defined`. A stray line from an earlier draft that had moved from the page
+  side to the node side; the value was already being returned. **A probe that
+  spans two scopes has two vocabularies and `--check` cannot tell them apart**
+  -- run it once with a short `--cap` before spending the measurement.
+- **A TABLE THAT DOES NOT SAY WHICH FIELD A ROW WAS MEASURED ON CANNOT BE READ
+  SIX BUILDS LATER**, which is build 305's own correction to `tiers.mjs` and is
+  what let this survive. All three probes print it now: `fight.mjs` a three-
+  line slot block (rung, era with `(derived)` or `(FORCED -- derived N)`,
+  power/column/width, core hp and `hard`), `dps.mjs` and `variance.mjs` a
+  one-liner. `--era N` forces it, and the disagreement with `anomalyEra` is
+  printed rather than silent.
+  **`--hash` REFUSES an era-2 anomaly outright.** The whole recorded hash
+  history is era 1, so an era-2 figure compares to nothing; `anomalyEra(1)` is
+  1, so the documented command is unaffected. A number nothing can be compared
+  against is worse than a refusal -- build 344's lesson, which is why that
+  probe now names the tree it read as well.
+- **RECORDED AND NOT ACTED ON: `CFG.boss.patience` IS ONE NUMBER WHERE PHASE 7
+  ASKS FOR SEVEN, and so is the health.** There is no per-anomaly clock and no
+  per-anomaly multiplier: a boss meets its authored literal times `boss.hard`,
+  which is `min(gunScale, temper)` and therefore the same product for all nine.
+  Writing seven of either is phase 7b and it wants the two things this build
+  bought first -- the right field, and three runs. Seven numbers tuned against
+  one run each on the wrong field would be seven numbers fitted to the day's
+  draws.
+- **AND `temper`'s OWN ARGUMENT QUOTED A STALE PRODUCT, which changes what the
+  constant is for.** Its comment justified a ceiling "rather than the raw
+  product (which reaches 4.69)" -- build 352 measured `gunScale` at **8.823**
+  fully bought, and about 29 with CORE. At 4.69 against a ceiling of 4.2 the
+  clamp barely binds; at 8.823 it binds at a little over half of ONE node's
+  ladder, so **`temper` and not the product is the live quantity above that
+  rung**, and a change to the damage line moves the rung at which the clamp
+  starts binding rather than the difficulty of any boss met after it. Second
+  stale figure in the same family in two builds (352 fixed `gunScale`'s own
+  header) -- build 329's rule, and the grep it asks for should have run one
+  file further.
+- **AND TWO SHIPPED CAPTIONS ARE OVER THE READING-SPEED CEILING, WHICH THE
+  PROBE PRINTS AND NOTHING ASSERTS.** ORDINAL's "IT IS NOT A WALL. IT NEVER
+  WAS." reads at **14.1 chars/sec** and DYNAMO's "IT HAS CLOSED THE CIRCUIT."
+  at **15.1**, against the 13 `fight.mjs` calls law 4's ceiling -- and that
+  ceiling lives nowhere but in one `console.log` in that probe, which is build
+  329's rule verbatim ("a `console.log` in a guard script is not a guard").
+  Deliberately not fixed here: the two remedies are rewording a line, which
+  makes it a NEW line on every device that has already been told the old one
+  (build 287), or lengthening a hold, which is a change to a boss's beats --
+  both content decisions, and authoring one inside a build whose subject is
+  the instrument is build 304's mistake. What it wants is the ceiling asserted
+  over every line in `tutorial.js` and the boss tables, once, and then the
+  handful it catches.
+- **AND WITH THE FIELD RIGHT AND THREE RUNS EACH, THE BOSSES DO SEPARATE --
+  WHICH IS THE POSITIVE HALF OF THE NOISE FINDING AND WHERE 7b STARTS.** The
+  three era-2 slots, stock, assists only, all reconciled (`remainder 1`):
+
+  | slot | core | fight | runs | spread | longest stage |
+  |---|---|---|---|---|---|
+  | DYNAMO (35) | 4093 | **188.1s** | 187.5 / 188.1 / 192.3 | 2.6% | 51.1s |
+  | PARITY (42) | 7175 | **181.1s** | 185.3 / 174.1 / 181.1 | 6.4% | 42.9s |
+  | TERMINUS (49) | 8640 | **354.2s** | 346.4 / 354.2 / 355.7 | 2.7% | 103.7s |
+
+  TERMINUS is nearly twice the other two and every spread is under 7%, so
+  these differences are real where build 215's stock column's were not. Note
+  DYNAMO and PARITY are within 4% of each other across seven rungs of ladder
+  and 1.75x of core health -- PARITY's core is 75% larger and its fight is
+  SHORTER -- which is the sort of thing a per-slot table exists to answer and
+  is stated here as the input rather than fixed.
+- **AND "TERMINUS DOES NOT FINISH AT STOCK AT ALL" IS FALSE ON THE FIELD IT IS
+  MET ON.** Build 305 recorded that, measured on era 1; on era 2 it reconciles
+  **3 of 3** and its longest stage is 103.7s against `CFG.boss.patience` 150
+  -- so the game's longest boss at its weakest turret sits at **69% of the one
+  safety clock**, with 46 seconds of headroom. That is the single most useful
+  number phase 7b has: it says the clock is not currently inside any fight,
+  and it says how much room a per-slot table has before it would be. Build
+  215 raised `patience` 90 -> 150 precisely because TERMINUS's last stage read
+  "EXACTLY 90.0s every single time" -- i.e. it was withdrawing -- and that
+  measurement was also era 1, so the raise was larger than it needed to be and
+  is now the reason the clock clears.

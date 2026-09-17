@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '352';
+export const BUILD = '353';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '352';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '1fad9ad';
+export const REV = '524de0a';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4597,6 +4597,45 @@ export const CFG = {
      * clear of a stage that is visibly progressing. It is still measured off
      * a stage CHANGE, not the whole fight, and it is still scaled by the
      * boss's own temper (see Game.watchBoss).
+     *
+     * AND THAT 90.0s WAS MEASURED ON THE WRONG FIELD, so the raise was larger
+     * than it needed to be -- which is why the clock now clears comfortably.
+     * `fight.mjs` set no era until build 353 and TERMINUS is gated above
+     * `eraGate`, so the withdrawal above was a fight against a gun with
+     * `CFG.power` 1 rather than 1.3. Measured on era 2, stock, three runs: it
+     * reconciles 3 of 3 in 354.2s (346.4 / 354.2 / 355.7) and its longest
+     * stage is **103.7s against this 150** -- so the game's longest boss at
+     * its weakest turret sits at 69% of the clock with 46 seconds in hand.
+     * That is the number a per-slot table has to be written against: the net
+     * is currently outside every fight, and this is how much room there is
+     * before it would not be.
+     */
+    /*
+     * ONE NUMBER, WHERE PHASE 7 ASKS FOR SEVEN, and that is the phase's real
+     * shape rather than a detail of it. `docs/rebalance.html` reads "seven
+     * numbers and seven patience clocks, measured against the turret each slot
+     * actually meets" -- there is no per-anomaly clock and no per-anomaly
+     * health either: a boss meets the authored literal times `boss.hard`
+     * (above), which is the same product for all nine.
+     *
+     * Two things have to be true before seven of either can be written and
+     * neither was, which is why build 353 is the instrument and not the table.
+     * The FIELD: `fight.mjs` set no era until 353, so DYNAMO, PARITY and
+     * TERMINUS -- every anomaly gated above `eraGate` -- had never been
+     * measured on the field they are met on, and the correction is worth -25%
+     * of a fight (250.0s against 188.1s on DYNAMO, three runs a side,
+     * populations disjoint). The NOISE FLOOR: a fight length is a single draw,
+     * and stock ORDINAL reads 258.9 / 287.7 / 230.7 / 269.8 / 236.4 -- 1.25x
+     * between the extremes -- so nothing under about 25% is a reading at all
+     * at one run, and every recorded boss figure in this repo was taken at one
+     * run. Seven numbers tuned against that would be seven numbers fitted to
+     * the day's draws.
+     *
+     * The RUNG is deliberately not on that list, because it is not a channel:
+     * every boss body and every minion is `fixed`, so `scaleToTier` returns on
+     * its first line -- ORDINAL's core measures 1788 at rung 1 against 1787 at
+     * rung 7, and its TALLYs 171 against 172. A gate rung is a label for which
+     * turret a slot is met with, never a multiplier on the boss.
      */
     patience: 150,
     /*
@@ -4618,7 +4657,13 @@ export const CFG = {
      * for the measurement this answers: seven fights, all of them a fifth of
      * their tuned length once the tree is bought out.
      *
-     * A ceiling rather than the raw product (which reaches 4.69) because the
+     * A ceiling rather than the raw product -- which reached 4.69 when this was
+     * written and is 8.823 now, measured at build 352 after HOLLOWPOINT went to
+     * 5 levels at 229 and 8 at 302, and about 29 with CORE owned. That is not a
+     * detail: at 4.69 the ceiling barely bound, and at 8.823 it binds at a
+     * little over half of one node's ladder, so `temper` and not the product is
+     * the live quantity for anyone tuning boss scaling above that rung -- and
+     * because the
      * multiplier reaches only structure and cores -- minions come through
      * claim() and are deliberately left alone, since a longer fight already
      * means more of them -- and because a boss's scripted beats do not
