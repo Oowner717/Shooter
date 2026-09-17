@@ -570,8 +570,7 @@ export class Terminus extends Boss {
         // a second against a ceiling of thirteen -- because a line replaced
         // before it has been read is a line that was never said.
         if (!this.mends) {
-          world.bossLine = 'IT IS MENDING THE EDGE.';
-          this.lineFor = 3.2;
+          this.says(world, 'IT IS MENDING THE EDGE.', 3.2);
         }
         return;
       }
@@ -608,8 +607,7 @@ export class Terminus extends Boss {
     const C = X();
     this.eclipsed = true;
     this.eclipse = C.eclipseFor;
-    world.bossLine = 'EVERYTHING YOU BROKE WAS MEASURING YOU FOR THIS.';
-    this.lineFor = 5.0;
+    this.says(world, 'EVERYTHING YOU BROKE WAS MEASURING YOU FOR THIS.', 5.0);
     flash(0.5, TYPE_BY_ID.terminus.color);
     ripple(this.hub.x, this.hub.y, 3.4, 1300);
     shake(30);
@@ -909,8 +907,7 @@ export class Terminus extends Boss {
       // twenty-eight characters a second against a ceiling of thirteen.
       if (this.bare && !this.said) {
         this.said = true;
-        world.bossLine = 'IT IS INSIDE ITS OWN EDGE WITH YOU.';
-        this.lineFor = 3.4;
+        this.says(world, 'IT IS INSIDE ITS OWN EDGE WITH YOU.', 3.4);
       }
     }
     this.dip = this.bare ? 1 : 0;
@@ -937,10 +934,11 @@ export class Terminus extends Boss {
     if (n >= 4) this.lastClose(world);
     this.hold(world, 0.45);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'IT HAS LET GO OF EVERYTHING BUT YOU.'
-      : n >= 3 ? 'IT HAS LET GO OF THE EDGE.'
-        : 'THERE IS A SECOND EDGE INSIDE THE FIRST.';
-    this.lineFor = n >= 4 ? 4.4 : 3.6;
+    this.says(world,
+      n >= 4 ? 'IT HAS LET GO OF EVERYTHING BUT YOU.'
+        : n >= 3 ? 'IT HAS LET GO OF THE EDGE.'
+          : 'THERE IS A SECOND EDGE INSIDE THE FIRST.',
+      n >= 4 ? 4.4 : 3.6);
     ring(this.x, this.y, 20, 520, 0.7, TYPE_BY_ID.terminus.glow, 6);
     ripple(this.x, this.y, 2.2, 640);
     shake(16);

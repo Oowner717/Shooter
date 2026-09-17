@@ -40,6 +40,7 @@ import { shed } from './debris.js';
 import { background } from './background.js';
 import { registerAnomaly, makerOf, dressOf, anomalyOf } from './anomaly.js';
 import { gunScale } from './shooter.js';
+import { readFor } from './tutorial.js';
 
 const O = () => CFG.ordinal;
 /** The five numbers every boss's ending shares. See CFG.boss. */
@@ -248,6 +249,16 @@ export class Boss {
     this.dying = 0;
     this.done = false;
     this.flare = 0; // white bloom on a stage change or a mend
+    /*
+     * The caption band is one line wide and three of its fields are one
+     * mechanism. `lineFor` is what the current line has left, `lineShown`
+     * what it has had, and `lineNext` the one caption waiting for it. All
+     * three are declared here rather than sprung into existence by whichever
+     * site talks first, for `e.fan`'s reason.
+     */
+    this.lineFor = 0;
+    this.lineShown = 0;
+    this.lineNext = null;
     this.beams = []; // mend beams, drawn from the core to what it is mending
     this.repairT = 0;
     this.burstT = 0;
@@ -405,12 +416,98 @@ export class Boss {
     return [];
   }
 
+  /**
+   * Say something, and do not take away what is still being read.
+   *
+   * THE ONE DOOR for every caption that is not part of an arrival or death
+   * script. Before build 355 each of the twenty-seven sites wrote the text and
+   * its clock as two statements -- `world.bossLine = X` then
+   * `this.lineFor = Y` -- and two things that have to agree, authored apart,
+   * is the shape that has already cost this repo `HERO_GAITS`/`HERO_COL` read
+   * at one index and `solo: true` read by nothing. It also left the band with
+   * no way to refuse a write, which is the fault below.
+   *
+   * MEASURED, all nine anomalies, won fights, every write to the field spied
+   * rather than the field sampled once a frame: THREE captions were taken away
+   * before they could be read and TWO of them never reached the glass at all.
+   *   - AXIOM: the last clause to die posts "X IS YOURS AGAIN." and, four
+   *     lines further down the same `freed` call, opens the core and posts the
+   *     stage caption over it. ZERO frames, every fight, because the core opens
+   *     exactly when the last clause dies -- 1260 cps measured.
+   *   - AMPLITUDE: `enterStage(3)` calls `strike`, which posts "OCTAVE" with
+   *     its own flash, ripple and boom, and then writes the stage caption over
+   *     it eight lines later in the same function. ZERO frames, every fight,
+   *     360 cps.
+   *   - AXIOM again, intermittently: two clauses dying within a few frames,
+   *     16.7 cps over 1.3s.
+   * The other seven bosses lose nothing, which is why this is the band's fault
+   * and not a site's: the same shape in two unrelated files is the reason
+   * build 354's reword had to touch two `enterStage` arms as well.
+   *
+   * A line that cannot have the band WAITS. One deep, and the newest waiting
+   * line wins the slot: a caption is a statement about the moment, and a
+   * backlog of stale statements reads worse than a dropped one. That is the
+   * opposite ruling to `Hud.showHint`, which queues eight and drops nothing --
+   * and the difference is real. A first-use teaching line is SPENT when it is
+   * dropped and the device never offers it again; a release caption is a
+   * receipt for a button the bar has already lit back up.
+   */
+  says(world, text, hold) {
+    /*
+     * Deferred only while an AD-HOC line is up, which `lineFor > 0` is exactly
+     * the test for, because a script's line is re-asserted by `say` every
+     * frame off `lineT` and carries no clock at all. So a caption posted
+     * during an arrival or a death is posted immediately and the script wins
+     * the next frame -- unchanged from before this method existed, and the
+     * die-entry sites zero the clock so a script can never inherit one.
+     *
+     * Whether that can arise is MEASURED rather than argued: over all nine
+     * anomalies on won fights -- every stage, both scripts -- the write spy
+     * counted ZERO captions taken away inside a script, which it would read as
+     * a one-frame hold and therefore far over `CAPS_CPS`. Read in AXIOM, whose
+     * `freed` is the one site that fires on a body's death rather than on a
+     * beat, both early returns sit above it. The general claim is the
+     * measurement; do not assume it of a site added later without taking it
+     * again.
+     */
+    if (this.lineFor > 0 && world.bossLine && world.bossLine !== text
+      && this.lineShown < readFor(world.bossLine)) {
+      this.lineNext = { text, hold };
+      return;
+    }
+    world.bossLine = text;
+    this.lineFor = hold;
+    this.lineShown = 0;
+    this.lineNext = null;
+  }
+
+  /** Give the band to the caption that has been waiting. */
+  drainLine(world) {
+    const next = this.lineNext;
+    if (!next) return false;
+    this.lineNext = null;
+    world.bossLine = next.text;
+    this.lineFor = next.hold;
+    this.lineShown = 0;
+    return true;
+  }
+
   /** The per-frame housekeeping every boss does before anything else. */
   tickCommon(world, dt) {
     this.flare = Math.max(0, this.flare - dt * 2.2);
     if (this.lineFor > 0) {
-      this.lineFor -= world.dtRaw || dt;
-      if (this.lineFor <= 0) world.bossLine = null;
+      const step = world.dtRaw || dt;
+      this.lineFor -= step;
+      this.lineShown += step;
+      /*
+       * A waiting line takes the band as soon as the one up has been READ,
+       * which is sooner than that line's authored hold. `hold` is how long a
+       * caption stays when nothing else wants the band; `readFor` is what it
+       * is guaranteed. So OCTAVE costs the stage caption 0.46s and a full
+       * sentence costs it its whole span.
+       */
+      if (this.lineNext && this.lineShown >= readFor(world.bossLine)) this.drainLine(world);
+      else if (this.lineFor <= 0 && !this.drainLine(world)) world.bossLine = null;
     }
     for (let i = this.beams.length - 1; i >= 0; i--) {
       this.beams[i].t -= dt;
@@ -539,6 +636,11 @@ export class Boss {
     this.blewFor = 0;
     this.beat = 0;
     this.lineFor = 0;
+    /*
+     * ...and anything WAITING for the band goes with it. A belt, and named as
+     * one: see the same note in `Ordinal.die`.
+     */
+    this.lineNext = null;
     world.bossLine = null;
     this.snapped = 0;
     world.timeScale = B().endSlow;
@@ -1222,16 +1324,15 @@ export class Ordinal extends Boss {
   update(world, dt) {
     const C = O();
     this.t += dt;
-    this.flare = Math.max(0, this.flare - dt * 2.2);
-    // A stage caption reads for a few seconds and then gets out of the way.
-    if (this.lineFor > 0) {
-      this.lineFor -= world.dtRaw || dt;
-      if (this.lineFor <= 0) world.bossLine = null;
-    }
-    for (let i = this.beams.length - 1; i >= 0; i--) {
-      this.beams[i].t -= dt;
-      if (this.beams[i].t <= 0) this.beams.splice(i, 1);
-    }
+    /*
+     * ...through `tickCommon` rather than the inline copy of it this method
+     * carried until build 355. The copy was byte-identical -- flare, the
+     * caption clock, the mend beams -- so it was a second door of exactly the
+     * kind `Ordinal.clear` is (build 325 found the mark written out in two
+     * places for the same reason), and the caption queue would have had to be
+     * written into both. The ORDINAL hash is what says the two were the same.
+     */
+    this.tickCommon(world, dt);
 
     if (this.arriving > 0) {
       this.arrive(world, world.dtRaw || dt);
@@ -1363,8 +1464,7 @@ export class Ordinal extends Boss {
          * anything could read, which is what let the caption after it be 31
          * characters in a 2.2-second reel-back and nothing notice.
          */
-        world.bossLine = 'CONVERGENCE';
-        this.lineFor = C.convergePull + C.convergeHold;
+        this.says(world, 'CONVERGENCE', C.convergePull + C.convergeHold);
         flash(0.3, TYPE_BY_ID.ordinal.color);
         shake(14);
         audio.boom();
@@ -1424,8 +1524,7 @@ export class Ordinal extends Boss {
     this.tally = 0;
     this.tallyAt = 0;
     this.tallyGone = this.panels().filter((p) => p.dead).length;
-    world.bossLine = 'TALLY';
-    this.lineFor = 3.2;
+    this.says(world, 'TALLY', 3.2);
     this.hold(world, 0.6);
     flash(0.4, TYPE_BY_ID.ordinal.color);
     ripple(this.x, this.y, 2.8, 1000);
@@ -1518,8 +1617,7 @@ export class Ordinal extends Boss {
        * and a later tune of `convergeBack` moves the caption with the beat
        * instead of leaving it to be cut off by whatever speaks next.
        */
-      world.bossLine = 'IT WAS NEVER A WALL.';
-      this.lineFor = C.convergeBack;
+      this.says(world, 'IT WAS NEVER A WALL.', C.convergeBack);
       return false;
     }
 
@@ -1648,10 +1746,11 @@ export class Ordinal extends Boss {
     for (const ring of this.rings) ring.spin *= -1;
     // The whole sky escalates with it, not just the boss.
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'IT IS COMING DOWN TO LOOK AT YOU.'
-      : n >= 3 ? 'THE COUNT IS SHORT. IT HAS NOTICED.'
-        : 'IT IS MENDING ITSELF.';
-    this.lineFor = n >= 4 ? 4.4 : 3.4;
+    this.says(world,
+      n >= 4 ? 'IT IS COMING DOWN TO LOOK AT YOU.'
+        : n >= 3 ? 'THE COUNT IS SHORT. IT HAS NOTICED.'
+          : 'IT IS MENDING ITSELF.',
+      n >= 4 ? 4.4 : 3.4);
     if (n >= 4) {
       // Where it falls from, and it never goes back up.
       this.y0 = this.y;
@@ -1694,6 +1793,11 @@ export class Ordinal extends Boss {
     // A stage caption still counting down would clobber the outro's first
     // line the moment it expired.
     this.lineFor = 0;
+    /*
+     * ...and anything WAITING for the band goes with it. A belt, and named as
+     * one: see the same note in `Ordinal.die`.
+     */
+    this.lineNext = null;
     world.bossLine = null;
     this.snapped = 0; // segments taken so far during ARREST
     world.timeScale = B().endSlow;

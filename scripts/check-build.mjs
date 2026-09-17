@@ -1048,26 +1048,34 @@ for (const f of readdirSync(srcDir).filter((n) => n.endsWith('.js')).sort()) {
     const m = ln.match(/\{\s*text:\s*'((?:[^'\\]|\\.)*)'\s*,\s*hold:\s*([\d.]+)\s*\}/);
     if (m) caps.push({ kind: 'script', f, n: i + 1, texts: [m[1]], holds: [+m[2]] });
   });
-  // An ad-hoc line states its hold in a separate statement, so read the whole
-  // assignment and then the `lineFor` that follows it.
+  /*
+   * An ad-hoc line goes through `Boss.says(world, text, hold)` from build 355,
+   * so the text and the hold are two arguments of ONE call and the detection
+   * reads the call. It used to read `world.bossLine = X` and then hunt for a
+   * `this.lineFor = Y` within three lines -- and the conversion to one door
+   * made that detection match nothing, which is what the vacuity arm below
+   * caught on the very next build. The guard was right about the exposure and
+   * had pinned the SHAPE it happened to arrive in.
+   */
   for (let i = 0; i < L.length; i++) {
-    if (!/world\.bossLine\s*=/.test(L[i])) continue;
-    let stmt = ''; let j = i;
-    while (j < L.length) { stmt += L[j]; if (/;\s*$/.test(L[j])) break; j++; }
-    const texts = [...stmt.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1])
+    if (!/this\.says\(/.test(L[i])) continue;
+    let call = ''; let j = i;
+    while (j < L.length) { call += L[j] + ' '; if (/;\s*$/.test(L[j])) break; j++; }
+    const texts = [...call.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1])
       .filter((t) => t && t === t.toUpperCase() && /[A-Z]/.test(t));
     if (!texts.length) continue;
-    let holds = null;
-    for (let k = j + 1; k <= Math.min(j + 3, L.length - 1); k++) {
-      if (!/this\.lineFor\s*=/.test(L[k])) continue;
-      // Either literals, or a sum/ternary of CFG reads this file can evaluate.
-      const lits = [...L[k].matchAll(/(?<![\w.])\d+(?:\.\d+)?/g)].map((m) => +m[0]);
-      const reads = [...L[k].matchAll(/\bC\.(\w+)/g)].map((m) => m[1]);
-      holds = lits.filter((x) => x > 0.2 && x < 30);
-      if (reads.length) holds.push(...[sumOfCfgReads(f, reads)].filter((x) => x > 0));
-      break;
-    }
-    caps.push({ kind: holds && holds.length ? 'adhoc' : 'noHold', f, n: i + 1, texts, holds });
+    /*
+     * The HOLD is the last argument, so it is whatever follows the final
+     * comma that is not inside the text. Read off the tail of the call rather
+     * than off the whole of it, or the ring and ripple numbers on the lines
+     * below a wrapped call get counted as candidate holds.
+     */
+    const tail = call.slice(call.lastIndexOf("',") + 2);
+    const lits = [...tail.matchAll(/(?<![\w.])\d+(?:\.\d+)?/g)].map((m) => +m[0]);
+    const reads = [...tail.matchAll(/\bC\.(\w+)/g)].map((m) => m[1]);
+    const holds = lits.filter((x) => x > 0.2 && x < 30);
+    if (reads.length) holds.push(...[sumOfCfgReads(f, reads)].filter((x) => x > 0));
+    caps.push({ kind: holds.length ? 'adhoc' : 'noHold', f, n: i + 1, texts, holds });
   }
 }
 /*
@@ -1098,15 +1106,24 @@ function sumOfCfgReads(file, keys) {
  * So EACH KIND has to be non-empty, because each is a separate mechanism and
  * the guard's whole finding is that they fail differently: a scripted line
  * carries its own hold beside its own text and 66 of 66 are inside the
- * ceiling, while an ad-hoc line states its hold in another statement and
- * every offender the ceiling has ever caught was one of those. Losing sight
- * of either half is losing the guard, and only the count says which.
+ * ceiling, while an ad-hoc line is posted at a moment nothing else knows
+ * about and every offender the ceiling has ever caught was one of those.
+ * Losing sight of either half is losing the guard, and only the count says
+ * which.
+ *
+ * ...and it earned that on the VERY NEXT BUILD. 355 took the ad-hoc sites
+ * through one `Boss.says` call, the old detection (an assignment plus a
+ * `lineFor` within three lines) matched nothing at all, and this arm is what
+ * said so -- with its message naming the right half of the diagnosis: the
+ * detection had drifted, not the exposure. A guard pinned to the SHAPE a
+ * mechanism happens to arrive in needs a vacuity arm to survive the mechanism
+ * being tidied, which is the cheapest thing in this file to get wrong.
  */
 for (const kind of ['script', 'adhoc']) {
   if (caps.some((c) => c.kind === kind)) continue;
   console.error(`captions: no ${kind} caption found, so this guard is asserting nothing about `
     + 'that half -- the detection has drifted, not the exposure. It reads { text, hold } pairs '
-    + 'and world.bossLine assignments followed by a lineFor.');
+    + 'and this.says(world, text, hold) calls.');
   process.exit(1);
 }
 const capBad = [];
@@ -1133,8 +1150,103 @@ const capWorst = caps.map((c) => {
   const t = c.texts.reduce((a, b) => (b.length > a.length ? b : a));
   return { t, cps: t.length / Math.min(...c.holds) };
 }).sort((a, b) => b.cps - a.cps)[0];
+/*
+ * ...AND THERE IS ONE DOOR, which is what makes the floor a rule rather than
+ * twenty-seven hopes.
+ *
+ * `Boss.says` is the only thing that may put a caption up, because it is the
+ * only thing that can REFUSE to -- and the refusal is the whole of build
+ * 355's fix. A site that writes `world.bossLine` itself takes the band
+ * whatever is being read, which measured as two captions that never reached
+ * the glass at all (AXIOM's last release at 1260 cps, AMPLITUDE's OCTAVE at
+ * 360) and one at 16.7.
+ *
+ * Exactly two writers are legitimate and both are derived rather than named:
+ * a write of `null` is a site ENDING a caption, which needs no floor and must
+ * be immediate -- nineteen teardown paths depend on it -- and `Boss.say` is
+ * the SCRIPT path, which re-asserts its own text every frame off `lineT` and
+ * carries no `lineFor` at all. The set is "inside `say`, or writing null", so
+ * a tenth boss inherits the rule by existing. Same shape as `formable()`.
+ */
+const doorBad = [];
+let sayWriters = 0;
+for (const f of readdirSync(srcDir).filter((n) => n.endsWith('.js')).sort()) {
+  const body = readFileSync(new URL(f, srcDir), 'utf8');
+  const L = body.split('\n');
+  // `say`'s own body, by its signature and its closing brace column.
+  const sayAt = L.findIndex((ln) => /^\s{2}say\(world, script/.test(ln));
+  let sayEnd = -1;
+  if (sayAt >= 0) for (let k = sayAt + 1; k < L.length; k++) if (L[k] === '  }') { sayEnd = k; break; }
+  L.forEach((ln, i) => {
+    if (!/world\.bossLine\s*=/.test(ln)) return;
+    /*
+     * A COMMENT quoting the old form is not a write, and the first run of this
+     * arm failed the build for `says`'s own docstring naming the two
+     * statements it replaced. That is build 344's rule the other way up --
+     * there a `grep -c` passed because prose contained the string it was
+     * looking for, here a guard failed for the same reason. Parse lines of
+     * code, not lines of a file.
+     */
+    if (/^\s*(\*|\/\/|\/\*)/.test(ln)) return;
+    if (/=\s*null\s*;/.test(ln)) return;
+    if (sayAt >= 0 && i > sayAt && i < sayEnd) { sayWriters++; return; }
+    // `says` and `drainLine` ARE the door; they are inside boss.js's Boss.
+    if (f === 'boss.js' && /^\s{4}world\.bossLine = (text|next\.text);$/.test(ln)) { sayWriters++; return; }
+    doorBad.push(`${f}:${i + 1} writes world.bossLine directly -- go through this.says(world, text, hold)`);
+  });
+}
+if (doorBad.length || sayWriters < 3) {
+  if (sayWriters < 3) {
+    console.error('captions: found ' + sayWriters + ' of the 3 legitimate writers (say, says, drainLine), '
+      + 'so this arm is not reading the door it is about -- the detection has drifted.');
+  }
+  for (const line of doorBad) console.error(`captions: ${line}`);
+  process.exit(1);
+}
+/*
+ * ...AND NO CASE MAY SIT AFTER THE REPORT, which cost this build a whole
+ * suite run to find out.
+ *
+ * `ok` and `bad` only PUSH to `results`; nothing prints as it goes. The
+ * report block at the foot of `regress.mjs` is what prints every line, counts
+ * the failures into `failed`, and is read by the `process.exit` two blocks
+ * below it. So a case appended after that block is not printed, not counted
+ * AND NOT IN THE EXIT CODE -- build 355's own new case was spliced there and
+ * ran green, and the run said "765/765 passed" while the `--json` dump held
+ * 767 rows. Had it failed, the suite would have printed a clean count and
+ * exited 0.
+ *
+ * Nothing about that is visible in a diff, and the summary line is the one
+ * thing a reader checks -- so it is worth three lines here. The bound is
+ * derived from the file's own structure rather than a line number: every
+ * `check(` call has to come before the report's own heading.
+ */
+{
+  const rg = readFileSync(new URL('../scripts/regress.mjs', import.meta.url), 'utf8');
+  const at = rg.indexOf('\n// --- report ---');
+  if (at < 0) {
+    console.error('regress: regress.mjs has no report block, so this arm cannot find the '
+      + 'boundary it is about -- the detection has drifted.');
+    process.exit(1);
+  }
+  const after = [...rg.slice(at).matchAll(/^\s*check\(/gm)];
+  if (after.length) {
+    console.error(`regress: ${after.length} check() call(s) sit AFTER the report block, so they are `
+      + 'neither printed, counted nor in the exit code. Move them above '
+      + '"// --- report ---".');
+    process.exit(1);
+  }
+  const before = [...rg.slice(0, at).matchAll(/^\s*check\(/gm)].length;
+  if (before < 100) {
+    console.error(`regress: found only ${before} check() call(s) before the report, so this arm `
+      + 'is not reading the file it is about.');
+    process.exit(1);
+  }
+  console.log(`regress: all ${before} check() call(s) sit before the report, so every one is `
+    + 'printed, counted and in the exit code');
+}
 const capTexts = caps.reduce((a, c) => a + c.texts.length, 0);
-console.log(`captions: all ${capTexts} text(s) across ${caps.length} site(s) `
+console.log(`captions: ${sayWriters} legitimate writer(s); all ${capTexts} text(s) across ${caps.length} site(s) `
   + `(${caps.filter((c) => c.kind === 'script').length} scripted, `
   + `${caps.filter((c) => c.kind === 'adhoc').length} ad-hoc) read at or under CAPS_CPS ${CAPS_CPS}; `
   + `worst ${capWorst.cps.toFixed(1)} "${capWorst.t}"`);

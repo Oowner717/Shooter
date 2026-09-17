@@ -75,6 +75,26 @@ export const MIN_READ = 1.1;
 export const CAPS_CPS = 13;
 
 /**
+ * The least time a caption in CAPITALS may be left up, in seconds.
+ *
+ * `CAPS_CPS` read as a FLOOR rather than as a ceiling, and it is the same
+ * number on purpose: the guard says a caption has to be HELD long enough to
+ * be read, and this is the band promising not to take it away before it HAS
+ * been. A line's authored hold is how long it stays when nothing else wants
+ * the band; this is what it is guaranteed.
+ *
+ * The teaching band's equivalent is `MIN_READ`, and the difference is what
+ * each defends against. There a TAP can arrive at any instant, so the floor
+ * is flat. Here the thing arriving is another caption and the outgoing line's
+ * length is known, so the floor is that line's own read time -- which costs a
+ * six-letter set-piece word almost nothing (OCTAVE, 0.46s) and gives a full
+ * sentence its whole span.
+ */
+export function readFor(text) {
+  return String(text || '').length / CAPS_CPS;
+}
+
+/**
  * The opening, over an empty field. Four lines and then it stops talking: the
  * grip, the shot, the one button that is always yours, and what is coming.
  */

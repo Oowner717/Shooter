@@ -40554,6 +40554,159 @@ if (MINE_LINE) {
     + `interleaved crowd, two of four jumps on grey and 47% of the round)`);
 }
 
+// --- the caption band does not take a line away before it can be read --------
+/*
+ * AXIOM's last clause to die hands its button back AND opens the core, four
+ * lines apart in one `freed` call -- so the release caption and the stage
+ * caption were posted in the SAME FRAME and the release was never on screen at
+ * all. Measured across all nine anomalies on won fights, spying every WRITE to
+ * the field rather than sampling it once a frame: three captions taken away
+ * before they could be read, two of them at zero frames (AXIOM's release at
+ * 1260 cps and AMPLITUDE's OCTAVE at 360, both every fight), and the other
+ * seven bosses losing nothing.
+ *
+ * Build 354's own probe could not see either: it read `world.bossLine` once a
+ * frame, and a caption written and overwritten inside one `g.update` never
+ * appears in that reading. It reported the ONE instance that happened to
+ * straddle a frame boundary and called the fault intermittent.
+ *
+ * The A/B is the door itself. `Boss.says` is the only thing that can refuse a
+ * write, so replacing it with the two statements every site used to carry is
+ * the pre-355 behaviour exactly -- same bodies, same frames, same sequence,
+ * one switch inside the mechanism.
+ */
+{
+  const band = await page.evaluate(async () => {
+    const { readFor } = await import('../src/tutorial.js');
+    const g = window.__sim;
+    const w = g.world;
+    const S = 1 / 60;
+
+    const run = (old) => {
+      g.restart();
+      w.phase = 'staging';
+      w.director.timer = 1e9; w.director.driftTimer = 1e9;
+      for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+      /*
+       * The five ids AXIOM prefers, owned explicitly. Four of them are in
+       * `LOCKABLE.abilities`, so a run that owns nothing meets a boss holding
+       * nothing -- and this case is about what it says when it hands one back.
+       * Set here rather than inherited from seven thousand cases upstream.
+       */
+      for (const id of ['fan', 'lance', 'well', 'prism', 'stasis']) w.unlocked.add(id);
+      w.apertures[8] = 1;
+      if (!g.openBoss(8)) throw new Error('AXIOM did not open');
+      const bo = w.boss;
+      bo.arriving = 0;
+      g.update(S);
+      // The pre-355 site: the text and its clock as two statements, which is
+      // a write the band has no way to refuse.
+      if (old) bo.says = function (world, text, hold) { world.bossLine = text; this.lineFor = hold; };
+
+      const live = bo.clauses.filter((p) => p.holds);
+      if (live.length < 2) throw new Error('need two clauses holding something, got ' + live.length);
+      // Everything but one, released first so the band is quiet when the one
+      // that matters dies. `freed` is driven through `update`, not called.
+      for (const p of live.slice(0, -1)) p.dead = true;
+      g.update(S);
+      w.bossLine = null; bo.lineFor = 0; bo.lineShown = 0; bo.lineNext = null;
+
+      const last = live[live.length - 1];
+      const want = `${(w.abilities.slots.find((s) => s.def.id === last.holds) || {}).def.name} IS YOURS AGAIN.`;
+      last.dead = true;
+
+      const seen = [];
+      for (let k = 0; k < 60 * 5; k++) {
+        g.update(S);
+        const t = w.bossLine;
+        if (!seen.length || seen[seen.length - 1].text !== t) seen.push({ text: t, f: 1 });
+        else seen[seen.length - 1].f++;
+      }
+      const rel = seen.find((x) => x.text === want);
+      const relAt = seen.indexOf(rel);
+      const stage = seen.find((x, i) => i > relAt && x.text && x.text !== want);
+      const out = {
+        stage: bo.stage,
+        want,
+        relFrames: rel ? rel.f : 0,
+        relSecs: rel ? +(rel.f * S).toFixed(3) : 0,
+        floor: +readFor(want).toFixed(3),
+        stageText: stage ? stage.text : null,
+        texts: seen.filter((x) => x.text).map((x) => x.text),
+      };
+      if (w.boss) { w.boss.clear(w); w.boss = null; }
+      for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+      w.bossLine = null;
+      return out;
+    };
+
+    const fixed = run(false);
+    const broken = run(true);
+
+    /*
+     * ...and the waiting line must not outlive the beat it is about. Both
+     * die-entry sites zero the clock and null the field, and the queue gave
+     * them a third thing to clear: a release caption held back a moment
+     * earlier would otherwise land on top of the outro's first line, which is
+     * the fault the comment at those two sites has named since it was written.
+     */
+    g.restart();
+    w.phase = 'staging';
+    w.director.timer = 1e9; w.director.driftTimer = 1e9;
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    for (const id of ['fan', 'lance', 'well', 'prism', 'stasis']) w.unlocked.add(id);
+    w.apertures[8] = 1;
+    g.openBoss(8);
+    const bo = w.boss;
+    bo.arriving = 0;
+    g.update(S);
+    bo.says(w, 'A LINE THAT IS BEING READ.', 3.4);
+    bo.says(w, 'A LINE THAT IS WAITING.', 3.4);
+    const queued = !!bo.lineNext;
+    bo.core.hp = -1; bo.core.dead = true;
+    g.update(S);
+    const cleared = !bo.lineNext;
+    let invaded = false;
+    for (let k = 0; k < 60 * 6; k++) {
+      g.update(S);
+      if (w.bossLine === 'A LINE THAT IS WAITING.') invaded = true;
+    }
+    const dying = bo.dying > 0 || w.reconciled.includes(8);
+    if (w.boss) { w.boss.clear(w); w.boss = null; }
+    for (const e of [...w.enemies]) e.dead = true; w.enemies.length = 0;
+    w.bossLine = null; w.timeScale = 1;
+
+    return { fixed, broken, queued, cleared, invaded, dying };
+  });
+
+  const f = band.fixed;
+  const b = band.broken;
+  check('a boss caption is not taken away before it can be read',
+    f.relFrames > 0 && f.relSecs >= f.floor - 2 / 60 && f.relSecs <= f.floor + 2 / 60
+    && f.stageText && f.stageText !== f.want && b.relFrames === 0 && f.stage === 2,
+    `"${f.want}" held ${f.relSecs}s against a floor of ${f.floor}s, then "${f.stageText}"`
+    + ` — through the door the same frame writes it and the stage caption post`
+    + ` together; with the two statements back it holds ${b.relFrames} frames`);
+
+  /*
+   * Nothing is DROPPED, which is the half a queue exists for -- reverting the
+   * drain leaves the stage caption unsaid entirely and fails both arms.
+   *
+   * `invaded` is reported and NOT asserted, because measurement says it
+   * cannot fire: the die-entry sites zero `lineFor` as well, and the queue is
+   * only drained while a clock is running, so a waiting line left behind at a
+   * death never reaches the glass. Asserting it would be a belt somebody later
+   * reads as a brace. What DOES fire is `cleared`, proved by reverting the
+   * one line at those two sites.
+   */
+  check('...and the caption it stood aside for is said, not lost',
+    f.texts.length >= 2 && f.texts[0] === f.want
+    && band.queued && band.cleared && band.dying,
+    `${f.texts.length} captions in order [${f.texts.join(' | ')}]`
+    + `; a line queued at the death: held ${band.queued}, cleared ${band.cleared},`
+    + ` dying ${band.dying}; reached the outro ${band.invaded} (cannot, and is not asserted)`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
@@ -40585,6 +40738,7 @@ for (const e of errors.slice(0, 8)) console.log(`  ! ${e}`);
  * it writes the array as it stands so a reader can diff, group or plot it
  * without re-deriving anything.
  */
+
 const argJson = process.argv.indexOf('--json');
 if (argJson > 0 && process.argv[argJson + 1]) {
   require('fs').writeFileSync(process.argv[argJson + 1],

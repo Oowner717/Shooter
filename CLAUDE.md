@@ -4599,6 +4599,12 @@ came from before believing the other one covers it.
   `tail` keeps the count and loses the FAIL. That cost a full 13-minute re-run
   to recover a single line. Redirect the whole run to a file and grep it;
   the count is worthless without the name beside it.
+  **The advice is right and the mechanism is not -- corrected at build 355.**
+  It does NOT print as it goes: `ok` and `bad` only push to `results`, and one
+  loop at the foot of the file prints every line, counts `failed` and feeds
+  the `process.exit`. So the whole report arrives in one block at the end,
+  which is why `tail` truncates the front of it rather than the middle -- and
+  it is also why a case appended after that block is invisible to all three.
 
 - **A THRESHOLD BELONGS IN THE GAP BETWEEN WORKING AND BROKEN, AND AIRBURST'S
   HAS NOW STRADDLED ITS OWN DRAW TWICE.** Build 315 replaced a single-body
@@ -9792,6 +9798,13 @@ came from before believing the other one covers it.
   clauses at once. **Deferred because it is a mechanism and a case, not a
   reword**, and because the static guard below provably cannot see it: the
   authored numbers are legal and the fault is a race.
+  **"INTERMITTENT" IS WRONG, THE OUTRO CANNOT CAUSE IT, AND THERE ARE THREE
+  OF THEM IN TWO BOSSES -- see build 355.** The zero-frame case happens in
+  EVERY AXIOM fight and every AMPLITUDE fight, deterministically; the outro is
+  structurally incapable of it (`opened` requires every clause dead, so the
+  hold set is empty by then); and the reason only one was recorded is that the
+  probe sampled `world.bossLine` once a frame, which cannot see a caption
+  written and overwritten inside one `g.update`.
 - **AND THE CEILING ITSELF WAS ONE PROBE'S LITERAL, WHICH IS WHY IT COULD
   NEITHER ROT NOR BE TRUSTED.** `13` lived in a single `console.log` in
   `fight.mjs` from the day that probe was written -- build 329's rule verbatim.
@@ -9910,3 +9923,208 @@ came from before believing the other one covers it.
   conjuncts still bite. Seconds, against thirteen minutes of suite, and what
   is verified cannot disagree with what ships (build 349's harness, reused a
   third time).
+
+- **BUILD 355 IS THE CAPTION QUEUE BUILD 354 DEFERRED, AND THE FIRST THING
+  MEASURING IT DID WAS CORRECT BUILD 354'S ACCOUNT OF THE FAULT IN THREE
+  WAYS.** 354 recorded one instance, called it intermittent, and named the
+  outro's arrest as a cause. Measured across all nine anomalies on won fights
+  -- spying every WRITE to `world.bossLine` rather than sampling the field
+  once a frame -- there are **THREE captions taken away before they could be
+  read, in TWO bosses, and two of the three never reach the glass at all**:
+  - **AXIOM, every fight, 1260 cps.** The last clause to die hands its button
+    back and, four lines further down the same `freed` call, opens the core --
+    which posts the stage caption over the release in the SAME FRAME. It is
+    deterministic rather than intermittent, because `opened` fires exactly
+    when the last clause dies. Measured 0 frames in 3 of 3 runs, a different
+    ability each time (STASIS, WELL, LANCE), so the fifth of five releases is
+    simply never shown.
+  - **AMPLITUDE, every fight, 360 cps, and 354 never saw it at all.**
+    `enterStage(3)` calls `strike`, which posts `'OCTAVE'` with its own flash,
+    ripple, shake and boom -- and then writes the stage caption over it eight
+    lines later in the same function. A named set-piece, on screen for zero
+    frames, in every fight since it was written.
+  - **AXIOM again, intermittently, 16.7 cps over 1.3s** -- two clauses dying a
+    few frames apart, which is the one 354 found.
+  The other seven bosses lose nothing, which is what makes this the BAND's
+  fault and not a site's: the same shape, in two unrelated files, is exactly
+  what build 354's own reword met when it had to fix `enterStage` twice.
+- **THE OUTRO IS STRUCTURALLY INCAPABLE OF CAUSING IT, WHICH ONE LINE OF
+  READING SETTLES.** 354's note said it fires "when a blast or the outro's
+  arrest takes two clauses at once". `freed` only speaks for a clause whose id
+  is still in `world.abilityHold`, and `if (!this.opened && this.clauses.every
+  ((p) => p.dead))` means the core cannot be shot until every clause is gone
+  -- so by the time the arrest runs, the hold set is empty and the outro has
+  nothing to hand back. Its "EVERYTHING IT WAS HOLDING IS YOURS AGAIN." is a
+  scripted line and was never at risk. **A named cause is a claim; grep the
+  gate before writing it down.**
+- **THE PROBE COULD NOT SEE THE WORST CASE, AND THAT IS BUILD 354'S OWN RULE
+  ONE LEVEL IN.** 354 ended with "when a probe reduces a population to its
+  worst member, the thing to add is the population" -- and the population it
+  added was still a per-frame READING of the field. A caption written and
+  overwritten inside one `g.update` never appears in that reading at all, so
+  the two zero-frame instances were invisible and the one that happened to
+  straddle a frame boundary read as the whole fault. **Spy the WRITE.** The
+  question "what did this field hold" and the question "what did anything try
+  to put in it" are different questions, and only the second can see a value
+  that was destroyed before a frame ended.
+- **...AND MY FIRST WRITE-SPY REPORTED SIXTY LOSSES A SECOND ON A HEALTHY
+  BUILD.** `Boss.say` re-asserts `world.bossLine = cur.text` every frame while
+  a script is up, so a raw write counter reads a scripted line as clobbering
+  ITSELF at 60Hz -- pages of it, every line "killed by" its own text. A write
+  is only a transition when the text CHANGES. The tell was in the output: the
+  `text` and the `by` columns were identical on every row.
+- **THE FIX IS ONE DOOR, AND THE DOOR IS ALSO THE CURE FOR THE UNDERLYING
+  DEFECT.** Every one of the 27 ad-hoc sites wrote the text and its clock as
+  TWO STATEMENTS -- `world.bossLine = X` then `this.lineFor = Y` -- which is
+  the "two things that have to agree, authored apart" shape that has already
+  cost this repo `HERO_GAITS`/`HERO_COL` read at one index and `solo: true`
+  read by nothing. It is also why a SETTER on the world could not have fixed
+  this with no site edits, which was the tempting cheap answer: the setter sees
+  the text on one statement and the hold on the next, so it can neither price
+  the line it is being handed nor apply a deferred hold to the right one.
+  `Boss.says(world, text, hold)` is the one writer, and it is the only thing
+  that can REFUSE a write -- which is the whole of the fix.
+- **THE FLOOR IS `CAPS_CPS` READ AS A FLOOR, AND IT IS THE SAME NUMBER ON
+  PURPOSE.** `readFor(text) = text.length / CAPS_CPS` in `tutorial.js`: the
+  guard build 354 shipped says a caption has to be HELD long enough to be
+  read, and this is the band promising not to take it away before it HAS been.
+  A line's authored `hold` is how long it stays when nothing else wants the
+  band; `readFor` is what it is guaranteed. Delivered to the frame, measured:
+  **OCTAVE holds 0.467s against a `readFor` of 0.4615 (28 frames) and "HAIL IS
+  YOURS AGAIN." 1.55s against 1.538 (93 frames).**
+  The alternative -- a strictly serial band, where the waiting line takes over
+  when the current one's own `hold` expires -- costs the stage caption 2.4s
+  instead of 1.55 and costs it 3.0s instead of 0.47 behind a six-letter
+  set-piece word. **A read-time floor makes the delay proportional to how much
+  there was to read**, which is why a stage caption behind OCTAVE is
+  imperceptible and one behind a full sentence is not.
+- **DEPTH ONE, NEWEST WINS, AND IT IS THE OPPOSITE RULING TO `Hud.showHint`
+  WITH A REASON.** That band queues eight and drops nothing, under a paragraph
+  saying why: a first-use teaching line is marked said-on-this-device when it
+  PAINTS, so a line dropped there is a line the player never gets. A boss
+  release caption is a receipt for a button the bar has already lit back up,
+  and a caption is a statement about the MOMENT -- so a backlog of stale
+  statements reads worse than a dropped one. Two bands, two rulings, and the
+  difference is what dropping costs.
+- **ORDINAL'S PRIVATE COPY OF `tickCommon` IS FOLDED INTO A CALL, AND THE HASH
+  IS WHAT SAYS THE TWO WERE THE SAME.** `Ordinal.update` carried a
+  byte-identical inline copy -- the flare, the caption clock, the mend beams --
+  so the queue would have had to be written into BOTH, which is the
+  `Ordinal.clear` second door build 325 spent a build on. Eight bosses called
+  `tickCommon` and the ninth reimplemented it.
+- **THE HASH DID NOT MOVE AND IT WAS OWED RATHER THAN OPTIONAL.**
+  `-954811922` either side with all six intermediate marks identical
+  (-549790228 / 2055604435 / -1731762476 / 355215982 / 437007875), both
+  readings in this container, the served BUILD confirmed as 354 and 355 in
+  each heading. This build folds the inline copy inside the very boss the
+  probe fights, adds two fields and a branch to a clock that runs every frame
+  of that fight, and rewires ORDINAL's own four caption sites. An unchanged
+  hash is what "a caption queue reached no body and no payout" looks like
+  measured, which is the argument build 329 records this repo as not accepting
+  from inspection.
+- **BUILD 354'S VACUITY ARM CAUGHT ITS OWN DETECTION DRIFTING ONE BUILD
+  LATER, AND ITS MESSAGE HAD THE DIAGNOSIS RIGHT.** The conversion to one door
+  made the old ad-hoc detection (`world.bossLine =` plus a `this.lineFor =`
+  within three lines) match nothing at all, and `check-build` failed the build
+  with "no adhoc caption found... the detection has drifted, not the
+  exposure". That is the arm earning its keep on the next build: **a guard
+  pinned to the SHAPE a mechanism happens to arrive in needs a vacuity arm to
+  survive the mechanism being tidied.** Re-pointed at the `says` call, it
+  reads 111 texts across 93 sites (66 scripted, 27 ad-hoc), worst 11.8 --
+  byte-identical to 354's reading, which is the no-op claim the change owed.
+- **AND THE ONE-DOOR ARM IS DERIVED, NOT NAMED.** `check-build` refuses any
+  `world.bossLine = <non-null>` outside the three legitimate writers, and the
+  set is a FACT rather than a list: a write of `null` is a site ENDING a
+  caption (nineteen teardown paths need it immediate) and `Boss.say` is the
+  script path, which re-asserts its own text off `lineT` and carries no
+  `lineFor` at all. So the rule is "inside `say`, or writing null", and a tenth
+  boss inherits it by existing -- the `formable()` idiom. It also counts the
+  legitimate writers and fails if it cannot find all three, because an arm
+  that has lost sight of the door it is about passes for free.
+- **...AND ITS FIRST RUN FAILED THE BUILD FOR MY OWN DOCSTRING, WHICH IS BUILD
+  344'S RULE THE OTHER WAY UP.** `says`'s own paragraph quotes the two
+  statements it replaced, and the arm matched the prose. 344 recorded a
+  `grep -c` that PASSED because documentation contained the string it was
+  looking for; this is a guard that FAILED for the same reason. **Parse lines
+  of code, not lines of a file** -- the arm skips comment lines now.
+- **A REVERT PROOF WHOSE PATCH NEVER LANDED PRINTS ALL-CLEAR, WHICH READS
+  EXACTLY LIKE THE PROOF NOT FIRING.** The first attempt at the bypass proof
+  passed `'` through a single-quoted shell string into `node -e`; the
+  escape did not survive, the edit silently did not apply, and the guard duly
+  reported the tree it was actually given. The tell was in the message's own
+  counts -- 27 ad-hoc sites where the revert should have made 26. Build 346's
+  rule ("a revert proof whose baseline prints nothing has not measured the
+  revert") one step on: **check the revert LANDED before reading the result**,
+  and write the patch to a file rather than through two levels of quoting.
+- **FIVE REVERT PROOFS AND EACH FIRES ON ITS OWN CONJUNCT**, three static and
+  two through the shipped case: a site bypassing the door (named, with its
+  file and line); the door arm's own vacuity (2 of 3 writers found); the
+  caption sweep's vacuity, re-proved after the detection changed; **the DRAIN
+  removed, which fails BOTH arms** -- the release then holds its full 2.417s
+  and the stage caption is never said at all, which is the `sayOnce` drop
+  build 299 records rather than a clobber; and the die-site clear removed,
+  which fails arm 2 alone on `cleared`.
+- **AND REVERTING FOUND A CONJUNCT THAT CANNOT FIRE, IN CODE I HAD JUST
+  WRITTEN.** Both die-entry sites now clear `lineNext` as well as `lineFor`,
+  and I wrote a comment claiming a held-back release caption would otherwise
+  "land on top of the outro's first line". Measured by revert: it costs
+  **nothing** today -- those sites zero `lineFor` too, and `tickCommon` only
+  drains the queue while a clock is running, so a stale waiting line simply
+  sits there until the next `says` clears it. The clear goes in anyway, because
+  the clock and the queue are ONE mechanism and a site that puts half of it
+  back is how the next edit finds this; but it is named as a BELT at both
+  sites, and the case REPORTS `invaded` rather than asserting it. Build 319's
+  rule, and the prose was corrected before it shipped rather than left to be
+  measured later.
+- **THE CASE'S A/B IS THE DOOR ITSELF, WHICH IS AS CLEAN A SWITCH AS THIS
+  SUITE HAS.** Replacing `bo.says` with the two statements every site used to
+  carry IS the pre-355 behaviour -- same driver, same bodies, same frames, same
+  sequence, one switch inside the mechanism (build 314's serial A/B). It reads
+  **1.7s against 0 frames** on the identical run, and the setup drives `freed`
+  and `enterStage` through `g.update` rather than calling either, because the
+  fault lives in the fact that one call does both.
+  The case also unlocks the five ability ids explicitly: four of AXIOM's five
+  clauses hold ids in `LOCKABLE.abilities`, so a run owning nothing meets a
+  boss holding nothing, and what seven thousand cases upstream happen to have
+  unlocked is not a thing to measure a caption against.
+- **AND A CASE SPLICED AFTER THE REPORT IS NOT PRINTED, NOT COUNTED AND NOT IN
+  THE EXIT CODE -- WHICH COST A WHOLE SUITE RUN AND IS NOW A GUARD.** I
+  appended the new case above `--json`, which is AFTER the report block, and
+  the run came back **"765/765 passed" with 767 rows in the dump**. `ok` and
+  `bad` only push to `results`; the report loop is what prints each line and
+  computes `failed`, and `process.exit(failed || ...)` reads that same
+  variable two blocks later and never recomputes it. So both arms ran, both
+  passed, and **had either failed the suite would have printed a clean count
+  and exited 0.** The tell was the two numbers disagreeing in the last two
+  lines of the run -- 765 against 767 -- which is the only place it shows.
+  `check-build` now derives the boundary from the file's own report heading
+  and refuses any `check(` call after it, with a vacuity arm for the heading
+  moving and a floor on the count before it. Three revert proofs. **A report
+  that is printed in one block at the end has a cliff at the end of the file,
+  and nothing about falling off it is visible in a diff.**
+- **A READOUT PREFIX IS A NAMESPACE, AND I COLLIDED WITH MY OWN ONE BUILD
+  AFTER BUILD 347 RECORDED IT.** The new arm's vacuity message went out under
+  `captions:` while its two siblings print `regress:`, so the revert proof for
+  it appeared to produce no output at all -- the grep for the prefix found
+  nothing. 347 renamed a whole block for exactly this ("two unrelated readouts
+  sharing a prefix in a thirty-line block is how build 329's broadphase cell
+  got skim-read past"). Fixed; and the lesson is that the prefix has to be
+  chosen when the message is written, because the thing that reads it next is
+  a grep.
+- **WHAT THE FLOOR ACTUALLY PRODUCES IS A TITLE AND THEN ITS EXPLANATION,
+  WHICH IS WHY 0.47s FOR A SET-PIECE WORD IS ENOUGH.** Both fixed sites post a
+  short NAME and then a sentence about it -- OCTAVE for 0.467s then "TWO
+  WAVES. ONE PERIOD.", "STASIS IS YOURS AGAIN." for 1.55s then "THE ARGUMENT
+  IS OVER. THE CLAIM STANDS." -- so the band reads the way the arrival script
+  already does rather than like a queue draining. That is the read-time floor
+  earning its shape: a flat floor long enough for a sentence would have held
+  OCTAVE for as long as the sentence and pushed the stage caption a full 2.4s
+  behind the flash that belongs to it.
+- **AND THE OLD ORDINAL CAPTION ARM IS NOW A WEAKER DUPLICATE, LEFT IN PLACE
+  AND NAMED.** `regress.mjs` has asserted since the caption band was written
+  that no `{ text, hold }` pair in `boss.js` exceeds **15** a second. Build
+  354's guard sweeps all 111 texts in every file at **13**, so that arm's
+  population is a subset of a strictly tighter check and it cannot fail unless
+  the build has already failed. Not deleted -- it asserts something true and
+  costs nothing -- but it is a duplicate, and if a later build is tidying the
+  caption family it is the arm to fold in rather than a claim to preserve.

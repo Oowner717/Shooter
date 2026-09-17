@@ -358,8 +358,7 @@ export class Fractal extends Boss {
   startRecursion(world) {
     this.recursed = true;
     this.recurse = 0;
-    world.bossLine = 'IT REMEMBERS ITS SHAPE.';
-    this.lineFor = 3.4;
+    this.says(world, 'IT REMEMBERS ITS SHAPE.', 3.4);
     flash(0.4, TYPE_BY_ID.fractal.color);
     shake(16);
     audio.boom();
@@ -456,8 +455,7 @@ export class Fractal extends Boss {
     this.descended = true;
     this.descent = 0;
     this.sprungDeep = false;
-    world.bossLine = 'IT IS GOING DOWN A LEVEL.';
-    this.lineFor = 3.4;
+    this.says(world, 'IT IS GOING DOWN A LEVEL.', 3.4);
     this.hold(world, 0.5);
     flash(0.45, TYPE_BY_ID.fractal.color);
     ripple(this.x, this.y, 3, 1100);
@@ -577,10 +575,11 @@ export class Fractal extends Boss {
     }
     this.hold(world, 0.45);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'EVERY PIECE IS STILL THE WHOLE.'
-      : n >= 3 ? 'IT IS NOT SMALLER. THERE IS MORE OF IT.'
-        : 'IT HAS STOPPED KEEPING ITS SHAPE.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'EVERY PIECE IS STILL THE WHOLE.'
+        : n >= 3 ? 'IT IS NOT SMALLER. THERE IS MORE OF IT.'
+          : 'IT HAS STOPPED KEEPING ITS SHAPE.',
+      n >= 4 ? 4.2 : 3.4);
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.fractal.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
     shake(16);

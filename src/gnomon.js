@@ -382,8 +382,7 @@ export class Gnomon extends Boss {
     const C = G();
     this.noon = C.noonFor;
     this.noonDone = true;
-    world.bossLine = 'NOON';
-    this.lineFor = 3.2;
+    this.says(world, 'NOON', 3.2);
     for (const p of world.projectiles) p.dead = true;
     // Everything still waiting leaves, through whatever is nearest.
     for (const d of [...this.parked]) this.release(world, d, true);
@@ -492,10 +491,11 @@ export class Gnomon extends Boss {
     if (n >= 4) this.plant(world);
 
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'THE NEEDLE COMES DOWN.'
-      : n >= 3 ? 'IT HAS DECIDED THE HOUR.'
-        : 'THE DIAL IS CRACKED. IT RUNS FAST.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'THE NEEDLE COMES DOWN.'
+        : n >= 3 ? 'IT HAS DECIDED THE HOUR.'
+          : 'THE DIAL IS CRACKED. IT RUNS FAST.',
+      n >= 4 ? 4.2 : 3.4);
     this.garrison(C.garrison[Math.min(n, C.garrison.length) - 1]);
     ring(this.x, this.y, 20, 520, 0.7, TYPE_BY_ID.gnomon.glow, 6);
     ring(this.x, this.y, 10, 300, 0.4, '#ffffff', 3);
@@ -543,8 +543,7 @@ export class Gnomon extends Boss {
     this.midnight = 0;
     this.midnightDone = true;
     this.needleA = -Math.PI / 2;
-    world.bossLine = 'MIDNIGHT';
-    this.lineFor = 3.2;
+    this.says(world, 'MIDNIGHT', 3.2);
     this.hold(world, 0.6);
     this.reform(world, C.midnightHp, { sweep: 1.1 });
     flash(0.55, '#1a0d00');

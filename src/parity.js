@@ -399,8 +399,7 @@ export class Parity extends Boss {
     const C = P();
     this.merged = true;
     this.merge = C.mergeFor;
-    world.bossLine = 'IT IS TRYING TO BE ONE THING.';
-    this.lineFor = 3.4;
+    this.says(world, 'IT IS TRYING TO BE ONE THING.', 3.4);
     flash(0.4, TYPE_BY_ID.parity.color);
     ripple(this.hub.x, this.hub.y, 2.8, 1000);
     shake(20);
@@ -480,10 +479,11 @@ export class Parity extends Boss {
     this.echoT = C.echoEvery[n - 1];
     if (n >= 4) this.retireTwin(world);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'IT HAS GIVEN UP ON SYMMETRY.'
-      : n >= 3 ? 'THE HALVES NO LONGER AGREE.'
-        : 'THE HALVES DISAGREE.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'IT HAS GIVEN UP ON SYMMETRY.'
+        : n >= 3 ? 'THE HALVES NO LONGER AGREE.'
+          : 'THE HALVES DISAGREE.',
+      n >= 4 ? 4.2 : 3.4);
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.parity.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
     shake(16);
@@ -513,8 +513,7 @@ export class Parity extends Boss {
     this.invL0 = this.lineA;
     this.flipped = false;
     this.invBack = false;
-    world.bossLine = 'INVERSION';
-    this.lineFor = 3.6;
+    this.says(world, 'INVERSION', 3.6);
     this.hold(world, 0.7);
     flash(0.45, TYPE_BY_ID.parity.color);
     ripple(this.hub.x, this.hub.y, 2.8, 1000);

@@ -507,8 +507,7 @@ export class Dynamo extends Boss {
     const C = D();
     this.surged = true;
     this.surge = C.surgeFor;
-    world.bossLine = 'SURGE';
-    this.lineFor = 3.0;
+    this.says(world, 'SURGE', 3.0);
     for (const r of [...this.riders]) {
       this.riders.splice(this.riders.indexOf(r), 1);
       this.drop(world, r.e);
@@ -544,8 +543,7 @@ export class Dynamo extends Boss {
     this.earthed = true; // set here, not on completion: the gate is one-shot
     this.struck = false;
     this.curtain = [];
-    world.bossLine = 'EARTH';
-    this.lineFor = 3.6;
+    this.says(world, 'EARTH', 3.6);
     this.hold(world, 0.7);
     this.reform(world, C.earthHp, { sweep: 1 });
     flash(0.5, '#dceaff');
@@ -601,10 +599,11 @@ export class Dynamo extends Boss {
       this.next = -1;
     }
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'IT HAS TAKEN THE GROUND BACK.'
-      : n >= 3 ? 'IT HAS LET GO OF THE GROUND.'
-        : 'IT HAS CLOSED THE CIRCUIT.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'IT HAS TAKEN THE GROUND BACK.'
+        : n >= 3 ? 'IT HAS LET GO OF THE GROUND.'
+          : 'IT HAS CLOSED THE CIRCUIT.',
+      n >= 4 ? 4.2 : 3.4);
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.dynamo.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
     shake(16);
@@ -653,8 +652,7 @@ export class Dynamo extends Boss {
     this.fall = 0;
     this.hunt = { x: world.shooter.x, y: world.shooter.y };
     this.orbitPhase = 0;
-    world.bossLine = 'IT NO LONGER NEEDS THE GROUND.';
-    this.lineFor = 4.2;
+    this.says(world, 'IT NO LONGER NEEDS THE GROUND.', 4.2);
     flash(0.6, '#ffffff');
     ripple(this.x, this.y, 3.4, 1300);
     shake(34);

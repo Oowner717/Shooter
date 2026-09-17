@@ -345,8 +345,7 @@ export class Amplitude extends Boss {
      */
     const live = this.segs.filter((p) => !p.dead);
     for (let i = 0; i < live.length; i++) live[i].u = (i + 1) / live.length - 0.5;
-    world.bossLine = 'RESONANCE';
-    this.lineFor = 3.0;
+    this.says(world, 'RESONANCE', 3.0);
     flash(0.42, TYPE_BY_ID.amplitude.color);
     ripple(this.cx, this.cy, 3, 1100);
     shake(22);
@@ -424,10 +423,11 @@ export class Amplitude extends Boss {
       shake(30);
     }
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
-    world.bossLine = n >= 4 ? 'IT IS CLOSING ITS PERIOD AROUND YOU.'
-      : n >= 3 ? 'TWO WAVES. ONE PERIOD.'
-        : 'IT HAS DOUBLED ITS FREQUENCY.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'IT IS CLOSING ITS PERIOD AROUND YOU.'
+        : n >= 3 ? 'TWO WAVES. ONE PERIOD.'
+          : 'IT HAS DOUBLED ITS FREQUENCY.',
+      n >= 4 ? 4.2 : 3.4);
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.amplitude.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
     shake(16);
@@ -458,8 +458,7 @@ export class Amplitude extends Boss {
     // empty and the moiré is one line with company.
     const live = this.segs.filter((p) => !p.dead);
     live.forEach((p, i) => { p.strand = i % this.strands; });
-    world.bossLine = 'OCTAVE';
-    this.lineFor = 3.0;
+    this.says(world, 'OCTAVE', 3.0);
     this.hold(world, 0.5);
     flash(0.5, TYPE_BY_ID.crest.color);
     ripple(this.cx, this.cy, 3, 1100);

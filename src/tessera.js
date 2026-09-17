@@ -290,10 +290,11 @@ export class Tessera extends Boss {
      * prefix -- what stops at this stage is the cooldown before a cut berth
      * is laid again, not any waiting for open ground.
      */
-    world.bossLine = n >= 4 ? 'IT IS LAYING FASTER THAN YOU CAN CUT.'
-      : n >= 3 ? 'IT HAS STOPPED WAITING TO RE-LAY.'
-        : 'IT IS RE-SURVEYING.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'IT IS LAYING FASTER THAN YOU CAN CUT.'
+        : n >= 3 ? 'IT HAS STOPPED WAITING TO RE-LAY.'
+          : 'IT IS RE-SURVEYING.',
+      n >= 4 ? 4.2 : 3.4);
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.tessera.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
     shake(16);

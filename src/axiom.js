@@ -226,8 +226,7 @@ export class Axiom extends Boss {
       if (!p.dead || !p.holds || !held.has(p.holds)) continue;
       held.delete(p.holds);
       const name = (world.abilities.slots.find((s) => s.def.id === p.holds) || {}).def;
-      world.bossLine = `${(name && name.name) || 'IT'} IS YOURS AGAIN.`;
-      this.lineFor = 2.4;
+      this.says(world, `${(name && name.name) || 'IT'} IS YOURS AGAIN.`, 2.4);
       ring(p.x, p.y, 8, 170, 0.5, TYPE_BY_ID.clause.color, 3);
       for (let k = 0; k < 12; k++) {
         const a = rand(0, TAU);
@@ -292,10 +291,11 @@ export class Axiom extends Boss {
      * claim standing is what the mechanic does (it holds your buttons, and
      * the arrival script already says IT DOES NOT ARGUE. IT HOLDS).
      */
-    world.bossLine = n >= 4 ? 'THE RULE IS DOWN TO ONE WORD.'
-      : n >= 3 ? 'IT IS RESTATING ITSELF WITH LESS.'
-        : 'THE ARGUMENT IS OVER. THE CLAIM STANDS.';
-    this.lineFor = n >= 4 ? 4.2 : 3.4;
+    this.says(world,
+      n >= 4 ? 'THE RULE IS DOWN TO ONE WORD.'
+        : n >= 3 ? 'IT IS RESTATING ITSELF WITH LESS.'
+          : 'THE ARGUMENT IS OVER. THE CLAIM STANDS.',
+      n >= 4 ? 4.2 : 3.4);
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.axiom.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
     shake(16);
