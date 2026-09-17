@@ -1234,7 +1234,7 @@ body.menuOpen #quickBar { pointer-events: none; }
  */
 .menuPanel.loadout { padding: 0 0 8px; }
 .loadNote {
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--dim);
   padding: 10px 14px 0;
@@ -1260,8 +1260,26 @@ body.menuOpen #quickBar { pointer-events: none; }
   background: rgba(11, 26, 42, 0.7);
 }
 .loadSlot svg { width: 15px; height: 15px; }
+/*
+ * 11px, and the whole panel with it.
+ *
+ * This was 6px, and every one of the forty pieces of text in this tab was
+ * between 5.5 and 10 -- not one of them at the 11px floor the menu has had
+ * since build 154. It was never a decision: the loadout was a sheet of its
+ * own until build 226 folded it in as the first two tabs, and the sweep that
+ * enforces that floor could not see it (see build 359 in CLAUDE.md: it
+ * collected every panel's nodes and then re-hid all but one, so
+ * `el.closest('[hidden]')` skipped five of six panels at measurement time).
+ * A panel arriving through a door the guard cannot see through keeps
+ * whatever it came in with.
+ *
+ * Hierarchy is carried by weight, tracking and colour from here down, not by
+ * size: the floor is a floor. `text-overflow: ellipsis` was already here and
+ * is what makes the long round names fit an 11px chip -- measured at 320,
+ * every slot label and every state chip inside its own box.
+ */
 .loadSlot span {
-  font-size: 6px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   white-space: nowrap;
   overflow: hidden;
@@ -1271,18 +1289,21 @@ body.menuOpen #quickBar { pointer-events: none; }
 .loadSlot.empty {
   border-style: dashed;
   border-color: rgba(120, 160, 200, 0.22);
-  color: rgba(150, 180, 210, 0.45);
+  /* A real colour rather than a translucent one: at 0.45 over this ground it
+     composited to 2.62:1. The dashed border is what says "empty". */
+  color: #7d90a4;
   background: transparent;
 }
-.loadEmpty { font-size: 6px; letter-spacing: 0.1em; }
+.loadEmpty { font-size: 11px; letter-spacing: 0.1em; }
 /* A filled slot is pressable: it removes what is in it. The caption only
    appears on the ones that have something to remove. */
 .loadSlot { -webkit-appearance: none; appearance: none; font: inherit; cursor: pointer; }
 button.loadSlot:active { background: rgba(20, 44, 68, 0.9); }
 .slotOff {
-  font-size: 5.5px !important;
+  font-size: 11px !important;
   letter-spacing: 0.12em;
-  color: rgba(150, 180, 210, 0.42);
+  /* 0.42 over the slot's own panel was 2.5:1 -- the worst reading in the tab. */
+  color: #7d90a4;
 }
 button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
 
@@ -1321,23 +1342,29 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
 }
 .loadArt svg { width: 17px; height: 17px; }
 .loadBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.loadName { font-size: 10px; letter-spacing: 0.18em; }
-.loadLine { font-size: 8.5px; line-height: 1.45; color: var(--dim); }
+.loadName { font-size: 12px; letter-spacing: 0.18em; }
+/* `--dim` is #6d829a, which reads 4.53:1 on this row -- three hundredths over
+   the floor. The line that matters most in this tab is the one on a row you
+   do not own yet, so it gets a colour with room in it rather than the shared
+   variable. */
+.loadLine { font-size: 11px; line-height: 1.45; color: #8399ad; }
 /* Damage, then effect. Two labelled rows in a fixed order rather than a
    paragraph, so the eye can run down a column of them and compare. */
 .spec {
   display: flex;
   gap: 6px;
   align-items: baseline;
-  font-size: 8.5px;
+  font-size: 11px;
   line-height: 1.45;
 }
 .spec b {
-  flex: 0 0 20px;
+  /* The label column. 20px held "DMG" at 6.5px; at 11 it needs the width of
+     the word, and the colour was 3.02:1 at 0.5 alpha. */
+  flex: 0 0 34px;
   font-weight: 400;
-  font-size: 6.5px;
+  font-size: 11px;
   letter-spacing: 0.12em;
-  color: rgba(150, 180, 210, 0.5);
+  color: #7d90a4;
   padding-top: 1px;
 }
 .spec i { font-style: normal; color: var(--dim); }
@@ -1350,9 +1377,9 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
 
 .loadState {
   flex: 0 0 auto;
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.14em;
-  color: var(--dim);
+  color: #8399ad;
   padding: 3px 6px;
   border: 1px solid var(--line);
 }
@@ -1364,14 +1391,54 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
   color: var(--tone, var(--accent));
   border-color: color-mix(in srgb, var(--tone, var(--accent)) 45%, transparent);
 }
-/* Owned, but there is nowhere to put it — or it is the last thing to shoot. */
-.loadRow.stuck .loadState { opacity: 0.5; }
-/* Not owned. The same language the strip uses: grey, and hatched. */
+/*
+ * Owned, but there is nowhere to put it — or it is the last thing to shoot.
+ *
+ * Was `opacity: 0.5`, which composited the chip to 2.6:1. Build 282's ruling:
+ * express a disabled state as a real colour, because an alpha pushes the text
+ * further into whatever it is drawn over the dimmer it gets.
+ */
+.loadRow.stuck .loadState { color: #7d90a4; border-color: rgba(143, 184, 216, 0.14); }
+/*
+ * Not owned. The same language the strip uses: grey, and hatched.
+ *
+ * It was `opacity: 0.4` with `grayscale(1) brightness(0.62)` on top, and the
+ * two together rendered the name at 1.96:1, the line at 1.30 and the LOCKED
+ * chip at 1.30 -- on the eight rows of this tab that name the rounds a player
+ * has not bought, which is exactly the state those labels most need to read
+ * in (build 245's rule about designing to the LOCKED width, and build 358's
+ * about the padlocked ERA cell). Both the opacity and the filter were
+ * invisible to the menu's contrast sweep, which composites the background
+ * chain and read the declared colour.
+ *
+ * So: real colours, and the recession is carried by the hatch below, the
+ * LOCKED chip and a quieter ground -- none of which is a hue, so a player who
+ * receives no colour still gets it. The round's own tone stays on the art,
+ * which is what `.qc.sealed` on the strip already does.
+ */
 .loadRow.sealed {
-  opacity: 0.4;
-  filter: grayscale(1) brightness(0.62);
+  border-color: rgba(143, 184, 216, 0.14);
+  background: rgba(7, 13, 22, 0.72);
   position: relative;
 }
+/*
+ * ...and the ART is desaturated with a COLOUR rather than with the filter
+ * that used to do it. Rendered side by side, eight rows of fully saturated
+ * round icons are the brightest thing in the tab and pull the eye onto the
+ * things you cannot have -- the hue is the game's word for "this is yours",
+ * on the strip cell, the ledger row and the codex alike. The SHAPE is what
+ * identifies a round and it is kept, with the name beside it at 12px.
+ * (`.qc.sealed` on the strip does keep its tone, and that is not a
+ * contradiction: it is one cell among live ones rather than eight rows.)
+ */
+.loadRow.sealed .loadArt {
+  color: #7d90a4;
+  border-color: rgba(143, 184, 216, 0.14);
+}
+.loadRow.sealed .loadName { color: #8b9dae; }
+.loadRow.sealed .loadLine,
+.loadRow.sealed .loadState { color: #7d90a4; }
+.loadRow.sealed .loadState { border-color: rgba(143, 184, 216, 0.14); }
 .loadRow.sealed::after {
   content: '';
   position: absolute;
@@ -1422,8 +1489,8 @@ button.loadSlot:active .slotOff { color: var(--tone, var(--accent)); }
 }
 .loadMoreIcon svg { width: 15px; height: 15px; display: block; }
 .loadMoreBody { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.loadMoreName { font-size: 9.5px; letter-spacing: 0.2em; color: var(--accent); }
-.loadMoreLine { font-size: 8px; letter-spacing: 0.1em; color: var(--dim); }
+.loadMoreName { font-size: 12px; letter-spacing: 0.2em; color: var(--accent); }
+.loadMoreLine { font-size: 11px; letter-spacing: 0.1em; color: #8399ad; }
 /* Something is affordable in this branch right now. Same green the tree and
    the energy chip use for the same fact, so it is one language. */
 .loadMore.reach { border-top-color: rgba(124, 255, 178, 0.4); }

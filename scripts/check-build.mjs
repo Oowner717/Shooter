@@ -1245,6 +1245,65 @@ if (doorBad.length || sayWriters < 3) {
   console.log(`regress: all ${before} check() call(s) sit before the report, so every one is `
     + 'printed, counted and in the exit code');
 }
+/*
+ * ...AND EVERY CONTRAST SWEEP READS BOTH WAYS THIS STYLESHEET DIMS TEXT.
+ *
+ * There are four of them -- the title screen, the menu, the play strip and
+ * the ASSAY room -- each inside its own `page.evaluate`, so each carries its
+ * own copy of the colour maths. That is the established shape in that file
+ * and it is not the problem; the problem is that a RULE spread across four
+ * copies gets applied to one of them. It has happened twice:
+ *
+ *  - build 282 found `#wipeGo[disabled]` recorded at 8.08:1 while rendering
+ *    at 1.92, wrote that "the fix belongs in the SWEEP... the next one would
+ *    have been invisible again", and put the opacity chain in the TITLE
+ *    sweep alone.
+ *  - build 359 then found the next two: the strip's three switched-off cells
+ *    at 1.46, and `.loadRow.sealed` in the AMMO tab at 1.30 behind an
+ *    `opacity` AND a `grayscale(1) brightness(0.62)` -- the second of which
+ *    no sweep had ever looked at, and which is worth 3.20:1 on its own.
+ *
+ * So the rule is asked of the SOURCE rather than left to four hopes: every
+ * sweep's own evaluate has to accumulate `opacity` up the ancestor chain, and
+ * has to accumulate `filter` and put it through the group map. A fifth sweep
+ * inherits the requirement by existing, which is the `formable()` idiom.
+ *
+ * The anchor is the size floor, which is what makes a block a contrast sweep.
+ */
+{
+  const rg = readFileSync(new URL('../scripts/regress.mjs', import.meta.url), 'utf8');
+  const need = [
+    ['.opacity)', 'read `opacity` off the ancestor chain'],
+    ['dim *= o', 'accumulate it into a group alpha'],
+    ["!== 'none'", 'read `filter` off the same chain'],
+    ['filt(', 'put the group through the filter map'],
+  ];
+  const anchors = [...rg.matchAll(/size < 11 \|\|/g)].map((m) => m.index);
+  const missing = [];
+  for (const at of anchors) {
+    const evAt = rg.lastIndexOf('page.evaluate(', at);
+    const line = rg.slice(0, at).split('\n').length;
+    if (evAt < 0) { missing.push(`the sweep at line ${line} is not inside a page.evaluate`); continue; }
+    const win = rg.slice(evAt, at);
+    for (const [term, what] of need) {
+      if (!win.includes(term)) missing.push(`the sweep at line ${line} does not ${what} (no \`${term}\`)`);
+    }
+  }
+  if (anchors.length < 4) {
+    console.error(`contrast: found only ${anchors.length} contrast sweep(s) in regress.mjs, so this `
+      + 'arm is not reading the file it is about -- the detection has drifted, not the exposure.');
+    process.exit(1);
+  }
+  if (missing.length) {
+    for (const m of missing) console.error(`contrast: ${m}`);
+    console.error('contrast: `opacity` and `filter` are the two cheapest ways to dim text in '
+      + 'styles.css and a background-colour chain sees neither. Both have shipped a '
+      + 'sub-2:1 label past a green sweep.');
+    process.exit(1);
+  }
+  console.log(`contrast: all ${anchors.length} contrast sweeps accumulate the opacity AND filter `
+    + 'chains, so neither way of dimming text can pass one');
+}
 const capTexts = caps.reduce((a, c) => a + c.texts.length, 0);
 console.log(`captions: ${sayWriters} legitimate writer(s); all ${capTexts} text(s) across ${caps.length} site(s) `
   + `(${caps.filter((c) => c.kind === 'script').length} scripted, `

@@ -106,6 +106,27 @@ await page.waitForTimeout(900);
     const L = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
     const cr = (x, y) => { const a2 = L(x); const b2 = L(y);
       return (Math.max(a2, b2) + 0.05) / (Math.min(a2, b2) + 0.05); };
+    /*
+     * ...and the FILTER chain beside it, which is the same hole one function
+     * along. See the menu's own floor for the group model and for what it
+     * cost: `.loadRow.sealed` carried an `opacity` AND a `grayscale(1)
+     * brightness(0.62)`, and the filter took a 17.4:1 label to 3.20 on its
+     * own. Nothing in this panel carries one today, which is exactly build
+     * 282's argument for putting the term in the sweep rather than waiting
+     * for the next instance.
+     */
+    const filt = (c, str) => {
+      let o = { ...c };
+      for (const m of String(str).matchAll(/(grayscale|brightness)\(([^)]+)\)/g)) {
+        const k = parseFloat(m[2]);
+        if (m[1] === 'grayscale') {
+          const y = 0.2126 * o.r + 0.7152 * o.g + 0.0722 * o.b;
+          o = { r: o.r + (y - o.r) * k, g: o.g + (y - o.g) * k, b: o.b + (y - o.b) * k, a: o.a };
+        } else o = { r: o.r * k, g: o.g * k, b: o.b * k, a: o.a };
+      }
+      return o;
+    };
+    const ROOT = { r: 4, g: 8, b: 14, a: 1 };
     const bad = [];
     let seen = 0;
     const wk = document.createTreeWalker(document.getElementById('boot'), NodeFilter.SHOW_TEXT);
@@ -119,7 +140,7 @@ await page.waitForTimeout(900);
       const fg = px(cs.color);
       if (!fg || fg.a === 0) continue;
       seen++;
-      let bg = { r: 4, g: 8, b: 14, a: 1 };
+      let bg = ROOT;
       const chain = [];
       /*
        * ---- and the OPACITY chain, which this was blind to ---------------
@@ -132,18 +153,29 @@ await page.waitForTimeout(900);
        * the backgrounds already walk, and folded into the foreground's alpha.
        */
       let dim = 1;
+      const filters = [];
       for (let e = el; e; e = e.parentElement) {
         const ecs = getComputedStyle(e);
         const q = px(ecs.backgroundColor);
         if (q && q.a > 0) chain.unshift(q);
         const o = parseFloat(ecs.opacity);
         if (Number.isFinite(o) && o < 1) dim *= o;
+        if (ecs.filter && ecs.filter !== 'none') filters.push(ecs.filter);
       }
       for (const q of chain) bg = over(q, bg);
-      fg.a *= dim;
+      /*
+       * The GROUP model, which replaced `fg.a *= dim`. An `opacity` on an
+       * ancestor dims that ancestor's background as well as its text, so the
+       * honest reading is the text over its own local ground, the pair
+       * filtered, and then the pair composited over what is outside the
+       * group -- not the text dimmed against a ground left at full.
+       */
+      let f2 = over(fg, bg);
+      let b2 = bg;
+      for (const f of filters) { f2 = filt(f2, f); b2 = filt(b2, f); }
       const size = parseFloat(cs.fontSize);
       const large = size >= 24 || (size >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
-      const ratio = cr(over(fg, bg), bg);
+      const ratio = cr(over({ ...f2, a: dim }, ROOT), over({ ...b2, a: dim }, ROOT));
       if (size < 11 || ratio < (large ? 3 : 4.5)) bad.push(`${txt.slice(0, 14)}@${size}px:${ratio.toFixed(2)}`);
     }
     const foot = document.querySelector('.bootFoot').getBoundingClientRect();
@@ -436,6 +468,37 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const L = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
     const cr = (x, y) => { const a = L(x); const b = L(y);
       return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+    /*
+     * The two cheapest ways this stylesheet dims text, neither of which a
+     * background-colour chain can see.
+     *
+     * `opacity` was build 282's finding, on the title screen, and the note it
+     * left said the fix belonged IN THE SWEEP because "dimming with `opacity`
+     * is the cheapest thing in the stylesheet and the next one would have been
+     * invisible again" -- and it went into the title sweep alone. `filter` is
+     * the same hole one function along: `.loadRow.sealed` carried
+     * `opacity: 0.4` AND `grayscale(1) brightness(0.62)`, which together took
+     * a 17.4:1 label to 1.96 and an 8.5px line to 1.30.
+     *
+     * Both apply to an element and its subtree as one GROUP: the text is
+     * composited over its own local ground first, the pair is filtered, and
+     * then the pair is alpha-composited over whatever is outside the group.
+     * So the ratio is between those two results -- which is why the filter
+     * matters even though it moves the text and its ground together: scaling
+     * both luminances down compresses the ratio toward 1 against the formula's
+     * own +0.05.
+     */
+    const filt = (c, str) => {
+      let o = { ...c };
+      for (const m of String(str).matchAll(/(grayscale|brightness)\(([^)]+)\)/g)) {
+        const k = parseFloat(m[2]);
+        if (m[1] === 'grayscale') {
+          const y = 0.2126 * o.r + 0.7152 * o.g + 0.0722 * o.b;
+          o = { r: o.r + (y - o.r) * k, g: o.g + (y - o.g) * k, b: o.b + (y - o.b) * k, a: o.a };
+        } else o = { r: o.r * k, g: o.g * k, b: o.b * k, a: o.a };
+      }
+      return o;
+    };
     const bad = [];
     let seen = 0;
     /*
@@ -467,54 +530,104 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
      * that exists is measured; one added later is covered by existing.
      */
     const panels = [...document.querySelectorAll('#menuPanels [data-panel]')];
-    for (const panel of panels) g.hud.menu.show(panel.dataset.panel);
-    g.hud.menu.show('tree');
-    const nodes = [];
+    const menuEl = document.getElementById('menu');
+    const ROOT = { r: 5, g: 8, b: 15, a: 1 };
+    const per = {};
+    let sheetDim = 1;
+    /*
+     * ...and each panel is measured WHILE IT IS THE OPEN ONE, which is the
+     * state a player reads it in.
+     *
+     * It used to collect every panel's text nodes with each panel temporarily
+     * un-hidden, re-hide all but `tree`, and only then measure -- so
+     * `el.closest('[hidden]')` three lines down skipped five of the six
+     * panels and this floor was a floor for ONE TAB. Which is the fault the
+     * paragraph above is about, arriving one line below it: the list really
+     * was asked of the DOM, and the measurement then threw five sixths of it
+     * away. Measured: the shipped case read 151 words, which is the tree
+     * panel's count exactly, against 253 across all six.
+     *
+     * What it cost is the AMMO tab. The loadout was a sheet of its own until
+     * build 226 folded it in as the first two panels, so it arrived through a
+     * door this guard could not see through and kept everything it came in
+     * with: all forty of its words between 5.5px and 10px -- not one at the
+     * floor -- and twenty-one of them under 4.5:1, eight rows of them at 1.30
+     * behind an `opacity` and a `filter`.
+     */
     for (const panel of panels) {
+      const name = panel.dataset.panel;
+      g.hud.menu.show(name);
+      /*
+       * `#menu` opens on a 0.26s transform-and-opacity transition and a
+       * `page.evaluate` advances no wall time, so the sheet is still at
+       * `opacity: 0` while this runs -- which is why the chain below could not
+       * simply be added: it reads every node at dim 0 and fails the lot.
+       * The animations are FINISHED rather than waited out, which needs no
+       * clock and lands on the settled state exactly (build 296's rule that
+       * `getAnimations()` is the instrument for a DOM animation). `sheetDim`
+       * is asserted, so a future transition this cannot settle fails on a
+       * named conjunct instead of reddening every word in the menu.
+       */
+      for (const a of menuEl.getAnimations({ subtree: true })) a.finish();
+      sheetDim = Math.min(sheetDim, +getComputedStyle(menuEl).opacity);
+      per[name] = 0;
       const wk = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
-      let n;
-      // A panel that is not the open one is `hidden`, so offsetParent is null
-      // for everything inside it. It is un-hidden for the measurement and put
-      // back afterwards.
-      const was = panel.hidden;
-      panel.hidden = false;
-      while ((n = wk.nextNode())) nodes.push(n);
-      panel.hidden = was;
-    }
-    for (const panel of panels) panel.hidden = panel.dataset.panel !== 'tree';
-    let t;
-    let at = -1;
-    while ((t = nodes[++at])) {
-      const txt = t.nodeValue.trim();
-      if (!txt) continue;
-      const el = t.parentElement;
-      if (!el.isConnected || el.hidden || el.closest('[hidden]')) continue;
-      const cs = getComputedStyle(el);
-      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
-      const fg = px(cs.color);
-      // Text painted through a gradient with background-clip reports a
-      // transparent colour; there is nothing there to measure.
-      if (!fg || fg.a === 0) continue;
-      seen++;
-      let bg = { r: 5, g: 8, b: 15, a: 1 };
-      const chain = [];
-      for (let e = el; e; e = e.parentElement) {
-        const c = px(getComputedStyle(e).backgroundColor);
-        if (c && c.a > 0) chain.unshift(c);
+      let t;
+      while ((t = wk.nextNode())) {
+        const txt = t.nodeValue.trim();
+        if (!txt) continue;
+        const el = t.parentElement;
+        if (!el.isConnected || el.hidden || el.closest('[hidden]')) continue;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        const fg = px(cs.color);
+        // Text painted through a gradient with background-clip reports a
+        // transparent colour; there is nothing there to measure.
+        if (!fg || fg.a === 0) continue;
+        seen++;
+        per[name]++;
+        const chain = [];
+        let dim = 1;
+        const filters = [];
+        for (let e = el; e; e = e.parentElement) {
+          const ecs = getComputedStyle(e);
+          const c = px(ecs.backgroundColor);
+          if (c && c.a > 0) chain.unshift(c);
+          const o = parseFloat(ecs.opacity);
+          if (Number.isFinite(o) && o < 1) dim *= o;
+          if (ecs.filter && ecs.filter !== 'none') filters.push(ecs.filter);
+        }
+        let bg = ROOT;
+        for (const c of chain) bg = over(c, bg);
+        let f2 = over(fg, bg);
+        let b2 = bg;
+        for (const f of filters) { f2 = filt(f2, f); b2 = filt(b2, f); }
+        const size = parseFloat(cs.fontSize);
+        const large = size >= 24 || (size >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
+        const ratio = cr(over({ ...f2, a: dim }, ROOT), over({ ...b2, a: dim }, ROOT));
+        if (size < 11 || ratio < (large ? 3 : 4.5)) {
+          bad.push(`${name}:${txt.slice(0, 12)}@${size}px:${ratio.toFixed(2)}`);
+        }
       }
-      for (const c of chain) bg = over(c, bg);
-      const size = parseFloat(cs.fontSize);
-      const large = size >= 24 || (size >= 18.66 && parseInt(cs.fontWeight, 10) >= 700);
-      const ratio = cr(over(fg, bg), bg);
-      if (size < 11 || ratio < (large ? 3 : 4.5)) {
-        bad.push(`${txt.slice(0, 14)}@${size}px:${ratio.toFixed(2)}`);
-      }
     }
+    g.hud.menu.show('tree');
     g.hud.menu.setOpen(false);
-    return { seen, bad };
+    return { seen, bad, per, sheetDim };
   });
+  /*
+   * The vacuity arm is EVERY PANEL CONTRIBUTING, not a total.
+   *
+   * A total is what let the one-panel sweep pass: `seen > 60` against a tree
+   * panel that reads 151 on its own. The floor of 180 is a belt sized between
+   * those two figures -- above anything one panel can produce, under the 253
+   * the six of them read -- and the per-panel counts are printed so the next
+   * reader can see which one went quiet rather than infer it.
+   */
   check('every word in the menu clears 11px and 4.5:1',
-    r.bad.length === 0 && r.seen > 60, `${r.seen} read; failing: ${r.bad.slice(0, 6)}`);
+    r.bad.length === 0 && r.sheetDim === 1 && r.seen > 180
+    && Object.keys(r.per).length >= 5 && Object.values(r.per).every((n) => n > 0),
+    `${r.seen} read, sheet settled at ${r.sheetDim}, per panel ${JSON.stringify(r.per)}`
+    + `; failing: ${r.bad.slice(0, 6)}`);
 }
 
 // --- what a purchase sounds like --------------------------------------------
@@ -6020,8 +6133,26 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     let ground = { r: 5, g: 8, b: 15, a: 1 };
     for (const c of skies) if (L(c) > L(ground)) ground = { ...c, a: 1 };
 
+    /*
+     * The same group model the menu's floor carries, and for the same reason:
+     * `opacity` and `filter` apply to an element and its subtree as one
+     * group, and a background-colour chain sees neither. This strip dims
+     * three cells to 0.22 while the ammunition row is open -- measured at
+     * 8.21:1 declared and 1.46 rendered, which this sweep recorded as a pass
+     * for four builds.
+     */
+    const filt = (c, str) => {
+      let o = { ...c };
+      for (const m of String(str).matchAll(/(grayscale|brightness)\(([^)]+)\)/g)) {
+        const k = parseFloat(m[2]);
+        if (m[1] === 'grayscale') {
+          const y = 0.2126 * o.r + 0.7152 * o.g + 0.0722 * o.b;
+          o = { r: o.r + (y - o.r) * k, g: o.g + (y - o.g) * k, b: o.b + (y - o.b) * k, a: o.a };
+        } else o = { r: o.r * k, g: o.g * k, b: o.b * k, a: o.a };
+      }
+      return o;
+    };
     const bad = [];
-    let seen = 0;
     /*
      * The case sets its own state up. Run on whatever an earlier case left
      * behind it read nine cells out of twenty-three -- a restart empties the
@@ -6040,40 +6171,88 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
      * query, skipped by the loop for having no box, and still counted in the
      * denominator, which is what failed the guard.
      */
-    window.__sim.hud.openAmmoRow?.(true);
     const cells = [...document.querySelectorAll('.qc, #abilities .ab')];
-    let shown = 0;
-    for (const el of cells) {
-      const q = el.getBoundingClientRect();
-      if (!(q.height > 0)) continue;
-      shown++;
-      // The button's own painted panel, composited onto that sky.
-      let bg = ground;
-      for (const e of [el]) {
-        const cs = getComputedStyle(e);
-        // The panel is a gradient; take its darkest declared stop, which is
-        // the end a label most often sits over.
-        const stops = [...cs.backgroundImage.matchAll(/rgba?\([^)]+\)/g)].map((m) => px(m[0]));
-        const c = stops.length ? stops.reduce((a, b) => (L(a) < L(b) ? a : b)) : px(cs.backgroundColor);
-        if (c && c.a > 0) bg = over(c, bg);
+    const sweep = (state) => {
+      let shown = 0;
+      let seen = 0;
+      let off = 0;
+      for (const el of cells) {
+        const q = el.getBoundingClientRect();
+        if (!(q.height > 0)) continue;
+        /*
+         * A cell the strip has deliberately SWITCHED OFF is skipped rather
+         * than measured, and both halves of that have to be true of it.
+         *
+         * `body.ammoOpen .q_auto, body.ammoOpen .q_cfg { opacity: 0.22 }`
+         * plus `pointer-events: none` on the buttons inside them: while the
+         * slots are up, AIM, FIRE and the AMMO door are dimmed AND turned
+         * off, and the CSS comment beside that rule says why -- "a miss must
+         * not land on AIM, FIRE or the door under the band". 4.5:1 on a
+         * control the game is telling you to ignore and will not accept a
+         * press on is not a requirement, so the honest answer is not a
+         * colour: it is to measure each cell in the state where it is LIVE.
+         * Hence two passes. What makes the skip a claim about a STATE rather
+         * than a blanket is the pair of counts asserted below: nothing is
+         * skipped in the resting pass, so the three cells really are measured.
+         *
+         * Dimmed and unpressable together, never either alone -- a cell that
+         * is merely unpressable is still read, and a cell that is merely dim
+         * is the thing this sweep exists for.
+         */
+        const ecs = getComputedStyle(el);
+        let cellDim = 1;
+        for (let e = el; e; e = e.parentElement) {
+          const o = parseFloat(getComputedStyle(e).opacity);
+          if (Number.isFinite(o) && o < 1) cellDim *= o;
+        }
+        if (cellDim < 1 && ecs.pointerEvents === 'none') { off++; continue; }
+        shown++;
+        // The button's own painted panel, composited onto that sky.
+        let bg = ground;
+        {
+          // The panel is a gradient; take its darkest declared stop, which is
+          // the end a label most often sits over.
+          const stops = [...ecs.backgroundImage.matchAll(/rgba?\([^)]+\)/g)].map((m) => px(m[0]));
+          const c = stops.length ? stops.reduce((a, b) => (L(a) < L(b) ? a : b)) : px(ecs.backgroundColor);
+          if (c && c.a > 0) bg = over(c, bg);
+        }
+        const wk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = wk.nextNode())) {
+          const txt = n.nodeValue.trim();
+          if (!txt) continue;
+          const cs = getComputedStyle(n.parentElement);
+          const fg = px(cs.color);
+          if (!fg || fg.a === 0) continue;
+          seen++;
+          let dim = 1;
+          const filters = [];
+          for (let e = n.parentElement; e; e = e.parentElement) {
+            const s2 = getComputedStyle(e);
+            const o = parseFloat(s2.opacity);
+            if (Number.isFinite(o) && o < 1) dim *= o;
+            if (s2.filter && s2.filter !== 'none') filters.push(s2.filter);
+          }
+          let f2 = over(fg, bg);
+          let b2 = bg;
+          for (const f of filters) { f2 = filt(f2, f); b2 = filt(b2, f); }
+          const size = parseFloat(cs.fontSize);
+          const ratio = cr(over({ ...f2, a: dim }, ground), over({ ...b2, a: dim }, ground));
+          if (size < 11 || ratio < 4.5) {
+            bad.push(`${state}:${txt.slice(0, 10)}@${size}px:${ratio.toFixed(2)}`);
+          }
+        }
       }
-      const wk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      let n;
-      while ((n = wk.nextNode())) {
-        const txt = n.nodeValue.trim();
-        if (!txt) continue;
-        const cs = getComputedStyle(n.parentElement);
-        const fg = px(cs.color);
-        if (!fg || fg.a === 0) continue;
-        seen++;
-        const size = parseFloat(cs.fontSize);
-        const ratio = cr(over(fg, bg), bg);
-        if (size < 11 || ratio < 4.5) bad.push(`${txt.slice(0, 10)}@${size}px:${ratio.toFixed(2)}`);
-      }
-    }
+      return { shown, seen, off };
+    };
     window.__sim.hud.openAmmoRow?.(false);
-    return { seen, bad, ground: `rgb(${Math.round(ground.r)},${Math.round(ground.g)},${Math.round(ground.b)})`,
-      skies: skies.length, cells: cells.length, shown };
+    const rest = sweep('rest');
+    window.__sim.hud.openAmmoRow?.(true);
+    const open = sweep('open');
+    window.__sim.hud.openAmmoRow?.(false);
+    return { rest, open, bad,
+      ground: `rgb(${Math.round(ground.r)},${Math.round(ground.g)},${Math.round(ground.b)})`,
+      skies: skies.length, cells: cells.length };
   });
   /*
    * The vacuity guard is a SHARE of the cells the sweep MEASURED, not a count
@@ -6089,9 +6268,13 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
    * had skipped six of them on purpose. Count what was measured.
    */
   check('every word on the strip and the ability bar clears 11px and 4.5:1 on the worst sky',
-    r.bad.length === 0 && r.shown >= 12 && r.seen >= r.shown - 2,
-    `${r.seen} read over ${r.ground} (brightest of ${r.skies} boss skies); failing: ${r.bad.slice(0, 6)}`
-    + ` | ${r.seen} words across ${r.shown} measured cells of ${r.cells} found`);
+    r.bad.length === 0
+    && r.rest.shown >= 12 && r.rest.seen >= r.rest.shown - 2 && r.rest.off === 0
+    && r.open.shown >= 12 && r.open.off >= 1,
+    `${r.rest.seen + r.open.seen} read over ${r.ground} (brightest of ${r.skies} boss skies)`
+    + ` | resting ${r.rest.seen} words across ${r.rest.shown} cells, ${r.rest.off} switched off`
+    + ` | slots up ${r.open.seen} across ${r.open.shown}, ${r.open.off} switched off`
+    + ` | of ${r.cells} found; failing: ${r.bad.slice(0, 6)}`);
 }
 
 // --- ...and the furniture gets out of the way on the beats, not on a press --
@@ -27495,6 +27678,24 @@ if (GUN_LINE) {
       const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
       const ratio = (x, y) => { const a2 = lum(x); const b2 = lum(y);
         return (Math.max(a2, b2) + 0.05) / (Math.min(a2, b2) + 0.05); };
+      /*
+       * ...and the FILTER chain, for the menu floor's reason: `opacity` and
+       * `filter` are the two cheapest ways this stylesheet dims text and a
+       * background chain sees neither. Nothing in this room carries a filter
+       * today; the term is here so the next one is not invisible.
+       */
+      const filt = (c, str) => {
+        let o = { ...c };
+        for (const m of String(str).matchAll(/(grayscale|brightness)\(([^)]+)\)/g)) {
+          const k = parseFloat(m[2]);
+          if (m[1] === 'grayscale') {
+            const y = 0.2126 * o.r + 0.7152 * o.g + 0.0722 * o.b;
+            o = { r: o.r + (y - o.r) * k, g: o.g + (y - o.g) * k, b: o.b + (y - o.b) * k, a: o.a };
+          } else o = { r: o.r * k, g: o.g * k, b: o.b * k, a: o.a };
+        }
+        return o;
+      };
+      const ROOT = { r: 5, g: 8, b: 15, a: 1 };
       const bad = [];
       let swept = 0;
       let shutSeen = 0;
@@ -27513,19 +27714,26 @@ if (GUN_LINE) {
         if (!fg || fg.a === 0) continue;
         swept++;
         if (el.closest('.shut')) shutSeen++;
-        let bg2 = { r: 5, g: 8, b: 15, a: 1 };
+        let bg2 = ROOT;
         const chain = [];
         let dim = 1;
+        const filters = [];
         for (let e = el; e; e = e.parentElement) {
           const ecs = getComputedStyle(e);
           const q = hex(ecs.backgroundColor);
           if (q && q.a > 0) chain.unshift(q);
           const o = parseFloat(ecs.opacity);
           if (Number.isFinite(o) && o < 1) dim *= o;
+          if (ecs.filter && ecs.filter !== 'none') filters.push(ecs.filter);
         }
         for (const q of chain) bg2 = onto(q, bg2);
+        // The group model the other three sweeps carry: the text over its own
+        // ground, the pair filtered, the pair composited over what is outside.
+        let f2 = onto(fg, bg2);
+        let b2 = bg2;
+        for (const f of filters) { f2 = filt(f2, f); b2 = filt(b2, f); }
         const size = parseFloat(cs.fontSize);
-        const cr2 = ratio(onto({ ...fg, a: fg.a * dim }, bg2), bg2);
+        const cr2 = ratio(onto({ ...f2, a: dim }, ROOT), onto({ ...b2, a: dim }, ROOT));
         if (size < 11 || cr2 < 4.5) {
           bad.push(`${txt.slice(0, 10)}@${size}px:${cr2.toFixed(2)}`);
         }

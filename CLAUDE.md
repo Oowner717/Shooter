@@ -1559,6 +1559,11 @@ came from before believing the other one covers it.
   Note the sweep also needs the room POPULATED: `.sbLast` is hidden with no
   session, so adding the tab alone would have measured three text nodes and
   passed.
+  **And the fix moved the fault one line down rather than removing it** -- see
+  build 359: the list became derived from the DOM, correctly, and the
+  measurement loop then re-hid five of the six panels before reading them, so
+  the floor was a floor for one tab again for another nineteen builds. A
+  derived list is not coverage; what the loop MEASURED is.
 - **Two dead fields in `ledger.js` were each costing a window walk.**
   `peak` was written on every `tick` and read by nothing (the rig's peak flag
   is `e.dummyPeak`, a decayed maximum of the STRAIN, and always was), and
@@ -10611,3 +10616,181 @@ came from before believing the other one covers it.
   being driven restarts the game itself -- `air()` calls `clean()` on every
   invocation and every resize rewrites `hail.burst.r` from `BASE`, so a
   written value survives exactly until the next arm.
+
+- **BUILD 359 CLOSES BUILD 282'S OWN RECORDED DEBT AND FOUND SOMETHING BIGGER
+  UNDERNEATH IT: THE MENU'S CONTRAST FLOOR WAS MEASURING ONE PANEL OF SIX, AND
+  THE PANEL IT SKIPPED HAD NOT ONE WORD AT THE 11px FLOOR.** 282 found
+  `#wipeGo[disabled]` recorded at 8.08:1 while rendering at 1.92, wrote that
+  *"the fix belongs in the SWEEP... because dimming with `opacity` is the
+  cheapest thing in the stylesheet and the next one would have been invisible
+  again"*, and put the chain in the TITLE sweep alone. Build 358 recorded the
+  other two sweeps as still blind and left them. Picking that up found the
+  coverage fault first, which is the one that mattered.
+- **THE MECHANISM IS ONE LINE BELOW THE PARAGRAPH COMPLAINING ABOUT IT.** The
+  menu sweep collected every panel's text nodes with each panel temporarily
+  un-hidden, then re-hid all but `tree`, and only THEN measured -- so
+  `el.closest('[hidden]')` in the measurement loop skipped five of the six
+  panels. Its own docstring is emphatic about exactly this class of fault
+  ("UPGRADES got a floor in 154 and OBJECTS and SYSTEM did not... A floor that
+  applies to one tab is not a floor", and "`sandbox` was missing from this very
+  list for four builds, which is the same mistake sitting inside the paragraph
+  complaining about it") -- and the list really WAS asked of the DOM. The
+  measurement then threw five sixths of it away.
+  **The evidence was in the shipped detail string all along**: the case printed
+  `151 read`, and 151 is the tree panel's own count to the word -- against 253
+  for the six on a page of its own and **316 in the suite**, where a hundred
+  cases upstream have populated the codex panel. Say which: the same sweep
+  reads two totals and only one of them is what a green run prints. **A total is what let it pass** -- `seen > 60` against a panel
+  that reads 151 on its own -- so the vacuity arm is now EVERY PANEL
+  CONTRIBUTING, with the per-panel counts printed rather than a sum. Same rule
+  as build 294's ("a vacuity denominator has to count what was MEASURED"), one
+  level out: count the populations, not the total.
+- **THE AMMO TAB CAME IN THROUGH A DOOR THE GUARD COULD NOT SEE THROUGH, AND
+  KEPT EVERYTHING IT CAME IN WITH.** The loadout was a sheet of its own
+  (`#loadout`, `body.loadoutOpen`) until build 226 folded it in as the first
+  two tabs. Measured, **39 of its 40 words sat between 5.5px and 10px** --
+  every one but a 15px chevron glyph, so not a single WORD at the floor:
+  `.slotOff` "REMOVE" at 5.5, four `EMPTY` chips and the slot names at 6,
+  `.spec b` "DMG" at 6.5, `.loadState` "LOCKED" and "ON STRIP" at 7,
+  `.loadLine` at 8.5, `.loadName` at 10. And **32 of the 40 under 4.5:1** once
+  the group is honoured, against **7 that failed on the declared colours
+  alone**, so the dimming is most of it -- eight rows at **1.30**. No transform anywhere in the chain (checked
+  before calling it a fault: a 6px label under a `scale()` would have been
+  honest). The other five panels are clean, which is what says this is a
+  coverage fault and not a standard drifting.
+  Taken to the floor and the hierarchy re-hung on weight, tracking and colour
+  instead of size: 11px throughout with `.loadName`/`.loadMoreName` at 12, and
+  `text-overflow: ellipsis` (already there) is what makes a long round name fit
+  an 11px chip -- measured at 320 and 390, every slot label and every state
+  chip inside its own box, one line each, no horizontal scroll, slots 51px wide
+  at 320. Ratios 5.15 to 7.08:1.
+- **AND THE SECOND WAY TO DIM TEXT IS `filter`, WHICH NO SWEEP HAD EVER LOOKED
+  AT.** `.loadRow.sealed` carried `opacity: 0.4` AND
+  `filter: grayscale(1) brightness(0.62)`. Both apply to an element and its
+  subtree as one GROUP, so the honest reading is the text composited over its
+  own local ground, the pair filtered, and the pair then alpha-composited over
+  whatever is outside the group. Measured on the eight rows that name the
+  rounds a player has not bought: declared 17.38 / 4.91 / 4.91, with the
+  opacity 3.52 / 1.73 / 1.73, with both **1.96 / 1.30 / 1.30**.
+  **The filter is worth 3.20:1 on its own and is therefore its own term rather
+  than a companion to the opacity** -- proved by planting it alone (the name
+  goes 17.38 -> 3.20, the sweep catches it, and the sweep with only the filter
+  term gutted passes). The reason it bites although it moves the text and its
+  ground together is the formula's own +0.05: scaling both luminances down
+  compresses the ratio toward 1.
+  Expressed as real colours, which is 282's ruling: the recession is carried by
+  the hatch `::after` that was already there, the LOCKED chip and a quieter
+  ground -- none of which is a hue, so a player who receives no colour still
+  gets it.
+- **...AND THE OLD `fg.a *= dim` FORM WAS THE WRONG MODEL, WHICH IS WHY ALL
+  FOUR SWEEPS MOVED TOGETHER.** An `opacity` on an ancestor dims that
+  ancestor's BACKGROUND as well as its text; dimming the text against a ground
+  left at full is a different number. All four now carry the group model, and
+  **it is the IDENTITY for a node with no dim and no filter** -- `dim === 1`
+  and no filters reduces it to the old expression exactly. Which is what let
+  the title and the room cases be re-measured for free rather than re-run:
+  censused, the title screen carries **zero** dims and zero filters in both
+  save states and the room's five controls read dim 1.00 each, so the
+  conversion provably moved nothing there. **Before re-running a case to find
+  out whether a rewrite touched it, ask whether the rewrite is an identity on
+  that case's own data.**
+- **THE STRIP'S THREE CELLS ARE A STATE QUESTION, NOT A COLOUR QUESTION.**
+  `body.ammoOpen .q_auto, body.ammoOpen .q_cfg { opacity: 0.22 }` plus
+  `pointer-events: none` on the buttons inside them: while the ammunition
+  slots are up, AIM, FIRE and the AMMO door are dimmed AND turned off, and the
+  CSS comment beside that rule says why ("a miss must not land on AIM, FIRE or
+  the door under the band"). The sweep opened that row deliberately -- nine
+  labels a player reads while choosing -- and then recorded those three at
+  **8.21:1 declared against 1.46 rendered**. 4.5:1 on a control the game is
+  telling you to ignore and will not accept a press on is not a requirement,
+  so the answer is not a colour: it is to measure each cell in the state where
+  it is LIVE. Two passes, resting and slots-up, and a cell is skipped only when
+  it is **dimmed AND unpressable together** -- either alone is wrong, since a
+  merely unpressable cell is still read and a merely dim one is what the sweep
+  is for.
+  **What makes the skip a claim about a STATE rather than a blanket is a pair
+  of counts**: `rest.off === 0` (so those three really are measured, in the
+  resting pass) and `open.off >= 1` (so the skip is not silently swallowing the
+  strip). Deleting the 0.22 rule reds the case on the second of those, with
+  `0 switched off` printed in the detail.
+- **A TRANSITION CANNOT BE WAITED OUT INSIDE A `page.evaluate`, AND THE REMEDY
+  IS TO FINISH IT RATHER THAN TO SLEEP.** `#menu` opens on a 0.26s
+  transform-and-opacity transition and an evaluate advances no wall time, so
+  the sheet is at `opacity: 0` while the sweep runs -- which is why the chain
+  could not simply be added here: it read **every node at dim 0**.
+  `el.getAnimations({ subtree: true }).forEach((a) => a.finish())` lands on the
+  settled state exactly, needs no clock and is deterministic (build 296's rule
+  that `getAnimations()` is the instrument for a DOM animation, used to finish
+  rather than to seek). Measured: 16 animations on the sheet alone, 112 with a
+  tree branch open, `opacity 0 -> 1`.
+  **And `sheetDim` is asserted**, so a future transition this cannot settle
+  fails on one named conjunct instead of reddening all 316 words -- build 350's
+  rule that a conjunct whose figure the message does not carry cannot be
+  diagnosed from its own FAIL line, applied in advance.
+- **FOUR COPIES OF ONE RULE, SO THE RULE IS ASKED OF THE SOURCE.** Each sweep
+  lives in its own `page.evaluate` and therefore carries its own colour maths;
+  that is the established shape in `regress.mjs` and is not the problem. The
+  problem is that a rule spread across four copies gets applied to one of them,
+  which has now happened twice. `check-build.mjs` anchors on the size floor --
+  what makes a block a contrast sweep -- and requires each one's own evaluate
+  to read `opacity` up the chain, accumulate it, read `filter` off the same
+  chain and put the group through the filter map. A fifth sweep inherits the
+  requirement by existing (the `formable()` idiom). Four revert proofs, each
+  naming the right sweep by line, plus the vacuity arm: rename the floor and it
+  reports "found only 0 contrast sweeps... the detection has drifted, not the
+  exposure".
+- **SEVEN REVERT PROOFS, AND TWO OF THEM REPRODUCE THE HOLE AS A CLEAN PASS,
+  which is the form worth aiming for.** The re-hide restored reads
+  `{ammo: 0, tree: 151, ...}` -- the shipped figure, reproduced. The
+  `finish()` removed reads `sheet settled at 0`. The shipped dimming put back
+  ON TOP OF THE NEW SIZES fails at 1.42/1.36 with the chain and **PASSES with
+  the chain gutted**; the filter alone fails at 3.20/2.83 and **passes with
+  only the filter term gutted**; and the pre-359 strip case -- no skip, no
+  chain, no `off` arm -- **passes on a build rendering those three labels at
+  1.38:1**. A proof that reproduces the old green is worth more than one that
+  merely turns the new case red.
+- **...AND ONE PROOF COULD NOT REPRODUCE ITS HOLE, BECAUSE A SECOND CONJUNCT
+  CAUGHT IT FIRST.** Removing the strip's skip AND its chain still reds the
+  case -- on `open.off >= 1`, with an empty failing list -- so the two
+  conjuncts cover each other's failure. That is the design working and it makes
+  the proof read confusingly, so the honest reproduction removes the third
+  conjunct as well and says so. **When a revert proof fails for a different
+  reason than the one it is about, say which conjunct fired**: a red is not a
+  proof of the arm you were testing.
+- **AND THE OTHER `opacity`-PLUS-`filter` DIMMER IN THE STYLESHEET IS A RULE
+  THAT CAN NEVER MATCH, WHICH IS RECORDED RATHER THAN SWEPT HERE.**
+  `.armRow.sealed { opacity: 0.4; filter: grayscale(1) brightness(0.7) }` is
+  the same shape as the fault above and is unreachable: the only producer of
+  `.armRow` is `ARSENAL.filter((x) => x.group === 'auto')` -- two rows, AUTO
+  AIM and AUTO FIRE -- `menu.js` seals one on `!world.unlocked.has(a.key)`,
+  and both keys are in `STARTING`, which `reset()` and `load()` both seed
+  `unlocked` from. So the class has a writer that can only ever compute false,
+  which is `world.endless`'s shape in a stylesheet, and its companion
+  `.armRow.sealed .codexName::after { content: ' — locked' }` with it.
+  Measured: 2 `.armRow`s, 0 sealed, in the `codex` panel. Left for a dead-CSS
+  sweep (build 186's) rather than deleted in a build whose subject is the
+  instrument -- and the instrument now covers it, since that panel is one of
+  the six the menu floor reads.
+- **THE PICTURE IS THE ARGUMENT, AND IT OVERTURNED MY OWN RULING ONCE.** With
+  the filter gone the sealed rows' art kept the round's full tone, and I had an
+  argument for it -- `.qc.sealed` on the strip keeps its tone, so this is
+  consistent. Rendered and looked at: eight rows of fully saturated icons are
+  the brightest thing in the tab and pull the eye onto the things you cannot
+  have. The hue is this game's word for "this is yours" on the strip cell, the
+  ledger row and the codex alike, so the art is desaturated with a COLOUR (the
+  shape, which is what identifies a round, is kept, with the name beside it at
+  12px). The strip precedent is not a contradiction and the difference is the
+  count: one cell among live ones rather than eight rows.
+- **FOUR INSTRUMENT FAULTS OF MY OWN IN ONE AFTERNOON, AND THE LAST IS THE ONE
+  WORTH KEEPING.** `el.className.slice` throws on an SVG element
+  (`SVGAnimatedString`, so `getAttribute('class')`); `ORDINAL_MOODS` is
+  exported from `anomaly.js` and not `config.js`; a first census read 44 words
+  where the shipped sweep reads 151 because it had not clicked the tree branch
+  the case opens. And build 351's sliced-out harness could not slice these two
+  cases at all: **its paren matcher handled quotes and comments and not REGEX
+  LITERALS**, so the `\(` inside `/rgba?\(([^)]+)\)/` counted as a paren and
+  every extraction came out unbalanced. That is the `pgrep -f` self-match
+  family in a third costume -- a scanner that does not know which characters
+  are code. Taught it regex literals (including character classes) and both
+  cases verified in about forty seconds each, against thirteen minutes of
+  suite.
