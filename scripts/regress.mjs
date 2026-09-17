@@ -1174,8 +1174,27 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
       // ...then a rotation inside each band.
       for (const rung of rungs) {
         d.setTier(rung);
+        /*
+         * TWO ROTATIONS OF THE POOL THIS RUNG ACTUALLY DRAWS FROM, derived --
+         * not fourteen, which was a guess at a rotation and is about HALF of
+         * one at the deep end. `bandsFor` returns `[hi - 1, hi]`, so a band's
+         * own rung draws from TWO bands' rosters; a type authored into exactly
+         * one wave of one band therefore has to win a draw, and across nine
+         * dumps that read 42% to 92% with nothing about the roster changing --
+         * LOOM 42% at build 350 and KITE 42% at 351, both 5 of 12 runs, both
+         * single-wave types. The FLOOR was never the parameter; the sample
+         * size was, which is why this is derived from the table instead.
+         *
+         * Counted by band alone rather than through `eligible`, which is
+         * state-dependent: that makes the pool a superset and the sample
+         * larger, which is the safe direction for a coverage claim.
+         */
+        const [lo, hi] = d.bandsFor(rung);
+        const pool = WAVES.filter((wv) => !wv.teach
+          && (wv.band || 1) >= lo && (wv.band || 1) <= hi).length;
+        const want = Math.max(14, pool * 2);
         const from = loads;
-        while (loads - from < 14 && guard++ < 200000) step();
+        while (loads - from < want && guard++ < 200000) step();
       }
       d.load = realLoad;
       for (const i of played) for (const [id] of WAVES[i].of) seen[id] = (seen[id] || 0) + 1;
@@ -20357,10 +20376,16 @@ if (MINE_LINE) {
  * damage produces the same band, the same strain and the same record on both
  * rigs. If that ever stops being true, one of them has grown a copy.
  *
- * The PICTURE is the frame-comparison instrument the Dummy band sweep already
- * uses -- greyscale, normalised by the frame's own 98th percentile, mean
- * absolute difference -- which is blind to brightness and opacity by
- * construction and therefore cannot report "different" for a recolour.
+ * The PICTURE is read on the ALPHA CHANNEL ALONE, which is the one reading
+ * that cannot report "different" for a recolour -- no channel a recolour can
+ * touch is looked at. That is the idiom builds 314 and 324 already use for
+ * exactly this claim. The Dummy band sweep's luma reading (greyscale
+ * normalised by the frame's own 98th percentile) is kept beside it as
+ * corroboration and is NOT what the arm rests on, because it is not in fact
+ * colour-blind: measured, the shipped rig with R and B swapped moves it by
+ * 1.6 to 13.9 across the five bands, and brightened 1.55x it moves by 25.5,
+ * since brightening CLIPS at 255 and clipping is not the uniform scale the
+ * percentile divides out. `audit-266-open.md` item 10 is that gap.
  */
 {
   const r = await page.evaluate(async () => {
@@ -20435,16 +20460,17 @@ if (MINE_LINE) {
 
     // ---- ...and none of the picture --------------------------------------
     /*
-     * Rendered at the SAME on-canvas size, with the colour divided out, so
-     * what is left is the shape. The control is the same rig rendered twice:
-     * it must be exactly 0, which is the instrument proving it is blind to
-     * everything except form before it is allowed to report a difference.
+     * Rendered at the SAME on-canvas size, so what is compared is the drawing.
+     *
+     * `shoot` hands back the RAW pixel buffer and every reading below is
+     * derived from it, so two figures compared against each other never come
+     * off two separate renders of the same thing.
      */
     const S = 220;
     const c = document.createElement('canvas');
     c.width = S; c.height = S;
     const x = c.getContext('2d', { willReadFrequently: true });
-    const frame = (e, band) => {
+    const shoot = (e, band) => {
       e.dummyBandF = band; e.dummyStrain = band / 5; e.dummyPeak = band / 5;
       e.dummyT = 4.2; e.dummyFlash = 0;
       x.setTransform(1, 0, 0, 1, 0, 0);
@@ -20453,7 +20479,20 @@ if (MINE_LINE) {
       x.setTransform(k, 0, 0, k, S / 2 - e.x * k, S / 2 - e.y * k);
       drawDummy(x, e);
       x.setTransform(1, 0, 0, 1, 0, 0);
-      const d = x.getImageData(0, 0, S, S).data;
+      return x.getImageData(0, 0, S, S).data;
+    };
+    /*
+     * THE SILHOUETTE, and the primary reading. Colour is divided out by
+     * construction rather than by arithmetic somebody has to trust: the three
+     * channels a recolour moves are not read at all.
+     */
+    const alpha = (d) => {
+      const a = new Float32Array(S * S);
+      for (let i = 0, p = 0; i < d.length; i += 4, p++) a[p] = d[i + 3] / 255;
+      return a;
+    };
+    // The Dummy sweep's luma reading, kept as corroboration only.
+    const luma = (d) => {
       const grey = new Float32Array(S * S);
       for (let i = 0, p = 0; i < d.length; i += 4, p++) {
         grey[p] = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) * (d[i + 3] / 255);
@@ -20468,19 +20507,84 @@ if (MINE_LINE) {
       for (let i = 0; i < a.length; i++) s2 += Math.abs(a[i] - b[i]);
       return +((s2 / a.length) * 1000).toFixed(2);
     };
+    /*
+     * Two RECOLOURS of a real render, so the geometry is identical by
+     * construction and whatever a reading reports for the pair is that
+     * reading's own colour sensitivity and nothing else. `hue` swaps R and B;
+     * `gain` scales all three, which is what the percentile is supposed to
+     * divide out.
+     */
+    const hue = (d) => {
+      const o = new Uint8ClampedArray(d.length);
+      for (let i = 0; i < d.length; i += 4) {
+        o[i] = d[i + 2]; o[i + 1] = d[i + 1]; o[i + 2] = d[i]; o[i + 3] = d[i + 3];
+      }
+      return o;
+    };
+    const gain = (d, k) => {
+      const o = new Uint8ClampedArray(d.length);
+      for (let i = 0; i < d.length; i += 4) {
+        o[i] = d[i] * k; o[i + 1] = d[i + 1] * k; o[i + 2] = d[i + 2] * k;
+        o[i + 3] = d[i + 3];
+      }
+      return o;
+    };
+
     const e1 = rigOf(1);
-    const f1a = frame(e1, 3);
-    const f1b = frame(e1, 3);
-    out.control = diff(f1a, f1b);
+    const d1a = shoot(e1, 3);
+    const d1b = shoot(e1, 3);
     const e2 = rigOf(2);
-    const f2 = frame(e2, 3);
-    out.apart = diff(f1a, f2);
+    const d2 = shoot(e2, 3);
+    // The render is deterministic at a pinned band, so this is 0 -- which is
+    // a determinism check and, on its own, true of any diff function. It is
+    // the three controls under it that say what the reading is blind to.
+    out.control = diff(alpha(d1a), alpha(d1b));
+    out.controlLuma = diff(luma(d1a), luma(d1b));
+    out.hue = diff(alpha(d1a), alpha(hue(d1a)));
+    out.hueLuma = diff(luma(d1a), luma(hue(d1a)));
+    out.dim = diff(alpha(d1a), alpha(gain(d1a, 0.62)));
+    out.dimLuma = diff(luma(d1a), luma(gain(d1a, 0.62)));
+    out.bright = diff(alpha(d1a), alpha(gain(d1a, 1.55)));
+    out.brightLuma = diff(luma(d1a), luma(gain(d1a, 1.55)));
+    out.apart = diff(alpha(d1a), alpha(d2));
+    out.apartLuma = diff(luma(d1a), luma(d2));
     // ...and the two are apart at EVERY band, not only the one sampled.
     out.perBand = [];
+    out.perBandLuma = [];
     for (let b2 = 1; b2 <= 5; b2++) {
-      const a = frame(rigOf(1), b2);
-      const b3 = frame(rigOf(2), b2);
-      out.perBand.push(diff(a, b3));
+      const a = shoot(rigOf(1), b2);
+      const b3 = shoot(rigOf(2), b2);
+      out.perBand.push(diff(alpha(a), alpha(b3)));
+      out.perBandLuma.push(diff(luma(a), luma(b3)));
+    }
+    /*
+     * THE BROKEN END, and what the arm is bounded against instead of a fitted
+     * constant: ONE rig, band 1 against each band above it. That is the
+     * largest difference this instrument reports for something that is the
+     * same drawing in another state, so "a different drawing" has to beat it.
+     *
+     * It is also what condemned the number this replaced. The arm asked for
+     * 60 under a comment calling that "a long way clear of anything a
+     * recolour or a size change could produce" -- and on the luma reading one
+     * rig from band 1 to band 5 is 187.6, which is LARGER than the two rigs
+     * at bands 2 and 3 (169.3 and 169.8). The threshold sat inside an
+     * ordinary band step. On alpha the same spread tops out at 135.9 against
+     * a worst per-band separation of 179.1, which is the 1.32x the arm now
+     * asserts, and every figure here is byte-identical run to run because the
+     * render is pinned.
+     */
+    out.bandSpread = 0;
+    out.bandSpreadLuma = 0;
+    {
+      const one = rigOf(1);
+      const base = shoot(one, 1);
+      const baseA = alpha(base);
+      const baseL = luma(base);
+      for (let b2 = 2; b2 <= 5; b2++) {
+        const nb = shoot(one, b2);
+        out.bandSpread = Math.max(out.bandSpread, diff(baseA, alpha(nb)));
+        out.bandSpreadLuma = Math.max(out.bandSpreadLuma, diff(baseL, luma(nb)));
+      }
     }
     out.bands = BANDS.length;
 
@@ -20500,16 +20604,36 @@ if (MINE_LINE) {
     + `peak ${r.p1.peak}/${r.p2.peak}, booked ${r.p1.booked}/${r.p2.booked}`);
 
   /*
-   * 60 is a long way clear of anything a recolour or a size change could
-   * produce -- the instrument returns exactly 0 for the same rig twice and
-   * the Dummy sweep's own band-to-band steps are 56 to 110 -- so a difference
-   * of this size is a different drawing and not a different tint.
+   * Four things, and only the last is the claim.
+   *
+   * The three controls say what the reading is blind to, which is the half
+   * this arm did not have: the same rig twice (determinism), the same render
+   * RECOLOURED, and the same render scaled up and down. All three must be
+   * exactly 0 on alpha, and they are by construction -- a recolour and a gain
+   * touch no channel the reading looks at -- so a future "optimisation" that
+   * folded colour back in fails here rather than silently turning the claim
+   * into a claim about tint.
+   *
+   * The claim is then bounded by the instrument's OWN worst reading for
+   * something that is the same drawing in another state, rather than by a
+   * constant: at every band the two rigs are further apart than one rig ever
+   * gets from itself across the band ladder.
    */
   check('...and looks nothing like it, at every band',
-    r.control === 0 && r.apart > 60 && r.perBand.every((d) => d > 60),
-    `the same rig twice differs by ${r.control} (must be exactly 0); the two `
-    + `rigs, at the same size with the colour divided out, differ by `
-    + `${r.apart} at band 3 and ${r.perBand.join('/')} across bands 1-5`);
+    r.control === 0 && r.hue === 0 && r.dim === 0 && r.bright === 0
+    && r.bandSpread > 0
+    && r.apart > r.bandSpread && r.perBand.every((d) => d > r.bandSpread),
+    `controls on alpha, all must be exactly 0: the same rig twice ${r.control}, `
+    + `recoloured ${r.hue}, dimmed ${r.dim}, brightened ${r.bright} `
+    + `(the luma reading, which is why it is not the one asserted, moves by `
+    + `${r.hueLuma} / ${r.dimLuma} / ${r.brightLuma} for the same three). `
+    + `The two rigs differ by ${r.apart} at band 3 and `
+    + `${r.perBand.join('/')} across bands 1-5, against ${r.bandSpread} for `
+    + `ONE rig across the whole band ladder -- ${(Math.min(...r.perBand) / (r.bandSpread || 1)).toFixed(2)}x `
+    + `the worst thing the instrument reports for the same drawing. On luma `
+    + `the same figures are ${r.apartLuma} and ${r.perBandLuma.join('/')} `
+    + `against a band spread of ${r.bandSpreadLuma}, which is why the 60 this `
+    + `replaced was inside its own confound`);
 }
 
 /*
@@ -26408,12 +26532,36 @@ if (GUN_LINE) {
     /*
      * ---- the throw ------------------------------------------------------
      *
-     * Healed every frame so what moves it is the shove and not its death, and
-     * `peak` is read after each step -- the ceiling is applied at the TOP of
-     * `integrate` (clamp the state, then integrate it), so a velocity handed
-     * over by a hit is legitimately seen once before it is clipped. It is the
-     * comparison against the body's OWN un-exempt cap that carries the arm,
-     * not the absolute number.
+     * Healed every frame so what moves it is the shove and not its death.
+     *
+     * `peak` is DISPLACEMENT over the frame, which is the instrument the SLUG
+     * case uses and says why: the impulse lands in the projectile sweep, which
+     * runs after physics, so the velocity left on the body at the end of a
+     * frame is the raw pre-clamp number it never travels at -- that case's
+     * first version read 87,643 u/s against a cap of 627 and concluded the cap
+     * did nothing. This arm read the velocity until build 351 and the two
+     * cases disagreed about one reading; `audit-266-open.md` item 7 is that
+     * disagreement.
+     *
+     * The arm held on the old instrument and held BY COINCIDENCE, which is
+     * why this is a change and not a tidy-up. Measured on build 350 with the
+     * exemption stripped off every pellet the press had just made -- one
+     * switch inside the mechanism, same fan, same impulse, same body -- the
+     * velocity reading came back 132.6 to 150.8 against a cap of 223.8 to
+     * 241.5, i.e. UNDER, three trials of three, because `throwOff` also skips
+     * the repeated-shove fade and thirty-four untagged pellets tax each other
+     * down to nothing. So the control was live. Then swept `CFG.hail.impulse`
+     * with the exemption still stripped: at 265 (shipped) the velocity reads
+     * 165.7 under a cap of 198.3, and at 800 it reads 452 OVER a cap of
+     * 227.9 -- so the arm would have passed on a build with no exemption at
+     * all from three times today's per-pellet impulse. The displacement
+     * reading holds at every impulse tried (800 -> 226.0 of a 227.9 cap, 2000
+     * -> 201.7 of 203.1, 20000 -> 213.3 of 214.9): it sits ON the ceiling,
+     * because what the clamp bounds is what the body travels at.
+     *
+     * The velocity figure is still read and REPORTED beside it, because the
+     * gap between the two is the whole finding and the next reader should not
+     * have to re-measure it.
      */
     const shove = (type, dist) => {
       const s = clean();
@@ -26424,12 +26572,19 @@ if (GUN_LINE) {
       w.abilities.clearCooldowns();
       g.useAbility(slot());
       let peak = 0;
+      let vPeak = 0;
       let thrown = 0;
+      let px = e.x;
+      let py = e.y;
       for (let f = 0; f < 60; f++) {
         e.hp = 1e9;
         g.update(1 / 60);
+        const step = Math.hypot(e.x - px, e.y - py) * 60;
+        if (step > peak) peak = step;
+        px = e.x;
+        py = e.y;
         const v = Math.hypot(e.vx, e.vy);
-        if (v > peak) peak = v;
+        if (v > vPeak) vPeak = v;
         if ((e.thrown || 0) > thrown) thrown = e.thrown;
       }
       const far = Math.hypot(e.x - s.x, e.y - s.y);
@@ -26462,6 +26617,7 @@ if (GUN_LINE) {
         cap: +((e.cruise || 60) * CFG.physics.maxSpeedFactor).toFixed(1),
         invMass: +(e.invMass || 0).toFixed(4),
         peak: +peak.toFixed(1),
+        vPeak: +vPeak.toFixed(1),
         thrown: +thrown.toFixed(2),
         pushed: +(far - d0).toFixed(1),
         start: Math.round(d0),
@@ -26659,21 +26815,26 @@ if (GUN_LINE) {
 
   /*
    * `peak > cap` is the whole arm: with the ordinary clamp a LURCHER cannot
-   * exceed `cruise * 6` however hard it is hit, so a number above it proves
-   * the exemption is live without needing a build without it to compare
-   * against.
+   * TRAVEL above `cruise * 6` however hard it is hit, so a number above it
+   * proves the exemption is live without needing a build without it to
+   * compare against. See the note on the measurement for why that sentence
+   * needs the word "travel" in it, and what the reading it replaced would
+   * have passed on.
    */
   check('HAIL throws a crowd back, and it is a throw and not a hit that pushes',
     r.near.peak > r.near.cap && r.near.thrown > 0 && r.near.pushed > 150
     && r.allThrow && r.allFan
     && r.heavy.peak < r.near.peak && r.heavy.pushed < r.near.pushed
     && r.heavy.invMass < r.near.invMass,
-    `a LURCHER (invMass ${r.near.invMass}) peaked at ${r.near.peak} u/s against `
-    + `its own un-exempt ceiling of ${r.near.cap} -- impossible without the `
-    + `exemption -- and gave up ${r.near.pushed} units of ground; a BULWARK `
-    + `(${r.heavy.invMass}) peaked at ${r.heavy.peak} and gave up `
+    `a LURCHER (invMass ${r.near.invMass}) TRAVELLED at up to ${r.near.peak} `
+    + `u/s against its own un-exempt ceiling of ${r.near.cap} -- impossible `
+    + `without the exemption -- and gave up ${r.near.pushed} units of ground; `
+    + `a BULWARK (${r.heavy.invMass}) travelled at ${r.heavy.peak} and gave up `
     + `${r.heavy.pushed}, which is mass and not magic; all ${r.n} pellets carry `
-    + `the throw (${r.allThrow}) and book to HAIL (${r.allFan})`);
+    + `the throw (${r.allThrow}) and book to HAIL (${r.allFan}). The raw `
+    + `end-of-frame velocity, which this arm read until build 351 and which `
+    + `goes vacuous at three times the shipped pellet impulse, was `
+    + `${r.near.vPeak} and ${r.heavy.vPeak}`);
 
   /*
    * The build-110 guard. A LURCHER coasts out while `thrown` lasts and then
@@ -30800,8 +30961,22 @@ if (MINE_LINE) {
     `shot it rings for ${r.shot}s, ${r.after1s}s left after one second and ${r.after3s} after `
     + `three; a DISSOLVING bell rings ${r.dissolved} and a MOTE ${r.notABell}`);
 
+  /*
+   * `tickPx` is a VACUITY floor and not the claim -- enough tick pixels for a
+   * hold FRACTION to mean anything -- and at 100 it was inside its own
+   * distribution. Priced off nine `--json` dumps: 98, 127, 146, 150, 168,
+   * 188, 189, 198, 235. Two things move it and neither is the mechanism. The
+   * live canvas, because the quality governor resizes it and what the suite
+   * reaches by this point is a draw (measured 1, 0.7 and 0.45 across five
+   * runs): at 332 rows the reading is 127-235 and at 273 it is 98-198, the
+   * ratio of the areas. And the field, because a tick is drawn per MOVING
+   * body and how many are moving here is whatever the cases upstream left --
+   * which is the larger term, since the reading spans 127 to 235 at ONE
+   * canvas size. 40 is 2.45x under the worst draw and still hundreds of times
+   * more pixels than a three-decimal fraction needs.
+   */
   check('...and the tick is drawn AFTER the corruption shader, not into it',
-    r.glitchOn && r.tickPx > 100
+    r.glitchOn && r.tickPx > 40
     // The tick's own pixels hold where they were put...
     && r.tickHold > 0.97
     // ...while the field's thin pixels, drawn into the torn buffer, do not --

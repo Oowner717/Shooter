@@ -9254,3 +9254,158 @@ came from before believing the other one covers it.
   worst draw; raising the loads per band is what tightens the distribution,
   and it costs suite seconds. Left for its own build with the seven readings
   written down, which is the whole point of build 320's dump.
+
+- **BUILD 351 CLOSES THE LAST TWO GUARD HOLES IN `audit-266-open.md`, AND BOTH
+  WERE SOUND-BY-COINCIDENCE RATHER THAN MERELY UNTIDY.** The doc listed items
+  6-10; 8 and 9 were closed at 269 and 5 at 350, so the live pair was 7 and 10.
+  Both had been written up as consistency complaints, and both turned out to be
+  a threshold or an instrument sitting inside its own confound -- which is only
+  visible from the broken end.
+- **ITEM 7: THE HAIL THROW ARM READ VELOCITY, AND THE DOC'S OWN PARENTHETICAL
+  EXCUSING IT IS FALSE FROM 3x THE SHIPPED PELLET IMPULSE.** The item said the
+  arm "still holds (`peak > cruise * 6` is impossible without `throwOff`
+  whichever side of the clamp you read)" and only wanted it to agree with the
+  SLUG case, which rejects the velocity instrument by name -- the impulse lands
+  in the projectile sweep, which runs AFTER physics, so the end-of-frame
+  velocity is the raw pre-clamp number the body never travels at, and that
+  case's first version read **87,643 u/s against a cap of 627** and concluded
+  the cap did nothing.
+  Measured the broken end, which nobody had: strip `throwOff` off every pellet
+  the press has just made -- one switch inside the mechanism, same fan, same
+  impulse, same body -- and the velocity reading comes back **132.6 / 150.8 /
+  132.6 against caps of 223.8 / 224.9 / 241.5**, i.e. UNDER, three of three. So
+  the control was live at the shipped impulse, and the reason is worth knowing:
+  `throwOff` also skips the repeated-shove fade, so thirty-four untagged
+  pellets tax each other down to nothing and never get near the cap.
+  Then swept `CFG.hail.impulse` with the exemption still stripped: **265 ->
+  165.7 under a cap of 198.3, 800 -> 452 OVER a cap of 227.9**, 2000 -> 649.7,
+  6000 -> 3615, 20000 -> 4283. The displacement reading holds at every one of
+  them and sits ON the ceiling (226.0 of 227.9, 201.7 of 203.1, 213.3 of
+  214.9), because what the clamp bounds is what the body travels at. **So the
+  arm was correct with a factor of three in hand on a config number that has
+  nothing to do with the claim** -- and a note in the doc saying "the arm still
+  holds" was an argument from inspection, which build 329 records this repo as
+  not accepting. It reads displacement now and reports the velocity beside it.
+  **And the fix was grepped for its own shape rather than assumed unique**
+  (build 325's rule): three other arms read `Math.hypot(e.vx, e.vy)`. The
+  PULSE-against-ARMORED one is the near miss and does NOT share the hole --
+  its conjuncts are `peak > 0`, a liveness floor satisfied either side of the
+  clamp, and `moved > 20`, which is displacement and is what discriminates.
+  Left alone, with the reason.
+- **ITEM 10: THE PICTURE ARM'S THRESHOLD WAS INSIDE ITS OWN CONFOUND, WHICH IS
+  WORSE THAN THE VACUOUS CONTROL THE ITEM REPORTED.** The item said the control
+  `diff(f, f) === 0` is true of any diff function, so the stated guarantee --
+  "blind to brightness and opacity by construction and therefore cannot report
+  different for a recolour" -- was held by no assertion. True, and two further
+  things were wrong underneath it.
+  **The guarantee is false, measured on a real render.** Swap R and B on the
+  shipped rig and the luma reading moves by **1.6 to 13.9** across the five
+  bands; scale RGB by 1.55 and it moves by **25.5**, because brightening CLIPS
+  at 255 and clipping is not the uniform scale a 98th-percentile normalisation
+  divides out. Dimming 0.62x really does cancel, so the claim held in one
+  direction only -- which is how it survived being written down.
+  **And the `> 60` floor sat inside an ordinary band step.** Its comment called
+  60 "a long way clear of anything a recolour or a size change could produce",
+  citing the Dummy sweep's ADJACENT band-to-band steps of 56 to 110. The
+  quantity that matters is the same rig from band 1 to band 5 -- the same
+  drawing in another state, which is the largest difference the instrument can
+  report for something that is not a different rig -- and on luma that is
+  **186.8, LARGER than the two rigs at bands 2 and 3 (169.0 and 169.8)**. So on
+  that reading the claim is not thin, it is **false**: the per-band minimum is
+  below the confound, and a green case was reporting "a different drawing" on a
+  number a band change produces.
+  The fix is the idiom builds 314 and 324 already use for exactly this claim:
+  **read the ALPHA CHANNEL ALONE**, where colour is divided out by construction
+  because the three channels a recolour moves are not looked at. Alpha
+  separates BETTER -- 179.2 to 245.5 per band against a band spread of 135.3,
+  1.32x -- and the arm asserts that RELATION rather than a constant, so it
+  calibrates itself against the instrument's own worst reading for the same
+  drawing. Three controls carry the blindness: the same rig twice, the same
+  render RECOLOURED, and the same render scaled up and down, all exactly 0 on
+  alpha. **The recolour control is applied to the real render** (a channel
+  permutation on the pixel buffer, geometry identical by construction) and both
+  readings run over two different buffers, so the 0 is earned by the data
+  rather than by calling the reading on one array twice -- which is the fault
+  item 10 raised, and the easy way to reintroduce it.
+  Every figure here is byte-identical run to run (verified, two runs) because
+  the render is pinned at `dummyT` 4.2 and flash 0. **A deterministic arm can
+  be bounded against a measured confound with no draw risk at all**, which is
+  the opposite end of build 320's population from the margins that keep
+  flaking -- so the thing to do with one is tie it to the confound, not leave
+  it on a constant somebody fitted once.
+- **THE GENERAL RULE, AND IT IS THE ONE BUILD 349 ALREADY PAID FOR ONCE: A
+  CONJUNCT'S SOUNDNESS IS A PROPERTY OF THE GAP BETWEEN WORKING AND BROKEN,
+  NOT OF THE WORKING SIDE.** Both of these arms were GREEN, both were reported
+  as style complaints, and both were one config value or one comparison away
+  from passing on a build with the mechanism deleted. 349 found the same shape
+  on the release gate ("a conjunct that has never bound is either vacuous or
+  enormous, and which one it is comes off the broken end"); here it is a
+  conjunct that HAD bound, on a margin nobody had priced. **When a review calls
+  something an inconsistency, price the inconsistency before filing it as
+  cosmetic.**
+- **AND THE HARNESS IS BUILD 349'S, REUSED AND MADE LINE-ANCHORED.** Both
+  rewritten cases were driven standalone BEFORE the suite by slicing the
+  shipped block out of `regress.mjs` and running it with `check` as a spy, so
+  what was verified cannot disagree with what ships. 349's version cut on
+  literal source markers and this one could not reproduce them -- the HAIL case
+  is indented three spaces where the D2 case is four, so a marker copied out of
+  one file region silently missed. It anchors on the check TITLE and walks
+  backwards to the enclosing `page.evaluate` now, which cannot miss on
+  whitespace. Two rewrites verified in about forty seconds each against
+  thirteen minutes of suite.
+- **AND THE SUITE RUN TURNED UP TWO MORE FLOORS OF THE SAME CLASS, WHICH IS
+  WHY THEY ARE IN THIS BUILD RATHER THAN NOTED.** 760/762 with 0 errors, and
+  both reds were fitted floors inside their own distributions -- the build's
+  own subject, arriving unasked.
+- **THE WAVE-TABLE COVERAGE ARM WAS UNDERSAMPLED, AND BUILD 350 HAD ALREADY
+  NAMED THE PARAMETER.** It read **KITE 42%** against a 50% floor where 350
+  read **LOOM 42%** -- both types authored into exactly ONE wave of one band,
+  both 5 of 12 runs. 350's note said "the parameter is the SAMPLE SIZE and not
+  the floor... raising the loads per band is what tightens the distribution",
+  and left it. Here is why it was right: `bandsFor` returns `[hi - 1, hi]`, so
+  a band's own rung draws from **TWO** bands' rosters, and the arm played a
+  flat **14** loads per band -- about HALF a rotation of that pool at the deep
+  end. So a single-wave type had to win a draw, and across nine dumps the
+  single-wave types read 42% to 92% with nothing about the roster changing.
+  The loads are DERIVED now, two rotations of the pool the rung actually draws
+  from, counted off the wave table through `d.bandsFor`. Measured after:
+  **every single-wave type reads 100%** -- kite 42 -> 100, loom 75 -> 100,
+  mire 67 -> 100, anvil / veil / yoke 83 -> 100, remnant 92 -> 100 -- so the
+  50% floor has the whole distribution above it instead of straddling it.
+  **Lowering the floor would have been fitting a number to the worst draw**;
+  the sample size was the thing with a reason.
+- **...AND THE OTHER RED WAS A PIXEL COUNT AGAINST A CANVAS THE GOVERNOR
+  RESIZES, WHICH CLAUDE.md ALREADY DOCUMENTS AS A FAULT CLASS.** The BELL tick
+  arm's `tickPx > 100` read **98**, with every other conjunct healthy (hold
+  0.999 against a field control of 0.889). Subtracted nine dumps: 98, 127, 146,
+  150, 168, 188, 189, 198, 235. **Two things move it and neither is the
+  mechanism.** The live canvas, because the quality governor resizes it and
+  what the suite reaches by that point is a DRAW -- measured 1, 0.7, 0.45, 1,
+  0.45 across five runs of four different trees -- so at 332 rows the reading
+  is 127-235 and at 273 it is 98-198, and every other pixel-counting arm in
+  the run moved by the same area ratio (0.822 squared = 0.676: STASIS 4632 ->
+  3101, PULSE 59420 -> 40267, the patch 2394 -> 1463, the tick 146 -> 98, all
+  0.67). And the FIELD, because a tick is drawn per MOVING body and how many
+  are moving there is whatever the cases upstream left -- which is the larger
+  term, since the reading spans 127 to 235 at ONE canvas size. That is the
+  HITBOXES floor-line note verbatim ("the case passed or failed on how slow
+  the cases before it had run", and the canvas it quotes is 273 wide). The
+  floor is 40, 2.45x under the worst draw, and is named as the vacuity guard
+  it is -- enough pixels for a three-decimal fraction to mean something.
+  **My change was a suspect and was cleared by measurement rather than by
+  argument**: the D2 case now ends on `rigOf(1)` where it ended on `rigOf(2)`,
+  which reaches `setEra(1)` -- a same-era no-op that skips `takeField` -- and
+  it adds five offscreen renders that could plausibly have tipped the
+  governor. The dumps refute it: canvas 273 occurs in six of nine runs
+  including four trees before this one, and s350b read 0.45 on the same tree
+  s350 and s350c read 1 on.
+- **THE DUMP SUBTRACTION IS WHAT MADE BOTH OF THOSE TEN MINUTES INSTEAD OF A
+  SESSION, AND IT ANSWERED "IS THIS MINE?" DIRECTLY.** Build 320 shipped
+  `--json` so a margin could be priced without writing a probe, and 348 used
+  it on an unchanged tree. This is the first time it was used to attribute a
+  RED: diff the failing run against the last green one, filter to the arms
+  whose detail mentions pixels, and the answer was one line -- "found quality
+  at 1" against "found quality at 0.45" -- with fourteen other arms moving by
+  the same ratio to corroborate it. **When a case fails on a build that
+  cannot plausibly reach it, diff the dumps before writing a probe**; a
+  whole-run signature is visible there that no single-case probe would show.

@@ -89,10 +89,12 @@ file:line so the next reader can see what was claimed against what was found.
 6. **The AIRBURST case's only witness is a LURCHER (r 24)**, so it cannot see
    the radius regression it narrates. 267 added an ASSAY-rig arm, which covers
    it — but the field arm should carry a large body too.
-7. **The throw case samples velocity before the clamp** it claims proves the
+7. ~~**The throw case samples velocity before the clamp** it claims proves the
    exemption. The arm still holds (`peak > cruise * 6` is impossible without
    `throwOff` whichever side of the clamp you read), but the SLUG case rejects
-   this instrument by name and the two should agree.
+   this instrument by name and the two should agree.~~ **FIXED 351** -- and
+   the parenthetical is false from about three times the shipped per-pellet
+   impulse. See phase 4.
 8. **The pad arm never renders `drawGuns`** — it asserts two fields on the
    model, so reverting the pad geometry keeps it green.
    `scripts/regress.mjs` ~21288.
@@ -100,10 +102,12 @@ file:line so the next reader can see what was claimed against what was found.
    switch in the suite goes through `g.setBenchEra()`, the method the handler
    calls. Only `#sbDoorEras` is pressed as a control. It is also still 10px,
    below the 11px floor the menu row was raised to.
-10. **"…and looks nothing like it, at every band"**: the control `diff(f, f) === 0`
+10. ~~**"…and looks nothing like it, at every band"**: the control `diff(f, f) === 0`
     is true of any diff function, so the stated guarantee (blind to a recolour)
     is not held by any assertion. Compare the real instrument used by the Dummy
-    band sweep.
+    band sweep.~~ **FIXED 351**, and the Dummy sweep's instrument was not the
+    answer: it is measurably NOT colour-blind, and the arm's `> 60` threshold
+    turned out to sit inside its own confound. See phase 4.
 
 ## Open — false claims in prose
 
@@ -191,10 +195,78 @@ Still open:
 - **6** — the AIRBURST field arm still witnesses only a LURCHER. The ASSAY-rig
   arm added in 267 covers the large-body case, so this is now redundancy
   rather than a hole; left as a note.
-- **7** — the throw case samples velocity before the clamp. The arm still
-  holds arithmetically (`peak > cruise * 6` is impossible without `throwOff`
-  on either side of the clamp), but it and the SLUG case, which rejects this
-  instrument by name, should agree on one reading.
+- ~~**7** — the throw case samples velocity before the clamp.~~
+  **CLOSED, BUILD 351 — and the parenthetical above was wrong.** It is not
+  "impossible without `throwOff` on either side of the clamp": it is
+  impossible on the DISPLACEMENT reading and possible on the velocity one,
+  from about three times the shipped per-pellet impulse. Measured both ends.
+  With the exemption stripped off every pellet a press had just made, the
+  velocity reading came back 132.6 / 150.8 / 132.6 against caps of 223.8 /
+  224.9 / 241.5 — under, so the control was live at the shipped 265. Sweeping
+  `CFG.hail.impulse` with the exemption still stripped: 265 → 165.7 under a
+  cap of 198.3, **800 → 452 OVER a cap of 227.9**, 2000 → 649.7, 6000 → 3615,
+  20000 → 4283. The displacement reading holds at every one of them, sitting
+  ON the ceiling (226.0 of 227.9, 201.7 of 203.1, 213.3 of 214.9), because
+  what the clamp bounds is what the body travels at. So the arm was sound by
+  a coincidence of one config number with a factor of three in hand. It reads
+  displacement now, which is the SLUG case's instrument and settles the
+  disagreement; the velocity figure is reported beside it.
+  Checked while there: the PULSE-against-ARMORED arm reads velocity too and
+  does **not** share the hole — its conjuncts are `peak > 0` (a liveness
+  floor, satisfied either side of the clamp) and `moved > 20`, which is
+  displacement and is what discriminates. Left alone.
 - **5** — HAIL's particle spend does not scale with `fx.quality`. Recorded in
   the docstring and the doc; the fix is a `q` term on the cast's counts, and
   it wants measuring on a reduced budget rather than guessing.
+
+## Phase 4 (build 351)
+
+Closed:
+
+- **7** — above.
+- **10** — the picture arm reads the **alpha channel** now, which is the
+  reading colour cannot reach because the three channels a recolour moves are
+  not looked at; builds 314 and 324 already use it for this exact claim. Two
+  things were wrong and both were measured rather than argued.
+  The docstring claimed the luma reading is "blind to brightness and opacity
+  by construction and therefore cannot report different for a recolour". It is
+  not. Applied to a real render, R and B swapped moves it by **1.6 to 13.9**
+  across the five bands, and scaled 1.55x it moves by **25.5** — brightening
+  CLIPS at 255 and clipping is not the uniform scale the 98th-percentile
+  normalisation divides out. Dimming 0.62x really does cancel, so the claim
+  held in one direction only.
+  And the `> 60` threshold was **inside its own confound**, which is the worse
+  half. Measured on one rig from band 1 upward — the same drawing in another
+  state, which is the largest difference the instrument can report for
+  something that is not a different rig — the luma spread reaches **186.8**,
+  larger than the two rigs at bands 2 and 3 (169.0 and 169.8). So on luma the
+  claim is not merely thin, it is **false**: the per-band minimum is below the
+  confound. On alpha the same spread tops out at 135.3 against a worst
+  per-band separation of 179.2, and that ratio — 1.32x — is what the arm
+  asserts instead of a constant. Every figure is byte-identical run to run,
+  because the render is pinned (`dummyT` 4.2, flash 0), so there is no draw to
+  be near.
+  The three controls are the half the arm did not have: the same rig twice
+  (determinism, and on its own true of any diff function, which is what item
+  10 said), the same render **recoloured**, and the same render scaled up and
+  down — all three exactly 0 on alpha, by construction, so folding colour back
+  into the reading fails here instead of quietly turning the claim into a
+  claim about tint.
+
+Still open:
+
+- **6** — redundancy rather than a hole; see above.
+
+Found while running the suite for phase 4, both of the same class as the two
+items above -- a floor sitting inside its own distribution -- and both fixed
+here rather than noted:
+
+- **The wave-table coverage arm played 14 loads per band against a pool of
+  two bands' rosters**, which is about half a rotation at the deep end, so any
+  type authored into exactly one wave had to win a draw: 42% to 92% across
+  nine dumps (LOOM 42% at 350, KITE 42% at 351, both 5 of 12). The loads are
+  derived from the pool now and every single-wave type reads 100%.
+- **The BELL tick arm's `tickPx > 100` is a vacuity floor on a live-canvas
+  pixel count**, which the quality governor resizes; the quality the suite
+  reaches there is a draw (1, 0.7, 0.45 measured across runs) and the field it
+  counts ticks over is inherited. Nine dumps read 98 to 235. Floor 40.
