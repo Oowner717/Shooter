@@ -26506,7 +26506,7 @@ if (GUN_LINE) {
  */
 {
   const r = await page.evaluate(async () => {
-    const { CFG } = await import('../src/config.js');
+    const { CFG, ENEMY_TYPES } = await import('../src/config.js');
     const { fx } = await import('../src/fx.js');
     const { ledger } = await import('../src/ledger.js');
     const g = window.__sim;
@@ -26744,6 +26744,10 @@ if (GUN_LINE) {
         bought,
         armed: !!w.up.fanBurst,
         r: +bodies[0].e.r.toFixed(1),
+        // the radius IN FORCE on this run, not read at the end of the case:
+        // `hail.burst.r` is a SCALED entry and everything that resizes
+        // rewrites it from BASE.
+        burst: +CFG.hail.burst.r.toFixed(1),
         took: +bodies.reduce((n, bd) => n + (bd.hp0 - bd.e.hp), 0).toFixed(1),
         rows: rows.join(','),
         ok,
@@ -26753,6 +26757,58 @@ if (GUN_LINE) {
     out.oneAir = air(true, 'lurcher', 180, 1);
     out.three = air(false, 'lurcher', 180, 3);
     out.threeAir = air(true, 'lurcher', 180, 3);
+
+    /*
+     * ---- and a body the radius can be WRONG about -------------------------
+     *
+     * Every field arm above stands on a LURCHER, and a LURCHER is the wrong
+     * witness for a radius: a pellet stops at about `e.r + p.r` from the
+     * centre and `applyBlast` measures centre to centre, so the reach a
+     * burst has to clear is 27 units for that body -- under the 34 this
+     * shipped with, under the 58 that replaced it, and under today's 74. So
+     * the burst reaches its centre whatever the radius does, and it reads
+     * like a working node all the way down: measured at 34, one LURCHER
+     * takes x1.301 (against 1.549 at 74) and the crowd separation falls only
+     * to 1.073, while a BULWARK at r 45 -- the body build 267's own note
+     * cites -- reads **x1.000 exactly, 1188 -> 1188**. At 58 nothing above
+     * fails at all. So the case narrated the regression build 267 fixed and
+     * had no arm that could have failed for it. `audit-266-open.md` item 6.
+     *
+     * The witness is DERIVED as the largest loose hostile on the roster --
+     * ANVIL at r 56 today, and a body added past it inherits the arm rather
+     * than needing to be added to it. Hostile because a harmless body is
+     * scenery and the claim is about what the node must be able to hurt; and
+     * BASE radii, because a graft takes ANVIL to 89.6 and 74 is deliberately
+     * under that (see the note on `hail.burst.r`, which build 357 measured
+     * and left alone, with the reason).
+     *
+     * One body and not three: three anvils cannot stand 46 apart at r 56, so
+     * a crowd arm on this body would measure the pair solver. The crowd claim
+     * stays on the LURCHER, which is what it was written for.
+     *
+     * The TWO conjuncts see two different failures and neither can see the
+     * other's, which is the whole reason there are two. GEOMETRY catches a
+     * radius that has stopped reaching: 74 -> 58 fails it and delivers
+     * x1.281 and x1.307 over two trials, inside the working band and
+     * invisible to any threshold on damage -- because the pellet's stop
+     * distance is a
+     * distribution around `r + p.r` and not a constant (p90 measured at
+     * 1.055r), so a radius a couple of units short still reaches on the
+     * nearer draws. DELIVERED catches a burst that has stopped delivering
+     * whatever its radius says.
+     *
+     * The floor is placed in a measured gap and BOTH ends were measured,
+     * three trials each, one body, ten presses: working (74) reads 1.312 /
+     * 1.304 / 1.393 and gutted (34) reads 0.980 / 1.027 / 0.981. 1.15 sits
+     * 12% above the worst broken reading and 12% below the worst working
+     * one.
+     */
+    const big = ENEMY_TYPES.filter((t) => !t.fixed && !t.harmless)
+      .reduce((a, b) => (b.r > a.r ? b : a));
+    out.bigId = big.id;
+    out.pelletR = CFG.hail.r;
+    out.big = air(false, big.id, 180, 1);
+    out.bigAir = air(true, big.id, 180, 1);
 
     /*
      * ---- and the same weapon in the room that measures weapons -----------
@@ -26993,6 +27049,33 @@ if (GUN_LINE) {
     + `${(r.threeAir.took / r.three.took).toFixed(2)}), which is the node `
     + `doing what it is for; and every row is HAIL's own, PILE's or contact `
     + `(${r.threeAir.rows})`);
+
+  /*
+   * The RULE and not the number, which is the shape the ASSAY arm above
+   * already uses: the burst has to clear the reach of the largest body the
+   * field sends, and that body has to be able to show it. A radius asserted
+   * as a literal would pass on a build where the roster grew past it -- which
+   * is exactly what happened at build 328, when ANVIL's r 56 arrived and the
+   * argument written beside `hail.burst.r` went stale in silence for
+   * twenty-nine builds.
+   *
+   * `bigAir.r > oneAir.r` is the conjunct that stops this arm being pointed
+   * back at a small body and called covered.
+   */
+  check('...and the field arm carries a body the radius can be wrong about',
+    r.bigAir.armed && r.big.armed === false
+    && r.bigAir.r > r.oneAir.r
+    && r.bigAir.burst > r.bigAir.r + r.pelletR
+    && r.bigAir.took > r.big.took * 1.15
+    && r.bigAir.ok,
+    `the largest loose hostile on the roster is ${r.bigId} at r ${r.bigAir.r}, `
+    + `so a pellet stops ${(r.bigAir.r + r.pelletR).toFixed(1)} from its centre `
+    + `and the burst is ${r.bigAir.burst} -- it reaches. Measured there, `
+    + `${r.big.took} -> ${r.bigAir.took} (x`
+    + `${(r.bigAir.took / r.big.took).toFixed(3)}) against 0.98-1.03 with the `
+    + `radius gutted, where the LURCHER the arms above stand on has a reach of `
+    + `${(r.oneAir.r + r.pelletR).toFixed(1)} and cannot tell any of them `
+    + `apart; rows ${r.bigAir.rows}`);
 }
 
 // --- the ASSAY's door picks its room ---------------------------------------
@@ -27370,12 +27453,91 @@ if (GUN_LINE) {
       cells[0].dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
       const back = { era: w.era, r: w.shooter.r };
 
+      /*
+       * ---- and NOTHING SWEPT THIS ROOM, which is why it sat at 10px ------
+       *
+       * The menu sweep walks `#menuPanels [data-panel]` and the strip sweep
+       * walks `.qc, #abilities .ab`; `#sbEras` is a child of the room
+       * overlay, which is `display: none` while the menu is open and is not
+       * the strip -- so the room's own controls were in neither. Measured
+       * once this existed: every cell ran at 10px and the SHUT one at
+       * 3.70:1, both under floors the rest of the game is held to.
+       *
+       * CONTROLS and not the whole room, and the scope is derived rather
+       * than listed -- a text node inside a `button`. Not because the room's
+       * readout would fail: measured with the panel expanded, the source
+       * table open and real damage through it, all 31 text nodes clear both
+       * floors (worst 4.58). It is because a control PAINTS ITS OWN GROUND
+       * (`rgba(10, 16, 24, .72)`), so a composited figure on one is honest,
+       * while the room's bare text sits over a CANVAS sky that no
+       * `backgroundColor` chain can see -- the assumed `rgb(5, 8, 15)` is a
+       * fiction there, and five of those readings are inside 9% of the
+       * floor. Widening this wants the room's sky sampled the way the strip
+       * sweep samples the eight boss skies, which is its own piece of work.
+       * The strip sweep draws the same line for the same reason: it takes
+       * the cells, not the play screen.
+       *
+       * The OPACITY chain is accumulated, which is build 282's fix and is
+       * the only reason the 3.70 is visible at all -- the declared colour
+       * reads 8.01. Note it can only be done here: the same chain over the
+       * MENU sweep reports every node at dim 0, because `#menu` opens on a
+       * 0.26s transition and an evaluate advances no wall time, so the
+       * sheet is still at `opacity: 0` when the sweep runs. The room is
+       * display-toggled and has no transition of its own; measured, dim 1
+       * on every cell but the shut one.
+       */
+      const hex = (v) => { const m = v.match(/rgba?\(([^)]+)\)/); if (!m) return null;
+        const a = m[1].split(',').map(Number);
+        return { r: a[0], g: a[1], b: a[2], a: a.length > 3 ? a[3] : 1 }; };
+      const onto = (f, b2) => ({ r: f.r * f.a + b2.r * (1 - f.a), g: f.g * f.a + b2.g * (1 - f.a),
+        b: f.b * f.a + b2.b * (1 - f.a), a: 1 });
+      const lin = (v) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
+      const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+      const ratio = (x, y) => { const a2 = lum(x); const b2 = lum(y);
+        return (Math.max(a2, b2) + 0.05) / (Math.min(a2, b2) + 0.05); };
+      const bad = [];
+      let swept = 0;
+      let shutSeen = 0;
+      const wk = document.createTreeWalker(document.getElementById('sandbox'),
+        NodeFilter.SHOW_TEXT);
+      let tn;
+      while ((tn = wk.nextNode())) {
+        const txt = tn.nodeValue.trim();
+        if (!txt) continue;
+        const el = tn.parentElement;
+        if (!el.closest('button')) continue;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        if (!(el.getBoundingClientRect().height > 0)) continue;
+        const fg = hex(cs.color);
+        if (!fg || fg.a === 0) continue;
+        swept++;
+        if (el.closest('.shut')) shutSeen++;
+        let bg2 = { r: 5, g: 8, b: 15, a: 1 };
+        const chain = [];
+        let dim = 1;
+        for (let e = el; e; e = e.parentElement) {
+          const ecs = getComputedStyle(e);
+          const q = hex(ecs.backgroundColor);
+          if (q && q.a > 0) chain.unshift(q);
+          const o = parseFloat(ecs.opacity);
+          if (Number.isFinite(o) && o < 1) dim *= o;
+        }
+        for (const q of chain) bg2 = onto(q, bg2);
+        const size = parseFloat(cs.fontSize);
+        const cr2 = ratio(onto({ ...fg, a: fg.a * dim }, bg2), bg2);
+        if (size < 11 || cr2 < 4.5) {
+          bad.push(`${txt.slice(0, 10)}@${size}px:${cr2.toFixed(2)}`);
+        }
+      }
+
       g.exitSandbox();
       delete w.director.update;
       g.setEra(1);
       g.restart();
       return {
         w: vw, cells: cells.length, bar, eras, panel, owns, before, moved, back,
+        swept, shutSeen, bad,
         // clear of the bar above it and the panel below it, with no overlap
         placed: !!(bar && eras && panel && eras.top >= bar.bot && panel.top >= eras.bot),
       };
@@ -27391,6 +27553,18 @@ if (GUN_LINE) {
       + `${x.eras.bot}, panel from ${x.panel.top} (clear ${x.placed}); the point `
       + `at ERA II's centre belongs to ERA II (${x.owns}); a pointerdown took `
       + `it to ${JSON.stringify(x.moved)} and back to ${JSON.stringify(x.back)}`).join('; '));
+
+  /*
+   * The vacuity terms are the two the sweep can go quiet on, and both have
+   * been the fault in a sweep before: enough controls to BE the room (five --
+   * the bar's two doors and the row's three cells), and at least one SHUT
+   * cell in the sample, because the shut cell is the one the contrast half of
+   * this is about and a sweep taken with era 3 open would assert nothing.
+   */
+  check("...and every word on a control in that room clears 11px and 4.5:1",
+    rows.every((x) => x.bad.length === 0 && x.swept >= 5 && x.shutSeen >= 1),
+    rows.map((x) => `${x.w}: ${x.swept} words on controls, ${x.shutSeen} of `
+      + `them on a shut one; failing ${JSON.stringify(x.bad)}`).join('; '));
 }
 
 // --- a THROW is not swallowed by ARMORED, and HEAVE reaches past the shell --

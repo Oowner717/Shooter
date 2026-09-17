@@ -10464,3 +10464,150 @@ came from before believing the other one covers it.
   `drawGuns`, which sleeps behind `CFG.gun.inPlay` and wants checking before it
   is believed either way) and 9 (`#sbEras` has no case and is 10px against an
   11px floor). 9 is the one with a player-visible half.
+
+- **BUILD 358 CLOSES `audit-266-open.md`'S LAST THREE GUARD HOLES, AND THE
+  COUNT WAS WRONG IN BOTH DIRECTIONS: ONE HAD BEEN FIXED BY THE BUILD THAT
+  RAISED IT AND ONE WAS WORSE THAN THE FINDING SAID.** Build 357's ruling
+  about that document, applied one section along -- a list of guard holes
+  decays about as fast as a list of prose faults, so each was verified
+  against the code before anything was written. Item **8** (the pad arm
+  "never renders `drawGuns`") renders it TWICE, once as shipped and once with
+  `hw`/`hh` deleted so the geometry falls back to `R * 1.5`, and requires the
+  two pictures to differ with the shipped one narrower; its docstring names
+  the hole and records why an ABSOLUTE could not work (a stroke is centred on
+  its path and bleeds about 2.6 past either candidate, so both read 38). Item
+  **9**'s case presses the row through `pointerdown` at two viewports with
+  `elementFromPoint` proving the cell owns its own centre; what was live was
+  the 10px -- plus a second breach the finding did not mention.
+- **...AND BOTH WERE CLOSED AT BUILD 269, WHICH THAT DOCUMENT'S OWN PHASE LOG
+  HAS RECORDED IN DETAIL EVER SINCE, WHILE ITS SUMMARY LIST WENT ON NAMING
+  THEM AS OPEN FOR EIGHTY-NINE BUILDS.** Build 357's closing report quoted the
+  SUMMARY, this session's brief came from that quote, and two of the three
+  "holes" then cost a re-verification each. `git log -S` settled every
+  attribution in a second and corrected three more in the same document (the
+  ASSAY-rig arm is build 265's, not 267's). **A summary that is not derived
+  from the log below it will disagree with it** -- the same shape as every
+  hand-kept list in this file, on a document rather than on a roster, and the
+  cheap habit is to read the phase sections before the heading and to attribute
+  with `git log -S` rather than from memory.
+- **THE ASSAY-RIG ARM DOES NOT COVER THE FIELD ARM'S BLINDNESS, AND THE
+  MEASUREMENT THAT SAYS SO IS THE 58 PIN.** `audit-266-open.md`'s phase 4
+  entry had downgraded item 6 to "redundancy rather than a hole" on the
+  ground that build 267's ASSAY arm carries the large-body case. Pinned at
+  **58 -- the radius 267 actually fixed** -- the field arms deliver
+  **x1.281, inside the working band**, and the ASSAY arm's rig claim is a
+  geometry claim that passes; so the case could not have failed for the
+  regression its own docstring narrates. A LURCHER's reach is `r + p.r` =
+  **27**, under 34, under 58 and under today's 74, so the burst reaches its
+  centre whatever the radius does and every arm above reads like a working
+  node all the way down: measured at 34, one LURCHER takes **x1.301** against
+  1.549 at 74 and the crowd separation falls only to 1.073, while a BULWARK
+  at r 45 -- the body build 267's own note cites -- reads **x1.000 exactly,
+  1188 -> 1188**. **A second arm measuring the same claim on a different
+  subject is not coverage of the first arm's witness** -- ask what each arm
+  can FAIL for, not what each arm is about. And the first draft of this
+  paragraph said "a single LURCHER's take is unchanged at 34", which is what
+  the geometry suggests and is off by thirty percentage points; it was
+  measured rather than reasoned before it shipped.
+- **TWO CONJUNCTS BECAUSE THEY SEE TWO DIFFERENT FAILURES, AND NEITHER CAN
+  SEE THE OTHER'S.** GEOMETRY -- the burst must clear `r + p.r`, where a
+  pellet stops and what `applyBlast` measures centre to centre from -- is
+  what catches a radius that has stopped reaching; DELIVERED is what catches
+  a burst that has stopped delivering whatever its radius says. Build 349's
+  shape, and the reason it is not one conjunct is that **the pellet's stop
+  distance is a DISTRIBUTION around `r + p.r` and not a constant** (p90
+  measured at 1.055r, recorded above), so a radius two units short still
+  reaches on the nearer draws and delivers a working-band number. A damage
+  threshold can never carry a geometry claim.
+- **BOTH ENDS MEASURED, THREE TRIALS EACH -- THE FOURTH FLOOR THIS CASE HAS
+  HAD TO PLACE AND THE FIRST PLACED BEFORE IT FAILED.** The other three were
+  all fitted and all failed: the single-body 1.3 of build 315 (drew 1.26), the
+  separation 1.3 of 319 (drew 1.291) and the ASSAY arm's 1.15 (drew 1.13).
+  One body, ten presses: working (74) **1.312 / 1.304 / 1.393** against
+  gutted (34) **0.980 / 1.027 / 0.981**, so 1.15 sits 12% either side. The
+  witness is DERIVED as the largest loose hostile on the roster (ANVIL r 56
+  -- hostile because a harmless body is scenery and the claim is about what
+  the node must be able to hurt; BASE radii, because a graft takes ANVIL to
+  89.6 and `hail.burst.r` is deliberately under that, which build 357
+  measured and left alone with the reason). One body and not three: three
+  anvils cannot stand 46 apart at r 56, so a crowd arm there would measure
+  the pair solver, and the crowd claim stays on the LURCHER it was written
+  for. Three revert proofs, each on its own conjunct: 34 fails both (and the
+  crowd arm as well), **58 fails geometry alone**, and the witness pointed
+  back at a LURCHER fails `bigAir.r > oneAir.r` -- the conjunct that exists
+  to stop the arm being "simplified" back to a small body.
+- **NOTHING SWEEPS THE ASSAY ROOM, WHICH IS WHY ITS ERA ROW SAT AT 10px FROM
+  THE DAY IT WENT IN AT BUILD 262.** The menu sweep walks `#menuPanels [data-panel]` and the strip
+  sweep walks `.qc, #abilities .ab`; `#sbEras` is a child of the room overlay
+  `#sandbox`, which is `display: none` while the menu is open and is not the
+  strip -- so the room's own controls were in neither. And the argument
+  written beside the MENU copy of that row was the thing that kept it there:
+  "11px because this one is IN THE MENU, where the swept floor is 11px". It
+  is not a menu floor. `regress.mjs` applies the same 11px to the quick bar's
+  cells and the ability buttons, over a boss sky, so it is the floor for
+  anything a thumb presses. **A floor attributed to the place it was first
+  applied is a floor every other place is quietly exempt from.**
+- **...AND THE SHUT CELL READ 3.70:1, WHICH THE FINDING DID NOT MENTION AND
+  IS BUILD 282'S RULING ON THE NEXT INSTANCE OF EXACTLY THE THING IT WAS
+  WRITTEN ABOUT.** `.sbEra.shut` was `opacity: .62`, and an alpha composites
+  the label further into its ground the dimmer it gets: `#8fa9c4` reads
+  **8.01 declared and 3.70 rendered**, on the one cell whose label most needs
+  reading -- a padlocked room is what a player is looking at when they want to
+  know what is behind it, which is build 245's rule about designing to the
+  LOCKED width. A real colour instead, `#6f8399` at **4.99** measured against
+  the same ground, with the border giving up the rest so "dimmer" is still
+  carried in two channels and the padlock (which is `currentColor`) follows.
+- **THE OPACITY CHAIN CAN BE ADDED TO THE ROOM'S SWEEP AND NOT TO THE MENU'S,
+  AND MEASURING THAT FIRST IS WHAT KEPT THIS A ROOM FIX RATHER THAN A RED
+  SUITE.** Build 282 said "the fix belongs in the SWEEP... because dimming
+  with `opacity` is the cheapest thing in the stylesheet and the next one
+  would have been invisible again" -- and it went into the TITLE sweep only.
+  Adding it to the menu sweep reports **every node at dim 0**, because
+  `#menu` opens on a 0.26s transform-and-opacity transition and a
+  `page.evaluate` advances no wall time, so the sheet is still at `opacity: 0`
+  when the sweep runs (confirmed by walking the ancestor chain: `#menu` = 0
+  during, 1 after ~0.9s of wall clock). Build 296's rule from the other side.
+  So the menu sweep and the strip sweep are still opacity-blind and are
+  RECORDED as such; fixing the menu one needs the sheet's own animation
+  seeking or an await outside the evaluate.
+- **AND THE TRACKING DOES NOT HAVE TO COME DOWN IN THE ROOM, WHICH IS
+  MEASURED RATHER THAN INHERITED FROM THE MENU.** The menu row pays for its
+  11px with `.1em`, because "ERA III" plus its padlock wrapped at `.18em`. At
+  320 the ROOM's cell is **97.3 wide with an 87.3 content box against the
+  menu's 72.9**, so the same label is 74.1 at 11px and `.18em` -- 13 units to
+  spare, `scrollWidth` equal to `clientWidth`. The row grows 27 to 28 tall
+  against a 38-unit slot and `#sbPanel`'s top is unchanged at 106, so nothing
+  the rig's `standoff` measures moved. **A constraint recorded at one site is
+  a measurement of that site, not of the rule.**
+- **FIVE REVERT PROOFS ON THE ROOM SWEEP AND THE ONE THAT MATTERS IS THE
+  THIRD.** 10px back fails on size (all three cells); `opacity: .62` back
+  fails on the shut cell at 3.70; **that same revert WITH the opacity chain
+  removed PASSES**, which is what says the chain is the load-bearing half
+  rather than the author saying so; the scope matched against nothing reads
+  `swept` 0; and the shut count broken reads `shutSeen` 0. The scope is
+  DERIVED -- a text node inside a `button` -- and the reason is NOT that the
+  room's readout would fail. Measured with the panel expanded, the source
+  table open and real damage through it, **all 31 of the room's text nodes
+  clear both floors, worst 4.58**; the first draft of that justification said
+  the panel is "8.5px on purpose", which is a figure copied from a comment in
+  `sandbox.js` that build 240's own pass had already made false -- there is
+  no sub-11px declaration anywhere in the room's 700 lines of CSS. The real
+  reason is that a control PAINTS ITS OWN GROUND, so a composited figure on
+  one is honest, while the room's bare text sits over a CANVAS sky no
+  `backgroundColor` chain can see: the sweep's assumed `rgb(5, 8, 15)` is a
+  fiction there and five of those readings are inside 9% of the floor.
+  Widening it wants the room's sky sampled the way the strip sweep samples
+  the eight boss skies. The strip sweep draws the same line for the same
+  reason: it takes the cells, not the play screen.
+- **Both rewritten cases were driven through the sliced-out harness before
+  the suite, for the third build running, and it cost about forty seconds
+  each against thirteen minutes.** Build 351's line-anchored version reused
+  verbatim: find the check by TITLE, walk back to the enclosing
+  `page.evaluate`, run its body with `new Function` and evaluate the shipped
+  predicate with `check` as a spy, so what is verified cannot disagree with
+  what ships. Two riders learned here. A predicate sliced on a trailing comma
+  is a `SyntaxError` and needs a `replace(/,+$/, '')`. And a pin on a
+  `SCALED` entry has to be a **getter** rather than a value when the body
+  being driven restarts the game itself -- `air()` calls `clean()` on every
+  invocation and every resize rewrites `hail.burst.r` from `BASE`, so a
+  written value survives exactly until the next arm.

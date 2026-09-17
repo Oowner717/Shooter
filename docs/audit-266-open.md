@@ -84,24 +84,61 @@ file:line so the next reader can see what was claimed against what was found.
    fits half of what the governor leaves (85–93 against 139.5). The floor is
    driven through `Game.trackFrame` rather than written down.
 
-## Open — guard holes in the suite (6, 8, 9 live; 7 and 10 fixed in 351)
+## Closed — guard holes in the suite (7 and 10 in 351; 6, 8, 9 in 358)
 
-6. **The AIRBURST case's only witness is a LURCHER (r 24)**, so it cannot see
-   the radius regression it narrates. 267 added an ASSAY-rig arm, which covers
-   it — but the field arm should carry a large body too.
+6. ~~**The AIRBURST case's only witness is a LURCHER (r 24)**, so it cannot see
+   the radius regression it narrates. 267 [**265**] added an ASSAY-rig arm,
+   which covers it — but the field arm should carry a large body too.~~ **FIXED 358.** The
+   witness is DERIVED as the largest loose hostile on the roster (ANVIL, r 56)
+   and the arm carries two conjuncts because they see two different failures:
+   the burst must clear `r + p.r` (the reach of the largest body the field
+   sends) and it must deliver. Both ends measured, three trials each: working
+   1.312 / 1.304 / 1.393 against 0.980 / 1.027 / 0.981 with the radius gutted
+   to 34, so the floor is 1.15 with 12% either side. Pinned at 58 -- the
+   radius 267 actually fixed -- the delivered reading is **x1.281, inside the
+   working band**, and only the geometry conjunct catches it; the LURCHER's
+   own reach is 27, under every candidate radius, which is why the old arms
+   could catch neither.
 7. ~~**The throw case samples velocity before the clamp** it claims proves the
    exemption. The arm still holds (`peak > cruise * 6` is impossible without
    `throwOff` whichever side of the clamp you read), but the SLUG case rejects
    this instrument by name and the two should agree.~~ **FIXED 351** -- and
    the parenthetical is false from about three times the shipped per-pellet
    impulse. See phase 4.
-8. **The pad arm never renders `drawGuns`** — it asserts two fields on the
+8. ~~**The pad arm never renders `drawGuns`** — it asserts two fields on the
    model, so reverting the pad geometry keeps it green.
-   `scripts/regress.mjs` ~21288.
+   `scripts/regress.mjs` ~21288.~~ **ALREADY FIXED AT BUILD 269 — and this
+   list said otherwise for eighty-nine builds while the phase 3 section
+   below recorded the fix in detail.** The arm renders
+   `drawGuns` into an offscreen canvas twice -- once as shipped and once with
+   `hw`/`hh` deleted, which falls back to `R * 1.5` -- and requires the two
+   pictures to differ with the shipped one narrower. Its own docstring records
+   why an ABSOLUTE could not work (a stroke is centred on its path and bleeds
+   about 2.6 past either candidate, so both read 38) and names this hole.
 9. **`#sbEras` — the room's own era row — has no case at all.** Every room
    switch in the suite goes through `g.setBenchEra()`, the method the handler
    calls. Only `#sbDoorEras` is pressed as a control. It is also still 10px,
    below the 11px floor the menu row was raised to.
+   **HALF ALREADY FIXED, half live, and the live half was worse than this
+   says, and the case half was closed at 269 with the phase 3 section below
+   recording it.** The case measures the
+   row's box against the bar and the panel, proves the cell owns the point at
+   its own centre with `elementFromPoint`, and presses it with `pointerdown`
+   at 320 and 390. The 10px was real, and so was something this did not
+   mention: the SHUT cell read **3.70:1**, because `.sbEra.shut` was
+   `opacity: .62` and an alpha composites the label further into its ground
+   the dimmer it gets -- build 282's ruling, on the next instance of exactly
+   the thing it was written about. 11px (measured: "ERA III" plus its padlock
+   is 74.1 against an 87.3 content box at 320, so the tracking does NOT have
+   to come down as it did in the menu) and a real colour, `#6f8399` at 4.99.
+   The reason it survived from 262 is that **nothing sweeps the room**: the
+   menu sweep walks `#menuPanels [data-panel]` and `#sbEras` is a child of
+   the room overlay. The room's CONTROLS are swept now -- not the whole room,
+   because a control paints its own ground while the room's bare text sits
+   over a canvas sky no `backgroundColor` chain can see. Measured for the
+   record, panel expanded and source table open: all 31 of the room's text
+   nodes clear both floors today, worst 4.58, so widening the sweep is
+   available and wants the sky sampled first.
 10. ~~**"…and looks nothing like it, at every band"**: the control `diff(f, f) === 0`
     is true of any diff function, so the stated guarantee (blind to a recolour)
     is not held by any assertion. Compare the real instrument used by the Dummy
@@ -236,8 +273,12 @@ Closed:
 Still open:
 
 - **6** — the AIRBURST field arm still witnesses only a LURCHER. The ASSAY-rig
-  arm added in 267 covers the large-body case, so this is now redundancy
-  rather than a hole; left as a note.
+  arm added in 267 [**265**] covers the large-body case, so this is now
+  redundancy rather than a hole; left as a note.
+  **THAT READING IS STRUCK — see phase 5.**
+  It is a hole: pinned at the 58 that 267 fixed, the ASSAY arm's rig claim is
+  a geometry claim that passes and the field arms cannot tell 58 from 74 at
+  all.
 - ~~**7** — the throw case samples velocity before the clamp.~~
   **CLOSED, BUILD 351 — and the parenthetical above was wrong.** It is not
   "impossible without `throwOff` on either side of the clamp": it is
@@ -298,7 +339,8 @@ Closed:
 
 Still open:
 
-- **6** — redundancy rather than a hole; see above.
+- **6** — redundancy rather than a hole; see above. **Struck at 358**, which
+  measured it.
 
 Found while running the suite for phase 4, both of the same class as the two
 items above -- a floor sitting inside its own distribution -- and both fixed
@@ -313,3 +355,68 @@ here rather than noted:
   pixel count**, which the quality governor resizes; the quality the suite
   reaches there is a draw (1, 0.7, 0.45 measured across runs) and the field it
   counts ticks over is inherited. Nine dumps read 98 to 235. Floor 40.
+
+## Phase 5 (build 358)
+
+Closed -- and the biggest finding is about this document rather than about
+the code: **its summary list of what was open contradicted its own phase
+log.** Phase 3 (build 269) closed items 8 and 9 and says so in detail, and
+the "Open -- guard holes" heading went on naming them as live for
+eighty-nine builds. Build 357's report quoted the heading; this session's
+brief came from that quote; and two of the three "holes" cost a
+re-verification each to establish they were already shut. Build 357's ruling
+about this document, one section along and one degree worse: a list decays
+about as fast as the prose does, and **a summary that is not derived from
+the log below it will disagree with it.** Read the phase sections first.
+
+- **6** -- and the "redundancy rather than a hole" reading above is struck.
+  It is a hole, and the measurement that says so is the 58 pin: that is the
+  radius build 267 actually fixed, and with it in force the delivered reading
+  is **x1.281, inside the working band** while the ASSAY arm's own rig claim
+  passes on geometry. So the case as it stood could not have failed for the
+  regression its docstring narrates. The field arm now carries a DERIVED
+  witness -- the largest loose hostile on the roster, ANVIL at r 56 -- with
+  two conjuncts that see two different failures and neither of which can see
+  the other's: a burst must clear `r + p.r` (where a pellet stops, and what
+  `applyBlast` measures centre to centre from) and it must deliver. Both ends
+  measured, three trials each, one body, ten presses: **74 reads 1.312 /
+  1.304 / 1.393 and 34 reads 0.980 / 1.027 / 0.981**, so 1.15 sits 12% either
+  side. Three revert proofs, each on its own conjunct: 34 fails both (and the
+  crowd arm as well), 58 fails geometry alone, and the witness pointed back
+  at a LURCHER fails `bigAir.r > oneAir.r`, which is the conjunct that stops
+  the arm being "simplified" back to a small body.
+  Worth keeping: the pellet's stop distance is a DISTRIBUTION around
+  `r + p.r` rather than a constant (CLAUDE.md records p90 at 1.055r), which
+  is why 58 still delivers on the nearer draws and why a damage threshold can
+  never carry a geometry claim.
+- **8** -- already fixed, at build **269**, and the phase 3 section above has
+  recorded it in detail ever since. See the struck item.
+- **9** -- the case existed from **269**, also recorded in phase 3; the 10px
+  was real and the SHUT cell's
+  **3.70:1** was not in the finding at all. `.sbEra.shut` was `opacity: .62`
+  over `#8fa9c4`, which reads 8.01 declared -- build 282's ruling on the next
+  instance of the thing it was written about, and the room is the one place
+  the fix could be applied to the sweep as well, because `#menu` opens on a
+  0.26s transition and an evaluate advances no wall time, so the same
+  opacity chain over the MENU sweep reports **every node at dim 0**. Measured
+  before deciding, which is what kept this a room fix and not a red suite.
+
+What the room fix rests on, all measured at 320 where the suite does not run:
+the room's cell is 97.3 wide with an 87.3 content box against the menu's
+72.9, so "ERA III" plus its padlock is 74.1 at 11px with the shipped .18em
+tracking and the tracking does NOT have to come down as it did in the menu;
+the row grows 27 to 28 tall against a 38-unit slot, so the panel below it is
+untouched; and `#6f8399` is 4.99 against the same ground the sweep uses.
+
+Five revert proofs on the room sweep, each on its own conjunct -- 10px back
+(fails on size, all three cells), `opacity: .62` back (fails on the shut cell
+at 3.70), **that revert plus the opacity chain removed (PASSES, which is what
+says the chain is the load-bearing half)**, the scope matched against nothing
+(`swept` 0), and the shut count broken (`shutSeen` 0).
+
+Still open: nothing in this list. What is NOT closed and is recorded rather
+than fixed: the menu sweep and the play-strip sweep are both still blind to
+`opacity`, and the menu one cannot simply take the chain for the transition
+reason above -- it would need the sheet's own animation seeking the way build
+296 does, or an await outside the evaluate. Neither is a hole in a claim
+anything currently makes.

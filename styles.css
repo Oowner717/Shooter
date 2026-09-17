@@ -4989,9 +4989,14 @@ body.evolving #waveRail { transform: translateY(-18px); }
   margin: 12px 0 4px;
 }
 /*
- * 11px because the swept menu floor is 11px, and the tracking comes DOWN to
- * pay for it: "ERA III" plus its padlock is 82px at .18em against a cell of
- * 76 at 320, which wrapped. At .1em it is 71.
+ * The TRACKING comes down to pay for the size, and that is this row's own
+ * problem rather than the size being it: "ERA III" plus its padlock is 82px
+ * at .18em against a cell of 76 at 320, which wrapped. At .1em it is 71.
+ *
+ * The 11px is the base's from build 358 and is left written out, because what
+ * differs here is the layout -- a menu cell is 72.9 wide at 320 against the
+ * room's 97.3, measured, which is the whole reason the tracking has to give
+ * and why the room's does not.
  */
 #sbDoorEras .sbEra {
   font-size: 11px; padding: 9px 2px; gap: 4px; letter-spacing: .1em;
@@ -5004,11 +5009,28 @@ body.evolving #waveRail { transform: translateY(-18px); }
  * documented failure mode and "ERA III" hit it at 320 the first time this row
  * was drawn there.
  */
+/*
+ * 11px, from build 358, and it was 10 from the day this row went in at 262 --
+ * on the argument, written at the menu copy of it above, that 11 was "the
+ * swept MENU floor". It is not a menu floor: `regress.mjs` applies the same
+ * 11px to the quick bar's cells and the ability buttons, over a boss sky, so
+ * it is the floor for anything a thumb presses. What kept this row at 10 is
+ * that NOTHING SWEEPS THE ROOM -- the menu sweep walks `#menuPanels
+ * [data-panel]` and `#sbEras` is a child of the room overlay, which is
+ * `display: none` while the menu is open. The room's own case sweeps its
+ * controls now.
+ *
+ * The tracking does NOT have to come down with it here, and that is measured
+ * rather than inherited from the menu row: at 320 the room's cell is 97.3
+ * wide with 87.3 of content box, and "ERA III" plus its padlock is 68.6 at
+ * 10px and 74.1 at 11px -- 13 units to spare, `scrollWidth` equal to
+ * `clientWidth` at both. The row grows 27 to 28 tall against a 38-unit slot.
+ */
 .sbEra {
   display: flex; align-items: center; justify-content: center; gap: 5px;
   padding: 7px 4px; border-radius: 6px; white-space: nowrap;
   border: 1px solid rgba(143, 184, 216, .28); background: rgba(10, 16, 24, .72);
-  color: #8fa9c4; font-size: 10px; letter-spacing: .18em; cursor: pointer;
+  color: #8fa9c4; font-size: 11px; letter-spacing: .18em; cursor: pointer;
 }
 .sbEra.on {
   border-color: rgba(143, 184, 216, .8); background: rgba(143, 184, 216, .14);
@@ -5025,8 +5047,21 @@ body.evolving #waveRail { transform: translateY(-18px); }
 .sbEraLock { display: inline-block; width: 9px; height: 9px; opacity: .75; }
 .sbEra:not(.shut) .sbEraLock { display: none; }
 .sbEraLock svg { width: 100%; height: 100%; display: block; }
-/* Shut reads as shut: dimmer, and it keeps the padlock beside the name. */
-.sbEra.shut { opacity: .62; }
+/*
+ * Shut reads as shut: dimmer, and it keeps the padlock beside the name.
+ *
+ * A REAL COLOUR and not `opacity`, which is build 282's ruling applied to the
+ * next instance of exactly the thing it was written about. This was
+ * `opacity: .62`, and an alpha composites the label further into whatever it
+ * is drawn over the dimmer it gets: measured in the room, `#8fa9c4` reads
+ * 8.01:1 on the cell's own ground and the same label at .62 reads **3.70**,
+ * under the 4.5 floor, on the one cell whose label most needs reading -- a
+ * padlocked room is what a player is looking at when they want to know what
+ * is behind it. `#6f8399` is 4.99 measured against the same ground, and the
+ * border gives up the rest of the difference so "dimmer" is still carried in
+ * two channels. The lock is `currentColor`, so it follows.
+ */
+.sbEra.shut { color: #6f8399; border-color: rgba(143, 184, 216, .16); }
 /* A door that does not open says so where it was pressed, once. */
 .sbEra.refuse { animation: sbRefuse .34s ease-out; }
 @keyframes sbRefuse {
