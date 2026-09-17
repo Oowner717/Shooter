@@ -9545,3 +9545,14 @@ came from before believing the other one covers it.
   above: build 321 records that `drive` multiplies its own local copy by the
   dawdle and never reads the field back, so pinning the field can never
   remove a ROUTE roll.
+- **THE HASH DID NOT MOVE AND IT WAS OWED RATHER THAN OPTIONAL.**
+  `-954811922` with all six intermediate marks identical to build 343's
+  (-549790228 / 2055604435 / -1731762476 / 355215982 / 437007875), the served
+  BUILD confirmed as 352 in the probe's own heading. This build puts a new
+  guard in `resolveSegment`'s pierce branch -- the one place a round is tested
+  against a body, on `fight.mjs`'s own hot path -- and changes a guard in
+  `Front.update`. Both reduce to the identity for everything the rung-1 fight
+  contains, by inspection, which is exactly the argument build 329 records
+  this repo as not accepting. An unchanged hash is what "a change on the
+  projectile sweep provably did not reach anything already using it" looks
+  like measured, and it is the same claim builds 315, 332 and 333 made.
