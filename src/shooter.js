@@ -100,8 +100,28 @@ export class Front {
        * be shot at, shoved, or cashed in. `harmless` keeps grey grey -- an
        * automatic thing that vaporised DRIFT would undercut SIEVE and break
        * the promise the colour rule makes.
+       *
+       * `staged` is NOT here, from build 352, and the reason is the rule
+       * CLAUDE.md states three times: `spent` is a rule for what may be
+       * SHOT and `staged` is a rule for what may be CHOSEN. config.js says
+       * in as many words that it never gated projectile collision -- only
+       * the assists -- so a body is shootable through most of its march in,
+       * and putting it on a damage path makes a wave visibly wash over a
+       * body on screen and do nothing.
+       *
+       * Build 220's audit filed it as unreachable and that reading was taken
+       * off one viewport. The margin is the mount-to-rim column against the
+       * front's own reach, and it is a SCREEN-SIZE quantity: measured, at
+       * 390x844 the column is 752.6 against a fully bought 240 and nothing
+       * of any radius can be both staged and inside (it would need r 256),
+       * but at 320x568 the column is 307.4 and the front reaches a body
+       * whose EDGE it has met -- so anything from r 33.7 up is inside on the
+       * last frames of its march. Measured there, same body, same place,
+       * `staged` the only switch: a BULWARK took 0 against 6 and an ANVIL 0
+       * against 6.4. Era 2 is covered by `shielded` instead, which refuses
+       * everything above the yard wall and is the correct guard for it.
        */
-      if (e.dead || e.harmless || e.staged || e.spent || e.fizzle) continue;
+      if (e.dead || e.harmless || e.spent || e.fizzle) continue;
       if (this.hit.has(e)) continue;
       const dx = e.x - this.x;
       const dy = e.y - this.y;
@@ -469,18 +489,36 @@ function sliverOn(world, e, x, y, p, dirx, diry, sp) {
  * body is `fixed`, and each one is built by `new Enemy` inside `Boss.body()` --
  * so a boss meets the authored literal whatever the player is carrying.
  *
- * Measured, seven anomalies, auto-aim and auto-fire, nothing bought against
- * the whole tree bought: 227.0s -> 57.3s, 227.3 -> 43.4, 245.0 -> 47.5,
- * 223.7 -> 43.3, 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one of
- * them falls to about a fifth of the length it was tuned to.
+ * Measured -- AT BUILD 215, on the seven anomalies there were then, and the
+ * figures are kept as the measurement the design was made against rather
+ * than as current: auto-aim and auto-fire, nothing bought against the whole
+ * tree bought, 227.0s -> 57.3s, 227.3 -> 43.4, 245.0 -> 47.5, 223.7 -> 43.3,
+ * 236.3 -> 41.5, 216.0 -> 41.0, 212.6 -> 67.8. Every one of them fell to
+ * about a fifth of the length it was tuned to. There are nine anomalies now,
+ * seven of them gated, and the damage line is half as steep per level and
+ * nearly twice as long -- so the ratios above are not reproducible.
  *
  * A HANDFUL OF NODES CARRY ALL OF IT, and they cost a few thousand of the
- * tree's hundred-odd: HOLLOWPOINT at 1.5 a level over three, SALVO's every
- * Nth shot, and what is left of FEED. Resetting them alone returns a
- * fully-bought fight to nearly its stock length -- so this is the product to
- * answer, not the ledger and not the spend. Half the tree is mines, abilities
- * and defence: a player who bought those has not shortened any fight and must
- * not be handed a harder boss for it.
+ * tree's hundred-odd: HOLLOWPOINT, SALVO's every Nth shot, and what is left
+ * of FEED. Resetting them alone returns a fully-bought fight to nearly its
+ * stock length -- so this is the product to answer, not the ledger and not
+ * the spend. Half the tree is mines, abilities and defence: a player who
+ * bought those has not shortened any fight and must not be handed a harder
+ * boss for it.
+ *
+ * ...AND THE CLAMP DOES MOST OF THE WORK NOW, which build 220's audit caught
+ * as a stale figure and is worth stating as a property. This paragraph used
+ * to price HOLLOWPOINT at "1.5 a level over three" -- x3.375, which is what
+ * it was until build 229 took it to 5 at 1.32 and build 302 to 8 at 1.26.
+ * Measured here: the node alone is x6.353, and with SALVO at 8 and FEED at
+ * 0.9 this function returns 8.823 for a fully bought gun against
+ * `CFG.boss.temper` 4.2 -- so the ceiling binds at a little over half of one
+ * node's ladder and every deeper purchase is invisible to a boss. With CORE
+ * owned (dormant until NEW FORM, x3.32 on top) the product is about 29, or
+ * seven times the clamp. The consequence for anyone tuning boss scaling is
+ * that `temper` and not this product is the live quantity above that point,
+ * and a change to the damage line moves the RUNG at which the clamp starts
+ * binding rather than the difficulty of a boss met after it.
  *
  * SIGHT was the fourth term and went in build 215, taking a 1.25^3 with it.
  * PILE replaces it on the TURRET branch and is NOT counted here on purpose:

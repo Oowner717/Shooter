@@ -311,6 +311,32 @@ function chainFrom(world, first, hx, hy, jumps) {
         // guard in `applyDamage` refuses, and still spend the jump, draw the
         // arc across the wall and mark the body EARTHED.
         if (e.dead || e.spent || seen.has(e) || shielded(world, e)) continue;
+        /*
+         * ...and grey is the ASSIST's decision, not the chain's, from build
+         * 352.
+         *
+         * A jump is chosen -- nearest body inside `jumpRange` -- so this is
+         * a chooser sitting inside a damage path, and every other chooser in
+         * the game honours the DRIFT rule. The reason is written out at
+         * `Front.update` in shooter.js, about the other automatic sweep: "an
+         * automatic thing that vaporised DRIFT would undercut SIEVE and
+         * break the promise the colour rule makes". Four jumps the player
+         * did not aim is exactly as automatic as a wave through the floor.
+         * Measured before the guard, one dart into three hostiles and three
+         * drifters interleaved: two of the four jumps landed on grey and
+         * 43.5 of the round's 91.9 delivered damage -- 47% -- went into
+         * bodies `autoTarget` would not have aimed at.
+         *
+         * So it is the assist's own rule rather than a flat refusal, because
+         * SIEVE is a node somebody bought: at `field` the chain skips grey,
+         * and at `drift` or `all` it reaches it, the same way the barrel
+         * does. `aimMode` is never written 'off' (Game.setAimMode keeps the
+         * last real position), so the default arm is the honest one. The
+         * chain deliberately does NOT take the other half of `consider` --
+         * refusing HOSTILES at `drift` -- because a chain is a spread from
+         * where the round landed and not a statement about what to hunt.
+         */
+        if (e.harmless && (world.aimMode || 'field') === 'field') continue;
         const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
         if (d2 < bestD) { bestD = d2; best = e; }
       }
@@ -655,13 +681,40 @@ function resolveSegment(world, p, ax, ay, bx, by) {
       if (p.onHit) p.onHit(world, e, c.x, c.y, p, c);
       if (p.chain) chainFrom(world, e, c.x, c.y, p.jumps);
       audio.hit();
-      // A piercing round carries on out the other side, weaker, ignoring what
-      // it just went through for long enough not to hit it twice.
+      /*
+       * A piercing round carries on out the other side, weaker, ignoring what
+       * it just went through for long enough not to hit it twice -- and the
+       * window is sized off the BODY, not flat, from build 352.
+       *
+       * It was 0.06s, and `ignoreT -= dt` clears on the frame after it goes
+       * under, so at SPINE's 1560 u/s the real window is four frames and 104
+       * units. The round enters at the NEAR face, so what it has to clear is
+       * the whole chord, `2 * (e.r + p.r)` -- which is 96.8 for a BULWARK, a
+       * 3.4% margin, and larger than 104 for anything from about r 48.6 up.
+       * Measured, one dart held against one pinned body: r 45 one hit, r 60
+       * two, r 72 two, r 90 two -- the second one spending a pierce inside
+       * the body it was already in and taking 39.9 where it should take
+       * 22.4. Bodies that reach it in ordinary play: ANVIL at 56, the
+       * FRACTAL core at 64, and anything grafted (a BULWARK with a full ring
+       * is 72, and `MAX_BODY_R` counts graft out to 89.6 -- see build 329's
+       * broadphase pin).
+       *
+       * This is the fault build 223 fixed for SLIVER's FRAGMENTS, at the two
+       * `fire` sites in shooter.js, in the same words ("each re-hit spending
+       * a pierce inside the body it was already in") -- and the PARENT's own
+       * pierce was never given the same treatment. A generous window costs
+       * nothing: `ignore` is one body reference, so no other target is
+       * affected, and a piercing round is leaving and never comes back. The
+       * two 0.08 windows on the bounces below are left flat on purpose --
+       * those REVERSE the round and set `placed` a unit outside the surface,
+       * so they have nothing to cross.
+       */
       if (p.pierce > 0) {
         p.pierce--;
         p.damage *= p.pierceFade;
         p.ignore = e;
-        p.ignoreT = 0.06;
+        p.ignoreT = (2 * ((e.r || 1) + (p.r || 0)) + 4)
+          / Math.max(1, Math.hypot(p.vx, p.vy));
         for (let i = 0; i < 3; i++) spark(c.x, c.y, spread(140), spread(140), p.color, 0.18, 1.8);
         return;
       }
