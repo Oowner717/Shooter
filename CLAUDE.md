@@ -9118,3 +9118,139 @@ came from before believing the other one covers it.
   nothing executable in `src/` -- so there is no change for it to measure, the
   way builds 345 to 348 had none. What had something to say is the suite and
   the ten-population harness above, and both are green.
+
+- **BUILD 350 CLOSES `audit-266-open.md` ITEM 5 BY MEASURING IT AND REFUSING
+  IT, AND THE GENERAL RULE IS THAT A SHARE IS NOT A COST.** That item has read
+  as a live fault for eighty-four builds: "HAIL's particle spend is ~4.7x what
+  it was and none of it scales with `fx.quality`. On the device the governor
+  exists for, one press asks for about 60% of the reduced budget." The
+  unscaledness is real. The figure and the consequence are not.
+  **The ask is 24%, not 60%** -- 66 particles of the 279 a 0.45 governor
+  leaves, or 31-33% counting AIRBURST's wall. And it is FOUR presses rather
+  than one, which the item did not say: PULSE 6.6% -> 14.7%, HAIL 10.6% ->
+  23.7%, STASIS 3.5% -> 7.9%, PRISM 0.5% -> 1.1%, each doubling its share as
+  the governor closes, against `explode(r40)`'s 8.9% -> 8.6%. The other four
+  abilities spend no particles at all -- they spend RINGS, which are a
+  separate pool and not budget-gated (build 334).
+  **What refuses the fix is the other side of the ledger, which nobody had
+  measured: what the FIELD leaves.** A real band-5 wave at rung 32, fully
+  bought, 2,700 sampled frames at each quality: `budgetLeft` has a p1 of 423
+  at quality 1 and **120** at the floor, and the share of frames leaving less
+  than even HAIL's 66 is **0.0% and 0.04%** -- one frame of 2,700. The press
+  lands 66 of 66 and starves no frame after it. So scaling the four would have
+  thinned the two loudest presses in the game -- PULSE is `essential`, so
+  every run has it -- to buy a per-frame saving that no frame needed. That is
+  the ruling GYRE (331), KITE's bolt (336) and three of MIRE's clauses (339)
+  already carry, arriving for the first time on a PERFORMANCE claim rather
+  than a gameplay one.
+  **The rule to take: a source taking twice the share of a budget is a fault
+  only if something else wanted that budget.** A share is one of two numbers
+  and it is the cheap one to measure; the headroom the rest of the frame
+  leaves is the one that decides. Ask for it before fixing a share.
+- **AND THE CONVENTION STOPPED WHERE IT DID FOR A REASON THE FILE MAKES
+  VISIBLE: `abilities.js` DOES NOT IMPORT `fx`.** Scaling by quality is done
+  in exactly three files and all three import `fx` directly -- `fx.js` (`explode`,
+  and the spawner at `:474`), `patch.js` (twice, with a `Math.max(0.45, q)`
+  floor) and `shooter.js:2205` (`Math.max(3, round(base * size * q))`).
+  `abilities.js` imports `{ spark, dot, ring, ripple, shake, flash, Shock }`
+  and not the object, so the whole ability bar could not have scaled without a
+  line nobody had reason to add. **A convention that stops at a file boundary
+  is worth checking against that file's imports before calling it an
+  oversight** -- and it is why the revert proof below was a ReferenceError
+  first.
+- **THE BOUND IS ON THE PEAK AND NOT THE CAST, BECAUSE THE PRESS IS NOT THE
+  WHOLE SPEND.** With AIRBURST owned, `endProjectile` bursts every pellet on
+  EXPIRY as well as on impact, so a dot and two sparks a pellet arrive about a
+  tenth of a second after the cast -- 66 becomes a concurrent peak of 85 to 93,
+  and it is a DRAW rather than a constant because the lives are jittered
+  (`life * rand(0.88, 1)`, build 335's fix for the wall arriving in one tick).
+  Measured four times: 85, 86, 91, 93. So the arm bounds the peak at half the
+  reduced budget (139.5), which sits between the worst press and the 120 of p1
+  headroom the field actually leaves -- a bound derived from two measurements
+  rather than fitted to one.
+- **THE FLOOR IS DRIVEN THROUGH `Game.trackFrame` AND NOT WRITTEN DOWN.**
+  `0.45` is a literal in that method and the arm's whole subject is the budget
+  at that quality, so restating it would be build 329's copy going stale. Sixty
+  late frames at a time with `qualityCooldown` cleared walks quality 1 -> 0.7
+  -> 0.45, which is also build 198's rule that a governor case has to be
+  synthetic: a headless software rasteriser produces none of the six timings
+  that matter. **Proved able to fail by raising the floor past 1** so quality
+  can never drop -- the arm then reads `floor 1, budget 620` and fails its
+  vacuity clause, which is what stops the whole case passing on a build where
+  the governor never moves.
+- **TWO INSTRUMENT FAULTS, BOTH MINE, BOTH THE SAME SHAPE AS THE FAULTS THIS
+  FILE ALREADY RECORDS.** `explode(x, y, r, color, glow, power)` takes the
+  COLOUR fourth, and the control run passed `explode(400, 600, 40, 1,
+  '#ffffff')` -- so `color` was `1`, `rgba` went into `hex.slice is not a
+  function`, and the page threw from inside the rAF loop. That is build 341's
+  `drawGlow` argument order verbatim, in a probe rather than in the game, and
+  it read as a live bug for the ten minutes it took to isolate: **check the
+  signature before believing a throw you caused.** The COUNTS were unaffected
+  (they do not depend on colour), so the control table stands. And the revert
+  proof that scales a press by `fx.quality` threw a ReferenceError until the
+  import went in, which is the finding above arriving as a broken probe.
+- **THE SEED HAD TO BE PINNED OR THE TWO QUALITIES MEASURED DIFFERENT
+  FIELDS.** The first field reading compared quality 1 against 0.45 and the
+  two arms had **55 bodies and 11** -- because each arm calls `restart()`,
+  which re-rolls `world.runSeed`, and `traitsFor` is seeded off it, so one arm
+  drew SWARM and the other did not. A budget comparison against a field a
+  fifth the size is not a budget comparison. Pinned, both arms read 51-58
+  bodies and the answer inverted in the useful direction: the field at the
+  FLOOR peaks at **277 of a 279 budget** on its own, where at quality 1 it
+  peaks at 282 of 620. That is the state the governor is actually about -- a
+  full field on a reduced budget -- and the unpinned pair never produced it.
+  Build 336's rule from the other side: pinning a seed is choosing a trait
+  roll, so a probe that pins one owes the reader the roll it drew, and one
+  that does not owes the reader the body counts.
+- **AND THE CASE LEFT THE DIRECTOR STUBBED, WHICH IS THIS FILE'S OWN RULE
+  BROKEN FOR THE FOURTH TIME, BY THE BUILD THAT QUOTES IT.** The first suite
+  run was **758 of 762**, and the four reds were the wave-figure family four
+  hundred lines downstream: "opened at 0%, highest 0% across an arrival that
+  put **0 bodies** on the field" against build 349's 8, and "no splitter wave
+  found". The case pins `w.director.update = () => {}` and `w.spawnLock = 1e9`
+  so nothing releases into its particle count, restored `fx.quality` and
+  `g.resize()` (build 198's rule, which I did follow) and put neither of the
+  other two back -- and `reset()` keeps the same Director object, so the stub
+  outlived every `restart()` after it. CLAUDE.md records this in THREE places,
+  one of them as an instruction to new cases in as many words.
+  **Diagnosing a fault does not inoculate you against writing it** -- which is
+  the note build 338 wrote about a hand-kept list it duplicated in the same
+  build that fixed one, and build 343's fourth self-asserting detail string.
+  The durable half is that the restore is now ASSERTED rather than performed:
+  `putBack` reads that `update` is a function AND not an own property of the
+  director, so a future `= undefined` (which shadows the prototype's method
+  and starves the suite exactly as a stub does) fails the case that left it.
+  Verified by slicing the shipped `page.evaluate` body out of `regress.mjs`
+  and driving a real wave after it -- 47 bodies and 32 released, against 0
+  before the fix -- which is build 349's harness idiom reused for a different
+  question.
+- **AND THEN THE CASE FAILED WITH EVERY PRINTED FIGURE CORRECT, WHICH NAMES
+  THE ONE CONJUNCT THE MESSAGE DID NOT CARRY.** Second run, 761 of 762: floor
+  0.45, pool 620 -> 279, 4 of 8 spenders, all 4 unscaled, 0 clipped, the
+  director put back -- and red. The failing clause was `restored === 1`, the
+  only one whose figure the detail string did not print. It asserts a VALUE
+  where it means a RESTORATION: standalone `wasQ` is 1 because nothing has
+  driven the governor, and in the suite fourteen thousand lines of cases run
+  first, so it read 0.7 and the arm rejected a perfect restore. `restored ===
+  wasQ`, with both printed. **A detail string is a declaration (builds 319,
+  323, 324, 343) and this is the same rule one step on: a conjunct whose
+  figure the message does not carry cannot be diagnosed from its own FAIL
+  line.** The tell was that every number in the line was right -- which is
+  not a confusing failure, it is a POINTER, and it should be read as one:
+  when a FAIL prints nothing wrong, the fault is in what it does not print.
+- **AND ONE PRE-EXISTING MARGIN DREW BADLY, WITH THE POPULATION IN HAND SO THE
+  NEXT SESSION NEED NOT RE-MEASURE IT.** "Every type in the wave table is met
+  in over 50% of runs that climb" read **LOOM 42%** on the third run of this
+  build. It is a sampling draw and not this build's: the arm is at
+  `regress.mjs:1188`, THIRTEEN THOUSAND LINES BEFORE the only code this build
+  inserts, and the same tree read LOOM at 92% on both of the other two runs.
+  Across seven dumps the figure is **75, 83, 83, 92, 92, 92 and then 42**
+  against a floor of 50 -- so six of seven sit 1.5x to 1.8x clear and the
+  seventh is under.
+  **The parameter is the SAMPLE SIZE and not the floor**, which is build 348's
+  ruling: the arm plays 12 runs of 14 wave loads at one rung per band, and
+  LOOM is in exactly ONE band-5 wave (build 332), so 42% is 5 of 12 rather
+  than a behaviour. Moving the floor down would be fitting a number to the
+  worst draw; raising the loads per band is what tightens the distribution,
+  and it costs suite seconds. Left for its own build with the seven readings
+  written down, which is the whole point of build 320's dump.

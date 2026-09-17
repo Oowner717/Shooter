@@ -1299,8 +1299,22 @@ export const ABILITIES = [
        * ...and that row is the CAST only. Each pellet also spawns its own
        * muzzle particle through `fire`, so a press measures about 66 -- and
        * the pellets go first, so under budget pressure it is the authored
-       * wedge that gets dropped and the accident that survives. Neither
-       * scales with `fx.quality`; see docs/audit-266-open.md.
+       * wedge that gets dropped and the accident that survives.
+       *
+       * NEITHER SCALES WITH `fx.quality`, DELIBERATELY, AND BUILD 350
+       * MEASURED THE DECISION RATHER THAN INHERITING IT. `explode`,
+       * `patch.js` and `shooter.js:2205` all multiply their counts by the
+       * governor's factor, so an unscaled press is the outlier: measured, a
+       * scaled source holds its share of the pool as the governor closes
+       * (8.9% -> 8.6%) and this press doubles it (10.6% -> 23.7%, and 15% ->
+       * 33% with AIRBURST's wall counted). What is not there is a COST. On a
+       * real band-5 field at rung 32, fully bought, the share of frames
+       * leaving less budget than this press asks for is 0.0% at quality 1 and
+       * 0.04% -- one frame of 2,700 -- at the floor; the press lands 66 of 66.
+       * `docs/audit-266-open.md` item 5 put the ask at "about 60% of the
+       * reduced budget", which is 24%. So scaling it would thin the loudest
+       * thing in the game to buy a saving no frame needed, and `regress.mjs`
+       * pins the unscaledness and the bound instead.
        *
        * The difference in kind is that PULSE's is a CIRCLE and HAIL's is a
        * WEDGE: every element here is thrown along the fan, so what the press

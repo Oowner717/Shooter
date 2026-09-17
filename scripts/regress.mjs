@@ -14361,6 +14361,198 @@ if (!GUN_LINE) {
     `stock ${r.parts} particles, fully bought ${r.bigParts}, budget ${r.maxParticles}`);
 }
 
+// --- an ability press is UNSCALED on purpose, and still fits the floor -----
+/*
+ * The sibling of the arm above, at the other end of the pool: a blast may not
+ * take a third of the FULL budget, and a press may not take half of what the
+ * governor leaves when it has closed down.
+ *
+ * `docs/audit-266-open.md` item 5 has read since build 266 as a live fault --
+ * "HAIL's particle spend is ~4.7x what it was and none of it scales with
+ * `fx.quality`. On the device the governor exists for, one press asks for
+ * about 60% of the reduced budget." Build 350 measured it and the FIGURE is
+ * wrong and the CONSEQUENCE is unreachable:
+ *
+ *   share of the budget a press asks for   q = 1     q = 0.45
+ *     HAIL cast                            10.6%      23.7%
+ *     HAIL peak, AIRBURST owned            15%        31-33%
+ *     PULSE                                 6.6%      14.7%
+ *     STASIS                                3.5%       7.9%
+ *     `explode(r40)`, which DOES scale       8.9%       8.6%
+ *
+ * So the ask is 24% and not 60%, and the divergence from the convention is
+ * real -- a scaled source holds its share as the governor closes (0.97x) and
+ * an unscaled one doubles it (2.22x). What is NOT real is a cost. Measured on
+ * a REAL band-5 field at rung 32, fully bought, the seed pinned so both
+ * qualities see the same field (build 336: pinning a seed is choosing a trait
+ * roll, and an unpinned pair compared 55 bodies against 11), 2,700 sampled
+ * frames at each quality: the field leaves `budgetLeft` at a p1 of 423 at
+ * quality 1 and 120 at the floor, and the share of frames leaving less than
+ * even HAIL's 66 is 0.0% at quality 1 and 0.04% -- one frame of 2,700 -- at
+ * the floor. A press lands 66 of 66.
+ *
+ * SO THE FIX IS REFUSED AND THE DECISION IS ASSERTED INSTEAD, which is the
+ * ruling GYRE, KITE's bolt and three of MIRE's clauses already have: a
+ * payload whose measured consequence is empty is withdrawn rather than
+ * shipped. Scaling the four presses would have thinned the two loudest
+ * things in the game -- PULSE is `essential`, so every run has it -- to buy
+ * a per-frame saving that no frame needed.
+ *
+ * Two things this arm therefore pins, because a refusal nobody can see is a
+ * refusal the next reader re-litigates:
+ *   - the presses are UNSCALED, deliberately and identically at both
+ *     qualities. `abilities.js` does not import `fx` at all, which is why
+ *     the convention stopped at the three files that do (`fx.js`,
+ *     `patch.js`, `shooter.js:2205`).
+ *   - the worst of them still fits HALF of what the governor leaves. That is
+ *     the bound the measurement supports: the field's own p1 headroom at the
+ *     floor is 120 against a worst press of 85-93, so half the reduced
+ *     budget (139.5) sits between the two.
+ *
+ * THE FLOOR IS DRIVEN AND NOT WRITTEN DOWN. `0.45` is a literal inside
+ * `Game.trackFrame` and this arm's whole subject is the budget at that
+ * quality, so restating it here is the copy that goes stale (build 329).
+ * `trackFrame(ms, work)` is the governor's own door, judged once every sixty
+ * frames behind a cooldown -- and a governor case has to be synthetic,
+ * because a headless software rasteriser produces none of the six timings
+ * that matter (build 198).
+ */
+{
+  const r = await page.evaluate(async () => {
+    const g = window.__sim;
+    const w = g.world;
+    const FX = await import('/src/fx.js');
+    const { ABILITIES } = await import('/src/abilities.js');
+    const { CFG } = await import('/src/config.js');
+    const fx = FX.fx;
+    const wasQ = fx.quality;
+    const out = { cap: CFG.maxParticles, at1: {}, atFloor: {}, owned: {} };
+
+    const drive = () => {
+      for (let round = 0; round < 12; round++) {
+        g.qualityCooldown = 0;
+        for (let f = 0; f < 60; f++) g.trackFrame(40, 20);
+      }
+    };
+    const bare = (buy) => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      g.debugClearField();
+      if (buy) { g.debugGiveBytes(500000000); g.debugBuyAll(); }
+      w.projectiles.length = 0; w.effects.length = 0; w.mines.length = 0;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      // Nothing else may spend the pool while the press is being counted.
+      w.autoFire = false;
+      w.autoAim = false;
+      fx.reset();
+    };
+    const ask = (id, buy) => {
+      bare(buy);
+      const before = fx.particles.active.length;
+      const budget = fx.budgetLeft;
+      ABILITIES.find((a) => a.id === id).run(w);
+      const cast = fx.particles.active.length - before;
+      /*
+       * The PEAK and not the cast, because the press is not the whole spend:
+       * with AIRBURST owned `endProjectile` bursts every pellet on EXPIRY as
+       * well as on impact, so a dot and two sparks a pellet arrive about a
+       * tenth of a second later -- jittered by `life * rand(0.88, 1)`, which
+       * is why the peak is a DRAW (85 to 93 measured) rather than a constant.
+       */
+      let peak = fx.particles.active.length;
+      for (let f = 0; f < 90; f++) {
+        g.update(1 / 60);
+        if (fx.particles.active.length > peak) peak = fx.particles.active.length;
+      }
+      // A clipped press reads as a smaller ask and would flatter the bound.
+      return { cast, peak, budget, clipped: fx.budgetLeft <= 0 };
+    };
+
+    const ids = ABILITIES.map((a) => a.id);
+    drive();
+    out.floor = fx.quality;
+    for (const id of ids) out.atFloor[id] = ask(id, false);
+    for (const id of ids) out.owned[id] = ask(id, true);
+    fx.quality = 1;
+    for (const id of ids) out.at1[id] = ask(id, false);
+
+    out.ids = ids;
+    out.spenders = ids.filter((id) => out.at1[id].cast > 0);
+    out.unscaled = out.spenders.filter((id) => out.at1[id].cast === out.atFloor[id].cast);
+    out.clipped = ids.filter((id) => out.atFloor[id].clipped || out.owned[id].clipped);
+    out.worstId = ids.reduce((a, b) => (out.owned[b].peak > out.owned[a].peak ? b : a), ids[0]);
+    out.worst = out.owned[out.worstId].peak;
+    out.reduced = out.cap * out.floor;
+    out.bound = out.reduced * 0.5;
+    out.casts = ids.map((id) => `${id} ${out.atFloor[id].cast}/${out.owned[id].peak}`);
+
+    /*
+     * ---- AND EVERYTHING THIS CASE PINNED GOES BACK, WHICH IT DID NOT ------
+     *
+     * The first version restored `fx.quality` (build 198's rule -- the
+     * backing store is sized inside `resize()` and a canvas left on the floor
+     * charges every later case for it) and left the DIRECTOR stubbed. `reset()`
+     * keeps the same Director object, so `w.director.update = () => {}`
+     * outlives every `restart()` after it: the suite went 758 of 762 and the
+     * four reds were the wave-figure family four hundred lines downstream,
+     * reading "0 bodies on the field" against build 349's 8 and "no splitter
+     * wave found". CLAUDE.md records this fault three times -- once as a rule
+     * for new cases and once as eighteen cases in the damage-bench family that
+     * still leave it -- and writing it a fourth time is what that note is for.
+     *
+     * `delete` and not `= undefined`: the method lives on the prototype and an
+     * own property of `undefined` shadows it.
+     */
+    delete w.director.update;
+    w.spawnLock = 0;
+    w.autoFire = true;
+    w.autoAim = true;
+    g.restart();
+    fx.quality = wasQ;
+    g.resize();
+    /*
+     * BOTH HALVES, because the first version asserted `restored === 1` -- a
+     * VALUE where it meant a RESTORATION. Standalone `wasQ` is 1 and the arm
+     * passed; in the suite fourteen thousand lines of cases run first and the
+     * governor has already moved, so it read 0.7 and the case failed with
+     * every printed figure correct. That is build 343's rule one step on: a
+     * conjunct whose figure the message does not carry cannot be diagnosed
+     * from its own FAIL line.
+     */
+    out.wasQ = wasQ;
+    out.restored = fx.quality;
+    out.putBack = typeof w.director.update === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update');
+    return out;
+  });
+
+  check('an ability press is not scaled by the quality governor, on purpose',
+    r.floor > 0 && r.floor < 1
+    && r.spenders.length >= 4
+    && r.clipped.length === 0
+    && r.unscaled.length === r.spenders.length
+    && r.restored === r.wasQ && r.putBack,
+    `the governor drops to ${r.floor} under sixty late frames, taking the pool from `
+    + `${r.cap} to ${r.reduced}; ${r.spenders.length} of ${r.ids.length} presses spend `
+    + `particles at all (${r.spenders.join(' ')} -- the other ${r.ids.length - r.spenders.length} `
+    + `spend rings, which are a separate pool) and all ${r.unscaled.length} of them ask for `
+    + `exactly the same count at both qualities, which is the decision and not an `
+    + `oversight: see the note above for the measurement that refused the fix. `
+    + `${r.clipped.length} of them were clipped by the budget, so the counts are asks. `
+    + `The director stub is put back (${r.putBack}) and the quality is back where `
+    + `this case found it (${r.wasQ} -> ${r.restored})`);
+
+  check('...and the worst of them still fits half of what the governor leaves',
+    r.worst <= r.bound && r.worst > 0,
+    `with everything owned the worst press is ${r.worstId.toUpperCase()} at ${r.worst} `
+    + `particles (a cast of ${r.owned[r.worstId].cast} plus its own wall of bursts, a draw `
+    + `of 85-93) against half the reduced budget, ${r.bound} -- and against the p1 `
+    + `headroom a real band-5 field leaves at the floor, measured at 120 over 2,700 `
+    + `frames. Cast/peak per press: ${r.casts.join('  ')}`);
+}
+
 // --- SPORE's ground is capped, and laid where the round landed -------------
 /*
  * Patch damage is per body, additive, with no cap and no dedup, so a round's

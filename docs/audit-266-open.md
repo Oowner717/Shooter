@@ -61,10 +61,28 @@ file:line so the next reader can see what was claimed against what was found.
    `src/game.js:1567` — `w.gunAt[w.gunAt.length - 1]`, and `gunAt` is sorted by
    lot, so buying lot 2 after lot 5 flashes lot 5.~~ **FIXED 268** --
    `gunAt.find(x => x.lot === i)`.
-5. **HAIL's particle spend is ~4.7× what it was and none of it scales with
+5. ~~**HAIL's particle spend is ~4.7× what it was and none of it scales with
    `fx.quality`.** On the device the governor exists for, one press asks for
    about 60% of the reduced budget. Compare `fx.js`'s own `hitBurst`/`explode`,
-   which multiply by `q`. `src/abilities.js:1168-1200, 1279-1296`.
+   which multiply by `q`. `src/abilities.js:1168-1200, 1279-1296`.~~
+   **MEASURED AND REFUSED, BUILD 350.** The figure is wrong and the
+   consequence is unreachable. The ask is **24%** of the reduced budget, not
+   60% (66 particles of 279 at the governor's 0.45 floor; 31–33% counting
+   AIRBURST's wall of expiry bursts). The unscaledness is real and it is four
+   presses rather than one — PULSE 6.6%→14.7%, HAIL 10.6%→23.7%, STASIS
+   3.5%→7.9%, PRISM 0.5%→1.1%, each doubling its share as the governor closes,
+   against `explode`'s 8.9%→8.6% — and `abilities.js` does not import `fx` at
+   all, which is why the convention stopped at the three files that do.
+   But on a real band-5 field at rung 32, fully bought, seed pinned so both
+   qualities see the same field, 2,700 sampled frames each: `budgetLeft` has a
+   p1 of 423 at quality 1 and **120** at the floor, and the share of frames
+   leaving less than even HAIL's 66 is 0.0% and **0.04%** — one frame of 2,700.
+   A press lands 66 of 66 and starves nothing after it.
+   So the fix is refused on the ruling GYRE, KITE's bolt and three of MIRE's
+   clauses already carry, and `regress.mjs` pins the decision instead: the
+   presses are unscaled identically at both qualities, and the worst of them
+   fits half of what the governor leaves (85–93 against 139.5). The floor is
+   driven through `Game.trackFrame` rather than written down.
 
 ## Open — guard holes in the suite
 
