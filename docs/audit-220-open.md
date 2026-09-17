@@ -4,8 +4,11 @@
 Nine round types and eight mine kinds, each read end to end by its own reader,
 then every claim put to an adversarial pass. Nine of the twelve passes ran
 before a session limit; the tree, machine and picture sweeps did not, so their
-readers' claims never got a second opinion and are filed at the bottom as
-leads rather than findings.
+readers' claims never got a second opinion and were filed at the bottom as
+leads rather than findings. **Those three were adjudicated at build 352** —
+see the section below the refutation list for the verdicts; three of their
+thirty-four leads were real and live, eight had been fixed by a later build,
+and twenty-three are about the mine line, which has had no door since 289.
 
 **All 56 confirmed findings are now fixed.** Everything behavioural was
 proved by reverting it and watching a named regress case fail. The suite is at
@@ -133,14 +136,136 @@ unadjudicated readers.
 - ALSO CHECKED AND FOUND CORRECT (short OK list, so the next audit does not re-report these). (a) `tally`'s exclusions are right per kind: `mouth = !!KIND[kind].trigger` (mines.js:121) correctly excludes THORN and LODE, which have no `trigger` key; `bang` (:122) covers blast/knell/spall, which are the three that read `up.mineBlast`; `hurts = bang || thorn` (:135) matches the six `up.mineDamage` reads. Denominators: void of=5, spall of=8, blast of=6 — all matching the measured mark counts. (b) The `spent`/`staged`/`fizzle` split is right in all four mine paths and matches the CLAUDE.md rule: `grip` (:337) and `repel` (:508) are steering and test `dead || spent || fizzle`; `cut` (:544) is damage and tests `dead || spent || harmless` with no `staged`; the trigger loop (:695) is a chooser and correctly DOES test `staged`. Each carries a comment saying which it is. (c) The SPALL pellet burst ring at :465 is drawn CONTRACTING (`ring(x, y, br, br * 0.4, ...)`), brightest at the radius that hurts — the correct form; likewise detonate at :300-301, fizzle at :407, toll at :572. (d) `fizzle` reads `f.r * world.up.mineBlast` for both the blast and the ring (:400, :406), so picture and damage share one number. (e) The trigger mouth is drawn from the same expression the trigger uses, EVENT HORIZON and WIDE MOUTH included (:687 vs :888). (f) No `export let`/`export var` in mines.js. (g) No bare `ctx.globalAlpha = 1` in mines.js; the one alpha manipulation in drawFx's ring path (fx.js:578-582) multiplies in and puts back. (h) `mineMarks`, `mineGrade` and `mineScale` are all live — no dead exports.
 
 
-## Never adjudicated — the three passes that did not run
+## ADJUDICATED AT BUILD 352 — the three passes that did not run
 
 
-No second opinion on any of these, and several are certainly wrong: of the
-eleven refutations the nine completed passes produced, four were "already
-fixed" and three were design preferences dressed as defects. Leads, not
-findings. Where a claim below is already answered by a build-220 commit, the
-commit is the record.
+Filed at build 220 as leads with no second opinion, and adjudicated a hundred
+and thirty-two builds later. The heading's own warning held: **of the
+thirty-four leads below, three were real and live, eight had already been
+fixed by a later build, and twenty-three are about a system that has had no
+door since build 289.** Nothing was taken on the lead's word; every verdict
+below is a measurement or a named site, and the leads are left in place
+underneath so nobody re-reports one.
+
+### Real, live, and fixed at 352
+
+- **PILE's front carries `staged` on a damage path** — filed `[cosmetic]` on
+  the ground that the guard "cannot be taken", **and that reading was taken
+  off one viewport**. The margin is the mount-to-rim column against the
+  front's own reach, and it is a SCREEN-SIZE quantity: `world.floorY` is
+  derived from the bar heights and the window while `CFG.pile.r` is not.
+  Measured: at 390x844 the column is 752.6 against a fully bought 240, so a
+  body would need r 256 to be both staged and inside — nothing in the game
+  reaches that. At **320x568 the column is 307.4**, and the front reaches a
+  body whose EDGE it has met, so anything from **r 33.7** up is inside on the
+  last frames of its march. Same body, same place, `staged` the only switch:
+  a BULWARK took **0 against 6** and an ANVIL **0 against 6.4**. Era 2 is
+  covered by `shielded` instead, which refuses everything above the yard wall
+  and is the correct guard for it. Fixed, revert-proved, and the case runs at
+  both sizes because the claim is different at each.
+- **A piercing round's ignore window is flat** — the lead was about SLIVER's
+  FRAGMENTS and that half was fixed at build 223 (shooter.js sizes it off the
+  body at both `fire` sites). **The parent's own pierce was never given the
+  same treatment.** `ignoreT -= dt` clears on the frame after it goes under,
+  so at SPINE's 1560 u/s the real window is four frames and 104 units against
+  a chord of `2 * (e.r + p.r)`: 96.8 for a BULWARK, a **3.4% margin**, and
+  larger than 104 from about **r 48.6** up. Measured, one dart at one pinned
+  body: r 45 one hit, r 60 two, r 72 two, r 90 two — the second spending a
+  pierce inside the body it was already in and taking 39.9 where it should
+  take 22.4. Reachable in ordinary play: ANVIL at 56, the FRACTAL core at 64,
+  a fully grafted BULWARK at 72, and `MAX_BODY_R` counts graft out to 89.6.
+  The case carries the old flat window as its own control, written back from
+  outside on every frame, so the A/B is inside the mechanism.
+- **ARC's chain jumps into harmless DRIFT** — real, and the reason not to was
+  already written down in this codebase at `Front.update`, about the other
+  automatic sweep: "an automatic thing that vaporised DRIFT would undercut
+  SIEVE and break the promise the colour rule makes". A jump is the nearest
+  body inside `jumpRange`, so it is a chooser sitting inside a damage path.
+  Measured before the guard, one dart into three hostiles and three drifters
+  interleaved: **two of the four jumps landed on grey and 43.5 of the round's
+  91.9 delivered damage — 47%** — went into bodies `autoTarget` would not have
+  aimed at. Fixed as the ASSIST's own rule rather than the flat refusal the
+  lead proposed, because SIEVE is a node somebody bought: at `field` the chain
+  skips grey, at `drift` or `all` it reaches it the way the barrel does.
+- **gunScale's header prices HOLLOWPOINT wrong** — and the interesting part is
+  that **the lead's own fix had already been applied and had rotted twice
+  more**. It said the header read 1.25 and should read 1.5; it read 1.5, and
+  the node went to 5 levels at 1.32 in build 229 and 8 at 1.26 in 302. Fixed,
+  the build-215 fight table marked as dated (seven anomalies against nine, and
+  the damage line half as steep per level and nearly twice as long, so its
+  ratios are not reproducible), and the property the stale figure was hiding
+  recorded: measured, the node alone is x6.353 and a fully bought gun returns
+  **8.823 against `CFG.boss.temper` 4.2**, so the ceiling binds at a little
+  over half of one node's ladder and `temper` rather than this product is the
+  live quantity above that point.
+
+### Already fixed by a later build, with the site as the record
+
+- **SPORE's burning ground takes no part of the AMMO damage line** `[high]` —
+  fixed. `shooter.js` is `dps: g.patch.dps * w.up.damage`, and THORN's mine
+  patch still reads `T.patch.dps * world.up.mineDamage` raw, which is exactly
+  what the lead asked for. CLAUDE.md records the sweep that did it (the ARC
+  chain, SPORE's ground and THORN's, all three found together).
+- **DEEP CHARGE has no `levels`** `[medium]` — overtaken. Build 224 removed the
+  `?? 3` default outright (`levelsOf` throws for a node declaring none, and
+  `check-build` fails the build for one), and build 230 took DEEP CHARGE to
+  1.22 a level and replaced `knell.grow` with `knell.spread`. Both mines top
+  out at 156, half a 390-point screen.
+- **upgrades.js's header says an absent `levels` means "without limit"**
+  `[medium]` — fixed at 220 (the paragraph) and properly at 224 (the default
+  removed, which is the lesson: correcting the documentation left the SILENCE
+  in place and DEEP CHARGE shipped uncapped three builds later).
+- **Five FIELD nodes still take `u.levels ?? 3`** `[low]` — same fix. There is
+  no default to take.
+- **OVERSTUFFED's row understates the node** `[low]` — fixed. The row reads
+  "+1 rebound, +1 wall bounce, and it stays up longer to use them", and
+  `upgrades.js` carries the note that the two budgets are separate.
+- **PILE pays the repeated-shove fade** `[medium]` — fixed. `throwOff` is the
+  eighth argument at the `applyDamage` call and the comment gives the cadence
+  argument for it. The lead's second half — delete the hand-written
+  `e.thrown` above it — is **refused with the reason at the site**: it is
+  written before the impulse deliberately, because the cap would otherwise
+  clip the shove on the frame it is given.
+- **A patch's rim band is erased from a third of the way into its life**
+  `[low]` — fixed. `patch.js`'s `reach` is 1.14 and sits clear of 1, so the
+  ragged rim is drawn for as long as there is anything to be outside of, and
+  the docstring records the fault.
+- **A SLIVER fragment's 0.06s `ignore`** `[low]` — fixed at 223 for the
+  fragments; see the parent's half above.
+
+### Out of play — the mine line, which has had no door since build 289
+
+`CFG.mines.inPlay` is false, so twenty-three of the leads below are about a
+system a player cannot reach: the WIRE cut-against-drawn fault (filed twice,
+once in each pass), SPALL's omnidirectional ring, `mineGrade`'s SPALL
+crediting, BLOOM OUT's placement, the ALL MINES group's gating and its
+three-of-six coverage, `toll()`'s live read, DEAD WEIGHT against the life
+contract (filed twice), `CFG.mines.cap`'s unreachable eviction, `LAY_TONE`'s
+four missing kinds, `specLine`'s dead `'none'` case, the snare's hold-wires
+(filed twice), KNELL's "three times" prose and its row's arithmetic, the pip
+collar's hardcoded denominator, the free first mine, the stale module header,
+and PAIRED CHARGE's and SALTED's borrowed marks.
+
+They are **not** struck, for build 289's reason: turning the line back on
+should be a config flip rather than an edit to the guards, so its findings
+keep. Two riders. Build 230 rewrote KNELL's radius and span outright
+(`knell.spread`, `knell.span`), so the tolls prose and the row figures in
+those leads describe a mine that no longer exists and want re-deriving rather
+than applying. And CLAUDE.md's own note applies to the lot: a case that sleeps
+behind an `inPlay` flag is a case whose thresholds have never been sampled, so
+**the build that flips the flag owes the figure dump as well as a suite run.**
+
+### What the adjudication itself was worth
+
+Three real faults out of thirty-four leads, and every one of the three was
+invisible to a suite that was green the whole time — because each is a guard
+or a window that is correct on the screen, the body or the crowd somebody
+happened to test it on. That is build 351's finding restated from the other
+end: **a conjunct's soundness is a property of the gap between working and
+broken**, and a lead filed `[cosmetic]` because the author could not reach the
+fault is a lead that was measured on one viewport.
+
+The original leads follow, unedited.
 
 
 ### TREE audit — the ROUNDS and MINES branches (src/upgrades.js, src/tree.js) and every world.up key they write or read

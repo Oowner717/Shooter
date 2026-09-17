@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '351';
+export const BUILD = '352';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.

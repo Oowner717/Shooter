@@ -40135,6 +40135,375 @@ if (MINE_LINE) {
     + `is unreachable${r.omit.length ? ` -- BUT ${r.omit.join(' ')} rely on it` : ''}`);
 }
 
+/*
+ * ---- PILE'S WAVE REACHES A BODY STILL IN THE THROAT ----------------------
+ *
+ * `staged` is a rule for what may be CHOSEN and `spent` is a rule for what
+ * may be SHOT -- config.js says in as many words that `staged` never gated
+ * projectile collision, only the assists. `Front.update` had it in a guard
+ * that also carries `dead`, `harmless`, `spent` and `fizzle`, four marks its
+ * docstring justifies one by one, and said nothing about the fifth.
+ *
+ * Build 220's audit filed it [cosmetic] on the ground that the guard "cannot
+ * be taken", and that reading was taken off one viewport. The margin is the
+ * mount-to-rim column against the front's own reach and it is a SCREEN-SIZE
+ * quantity, because `world.floorY` is derived from the bar heights and the
+ * window while `CFG.pile.r` is not: 752.6 against 240 at 390x844, where a
+ * body would need r 256 to be both staged and inside, and 307.4 at 320x568,
+ * where the front reaches a body whose EDGE it has met and so anything from
+ * r 33.7 up is inside on the last frames of its march.
+ *
+ * So the case is at both sizes and the claim is different at each, which is
+ * the point: the fault is real where the screen is small and the derivation
+ * is what says the other screen was never evidence.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    await page.waitForTimeout(120);
+    rows.push(await page.evaluate(async (vw) => {
+      const { CFG } = await import('../src/config.js');
+      const { entryLine } = await import('../src/portal.js');
+      const { Front } = await import('../src/shooter.js');
+      const g = window.__sim;
+      const w = g.world;
+      /*
+       * `setViewportSize` fires a resize the page handles on its own
+       * schedule, and `world.floorY` is only re-derived inside `resize()` --
+       * so without this both rows read whichever size the page was launched
+       * at, which is exactly the one-viewport reading this case exists to
+       * correct. Measured before the call: 752.6 at both sizes.
+       */
+      g.resize();
+      const wipe = () => {
+        for (const k of ['enemies', 'ghosts', 'respawns', 'drops', 'debris',
+          'projectiles', 'effects', 'mines', 'pendingBlasts']) {
+          if (Array.isArray(w[k])) w[k].length = 0;
+        }
+        if (w.attackers) w.attackers.clear();
+      };
+      /*
+       * One press, one body, held where its march would put it on the frame
+       * before `staged` comes off: the leading edge ON the rim, which is the
+       * nearest a staged body can legally be. Healed and pinned, because
+       * what is being read is whether the wave reaches it at all.
+       */
+      const put = (id, staged) => {
+        g.restart();
+        g.resize();
+        w.director.update = () => {};
+        w.spawnLock = 1e9;
+        w.director.traits = [];
+        wipe();
+        w.autoAim = false;
+        w.autoFire = false;
+        const rim = entryLine(w, 0);
+        const s = w.shooter;
+        const e = g.debugSpawn(id, w.width * 0.5, rim + 1);
+        if (!e) return null;
+        e.y = rim + e.r;
+        e.hp = 1e9;
+        e.maxHp = 1e9;
+        e.cruise = 0;
+        e.staged = staged;
+        const front = new Front(s.x, s.y, CFG.pile.r.length);
+        w.effects.push(front);
+        const d = Math.hypot(e.x - s.x, e.y - s.y);
+        const hp0 = e.hp;
+        for (let f = 0; f < 90; f++) {
+          e.vx = 0;
+          e.vy = 0;
+          e.x = w.width * 0.5;
+          e.y = rim + e.r;
+          e.staged = staged;
+          g.update(1 / 60);
+          if (front.dead) break;
+        }
+        return { r: e.r, edge: +(d - e.r).toFixed(1), reach: +front.r.toFixed(1),
+          inside: d - e.r <= front.r, took: +(hp0 - e.hp).toFixed(1) };
+      };
+      const rim = entryLine(w, 0);
+      const mount = w.shooter.y;
+      const reach = Math.max(...CFG.pile.r);
+      return {
+        vw,
+        mount: +mount.toFixed(1),
+        rim: +rim.toFixed(1),
+        column: +(mount - rim).toFixed(1),
+        reach,
+        // a staged body is inside once `column - r <= reach + r`
+        needs: +((mount - rim - reach) / 2).toFixed(1),
+        staged: put('bulwark', true),
+        loose: put('bulwark', false),
+        // ...and a body the front genuinely cannot reach, so a zero means
+        // the geometry and not a blind counter
+        far: put('mote', false),
+        src: Front.prototype.update.toString().includes('e.staged'),
+      };
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+
+  const small = rows[0];
+  const big = rows[1];
+  check('PILE\'s wave reaches a body still coming through the throat',
+    // THE FAULT, where the screen makes it reachable: the same body in the
+    // same place, `staged` the only difference, and both now take the hit
+    small.staged && small.loose && small.staged.inside && small.loose.inside
+    && small.staged.took > 0 && small.loose.took > 0
+    // ...and to the same amount, because the mark is not a damage term
+    && Math.abs(small.staged.took - small.loose.took) < 0.01
+    // THE CONTROL: a body outside the annulus takes nothing at all, so the
+    // reading above is the front's reach and not a counter that always moves
+    && small.far && !small.far.inside && small.far.took === 0
+    // THE DERIVATION: the guard is gone from the damage path, so no screen
+    // and no radius can be skipped for it
+    && !small.src && !big.src
+    // ...and the other viewport, which is where build 220 read it: the
+    // column is wide enough that no body in the game can be both
+    && big.column - big.reach > 2 * 90,
+    rows.map((x) => `${x.vw}: column ${x.column} against a fully bought front of `
+      + `${x.reach}, so a staged body is inside from r ${x.needs} -- BULWARK (r `
+      + `${x.staged ? x.staged.r : '?'}) edge ${x.staged ? x.staged.edge : '?'} of `
+      + `${x.staged ? x.staged.reach : '?'}, inside ${x.staged ? x.staged.inside : '?'}, `
+      + `took ${x.staged ? x.staged.took : '?'} staged against `
+      + `${x.loose ? x.loose.took : '?'} loose; control MOTE inside `
+      + `${x.far ? x.far.inside : '?'} took ${x.far ? x.far.took : '?'}`).join(' | ')
+    + `; \`staged\` still in the guard: ${small.src}`);
+}
+
+/*
+ * ---- A PIERCING ROUND CLEARS THE BODY IT WENT THROUGH --------------------
+ *
+ * The window was a flat 0.06s, and `ignoreT -= dt` clears on the frame after
+ * it goes under -- so at SPINE's 1560 u/s the real window is four frames and
+ * 104 units, against a chord of `2 * (e.r + p.r)`: 96.8 for a BULWARK, a
+ * 3.4% margin, and larger than 104 from about r 48.6 up. Bodies that reach
+ * it in ordinary play are ANVIL at 56, the FRACTAL core at 64 and anything
+ * grafted (a full ring takes a BULWARK to 72, and `MAX_BODY_R` counts graft
+ * out to 89.6).
+ *
+ * The A/B is inside the mechanism and needs no second build: the probe
+ * clamps `ignoreT` back to 0.06 every frame, which is exactly what the site
+ * used to write, and reads the same dart against the same body.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const wipe = () => {
+      for (const k of ['enemies', 'ghosts', 'respawns', 'drops', 'debris',
+        'projectiles', 'effects', 'mines', 'pendingBlasts']) {
+        if (Array.isArray(w[k])) w[k].length = 0;
+      }
+      if (w.attackers) w.attackers.clear();
+    };
+    const run = (radius, flat) => {
+      g.restart();
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.director.traits = [];
+      wipe();
+      w.round = 'spine';
+      w.up.damage = 1;
+      w.up.pierce = 0;
+      w.autoAim = false;
+      w.autoFire = false;
+      const e = g.debugSpawn('bulwark', w.width * 0.5, w.shooter.y - 300);
+      if (!e) return null;
+      if (radius) e.r = radius;
+      e.hp = 1e9;
+      e.maxHp = 1e9;
+      e.staged = false;
+      const hx = e.x;
+      const hy = e.y;
+      const s = w.shooter;
+      s.aim = Math.atan2(e.y - s.y, e.x - s.x);
+      s.shoot(w, true);
+      const p = w.projectiles[w.projectiles.length - 1];
+      if (!p) return null;
+      let hits = 0;
+      let took = 0;
+      let last = e.hp;
+      let win = 0;
+      for (let f = 0; f < 150; f++) {
+        e.vx = 0;
+        e.vy = 0;
+        e.x = hx;
+        e.y = hy;
+        g.update(1 / 60);
+        // the old flat window, written from outside on every frame
+        if (flat && p.ignoreT > 0.06) p.ignoreT = 0.06;
+        if (p.ignoreT > win) win = p.ignoreT;
+        if (e.hp < last) { hits++; took += last - e.hp; last = e.hp; }
+        if (!w.projectiles.includes(p)) break;
+      }
+      const sp = CFG.rounds.spine.speed;
+      return { r: e.r, chord: +(2 * (e.r + (p.r || 0))).toFixed(1),
+        // what the window is worth in units, quantised to whole frames the
+        // way `ignoreT -= dt` actually spends it
+        span: +(Math.ceil(win * 60) / 60 * sp).toFixed(1),
+        hits, took: +took.toFixed(1) };
+    };
+    const sized = [45, 60, 72, 90].map((x) => run(x, false));
+    const flat = [45, 60, 72, 90].map((x) => run(x, true));
+    return { sized, flat };
+  });
+
+  check('a piercing round clears the body it went through, whatever its size',
+    // THE FIX: one hit per body at every radius, and the window covers the
+    // chord it has to cross by construction
+    r.sized.every((x) => x && x.hits === 1)
+    && r.sized.every((x) => x.span >= x.chord)
+    // ...all four delivering the same one hit's worth, so a 1 is a hit and
+    // not a dart that stopped
+    && new Set(r.sized.map((x) => x.took)).size === 1 && r.sized[0].took > 0
+    // THE CONTROL: the old flat window, written back from outside, re-hits
+    // the three big ones -- so the counter is shown able to read a 2 and the
+    // margin at BULWARK's own radius is shown to be the 3.4% it measures
+    && r.flat.every((x) => !!x)
+    && r.flat[0].hits === 1
+    && r.flat.slice(1).every((x) => x.hits === 2)
+    && r.flat.slice(1).every((x) => x.span < x.chord),
+    `sized: ${r.sized.map((x) => `r${x.r} chord ${x.chord} window ${x.span} -> `
+      + `${x.hits} hit ${x.took}`).join(', ')}; flat 0.06 for comparison: `
+    + `${r.flat.map((x) => `r${x.r} window ${x.span} -> ${x.hits} hit ${x.took}`).join(', ')}`);
+}
+
+/*
+ * ---- ARC'S CHAIN DOES NOT CHOOSE GREY UNLESS THE ASSIST WOULD ------------
+ *
+ * A jump is the nearest body inside `jumpRange`, so it is a chooser sitting
+ * inside a damage path, and every other chooser in the game honours the
+ * DRIFT rule. The reason not to is already written at `Front.update` about
+ * the other automatic sweep: an automatic thing that vaporised DRIFT would
+ * undercut SIEVE and break the promise the colour rule makes.
+ *
+ * Measured before the guard, one dart into three hostiles and three drifters
+ * interleaved: two of the four jumps landed on grey and 43.5 of the round's
+ * 91.9 delivered damage -- 47% -- went into bodies `autoTarget` would not
+ * have aimed at.
+ *
+ * It defers to the assist's own position rather than refusing flatly,
+ * because SIEVE is a node somebody bought -- so the second arm is not a
+ * control for the sake of one, it is the other half of the rule.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const wipe = () => {
+      for (const k of ['enemies', 'ghosts', 'respawns', 'drops', 'debris',
+        'projectiles', 'effects', 'mines', 'pendingBlasts']) {
+        if (Array.isArray(w[k])) w[k].length = 0;
+      }
+      if (w.attackers) w.attackers.clear();
+    };
+    const run = (mode) => {
+      g.restart();
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.director.traits = [];
+      wipe();
+      w.round = 'arc';
+      w.up.damage = 1;
+      w.autoFire = false;
+      // SIEVE at two levels is what makes the fourth position legal, and the
+      // position is taken through the door that refuses an unowned one
+      w.up.driftAim = 2;
+      const legal = g.aimModes();
+      const set = g.setAim(mode);
+      /*
+       * ...and then the ASSIST is switched off, because what is under test is
+       * the chain and not the barrel: `setAim` writes `autoAim` as well as
+       * the position, and a slewing turret picks its own first target. The
+       * chain reads `world.aimMode` alone, which is never written 'off' --
+       * it holds the last position the player chose -- so the mode still
+       * means what it says with the assist down.
+       */
+      w.autoAim = false;
+      const cx = w.width * 0.5;
+      const y0 = w.shooter.y - 300;
+      const bodies = [];
+      const put = (id, dx) => {
+        const e = g.debugSpawn(id, cx + dx, y0);
+        if (!e) return;
+        e.hp = 1e9;
+        e.maxHp = 1e9;
+        e.staged = false;
+        e.homeX = cx + dx;
+        bodies.push(e);
+      };
+      /*
+       * A line at one depth, alternating, at 0.4 of `jumpRange` -- so every
+       * neighbour is one step away and every second one is two, which is
+       * what makes the chain CHOOSE rather than take the only thing within
+       * reach. The dart's own target is the far LEFT body and nothing else
+       * sits on the line to it, so the round's own hit is on a known hostile
+       * and anything grey can only have been reached by a jump: the first
+       * version aimed across the crowd and the dart clipped a drifter for
+       * exactly its own 11, which reads as a jump that should not have
+       * happened.
+       */
+      const d = CFG.rounds.arc.jumpRange * 0.4;
+      put('lurcher', -d * 1.5);
+      put('drift', -d * 0.5);
+      put('lurcher', d * 0.5);
+      put('drift', d * 1.5);
+      put('lurcher', d * 2.5);
+      const hp0 = bodies.map((e) => e.hp);
+      const s = w.shooter;
+      s.aim = Math.atan2(bodies[0].y - s.y, bodies[0].x - s.x);
+      s.shoot(w, true);
+      for (let f = 0; f < 40; f++) {
+        for (const e of bodies) { e.vx = 0; e.vy = 0; e.x = e.homeX; e.y = y0; }
+        g.update(1 / 60);
+      }
+      let grey = 0;
+      let live = 0;
+      let greyHit = 0;
+      let liveHit = 0;
+      bodies.forEach((e, i) => {
+        const lost = hp0[i] - e.hp;
+        if (e.harmless) { grey += lost; if (lost > 0) greyHit++; }
+        else { live += lost; if (lost > 0) liveHit++; }
+      });
+      return { mode, set, legal: legal.includes(mode), range: CFG.rounds.arc.jumpRange,
+        greys: bodies.filter((e) => e.harmless).length,
+        lives: bodies.filter((e) => !e.harmless).length,
+        grey: +grey.toFixed(1), live: +live.toFixed(1), greyHit, liveHit,
+        jumps: CFG.rounds.arc.jumps };
+    };
+    return { field: run('field'), all: run('all') };
+  });
+
+  check('ARC\'s chain does not choose grey unless the assist would',
+    // THE RULE: at the ordinary position the chain never lands on a harmless
+    // body -- an absolute, because a jump either chose it or it did not
+    r.field.grey === 0 && r.field.greyHit === 0
+    // ...and it is not that the chain did nothing: it worked the crowd
+    && r.field.live > 0 && r.field.liveHit >= 2
+    // THE OTHER HALF, which is also the control: the fourth position is what
+    // SIEVE sells, and there the chain reaches grey exactly as the barrel
+    // does -- so the zero above is the mode's and not a flat refusal
+    && r.all.grey > 0 && r.all.greyHit >= 1
+    // ...both positions reached through the door, on a field that really has
+    // both kinds, or neither arm is about what it says
+    && r.field.set && r.all.set && r.field.legal && r.all.legal
+    && r.field.greys >= 2 && r.field.lives >= 3,
+    `field: ${r.field.greyHit}/${r.field.greys} grey hit for ${r.field.grey}, `
+    + `${r.field.liveHit}/${r.field.lives} live for ${r.field.live}; `
+    + `all: ${r.all.greyHit}/${r.all.greys} grey for ${r.all.grey}, `
+    + `${r.all.liveHit}/${r.all.lives} live for ${r.all.live} `
+    + `(${r.field.jumps} jumps of ${r.field.range} reach; the \`all\` arm is also `
+    + `what EVERY position did before the guard -- measured on a six-body `
+    + `interleaved crowd, two of four jumps on grey and 47% of the round)`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
