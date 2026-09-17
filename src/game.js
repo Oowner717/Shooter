@@ -5087,9 +5087,11 @@ export class Game {
     /*
      * The FLAG with the era, which this did not do until build 276. `load()`
      * writes `newForm = 'done'` beside `era = 2` for a reason -- `eraHeld`
-     * returns the rung-42 ceiling unless the flag is 'done', and the bench's
-     * era-2 door reads it too -- so a debug step to era 2 left the run on a
-     * field past the ceiling with the ladder still holding it at 42. Coming
+     * returns the `eraGate` ceiling unless the flag is 'done' (42 when this
+     * was written and **28** from build 305, which moved the hold into the
+     * middle of the game), and the bench's era-2 door reads it too -- so a
+     * debug step to era 2 left the run on a field past the ceiling with the
+     * ladder still holding it there. Coming
      * back down it goes to 'armed' rather than null: a run that had bought
      * NEW FORM still owns it, and the banner is the door to taking it again.
      */

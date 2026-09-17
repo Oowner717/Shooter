@@ -11186,19 +11186,29 @@ export function applyBlast(world, blast) {
        * that would have refused it.
        */
       if (shielded(world, e)) continue;
-      const dx = e.x - x;
-      const dy = e.y - y;
-      const d2 = dx * dx + dy * dy;
-      if (d2 > r2) continue;
-      const d = Math.sqrt(d2) || 1;
-      const falloff = 1 - d / r;
-      const nx = dx / d;
-      const ny = dy / d;
       /*
        * The balls on a grafted body take the blast too, each judged from where
        * it actually is. Without this a mine or a PULSE could only ever hurt
        * the host, and a build with no precise shot in it had no answer at all
        * to a body carrying three of them.
+       *
+       * ---- and it is ABOVE the host's own reach test, which it was not ----
+       *
+       * A ring grows its host, so the ring is exactly what pushes the host's
+       * centre out of a small blast's reach -- and nested under `d2 > r2`
+       * that made the balls unreachable too, by the same ring the loop exists
+       * to answer. Measured, held ring, ten presses a row, delivered health
+       * with AIRBURST bought against not: a fully grafted ANVIL (r 89.6, so
+       * a pellet stops 92.6 out against a burst of 74) read **x1.01 with ZERO
+       * balls judged**, and a grafted BULWARK at 75 read x1.198 against
+       * x1.425 at two balls. The loop's own sentence, exactly inverted.
+       *
+       * It needs nothing from the host's geometry -- `gf` is computed from
+       * the ball's own distance -- so where the host IS in reach this is the
+       * same call with the same arguments, which is the claim the case makes
+       * by asserting the ungrown rows to the decimal. What it restores is the
+       * self-correcting half: taking a ball off shrinks the host back toward
+       * reach, so a blast too small for the ring can still work its way in.
        */
       if (e.graftCount) {
         // `orbit` is read once, outside the loop, and that is load-bearing:
@@ -11216,6 +11226,14 @@ export function applyBlast(world, blast) {
           e.hitGraft(g, damage * (0.35 + gf * 0.65), gx, gy);
         }
       }
+      const dx = e.x - x;
+      const dy = e.y - y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      const d = Math.sqrt(d2) || 1;
+      const falloff = 1 - d / r;
+      const nx = dx / d;
+      const ny = dy / d;
       e.applyDamage(world, damage * (0.35 + falloff * 0.65), nx, ny, impulse * falloff,
         0, 0, !!blast.throwOff, blast.src);
     }

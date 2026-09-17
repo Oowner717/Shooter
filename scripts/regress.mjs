@@ -41321,6 +41321,246 @@ if (MINE_LINE) {
     + ` dying ${band.dying}; reached the outro ${band.invaded} (cannot, and is not asserted)`);
 }
 
+/*
+ * ---- A BLAST REACHES THE BALLS ON A BODY IT CANNOT REACH THE CENTRE OF ----
+ *
+ * `applyBlast` had the graft loop NESTED under the host's own reach test, and
+ * a ring is exactly what pushes a host's centre out of a small blast's reach:
+ * a SEED gives `rides.grow` 0.2 a ball, so three of them are 1.6x the body,
+ * and a pellet's burst goes off where the pellet STOPPED, which is `r + p.r`
+ * out. So the loop whose own sentence is "a build with no precise shot in it
+ * had no answer at all to a body carrying three of them" was switched off by
+ * the third ball.
+ *
+ * The boundary is the HIT CIRCLE and not the radius, which is what the
+ * `CFG.hail.burst` sizing argument got wrong: it named the radii it had to
+ * clear (the rig at 68, the FRACTAL core at 64, a fully grafted BULWARK at
+ * 72) and 74 clears all three, while the burst arrives at `r + CFG.hail.r`
+ * -- 75 for that BULWARK, one unit past it. Measured with one blast laid by
+ * hand on the hit circle, delivered health, ring held and ball angles pinned:
+ *
+ *   body     balls  r      centre@   host   balls before -> after
+ *   LURCHER  3      38.4   41.4      6.36   11.39 -> 11.39   (in reach)
+ *   BULWARK  2      63     66        2.77    5.83 ->  5.83   (in reach)
+ *   BULWARK  3      72     75        0       0    ->  5.22
+ *   ANVIL    1      67.2   70.2      2.68    0    ->  0      (in reach)
+ *   ANVIL    2      78.4   81.4      0       0    ->  4.79
+ *   ANVIL    3      89.6   92.6      0       0    ->  4.03
+ *   ANVIL    on a ball at 117.92     0       0    ->  8.95
+ *
+ * Every row where the host IS in reach is identical to the HUNDREDTH across
+ * the move, and exactly the out-of-reach rows changed -- which is the no-op
+ * half measured rather than argued. `gf` comes off the ball's own distance,
+ * so above the test it is the same call with the same arguments.
+ *
+ * The host staying at 0 is the RECORDED RULING and not a defect: raising 74
+ * to cover a grown host is quadratic in what it gives, which is the argument
+ * `CFG.hail.burst` already carries and build 230 spent three builds on for
+ * BLAST and KNELL. What the move restores is the self-correcting half -- a
+ * ball coming off shrinks the host back toward reach, and the blast is now
+ * one of the things that can take it off.
+ *
+ * ---- and it is an ERA 1 fault, because only one of the two radii scales ---
+ *
+ * `hail.burst.r` is a `SCALED` entry and a type's `r` is not, so the burst is
+ * 74 world units at era 1 (zoom 0.62) and **113.85** at era 2 (0.403) against
+ * the same 89.6 body. Measured, a fully grafted ANVIL at era 2: host 3.3 and
+ * balls 6.12, in reach on both counts. So the ring is immunity on the FIRST
+ * field only -- and there it is LATENT, which is the last thing measured and
+ * corrects the first draft of this paragraph. `eraHeld` holds a run that has
+ * not taken NEW FORM at `eraGate` **28**, `bandsFor(28)` draws bands 3 and
+ * 4, SCION's three waves are all band 4, and ANVIL/VEIL/BULWARK are band 5
+ * from rung 29 -- so the largest graftable body a SCION meets on era 1 is a
+ * QUARRY, grown circle **67**, inside 74. The door that reaches it today is
+ * the debug panel (`debugStepEra` moves the era and leaves the rung), and it
+ * goes live by design on a deeper `eraGate`, a SCION wave in band 5, or a
+ * bands-3-4 body whose grown circle passes 74. The arm lays its bodies by
+ * hand for that reason and claims a MECHANISM, not a state the field sends.
+ *
+ * The guards stay ABOVE the loop and arm 3 is why: `hitGraft` takes no world
+ * and has no guard of its own, so `shielded` is the only thing keeping a
+ * blast under the era-2 wall off the balls of a body it cannot otherwise
+ * touch -- and that comment has said so since the guard went in.
+ */
+{
+  const gr = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const E = await import('../src/enemies.js');
+    const g = window.__sim;
+    const w = g.world;
+    const TAU = Math.PI * 2;
+    const out = {};
+
+    const lay = (type, balls, era, yOf) => {
+      g.restart();
+      g.debugTeachAll();
+      g.debugClearField();
+      w.phase = 'staging';
+      w.spawnLock = 1e9;
+      w.director.update = () => {};
+      w.director.traits = [];
+      if (era === 2 && w.era !== 2) { w.newForm = 'done'; g.setEra(2); }
+      if (era === 1 && w.era !== 1) g.setEra(1);
+      const s = w.shooter;
+      const e = g.debugSpawn(type, s.x, yOf ? yOf() : s.y - 300);
+      e.staged = false;
+      for (let k = 0; k < balls; k++) {
+        const seed = g.debugSpawn('seed', s.x - 600, s.y - 600);
+        seed.staged = false;
+        E.graft(w, e, seed);
+        seed.dead = true;
+        seed.dissolved = true;
+      }
+      /*
+       * Ball angles PINNED. The constructor jitters each slot by +-0.3 rad
+       * and `CFG.graft.spin` turns the ring, so an unpinned ball is a draw --
+       * and nothing here is a claim about where a ball happens to be.
+       */
+      if (e.grafts) {
+        for (let i = 0; i < e.grafts.length; i++) e.grafts[i].a = (i / CFG.graft.stack) * TAU;
+        // maxHp is DERIVED from graftBaseHp on every recount, so writing
+        // maxHp directly would be overwritten by the next ball removal.
+        e.graftBaseHp = 400000;
+        e.refreshGrafts();
+      } else {
+        e.maxHp = 400000;
+      }
+      e.hp = e.maxHp;
+      return e;
+    };
+
+    /*
+     * ONE blast, laid where a pellet's burst would go off: straight below the
+     * host centre on its own hit circle, which is the point `endProjectile`
+     * hands `burst`. Deterministic, so nothing is averaged and no threshold
+     * is fitted -- which is what a fan of 34 jittered pellets cannot give.
+     */
+    const at = (e, bx, by) => {
+      const B = CFG.hail.burst;
+      const hp0 = e.hp;
+      const b0 = (e.grafts || []).map((x) => x.hp);
+      E.applyBlast(w, {
+        x: bx, y: by, r: B.r, damage: B.damage, impulse: 0, throwOff: true, src: 'fan',
+      });
+      const dist = Math.hypot(bx - e.x, by - e.y);
+      return {
+        r: +e.r.toFixed(2),
+        dist: +dist.toFixed(2),
+        burst: +B.r.toFixed(2),
+        host: +(hp0 - e.hp).toFixed(2),
+        ball: +(e.grafts || []).reduce((n, x, i) => n + (b0[i] - x.hp), 0).toFixed(2),
+        // What the host's own term SHOULD deliver at that distance, off the
+        // config rather than a recorded figure.
+        want: +(B.damage * (0.35 + (1 - dist / B.r) * 0.65) * (1 - e.armor)).toFixed(2),
+      };
+    };
+
+    const onCircle = (type, balls) => {
+      const e = lay(type, balls, 1);
+      return at(e, e.x, e.y + e.r + CFG.hail.r);
+    };
+    const onBall = (type) => {
+      const e = lay(type, 3, 1);
+      const b = e.grafts[0];
+      const reach = e.graftR - CFG.graft.ball - CFG.hail.r;
+      return at(e, e.x + Math.cos(b.a) * reach, e.y + Math.sin(b.a) * reach);
+    };
+
+    out.a0 = onCircle('anvil', 0);
+    out.a1 = onCircle('anvil', 1);
+    out.a2 = onCircle('anvil', 2);
+    out.a3 = onCircle('anvil', 3);
+    out.aBall = onBall('anvil');
+    out.b3 = onCircle('bulwark', 3);
+    out.l3 = onCircle('lurcher', 3);
+
+    // ---- arm 3: the guards are still above the loop ----------------------
+    // A grafted body wholly above the era-2 wall, and the SAME body below it
+    // as the control -- so a zero means the guard and not a blast that
+    // reached nothing.
+    const above = lay('anvil', 3, 2, () => w.yard.wallY - 120);
+    out.era = w.era;
+    out.wall = w.yard ? +w.yard.wallY.toFixed(1) : null;
+    out.aboveY = +(above.y + above.r).toFixed(1);
+    out.shieldedAbove = at(above, above.x, above.y + above.r + CFG.hail.r);
+    const below = lay('anvil', 3, 2, () => w.yard.wallY + above.r + 200);
+    out.belowY = +(below.y + below.r).toFixed(1);
+    out.shieldedBelow = at(below, below.x, below.y + below.r + CFG.hail.r);
+
+    if (w.era !== 1) g.setEra(1);
+    w.newForm = null;
+    // `reset()` keeps the same Director object, so a stub outlives every
+    // restart after it -- and this is the last case in the file, which is
+    // luck rather than a reason. Asserted rather than performed: a later
+    // `= undefined` shadows the prototype's method and starves the suite
+    // exactly as a stub does.
+    delete w.director.update;
+    w.spawnLock = 0;
+    out.putBack = typeof w.director.update === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update');
+    out.era1 = w.era;
+    return out;
+  });
+
+  const { a0, a1, a2, a3, aBall, b3, l3 } = gr;
+  /*
+   * The vacuity terms are the geometry: a0/a1/l3 must be rows where the host
+   * IS in reach and a2/a3/b3 rows where it is NOT, or the arm is comparing
+   * two of the same thing. Both are read off the measured distance against
+   * the burst in force on this run -- `hail.burst.r` is a SCALED entry and
+   * every resize rewrites it from BASE.
+   */
+  check('a blast reaches the balls on a body it cannot reach the centre of',
+    a3.dist > a3.burst && a3.host === 0 && a3.ball > 0
+    && aBall.dist > aBall.burst && aBall.host === 0 && aBall.ball > 0
+    && b3.dist > b3.burst && b3.host === 0 && b3.ball > 0
+    && a2.dist > a2.burst && a2.host === 0 && a2.ball > 0,
+    `burst ${a3.burst}: a fully grafted ANVIL is r ${a3.r} and a pellet stops`
+    + ` ${a3.dist} out, so the host takes ${a3.host} and the balls ${a3.ball};`
+    + ` on a ball at ${aBall.dist}, host ${aBall.host} balls ${aBall.ball};`
+    + ` a grafted BULWARK at ${b3.dist} takes ${b3.host}/${b3.ball} and at two`
+    + ` balls ANVIL is ${a2.dist} out for ${a2.host}/${a2.ball}`
+    + ` — nested under the host's reach test every ball figure here is 0`);
+
+  /*
+   * The host's term is UNTOUCHED where the host is in reach, and it is
+   * asserted against its own arithmetic rather than against a recorded
+   * figure -- so this fails for a `falloff` regression as well as for the
+   * move. a0 carries the other half: with no balls the loop is skipped
+   * outright, so its ball figure is a 0 that is not about geometry.
+   */
+  check('...and a blast the host is inside is the same blast it was',
+    a1.dist < a1.burst && Math.abs(a1.host - a1.want) < 0.05
+    && a0.dist < a0.burst && Math.abs(a0.host - a0.want) < 0.05 && a0.ball === 0
+    && l3.dist < l3.burst && Math.abs(l3.host - l3.want) < 0.05 && l3.ball > 0
+    && a2.host === 0 && a3.host === 0,
+    `in reach: ANVIL bare ${a0.host} against an arithmetic ${a0.want},`
+    + ` one ball ${a1.host} against ${a1.want} at ${a1.dist},`
+    + ` a grafted LURCHER ${l3.host} against ${l3.want} with ${l3.ball} to its balls`
+    + ` — and TWO balls have to come off an ANVIL (${a3.r} -> ${a2.r} -> ${a1.r})`
+    + ` before its own centre is reachable again, which is why the ruling is to`
+    + ` leave the radius and let a ball coming off shrink the host back`);
+
+  /*
+   * ...and the wall. `hitGraft` takes no world and no guard of its own, so
+   * `shielded` above the loop is the whole of what keeps a blast under the
+   * era-2 wall off the balls -- the reason the move is above the REACH test
+   * and not above the guards. The control is the same body, same ring, same
+   * blast, below the line.
+   */
+  check('...and the era-2 wall still refuses a blast the balls as well',
+    gr.era === 2 && gr.aboveY <= gr.wall
+    && gr.shieldedAbove.host === 0 && gr.shieldedAbove.ball === 0
+    && gr.belowY > gr.wall
+    && gr.shieldedBelow.ball > 0
+    && gr.putBack && gr.era1 === 1,
+    `wall at ${gr.wall}, burst ${gr.shieldedBelow.burst} (SCALED, so wider than`
+    + ` era 1's ${a3.burst}): a grafted ANVIL whose lowest pixel is ${gr.aboveY}`
+    + ` takes ${gr.shieldedAbove.host}/${gr.shieldedAbove.ball},`
+    + ` against ${gr.shieldedBelow.host}/${gr.shieldedBelow.ball} for the same`
+    + ` body at ${gr.belowY}; era back to ${gr.era1}, director put back ${gr.putBack}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

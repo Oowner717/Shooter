@@ -10452,7 +10452,12 @@ came from before believing the other one covers it.
   **The weapon under test strips the thing the measurement is about**, so a
   probe that holds the ring up by hand is measuring a state the press destroys
   -- and the honest record is that the question is open, not a figure from a
-  scenario that did not happen.
+  scenario that did not happen. **ANSWERED AT BUILD 361, and neither half of
+  that obstacle was one**: `refreshGrafts` preserves `hp / maxHp` exactly
+  across a ball coming off, so the change in the FRACTION times the `maxHp`
+  in force is the delivered health whether the ring moved or not -- and
+  `applyBlast` can be CALLED directly with its centre laid where a pellet
+  would have stopped, which is deterministic and needs no fan at all.
 - **A PROBE'S OWN FIELDS ARE UNGUARDED, WHICH IS WHERE EVERY DEAD-FIELD RULE IN
   THIS FILE DOES NOT REACH.** `check-build`'s sweep walks keys `ENEMY_TYPES`
   declares (build 313) and the ghost Proxy covers `world` and `world.up`
@@ -10889,3 +10894,121 @@ came from before believing the other one covers it.
   probe to measure and the reading would be a formality rather than a proof --
   the same call builds 345 to 349 made. What had something to say is the suite,
   the sweep's own output and the before/after pair above.
+
+- **BUILD 361 ANSWERS BUILD 357'S ONE OPEN QUESTION, AND THE ANSWER WAS THE
+  ORDERING RATHER THAN THE NUMBER: `applyBlast` HAD THE GRAFT LOOP NESTED
+  UNDER THE HOST'S OWN REACH TEST, SO THE RING THAT PUSHED A HOST OUT OF
+  REACH TOOK ITS BALLS WITH IT.** That loop's own sentence is "a build with no
+  precise shot in it had no answer at all to a body carrying three of them",
+  and a ring is exactly what makes a small blast unable to reach the host: a
+  SEED gives `rides.grow` 0.2 a ball, so three are 1.6x the body. Measured,
+  one blast laid by hand on the hit circle with the ball angles pinned and
+  `applyBlast` called directly -- host and ball health, before against after
+  the move:
+
+  | body | balls | r | centre@ | host | balls before | balls after |
+  |---|---|---|---|---|---|---|
+  | LURCHER | 3 | 38.4 | 41.4 | 6.36 | 11.39 | 11.39 |
+  | BULWARK | 2 | 63 | 66 | 2.77 | 5.83 | 5.83 |
+  | BULWARK | 3 | 72 | **75** | 0 | **0** | **5.22** |
+  | ANVIL | 1 | 67.2 | 70.2 | 2.68 | 0 | 0 |
+  | ANVIL | 2 | 78.4 | **81.4** | 0 | **0** | **4.79** |
+  | ANVIL | 3 | 89.6 | **92.6** | 0 | **0** | **4.03** |
+  | ANVIL | on a ball | 89.6 | 117.92 | 0 | **0** | **8.95** |
+
+  **Every row where the host IS in reach is identical to the HUNDREDTH and
+  exactly the out-of-reach rows moved**, which is the no-op half measured
+  rather than argued -- `gf` comes off the ball's own distance, so above the
+  test it is the same call with the same arguments. The host staying at 0 is
+  the RULING and not a defect: raising 74 is quadratic in what it gives, which
+  is build 230's lesson on BLAST and KNELL. What the move restores is the
+  self-correcting half -- a ball coming off shrinks the host back toward
+  reach, and the blast is now one of the things that can take it off. Two
+  have to come off an ANVIL (89.6 -> 78.4 -> 67.2).
+- **AND THE BOUNDARY IS THE HIT CIRCLE, NOT THE RADIUS, WHICH IS WHAT
+  `CFG.hail.burst`'S SIZING ARGUMENT GOT WRONG.** It names the radii 74 had
+  to clear -- "the rig at 68, the FRACTAL core at 64 and a fully grafted
+  BULWARK at 72" -- and the burst arrives where the pellet STOPPED, which is
+  `r + CFG.hail.r`: the rig is really 71 and the core 67, both inside, and
+  **that BULWARK is 75, one unit past**. So the list was right about two of
+  its three anchors by luck and wrong about the one it was written for. A
+  burst radius sized against a body's `r` is the arithmetic to get right
+  whatever the number is, and it is the same family as the broadphase cell and
+  every other derived figure quoted as a constant.
+- **...AND IT IS AN ERA-1 FAULT, BECAUSE ONLY ONE OF THE TWO RADII SCALES.**
+  `hail.burst.r` is a `SCALED` entry and a type's `r` is not, so the burst is
+  74 world units at era 1 (zoom 0.62) and **113.85** at era 2 (0.403) against
+  the same 89.6 body -- measured there, a fully grafted ANVIL takes 3.3 to the
+  host and 6.12 to the balls, in reach on both counts. **Any claim about a
+  blast reaching a body has to say which era it was measured on**, because one
+  term of the comparison is in world units and the other is in screen units.
+- **AND THEN THE OTHER FIELD ANSWERED IT TOO, SO THE STATE IS LATENT -- WHICH
+  I WROTE UP AS REACHABLE FIRST, ON A RUNG I HAD NOT CHECKED.** The claim was
+  "a SCION and an ANVIL are sent together from rung 29 on either field", and
+  its one load-bearing figure was `eraHeld`'s hold rung quoted from build
+  272's note as 42. Build 305 moved `eraGate` **42 -> 28** -- and 305's own
+  entry in this file says so, four screens up from where I was writing.
+  Measured off the running director: era 1 is held at 28, `bandsFor(28)` is
+  bands **3 and 4**, SCION's three waves are all band 4, and ANVIL, VEIL and
+  BULWARK are band 5 from rung 29. So the largest graftable body a SCION can
+  meet on era 1 is a **QUARRY: r 40, grown 64, hit circle 67** -- inside 74
+  with three units to spare. Nothing in ordinary play reaches the state on
+  either field.
+  What does reach it is the DEBUG panel, which is in SETTINGS and ungated:
+  `debugStepEra` sets the era and leaves the RUNG alone, so a run stepped
+  down from era 2 at rung 32 is a band-5 field carrying era 1's burst. And it
+  goes live by design on a deeper `eraGate`, a SCION wave in band 5, or a
+  bands-3-4 body whose grown circle passes 74.
+  **The reorder still ships**, for the reason build 329 gives about the
+  broadphase cell: it is correct, it is the identity everywhere reachable, and
+  it makes the loop's own stated purpose true instead of leaving a mechanism
+  whose justification the geometry defeats. What changes is the CLAIM -- this
+  is a latent fault fixed and recorded, not a live one found.
+  The general rule, and it is this file's own: **a reachability argument is a
+  chain of derived figures, and quoting one of them from a note is how the
+  chain breaks.** Three gates had to agree here (the hold rung, which bands a
+  rung draws, and which band each type is authored into) and I checked two.
+  Ask the running game for all of them -- `d.bandsFor(rung)` and the wave
+  table are two lines, and they refuted a paragraph I had already written into
+  two files.
+  (While confirming it: `debugStepEra`'s own docstring still quoted the
+  rung-42 ceiling, which is a fifth instance of the stale figure build 305
+  went looking for and found four of.)
+- **THE GUARDS STAY ABOVE THE LOOP AND THE THIRD ARM IS WHY.** `hitGraft`
+  takes no world and no guard of its own, so `shielded` is the whole of what
+  keeps a blast under the era-2 wall off the balls of a body it cannot
+  otherwise touch -- which that guard's own comment has said since it went in.
+  So the loop moved above the REACH test and not above the guards, and the arm
+  that pins it reads 0/0 for a grafted ANVIL whose lowest pixel is above the
+  line against 3.3/6.12 for the same body below it. Proved by moving the loop
+  one line further up: the shielded body then reads 0/**6.12**, its balls
+  popped through a wall the blast cannot cross.
+- **A HELD-RING `took` COUNTS HOST HEALTH AND CANNOT SEE A FIX ABOUT BALLS**,
+  which is why the first instrument for this said nothing. Ten presses a row
+  with the ring topped up each frame read the on/off ratio at **1.000 and
+  1.01** for two and three balls before the move and **0.986 and 1.083**
+  after -- straddling 1 both ways, so the fix read as no change, because the
+  arm's own metric was the host's. What moved was the
+  count of blast-judged balls (0 -> 89 at two balls, 0 -> 120 at three),
+  discriminated by ARITY: `hitGraft` takes four arguments from a blast and
+  six from a pellet, which carries a normal. **Ask what the readout is a
+  property of before reading a flat ratio as a flat mechanism.**
+- **AND THE DETERMINISTIC PROBE IS AVAILABLE AND WAS NOT USED FOR FOUR
+  BUILDS.** `page.evaluate` can `await import('../src/enemies.js')`, so
+  `applyBlast` and `graft` can be called directly -- one blast at a chosen
+  centre, exact figures, no fan, no averaging, no threshold, and a full
+  before/after table in seconds. Builds 267, 315, 319, 357 and 358 all
+  measured this node through a FAN of thirty-four jittered pellets, and build
+  358's own count is that it took four floors to place, three of them fitted
+  and all three failed on the draw. A fan is the right
+  instrument for what a PRESS is worth; it is the wrong one for whether a
+  circle reaches a point.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922` either side, all
+  six intermediate marks and all six body counts identical, both readings in
+  this container with 360 served from a worktree on :8097 and the served BUILD
+  confirmed in each heading. This build reorders `applyBlast`'s own body --
+  the door every blast in a boss fight comes through -- and the change is the
+  identity for a body with `graftCount === 0`, which is every body in that
+  fight, by inspection. Build 329's rule is that inspection is exactly what
+  this repo does not accept: an unchanged hash is what "a reorder on the blast
+  path reached nothing already using it" looks like measured.

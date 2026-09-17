@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '360';
+export const BUILD = '361';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '360';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'fe20b2b';
+export const REV = '33a8deb';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -2637,7 +2637,9 @@ export const CFG = {
      *
      * 74 is the smallest number that clears everything it must be able to
      * hurt: the rig at 68, the FRACTAL core at 64 (the largest base body) and
-     * a fully grafted BULWARK at 72. The damage comes down 11 -> 10 to pay
+     * a fully grafted BULWARK at 72. (**That list sizes against `r` and the
+     * boundary is `r + CFG.hail.r` -- see build 361 below.**)
+     * The damage comes down 11 -> 10 to pay
      * for the area, and the field is where it was -- measured at twelve
      * presses, one LURCHER x1.71 -> x1.62, three abreast x1.89 -> x2.03, a
      * BULWARK x1.36 -> x1.40, and the rig x0.98 -> x1.30.
@@ -2656,22 +2658,74 @@ export const CFG = {
      * arithmetic. On the biggest body the field actually sends, ten presses on
      * a pinned witness, delivered health, burst on against burst off: a clean
      * ANVIL (r 56) reads x1.30 to x1.37 over three runs and a BULWARK (r 45)
-     * x1.403 in all three, so the node works on everything ungrown. The GROWN
-     * case did not settle in three instruments and is NOT claimed here: a ring
-     * interacts with the weapon under test -- the press strips it, and the
-     * host's radius is back at base by the time the window closes, so a probe
-     * that holds the ring up by hand is measuring a state the press destroys.
-     * (And `e.grafts` holds ball RECORDS rather than bodies, with their own
-     * `alive` flag that `refreshGrafts` reads and nothing else writes -- so a
-     * probe topping them up by `hp` alone puts nothing back on the ring.)
-     * Raising the
-     * radius to cover it would be a balance change (a blast is quadratic in
-     * what it gives) against a body that needs a full ring, and only SEED
-     * grows a host (`rides.grow` 0.2 against LATCH's 0). SCION is band 4 and
-     * these three are band 5, and `bandsFor` draws `[hi - 1, hi]` with the
-     * authored bands ending at rung 35 -- so bands 4 and 5 are sent together
-     * from rung 29 to the ceiling at 49, which is where a grown one of them
-     * can exist. Measure it before moving the number.
+     * x1.403 in all three, so the node works on everything ungrown.
+     *
+     * ---- build 361: the GROWN case, and the boundary is the HIT CIRCLE ----
+     *
+     * Build 357 left the grown case open because a ring interacts with the
+     * weapon under test -- the press strips it, so a probe that holds the ring
+     * up by hand is measuring a state the press destroys, and `e.grafts` holds
+     * ball RECORDS rather than bodies, with their own `alive` flag that
+     * `refreshGrafts` reads and nothing else writes. Both halves are true and
+     * neither is the obstacle it looked like: `refreshGrafts` preserves
+     * `hp / maxHp` EXACTLY across a ball coming off, so the change in the
+     * FRACTION times the `maxHp` in force is the delivered health whether the
+     * ring moved or not -- and `applyBlast` can be called directly with the
+     * centre laid where a pellet would have stopped, which is deterministic
+     * and needs no fan, no averaging and no threshold.
+     *
+     * Measured that way, one blast on the hit circle, ball angles pinned:
+     *
+     *   body     balls  r      centre@   host   balls
+     *   LURCHER  3      38.4   41.4      6.36   11.39
+     *   BULWARK  2      63     66        2.77    5.83
+     *   BULWARK  3      72     75        0       5.22
+     *   ANVIL    1      67.2   70.2      2.68    0
+     *   ANVIL    2      78.4   81.4      0       4.79
+     *   ANVIL    3      89.6   92.6      0       4.03
+     *
+     * **So the boundary is `r + CFG.hail.r` and not `r`**, because that is
+     * where `endProjectile` hands the burst its centre. The list above sizes
+     * against the radius: the rig at 68 is really 71 and the core at 64 is 67,
+     * both inside 74 -- and the fully grafted BULWARK it names at 72 is **75,
+     * one unit past**. Sizing a burst radius against a body's `r` is the
+     * arithmetic to get right, whatever the number is.
+     *
+     * **And it is an era-1 fault, because only one of the two radii scales.**
+     * `hail.burst.r` is a `SCALED` entry and a type's `r` is not, so the
+     * burst is 74 world units at era 1 and **113.85** at era 2 against the
+     * same 89.6 body: measured there, a fully grafted ANVIL takes 3.3 to the
+     * host and 6.12 to the balls, in reach on both counts.
+     *
+     * The HOST figures above stand and 74 is UNCHANGED: raising the radius to
+     * cover a grown host is quadratic in what it gives, which is what build
+     * 230 spent three builds on for BLAST and KNELL. What build 361 changed
+     * is `applyBlast`'s ORDERING -- the graft loop was nested under the
+     * host's own reach test, so the ring that pushed the host out of reach
+     * took the balls with it, and every ball figure in that table was 0. The
+     * balls are judged first now, which restores the self-correcting half: a
+     * ball coming off shrinks the host back toward reach, and the blast is
+     * one of the things that can take it off. Two have to come off an ANVIL
+     * (89.6 -> 78.4 -> 67.2) before its own centre is reachable again.
+     *
+     * ---- and the out-of-reach state is LATENT, which was measured last ---
+     *
+     * Only SEED grows a host (`rides.grow` 0.2 against LATCH's 0), and the
+     * two fields answer it from opposite ends. At era 2 the burst is 113.85
+     * and every grown body is inside it. At era 1 the burst is 74 and the run
+     * is HELD at `eraGate` 28 until NEW FORM, so `bandsFor` draws bands 3
+     * and 4 -- and SCION's three waves are all band 4, while ANVIL, VEIL and
+     * BULWARK are band 5, drawn from rung 29. The largest graftable body a
+     * SCION can meet on that field is a QUARRY: r 40, grown 64, hit circle
+     * **67**, inside 74 with three units to spare.
+     *
+     * So nothing in ordinary play reaches it on either field. What does is
+     * the DEBUG panel, which is in SETTINGS and ungated: `debugStepEra` sets
+     * the era and leaves the RUNG alone, so a run stepped down from era 2 at
+     * rung 32 is a band-5 field with era 1's burst on it. And it goes live by
+     * design the moment either term moves -- a deeper `eraGate`, a SCION
+     * wave in band 5, or a body in bands 3-4 whose grown circle passes 74.
+     * Measure it before moving the number.
      *
      * What it is FOR is still the neighbours: chip damage that spreads
      * sideways off whatever a pellet found, which a fan of thirty-four cannot
