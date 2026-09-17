@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '355';
+export const BUILD = '356';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '355';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'ce34576';
+export const REV = '70f6543';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4955,7 +4955,35 @@ export const ENEMY_TYPES = [
     id: 'bloom',
     opens: kB(700),
     name: 'BLOOM',
-    gait: 'march',
+    /*
+     * INEVITABLE, NOT WANDERING -- phase 4b, the guide's other `creep` row
+     * and the same correction: "it detonates on death. It should read as
+     * inevitable, not as wandering." It was `march` with `wobble: 1.4`, on a
+     * roster whose loose types run 0 to 2.6 (LURCHER).
+     *
+     * `straight` rather than `creep` for BULWARK's reason -- nothing about
+     * this body is a clock, and at `accel` 110 the gross-up would have been
+     * a silent **x1.50** on a body whose whole point is what happens when it
+     * reaches something. See the BULWARK note above for the full argument
+     * and the `straight`/`creep` arm in enemies.js for the pair.
+     *
+     * Measured at rung 18 on era 1 -- its own band and its own field.
+     * Crossing, path over chord, widest offset:
+     *
+     *   route       march                straight
+     *   direct       33.08s  1.0190    8   32.13s  1.0000   0
+     *   sweep        35.77s  1.0919  138   32.13s  1.0000   0
+     *   wide         37.57s  1.1053  149   32.13s  1.0000   0
+     *   serpentine   34.27s  1.0576   29   32.13s  1.0000   0
+     *   hook         35.83s  1.0844  134   32.13s  1.0000   0
+     *   loiter       53.53s  1.0398   21   32.13s  1.0000   0
+     *
+     * Weighted 36.87s -> 32.13s (-13%), crossing spread 1.618x -> 1.000x,
+     * and the delivered mid-field speed is 22.0 u/s either way, which is
+     * what an uncompensated gait means. Its four band-3 waves and its
+     * band-4 one clear in 5.8s against 4.7s.
+     */
+    gait: 'straight',
     shape: 'bloom',
     r: 33,
     hp: 247,
@@ -4963,7 +4991,7 @@ export const ENEMY_TYPES = [
     speed: 33,
     accel: 110,
     restitution: 0.62,
-    wobble: 1.4,
+    wobble: 0, // the word excludes it; written out per build 224
     color: '#ff5d8f',
     glow: '#ff2d6f',
     weight: 6,
@@ -4975,7 +5003,81 @@ export const ENEMY_TYPES = [
     id: 'bulwark',
     opens: kB(2800),
     name: 'BULWARK',
-    gait: 'march',
+    /*
+     * IT ARRIVES -- phase 4b, and the guide's reason is one sentence: "a
+     * 2.7-density body should not have a lateral or a wobble. It arrives."
+     * It was `march` with `wobble: 0.9` and all six routes.
+     *
+     * The guide asks for `creep`, and `creep` is the wrong word for it.
+     * That gait GROSSES THE CRUISE UP so the body arrives at the number its
+     * type names, and a march body has never delivered its authored `speed`
+     * -- the blend against `linearDamping` gives `speed * k / (k + 0.55)`
+     * with `k = accel / 100`, which at `accel` 90 is 0.621. So `creep` here
+     * would have been a silent **x1.611** on the second heaviest body in the
+     * game -- the steepest factor of the rows the guide asks to re-gait bar
+     * the towed MASS at x1.917, whose row is refused for wanting a handover,
+     * and sixth of the 44 loose types (HUSK x2.833 and ANVIL x2.375 are the
+     * extremes, and both already declare a gait where the factor either
+     * cannot apply or IS the point). `straight` is the same line with no
+     * speed change at all, which is what the sentence asked for.
+     *
+     * Three of the four figures in the two paragraphs above were wrong when
+     * they were first written -- "the steepest on the roster", "the heaviest
+     * body in the game" (ANVIL is 33,497 against 17,177) and BLOOM's "fourth
+     * largest wobble" (it was fourteenth) -- and all three were caught by
+     * computing them rather than by anything failing. A rank is a claim.
+     *
+     * Measured at rung 32 on era 2 -- its own band and its own field, one
+     * body a route with the route, side, scale and cruise all pinned so the
+     * gait is the only switch. Crossing time, path length over chord and
+     * the widest offset from its own start-to-mount line:
+     *
+     *   route       march                straight
+     *   direct       77.27s  1.0080    5   76.35s  1.0000   0
+     *   sweep        84.78s  1.0879  230   76.35s  1.0000   0
+     *   wide         90.48s  1.1346  275   76.35s  1.0000   0
+     *   serpentine   79.83s  1.0391   17   76.35s  1.0000   0
+     *   hook         85.85s  1.1014  244   76.35s  1.0000   0
+     *   loiter      124.77s  1.0267   14   76.35s  1.0000   0
+     *
+     * Weighted by the routes' own weights that is 86.98s -> 76.35s, **-12%**,
+     * and the crossing stops depending on a roll at all: max/min 1.615x ->
+     * 1.000x. The ratio is EXACTLY 1 because once the route's offset is
+     * declined the wobble is the only thing left bending the path.
+     *
+     * THREE TERMS, AND THE ONE NOBODY ASKS FOR IS HALF OF IT. `straight` is
+     * in `OWN_SPEED`, which gates the route's `dawdle` -- so `loiter`, one
+     * body in ten, stops crossing at 8.1 u/s and crosses at 14.3 like every
+     * other draw. Attributed: the dawdle is about -5.3%, the lateral -6.2%
+     * and the wobble -1.2%. That is a consequence of the WORD rather than a
+     * choice made here, and it is the right one: a body that takes no
+     * evasive arc has no business inheriting a route's speed profile, and
+     * 124.77 seconds is not "it arrives".
+     *
+     * WHAT IT COSTS, which is what build 343 said this build needed: the
+     * clear gets SHORTER, measured over all five band-5 waves that carry
+     * one, six runs an arm, fully bought, era 2, rung 32. Pooled 30 runs an
+     * arm: **73.9s -> 61.9s mean** (-16%), median 73.8 -> 62.0, worst single
+     * run 120.0 -> 90.1, and the one run in sixty that failed the 120-second
+     * cap was on `march`. Bands 3 and 4 move the same way on BLOOM's waves
+     * (5.8s -> 4.7s). So this pulls band 5 AWAY from the plateau build 306
+     * recorded rather than toward it. Per wave the spread inside one arm
+     * runs to 3.8x -- the TOW wave reads the other way and its own range is
+     * 19-73s -- so the pooled figure is the claim and the per-wave deltas
+     * are not.
+     *
+     * AND A CROWD DOES NOT QUEUE, which was the one picture-level risk and
+     * is refuted rather than argued. Every body of a type derives the same
+     * line, so the worry is fifteen bulwarks down one column; what spreads a
+     * wave is the MOUTH, not the route. Measured on the real waves at rung
+     * 32, worst crowding over twenty seconds of crossing: the closest pair
+     * is 89.6 units in BOTH arms -- the pair solver's own floor -- and the
+     * median width of the crowd goes 497 -> 583 on one wave and 700 -> 600
+     * on the other. The shipped precedent is more clustered than either:
+     * ANVIL is `creep`, has no lateral, and seven of them at rung 32 read a
+     * closest pair of 9.5 units.
+     */
+    gait: 'straight',
     shape: 'plated',
     r: 45,
     hp: 676,
@@ -4983,7 +5085,7 @@ export const ENEMY_TYPES = [
     speed: 23,
     accel: 90,
     restitution: 0.32,
-    wobble: 0.9,
+    wobble: 0, // the word excludes it; written out per build 224
     armor: 0.34, // flat damage reduction
     // Cobalt. It was #9fb3c8 on a #5f7fa6 glow -- grey on the single hardest
     // body in the game, which is the exact opposite of what grey promises.
@@ -5088,7 +5190,9 @@ export const ENEMY_TYPES = [
      *
      * Measured: direct 38.2s/1, sweep 34.3/86, wide 36.9/166, serpentine
      * 33.1/16, hook 32.5/99, loiter 43.8/18. So it is 43.8 against an old mean
-     * of 36.5 -- **20% slower on the slowest body in the game** -- and its
+     * of 36.5 -- **20% slower on one of the two slowest bodies in the game**
+     * (14.6 u/s delivered, against a BULWARK's 14.3; the claim here read "the
+     * slowest" until build 356 and never was) -- and its
      * widest offset is only 18, because `loiter`'s width is 180 against
      * `wide`'s 480. "Hangs back" is delivered by the dawdle; the lateral is
      * not what this route gives a body this slow.
@@ -6601,7 +6705,7 @@ export const ENEMY_TYPES = [
      *
      * Those are longer than `column / speed` (26.0 and 14.5) by about a
      * second and a half, and the reason is worth stating rather than tuning
-     * away: `accel` 40 is the slowest on the roster, so the body spends the
+     * away: `accel` 40 is the lowest of any HOSTILE, so the body spends the
      * first two seconds getting up to 45.8 from a standing start. The clock
      * this object promises is the crossing, and the crossing is what was
      * measured.

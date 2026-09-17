@@ -10128,3 +10128,217 @@ came from before believing the other one covers it.
   the build has already failed. Not deleted -- it asserts something true and
   costs nothing -- but it is a duplicate, and if a later build is tidying the
   caption family it is the arm to fold in rather than a claim to preserve.
+
+- **PHASE 4b IS IN FROM BUILD 356: BULWARK AND BLOOM TAKE `straight`, AND THE
+  GUIDE ASKED FOR `creep` ON BOTH.** They were the last two BUILDABLE rows of
+  the gait plan's ten re-gaitings; the four that are left each need a
+  mechanism rather than a word (a per-release serial for MOTE, a `lob` block
+  for HERALD, a new steering target for GLUT, a handover for MASS). Build 343
+  named this build's job and its instrument in as many words: "`straight` is
+  that request with no speed change at all... what the next build needs is
+  the clear table either side, not another gait word."
+- **THE WORD IS THE FINDING, AND IT IS THE DIFFERENCE BETWEEN A PATH CLAIM AND
+  A SPEED CLAIM.** `docs/objects.html` gives both rows `creep`, and `creep`
+  GROSSES THE CRUISE UP so the body arrives at the number its type names --
+  because ANVIL's crossing time is quoted to the player and a clock cannot be
+  14% either side of itself. A march body has never delivered its authored
+  `speed`: the blend against `linearDamping` gives `speed * k / (k + 0.55)`
+  with `k = accel / 100`. So `creep` here would have been a silent **x1.611**
+  on the SECOND heaviest body in the game -- the steepest of the rows the
+  guide asks to re-gait bar the towed MASS at x1.917, whose row is refused for
+  wanting a handover, and sixth of the 44 loose types -- and **x1.50** on
+  BLOOM. Both of the guide's own reasons are about the
+  PATH ("a 2.7-density body should not have a lateral or a wobble. It
+  arrives", "it detonates on death. It should read as inevitable, not as
+  wandering") and neither names a second. `straight` is the request with
+  nothing added, and `type.speed` means "delivered" for a marcher and "asked"
+  for a compensated gait -- which is a word rather than an accident since
+  build 343.
+- **MEASURED AT EACH BODY'S OWN BAND AND OWN FIELD, one body a route with the
+  route, side, scale and cruise pinned so the gait is the only switch.**
+  BULWARK is band 5 (rung 32, era 2) and BLOOM band 3 (rung 18, era 1), and a
+  crossing is a distance -- build 305's `tiers.mjs` finding is that a probe
+  which never sets the era measures the wrong field. Crossing, path length
+  over chord, widest offset from the body's own start-to-mount line:
+
+  | route | BULWARK march | BULWARK straight | BLOOM march | BLOOM straight |
+  |---|---|---|---|---|
+  | direct | 77.27s 1.008 5 | 76.35s 1.0000 0 | 33.08s 1.019 8 | 32.13s 1.0000 0 |
+  | sweep | 84.78s 1.088 230 | 76.35s 1.0000 0 | 35.77s 1.092 138 | 32.13s 1.0000 0 |
+  | wide | 90.48s 1.135 275 | 76.35s 1.0000 0 | 37.57s 1.105 149 | 32.13s 1.0000 0 |
+  | serpentine | 79.83s 1.039 17 | 76.35s 1.0000 0 | 34.27s 1.058 29 | 32.13s 1.0000 0 |
+  | hook | 85.85s 1.101 244 | 76.35s 1.0000 0 | 35.83s 1.084 134 | 32.13s 1.0000 0 |
+  | loiter | 124.77s 1.027 14 | 76.35s 1.0000 0 | 53.53s 1.040 21 | 32.13s 1.0000 0 |
+
+  Weighted by the routes' own weights: **86.98s -> 76.35s (-12%)** and
+  **36.87s -> 32.13s (-13%)**, with the crossing's dependence on the roll
+  gone outright -- max/min over the six routes **1.615x -> 1.000x** and
+  **1.618x -> 1.000x**. The delivered mid-field speed is 14.3 and 22.0 u/s
+  either way, which is what an uncompensated gait means.
+- **THE RATIO IS EXACTLY 1 AND THE WIDEST OFFSET EXACTLY 0, WHICH IS A
+  PROPERTY OF THE PAIR OF TERMS RATHER THAN A ROUNDING.** Once the route's
+  offset is declined the wobble is the ONLY thing left bending the path, so
+  removing both leaves a perfect line and the case is an absolute rather than
+  a margin. `straight` with the wobble put back reads 1.0095 and 1.0259 (the
+  revert proof), and NEEDLE's own arm reads 1.013-1.016 because a body at 89
+  u/s is shoved by the mount in the frame before its arrival test fires.
+- **THREE TERMS, AND THE ONE NOBODY ASKS FOR IS HALF OF IT.** `straight` is in
+  `OWN_SPEED`, which gates the route's `dawdle` -- so `loiter`, one body in
+  ten, stops crossing at 8.1 u/s and crosses at 14.3 like every other draw.
+  Attributed off the table above: the **dawdle is about -5.3%, the lateral
+  -6.2% and the wobble -1.2%**. That is a consequence of the WORD rather than
+  a choice made here, and it cannot be exempted per type -- `OWN_SPEED` is
+  keyed on the gait, so a carve-out would need a new field. It is also the
+  right answer: a body that takes no evasive arc has no business inheriting a
+  route's SPEED profile either, and 124.77 seconds is not "it arrives".
+  Build 343 recorded the same membership for NEEDLE as a fix to a broken
+  claim and noted that for `roll` and `flock` it would be a balance decision;
+  for these two it is a balance decision that agrees with the design.
+- **THE CLEAR GOES THE FAVOURABLE WAY, AND IT IS THE POOLED FIGURE THAT SAYS
+  SO RATHER THAN ANY WAVE.** All ten ordinary waves carrying either type, at
+  their band's middle rung, fully bought, the wave built by the director's own
+  budget and timed from the rim with the gun turning on. Band 5, six runs an
+  arm across five waves -- **30 runs an arm: 73.9s -> 61.9s mean (-16%),
+  median 73.8 -> 62.0, worst single run 120.0 -> 90.1, and the one run in
+  sixty that failed the 120-second cap was on `march`.** Bands 3 and 4 move
+  the same way on BLOOM's five waves (5.8s -> 4.7s). So this pulls band 5
+  AWAY from the plateau build 306 recorded rather than toward it, which is
+  the opposite of what build 343 was worried about.
+  **The per-wave deltas do not survive their own spread and are not claimed.**
+  Inside ONE arm the same wave runs 19-73s (`tow+bulwark+mote`, whose hurl is
+  a variable event -- build 308 measured two of five pairs throwing nothing at
+  all) and 52-112s (`kite+bulwark+mote`): up to 3.8x. That wave reads +21% on
+  the median and is the only one of ten pointing the other way. Two runs an
+  arm -- what the first pass took -- is a coin toss per wave; the pooled
+  population is the reading.
+- **AND A CROWD DOES NOT QUEUE, WHICH WAS MY OWN WORRY AND IS REFUTED RATHER
+  THAN ARGUED.** Every body of a type derives the same line from wherever it
+  came loose, so the obvious risk is fifteen bulwarks down one column -- build
+  330's VEIL finding, where thirty sheets arriving as a formation left twenty
+  standing in the throat. **What spreads a wave is the MOUTH, not the route.**
+  Measured on the real waves at rung 32, worst crowding over twenty seconds of
+  crossing: the closest pair is **89.6 units in BOTH arms** -- the pair
+  solver's own floor at `2r - slop` -- and the median width of the crowd goes
+  497 -> 583 on one wave and 700 -> 600 on the other, i.e. it does not
+  narrow. The shipped precedent is more clustered than either: ANVIL is
+  `creep`, has no lateral, and seven of them at rung 32 read a closest pair of
+  **9.5** with twelve touching pairs. A structural analogy is a reason to
+  measure, not a finding.
+- **THE HASH DID NOT MOVE AND THE TWO READOUTS ARE BYTE-IDENTICAL**, which is
+  the strongest form this instrument has. `-954811922`, marks -549790228 /
+  2055604435 / -1731762476 / 355215982 / 437007875, body counts 39/32/27/8/40
+  /32 -- `diff` of the two whole runs differs only in the `serving` line and
+  the build number. Both readings in this container, 355 from a worktree on
+  :8097 and 356 live, with the served BUILD confirmed in each heading. It was
+  owed rather than optional: two config fields on two types is exactly the
+  change an argument from inspection would wave through, and build 329's rule
+  is that inspection is what this repo does not accept. What makes it blind
+  here is structural -- `fight.mjs` opens from `openBoss` and `Game.update`
+  is `if (w.boss) {...} else { director.update() }`, so the only bodies on
+  that field are ORDINAL, TALLY and DIGIT.
+- **`--url` WANTS A PATH, AND A BARE ORIGIN MAKES THE SERVED-TREE GUARD REFUSE
+  FOR THE WRONG REASON.** `servedTree` does `base.replace(/\/[^/]*$/, '')` to
+  strip the filename off the default `http://127.0.0.1:8099/index.html`, so
+  `--url http://127.0.0.1:8097` becomes `http:/` and the fetch throws:
+  "build undefined", and the refusal then quotes the CWD fault build 344
+  found, which was not the fault. The guard is RIGHT -- it refused rather than
+  measuring an unknown tree, which is the whole point -- and the message sent
+  the reader at the wrong file, which build 346 records as worse than a guard
+  that does not fire. `checkServed` now distinguishes the two: a tree it could
+  not READ names `--url` and its own path requirement, and a tree whose BUILD
+  disagrees names the CWD fault. Verified both ways after the suite, because
+  no case covers `served.mjs` at all.
+- **A STALE FIGURE IN A LIVE COMMENT, FOUND BY GREPPING THE READERS OF A FIELD
+  BEFORE TOUCHING IT.** The wobble case's control comment read "Measured 20.75
+  degrees mean on a LURCHER at 0.9" -- LURCHER declares **2.6**, the largest
+  wobble on the roster, and 0.9 was BULWARK's. The arm's own message has been
+  printing the live 2.6 and a measured 28.91/72.73 all along, so nothing could
+  fail for it. Build 329's rule, and the discipline that caught it is the
+  cheap one: when you author a value, read its reader -- which is also how
+  build 343 found `|| 1` discarding a declared zero.
+- **AND THE ZEROS LIST IS NOW FOURTEEN, WHICH IS WHY THAT ARM ASSERTS A SHARE.**
+  `zeros: loose.filter((t) => t.wobble === 0)` went from 12 to 14 entries with
+  this build and the assertion is `> 0` rather than a count -- build 315's
+  rule about a count of the roster being a maintenance trap. The two march
+  counts in `check-build` and the gait case are printed rather than asserted
+  for the same reason: 22 marchers of 44 loose types became 20, and nothing
+  went red for it.
+- **AND THREE FIGURES IN MY OWN FIRST DRAFT OF THOSE NOTES WERE WRONG, EVERY
+  ONE OF THEM A RANK OR A SUPERLATIVE, AND ALL THREE WERE CAUGHT BY COMPUTING
+  THEM RATHER THAN BY ANYTHING FAILING.** "The steepest factor on the whole
+  roster" is sixth of 44 (HUSK x2.833, ANVIL x2.375, towMass x1.917, SCION
+  x1.786, LANTERN x1.688, then BULWARK). "The heaviest body in the game" is
+  ANVIL at a mass of **33,497 against BULWARK's 17,177** -- and ANVIL's own
+  codex line has said so since build 328, three hundred lines up the same
+  file. And BLOOM's "fourth largest wobble on the roster" was **fourteenth**
+  of 44. Nothing in the suite or `check-build` can see any of them, because
+  each is a sentence about the shape of a table rather than a value the game
+  reads.
+  This is build 329's rule ("a derived number quoted in prose is a copy") one
+  step earlier: a RANK is not a copy of a number, it is a claim about every
+  other row, and it is exactly as cheap to check as it is to assert -- one
+  `sort` over `ENEMY_TYPES`. **Three superlatives in one afternoon is the
+  base rate, so compute one before writing it**, and the tell is the word:
+  steepest, heaviest, largest, only, first.
+- **...AND THE SAME SORT FALSIFIED TWO SHIPPED SUPERLATIVES, ONE OF THEM A
+  CODEX LINE THE PLAYER READS.** ANVIL's entry said "it simply comes,
+  straight, **slower than anything else on the field**" and "the time it has
+  to spend crossing, **which is longer than any other body spends**". Ranked
+  by DELIVERED closing speed an anvil is **23rd of 37 hostiles** -- middle of
+  the table -- and its era-2 crossing is **27.5s against a BULWARK's 84**, so
+  both claims were false by a factor of three from the day they were written
+  at build 328. A LURCHER is slower than it (26.1 u/s against 45.8).
+  **The cause is this build's own subject read backwards.** `speed: 46` is a
+  COMPENSATED ask -- `creep` grosses the cruise up, so an anvil really does
+  deliver 45.8 -- while every marcher's `speed` is an ask it never reaches, at
+  a factor that is different per body. So the config table cannot be read down
+  a column: 46 against a BULWARK's 23 says "faster", the delivered figures say
+  45.8 against 14.3, and the DESIGN intent (the guide's twenty-six-second
+  clock) says "the slowest thing in the game". Three readings, one of them the
+  behaviour and one of them the line, and nothing compared them. The clock is
+  what ships and the line is what was wrong, so the line lost the two
+  superlatives; correcting the clock is a balance pass and is recorded rather
+  than taken (build 304's rule). `SCION`'s note carried the same shape -- "20%
+  slower on THE SLOWEST body in the game", where it is 14.6 against a
+  BULWARK's 14.3, two per cent apart -- and ANVIL's own `accel` note said 40
+  "is the slowest on the roster" when HUSK is 30.
+  **The instrument is one `sort` and it is worth running as a sweep, not per
+  claim.** Five superlatives fell to it in one afternoon across three files:
+  three written that day and two shipped for fourteen and twenty-eight builds.
+  Nothing in the suite or `check-build` can see one, because a superlative is
+  a sentence about the shape of a table rather than a value the game reads.
+- **AND DO NOT EDIT `src/` WHILE THE SUITE IS RUNNING, EVEN COMMENTS.**
+  CLAUDE.md already records the loud form -- bumping the BUILD literal
+  mid-run makes `askServer()` reload the page and the runner dies with
+  "Execution context was destroyed". The quiet form is worse: the page loads
+  its modules once at `page.goto` (there is exactly ONE in the file) and
+  `regress.mjs` imports `../src/` at startup, so an edit after launch is
+  invisible to the run -- and the tree the suite validated is then not the
+  tree that ships. Build 355 noted two comment-only edits landing that way;
+  build 356 also moved a live codex string, which is a shipped module, so it
+  paid for a second full run rather than argue about which strings a case can
+  see. Bump, edit, THEN launch -- and if an edit is unavoidable, the cost is
+  thirteen minutes and not a paragraph.
+- **AND THE NEW CASE STUBBED THE DIRECTOR TWELVE TIMES AND PUT IT BACK ONLY
+  BECAUSE THE DIFF WAS RE-READ.** `setup` writes `w.director.update = () => {}`
+  and `w.spawnLock = 1e9` once a run, `reset()` keeps the same Director object,
+  and nothing restored either -- so the stub would have outlived every
+  `restart()` after it. That is the rule CLAUDE.md states in three places and
+  which build 350 broke in the build that quotes it, so this is the fourth
+  instance; what caught it here was reading the diff rather than the suite,
+  because only SEVEN arms run after this one and none of them wants a wave.
+  **"Nothing downstream needs it" is luck, not a reason**, and the durable
+  form is build 350's: `delete` the stub, then ASSERT the restore
+  (`typeof update === 'function'` AND not an own property, so a later
+  `= undefined` -- which shadows the prototype's method and starves the suite
+  exactly as a stub does -- fails the case that left it). Revert-proved: with
+  the delete removed the arm fails on `putBack` alone.
+- **Five revert proofs, each on its own conjunct and each with its own failing
+  detail** -- which is the check build 353 added after four proofs printed the
+  same message because `git checkout --` had restored to a HEAD predating the
+  fix. The gait put back fails the DECLARATION with every measured figure
+  unchanged (the arm's switch is a per-body clone, so nothing else moves); the
+  wobbles put back read 1.0095 and 1.0259 with a widest of 5.5 and 12.6; the
+  arm given creep's gross-up delivers 23.0 and 33.0 and prints COMPENSATED;
+  `straight` out of `OWN_SPEED` reads a spread of 1.579 and a loiter/direct of
+  1.579; and the director left stubbed fails `putBack`.

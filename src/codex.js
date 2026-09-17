@@ -475,8 +475,30 @@ export const CODEX = [
      * HEAVE and HAIL all take -- moves an anvil by **0.00 u/s**, against
      * 91.45 for a BULWARK and 643 for a LURCHER on the same press. A hurled
      * MASS stops on it. So the line names the gun and the clock and nothing
-     * else, and it names the clock as a comparison rather than a figure
-     * (`speed` is derived from the crossing and a quoted number would rot).
+     * else, and it names the clock as NEITHER a figure nor a comparison:
+     * `speed` is derived from the crossing, so a quoted number would rot, and
+     * build 356 removed the comparison this sentence used to point at because
+     * it was false. Removing it made this very sentence stale, which is the
+     * grep the rule about a moved number asks for -- one paragraph up from the
+     * edit.
+     *
+     * WHAT IT NO LONGER SAYS, AND WHY (build 356). It read "it simply comes,
+     * straight, slower than anything else on the field" and "the time it has
+     * to spend crossing, which is longer than any other body spends", and
+     * both were false by a factor of three from the day they were written.
+     * `speed: 46` is a COMPENSATED ask -- `creep` grosses the cruise up, so
+     * the body really does deliver 45.8 -- while every marcher's `speed` is
+     * an ask it never reaches: ranked by DELIVERED closing speed an anvil is
+     * **23rd of 37 hostiles**, against a towed MASS at 13.6, a BULWARK at
+     * 14.3, a SCION at 14.6, a VEIL at 16.1 and a LURCHER at 26.1. Its era-2
+     * crossing is 27.5s where a BULWARK's is 84. The design intent (the
+     * guide's twenty-six-second clock) and the roster disagreed and nothing
+     * compared them; the clock is the shipped behaviour and the line is what
+     * was wrong. Fixing the clock is a balance pass, not a line edit.
+     *
+     * "The heaviest thing that has ever walked down this field" IS true and
+     * stays -- mass 33,497 against a BULWARK's 17,177, the largest on the
+     * roster -- and so is the refusal, which `check-build` holds to one type.
      *
      * What it does NOT say, deliberately: anything about a mine
      * (`CFG.mines.inPlay` false since 289), and anything about hitting it
@@ -486,7 +508,7 @@ export const CODEX = [
      */
     id: 'anvil',
     name: 'ANVIL',
-    line: 'The heaviest thing that has ever walked down this field, and the only one that cannot be moved. It takes no lane and no evasive arc -- it simply comes, straight, slower than anything else on the field. Every shove in the game is refused: PULSE, PILE, HEAVE, a hurled MASS, the knockback of your own rounds. Nothing pushes it off the mount because nothing pushes it at all. What is left is the gun and the time it has to spend crossing, which is longer than any other body spends -- so it is a problem you answer early or answer with everything, and the things arriving beside it are what make that a choice.',
+    line: 'The heaviest thing that has ever walked down this field, and the only one that cannot be moved. It takes no lane and no evasive arc -- it simply comes. Every shove in the game is refused: PULSE, PILE, HEAVE, a hurled MASS, the knockback of your own rounds. Nothing pushes it off the mount because nothing pushes it at all. What is left is the gun and the time it has to spend crossing -- so it is a problem you answer early or answer with everything, and the things arriving beside it are what make that a choice.',
   },
   /*
    * MEASURED BEFORE IT WAS WRITTEN, which is build 319's correction applied

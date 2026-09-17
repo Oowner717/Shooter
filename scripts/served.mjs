@@ -77,10 +77,27 @@ export const checkServed = async (base, expect, who) => {
   }
   if (expect !== null && expect !== undefined
       && String(served.build) !== String(expect)) {
-    console.error(`\n${who}: --expect ${expect} but the server at ${base} is `
-      + `serving build ${served.build}. This container's http-server serves its own `
-      + `CWD and ignores a trailing path, so launch it as `
-      + `\`cd <worktree> && http-server -p N -c-1 --silent\` with no path argument.`);
+    /*
+     * TWO CAUSES AND TWO REMEDIES, because a guard that fires for the wrong
+     * reason sends the next reader at the wrong file -- build 346's rule,
+     * paid for here at build 356. `--url http://127.0.0.1:8097` (a bare
+     * origin, no path) refused with "serving build undefined" and then
+     * quoted the CWD fault, which was not the fault: `servedTree` strips the
+     * last `/`-segment off `base` to turn the default
+     * `http://.../index.html` into a root, so a bare origin becomes `http:/`
+     * and the fetch throws. A tree that could not be READ names `--url`; a
+     * tree whose BUILD disagrees names the CWD.
+     */
+    console.error(served.err
+      ? `\n${who}: --expect ${expect} but the tree at ${base} could not be read `
+        + `(${served.err}). \`--url\` takes a PAGE and not an origin -- the default `
+        + `is \`http://127.0.0.1:8099/index.html\` and the root is derived by `
+        + `stripping the last path segment, so a bare \`http://host:port\` loses `
+        + `its host. Add \`/index.html\`.`
+      : `\n${who}: --expect ${expect} but the server at ${base} is `
+        + `serving build ${served.build}. This container's http-server serves its own `
+        + `CWD and ignores a trailing path, so launch it as `
+        + `\`cd <worktree> && http-server -p N -c-1 --silent\` with no path argument.`);
     return { abort: true, served };
   }
   return { abort: false, served };

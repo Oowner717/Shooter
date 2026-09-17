@@ -40072,6 +40072,234 @@ if (MINE_LINE) {
 }
 
 /*
+ * ---- PHASE 4b: THE HEAVY TWO LOSE THE LATERAL ----------------------------
+ *
+ * Build 356. BULWARK and BLOOM were `march` with `wobble: 0.9` and `1.4` and
+ * all six routes; the guide asks for `creep` on both ("a 2.7-density body
+ * should not have a lateral or a wobble. It arrives", and "it detonates on
+ * death. It should read as inevitable, not as wandering") and `creep` is the
+ * wrong word for either, because it GROSSES THE CRUISE UP -- a silent x1.611
+ * on the second heaviest body in the game (ANVIL is nearly twice its mass)
+ * and x1.50 on BLOOM. `straight` is the same line with no speed change,
+ * which is what both sentences asked for.
+ *
+ * This is build 343's case one type along and the three claims are the same
+ * three, which is the point of there being a word: a second type takes the
+ * gait and inherits the whole of its meaning.
+ *
+ * The CONTROL is the same body on the same six routes with the gait put back
+ * to `march`, because a flat ratio means nothing unless the instrument has
+ * been shown to read a bent one -- and it is the same six draws, so the
+ * comparison cannot be about which routes were sampled. Note the control
+ * carries the type's OWN wobble, which is now 0, so what it measures is the
+ * LATERAL alone: a hand-written 0.9 here would be a copy of a value that has
+ * left the type, and the lateral is what bends the path (the wobble was
+ * worth 1.0s of 86.0 on BULWARK, measured either way).
+ *
+ * WHAT IS ASSERTED IS DETERMINISTIC AND WHAT ROLLS IS NOT ASSERTED. With the
+ * route, side, scale and cruise pinned the straight arm reads a ratio of
+ * exactly 1 and a widest offset of exactly 0, six routes out of six, both
+ * types -- because once the route's offset is declined the wobble is the only
+ * thing left bending the path. The CLEAR TIME is the other half of the change
+ * and is not in here: pooled over the five band-5 waves that carry a BULWARK,
+ * six runs an arm, it goes 73.9s -> 61.9s with a within-arm spread of up to
+ * 3.8x, so it is a population to report and not a margin to assert. The table
+ * is in the BULWARK note in config.js.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ROUTES, CFG, TYPE_BY_ID } = await import('../src/config.js');
+    const { entryLine, ENTRY_Y } = await import('../src/portal.js');
+    const g = window.__sim;
+    const w = g.world;
+
+    const setup = (rung) => {
+      g.restart();
+      w.phase = 'staging';
+      g.debugTeachAll();
+      /*
+       * ITS OWN BAND'S FIELD. BULWARK is band 5 (rungs 29-35, era 2) and
+       * BLOOM band 3 (era 1), and a crossing is a distance: build 305's
+       * `tiers.mjs` finding is that a probe which never sets the era measures
+       * one. Forced rather than requested, because `setEra` refuses a switch
+       * to the era it is already in and `reset()` writes 1.
+       */
+      const era = rung > CFG.waves.tier.eraGate ? 2 : 1;
+      w.era = era === 2 ? 1 : 2;
+      w.newForm = era === 2 ? 'done' : 'armed';
+      g.setEra(era);
+      w.director.setTier(rung);
+      g.debugClearField();
+      // a stray SWARM halves health and MENDING heals, and both change a
+      // crossing; build 332's rule, on a case that loads no wave at all
+      w.director.traits = [];
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.timeScale = 1;
+      for (const k of ['projectiles', 'mines', 'effects', 'drops', 'debris']) w[k].length = 0;
+    };
+
+    const run = (id, rung, gait, routeId) => {
+      setup(rung);
+      const rim = entryLine(w, ENTRY_Y);
+      const e = g.debugSpawn(id, w.width * 0.25, rim + 10);
+      if (!e) return null;
+      e.staged = false;
+      // the gait is the SWITCH: same type, same spawn, same pinned route,
+      // side, scale and cruise. The type is cloned per body rather than
+      // written, so nothing leaks into the case after this one.
+      e.type = Object.assign(Object.create(Object.getPrototypeOf(e.type)), e.type, { gait });
+      e.route = ROUTES.find((x) => x.id === routeId);
+      e.routeSide = 1;
+      e.routeScale = 1;
+      e.cruise = e.type.speed; // drop the constructor's rand(0.86, 1.14) roll
+      const x0 = e.x;
+      const y0 = e.y;
+      const mx = w.shooter.x;
+      const my = w.shooter.y;
+      /*
+       * A DERIVED CAP, not a frame count. Build 331: a loop bound is a fitted
+       * margin wearing a `for` statement's clothes, and a BULWARK crossing
+       * era 2 at 14.3 u/s takes 76 seconds against a NEEDLE's 8.
+       */
+      const k = Math.max(0.01, e.accel / 100);
+      const vDel = e.type.speed * k / (k + CFG.physics.linearDamping);
+      const cap = Math.ceil((Math.hypot(mx - x0, my - y0) / vDel) * 60 * 3);
+      let px = e.x;
+      let py = e.y;
+      let path = 0;
+      let t = 0;
+      let widest = 0;
+      let mid = 0;
+      let midN = 0;
+      let arrived = false;
+      for (let f = 0; f < cap; f++) {
+        g.update(1 / 60);
+        t += 1 / 60;
+        if (e.dead) break;
+        path += Math.hypot(e.x - px, e.y - py);
+        px = e.x;
+        py = e.y;
+        const ax = mx - x0;
+        const ay = my - y0;
+        const L = Math.hypot(ax, ay) || 1;
+        const off = Math.abs(((e.x - x0) * ay - (e.y - y0) * ax) / L);
+        if (off > widest) widest = off;
+        // mid-field, clear of the standing start and of the mount
+        const frac = (e.y - y0) / ((my - y0) || 1);
+        if (frac > 0.3 && frac < 0.7) { mid += Math.hypot(e.vx, e.vy); midN += 1; }
+        if (Math.hypot(e.x - mx, e.y - my) <= e.r + w.shooter.r + 4) { arrived = true; break; }
+      }
+      const chord = Math.hypot(e.x - x0, e.y - y0) || 1;
+      return { route: routeId, gait, arrived,
+        t: +t.toFixed(2), ratio: +(path / chord).toFixed(4),
+        widest: +widest.toFixed(2), mid: +(mid / Math.max(1, midN)).toFixed(1) };
+    };
+
+    const ids = ROUTES.map((x) => x.id);
+    const out = {};
+    for (const [id, rung] of [['bulwark', 32], ['bloom', 18]]) {
+      const t = TYPE_BY_ID[id];
+      const k = Math.max(0.01, t.accel / 100);
+      out[id] = {
+        rung,
+        gait: t.gait,
+        wobble: t.wobble,
+        routes: t.routes || null,
+        asked: t.speed,
+        // what an UNcompensated blend delivers, and what creep would
+        predict: +(t.speed * k / (k + CFG.physics.linearDamping)).toFixed(1),
+        factor: +((k + CFG.physics.linearDamping) / k).toFixed(3),
+        straight: ids.map((rid) => run(id, rung, 'straight', rid)),
+        march: ids.map((rid) => run(id, rung, 'march', rid)),
+      };
+    }
+    /*
+     * PUT THE DIRECTOR BACK. `setup` stubs `update` and pins `spawnLock`
+     * twelve times over, and `reset()` keeps the same Director object -- so a
+     * stub outlives every `restart()` after it and starves every later case
+     * of waves. CLAUDE.md records three cases written that way in one
+     * session and build 350 shipped a fourth; the durable form is build
+     * 350's, which ASSERTS the restore rather than performing it, because a
+     * later `= undefined` shadows the prototype's method and starves the
+     * suite exactly as a stub does. Only seven arms run after this one today
+     * and none of them wants a wave, which is luck rather than a reason.
+     */
+    delete w.director.update;
+    w.spawnLock = 0;
+    out.putBack = typeof w.director.update === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update')
+      && w.spawnLock === 0;
+    // nothing leaked: the clone is per body and the types still declare it
+    out.after = { bulwark: TYPE_BY_ID.bulwark.gait, bloom: TYPE_BY_ID.bloom.gait };
+    return out;
+  });
+
+  const sum = (a) => a.reduce((q, x) => q + x, 0);
+  const per = ['bulwark', 'bloom'].map((id) => {
+    const d = r[id];
+    const S = d.straight;
+    const M = d.march;
+    const g = (a, f) => a.map(f);
+    const spread = (a) => Math.max(...g(a, (x) => x.t)) / Math.min(...g(a, (x) => x.t));
+    const loiter = (a) => a.find((x) => x.route === 'loiter').t / a.find((x) => x.route === 'direct').t;
+    return { id, d,
+      sRatio: Math.max(...g(S, (x) => x.ratio)),
+      mRatio: Math.max(...g(M, (x) => x.ratio)),
+      sWide: Math.max(...g(S, (x) => x.widest)),
+      mWide: Math.max(...g(M, (x) => x.widest)),
+      sSpread: spread(S), mSpread: spread(M),
+      sLoiter: loiter(S), mLoiter: loiter(M),
+      mid: sum(g(S, (x) => x.mid)) / S.length,
+      arrived: S.every((x) => x && x.arrived) && M.every((x) => x && x.arrived) };
+  });
+  check('BULWARK and BLOOM arrive along one line, at the speed they already had',
+    // both declare the gait, and the wobble the word excludes is written out
+    per.every((p) => p.d.gait === 'straight' && p.d.wobble === 0)
+    // ...and neither names routes, because a replacer reads none
+    && per.every((p) => p.d.routes === null)
+    // every body arrived, or a ratio is a claim about a journey that stopped
+    && per.every((p) => p.arrived)
+    // THE CLAIM: the path IS its own chord. Measured exactly 1.0000 and a
+    // widest offset of exactly 0, six routes of six, both types -- so this
+    // is an absolute rather than a margin.
+    && per.every((p) => p.sRatio < 1.002 && p.sWide < 1)
+    // ...and the CONTROL is bent, or a flat reading proves nothing. Measured
+    // 1.1243/274 on a BULWARK and 1.0870/148 on a BLOOM, same six draws.
+    && per.every((p) => p.mRatio > 1.04 && p.mWide > 60)
+    // THE CROSSING STOPS DEPENDING ON A ROLL: max/min over the six routes is
+    // 1.000 against a measured 1.615 and 1.618 on `march`.
+    && per.every((p) => p.sSpread < 1.01 && p.mSpread > 1.3)
+    // THE DAWDLE: `loiter` is the one route with one, and `OWN_SPEED` means
+    // a body with no evasive arc no longer inherits a route's speed profile.
+    // Half of the whole change, and a consequence of the WORD -- 123.3s
+    // against 76.4 before, one body in ten.
+    && per.every((p) => Math.abs(p.sLoiter - 1) < 0.02 && p.mLoiter > 1.3)
+    // THE SPEED IS NOT COMPENSATED, which is the whole reason `straight` and
+    // `creep` are two words. This is what would catch somebody "fixing" this
+    // arm into a copy of creep's: x1.611 on a BULWARK and x1.50 on a BLOOM.
+    && per.every((p) => Math.abs(p.mid / p.d.predict - 1) < 0.03
+      && p.mid < p.d.asked * 0.9)
+    // nothing leaked out of the per-body clone, and the director is back
+    && r.after.bulwark === 'straight' && r.after.bloom === 'straight'
+    && r.putBack,
+    per.map((p) => `${p.id} (rung ${p.d.rung}): straight ratio <= `
+      + `${p.sRatio.toFixed(4)} widest ${p.sWide.toFixed(1)} spread `
+      + `${p.sSpread.toFixed(3)} against march ${p.mRatio.toFixed(4)}/`
+      + `${p.mWide.toFixed(0)}/${p.mSpread.toFixed(3)}; loiter/direct `
+      + `${p.sLoiter.toFixed(3)} against ${p.mLoiter.toFixed(3)}; delivered `
+      + `${p.mid.toFixed(1)} u/s against a blend prediction of ${p.d.predict} `
+      + `and an asked ${p.d.asked} (creep would gross it up x${p.d.factor}) `
+      // DERIVED, not declared -- build 343's fourth self-asserting detail
+      // string is why this is computed
+      + `-- reads as ${Math.abs(p.mid / p.d.predict - 1) < 0.03 ? 'UNCOMPENSATED'
+        : Math.abs(p.mid / p.d.asked - 1) < 0.05 ? 'COMPENSATED (this is creep)'
+          : 'NEITHER'}`).join(' | '));
+}
+
+/*
  * ---- A DECLARED `wobble: 0` MEANS ZERO ----------------------------------
  *
  * Build 343. `drive` read `(this.type.wobble || 1)`, and `0` is falsy -- so
@@ -40169,7 +40397,11 @@ if (MINE_LINE) {
     // ...and each ran long enough to have wandered
     && r.anvil.samples > 200 && r.needle.samples > 200
     // THE CONTROL: a declared non-zero still wanders, so a zero means
-    // something. Measured 20.75 degrees mean on a LURCHER at 0.9.
+    // something. Measured 28.91 degrees mean and 72.73 worst on a LURCHER,
+    // which declares 2.6 -- the largest wobble on the roster. (This said
+    // "20.75 on a LURCHER at 0.9" until build 356: 0.9 is BULWARK's figure,
+    // and the arm's own message has been printing the live 2.6 all along.
+    // A number quoted in prose is a copy -- build 329.)
     && r.lurcherDeclared > 0 && r.lurcher.worst > 5
     // THE DERIVATION: the `?? 1` fallback is unreachable, so correcting it
     // cannot have changed a body that was relying on it
