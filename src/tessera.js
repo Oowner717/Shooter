@@ -283,8 +283,15 @@ export class Tessera extends Boss {
     this.flare = 1;
     if (n >= 2) this.layT = Math.min(this.layT, C.layII);
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
+    /*
+     * The other one the ceiling caught: 47 characters against the 3.4s this
+     * arm shares with a 19-character sibling, 13.8 a second. At 33 it is 9.7,
+     * and "RE-LAY" is the mechanic's own verb and the stage-II line's own
+     * prefix -- what stops at this stage is the cooldown before a cut berth
+     * is laid again, not any waiting for open ground.
+     */
     world.bossLine = n >= 4 ? 'IT IS LAYING FASTER THAN YOU CAN CUT.'
-      : n >= 3 ? 'IT HAS STOPPED WAITING FOR THE GROUND TO CLEAR.'
+      : n >= 3 ? 'IT HAS STOPPED WAITING TO RE-LAY.'
         : 'IT IS RE-SURVEYING.';
     this.lineFor = n >= 4 ? 4.2 : 3.4;
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.tessera.glow, 6);

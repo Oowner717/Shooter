@@ -1000,6 +1000,144 @@ if (!eraProbes.length) {
 }
 console.log(`era: all ${eraProbes.length} anomaly probe(s) (${eraProbes.join(' ')}) derive the `
   + 'era from anomalyEra() and set it before openBoss()');
+
+/*
+ * ---- AND A CAPTION MAY NOT BE SHOWN FASTER THAN IT CAN BE READ ---------
+ *
+ * Build 354. `CAPS_CPS` is the ceiling and `src/tutorial.js` carries the
+ * argument for its value; this is what stops it rotting. It had lived as a
+ * bare 13 in one `console.log` in `fight.mjs` since that probe was written,
+ * which is build 329's rule -- a number that only ever gets printed is only
+ * ever read by somebody already looking for it -- and the probe only ever saw
+ * the FASTEST caption of one fight, so a second offender was invisible behind
+ * the first.
+ *
+ * It caught four sites and each was a different fault, which is the argument
+ * for a sweep rather than a grep:
+ *   - AXIOM and TESSERA authored a stage-II text of 48 and 47 characters
+ *     against the 3.4s their `enterStage` hold shares with two much shorter
+ *     siblings: 14.1 and 13.8 a second. `enterStage` keys the hold on the
+ *     STAGE and the length on the TEXT, so the pairing is arbitrary, and it
+ *     is the long arm on the short clock that goes over both times.
+ *   - ORDINAL's convergence pair had no `lineFor` at all, so their hold was
+ *     whatever the beat took. Measured 2.45s and 2.20s in three of three runs
+ *     to the hundredth, because they are `convergePull + convergeHold` and
+ *     `convergeBack` -- a reel-back time standing in for a reading time.
+ *
+ * WORST-CASE PAIRING is the rule, and it is the point rather than pedantry: a
+ * ternary of texts beside a ternary of holds has no positional correspondence
+ * to read (the two do not even have the same arity at every site), so the
+ * longest text is checked against the shortest hold. An author who wants a
+ * long line and a long hold has to put them in a branch of their own.
+ *
+ * And a caption with NO hold is refused outright rather than exempted. Both
+ * of the two that had none turned out to have a window derivable from the
+ * beat they ride, which is why there is no exemption list here to go stale --
+ * the shape `world.apertures` sized 8 against 9 anomalies already cost this
+ * repo once.
+ */
+const { CAPS_CPS } = await import(new URL('../src/tutorial.js', import.meta.url));
+const srcDir = new URL('../src/', import.meta.url);
+const caps = [];
+for (const f of readdirSync(srcDir).filter((n) => n.endsWith('.js')).sort()) {
+  const body = readFileSync(new URL(f, srcDir), 'utf8');
+  const L = body.split('\n');
+  // A scripted line carries its own hold beside its own text -- the shape that
+  // has never produced an offender, 66 of 66 inside the ceiling.
+  L.forEach((ln, i) => {
+    const m = ln.match(/\{\s*text:\s*'((?:[^'\\]|\\.)*)'\s*,\s*hold:\s*([\d.]+)\s*\}/);
+    if (m) caps.push({ kind: 'script', f, n: i + 1, texts: [m[1]], holds: [+m[2]] });
+  });
+  // An ad-hoc line states its hold in a separate statement, so read the whole
+  // assignment and then the `lineFor` that follows it.
+  for (let i = 0; i < L.length; i++) {
+    if (!/world\.bossLine\s*=/.test(L[i])) continue;
+    let stmt = ''; let j = i;
+    while (j < L.length) { stmt += L[j]; if (/;\s*$/.test(L[j])) break; j++; }
+    const texts = [...stmt.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1])
+      .filter((t) => t && t === t.toUpperCase() && /[A-Z]/.test(t));
+    if (!texts.length) continue;
+    let holds = null;
+    for (let k = j + 1; k <= Math.min(j + 3, L.length - 1); k++) {
+      if (!/this\.lineFor\s*=/.test(L[k])) continue;
+      // Either literals, or a sum/ternary of CFG reads this file can evaluate.
+      const lits = [...L[k].matchAll(/(?<![\w.])\d+(?:\.\d+)?/g)].map((m) => +m[0]);
+      const reads = [...L[k].matchAll(/\bC\.(\w+)/g)].map((m) => m[1]);
+      holds = lits.filter((x) => x > 0.2 && x < 30);
+      if (reads.length) holds.push(...[sumOfCfgReads(f, reads)].filter((x) => x > 0));
+      break;
+    }
+    caps.push({ kind: holds && holds.length ? 'adhoc' : 'noHold', f, n: i + 1, texts, holds });
+  }
+}
+/*
+ * `C.` in a boss module is that boss's own CFG block, reached through a
+ * one-line getter. Resolved by NAME against every block in CFG rather than by
+ * guessing which one, because a caption's hold summed from two reads is the
+ * shape ORDINAL's two now use and the guard has to be able to price it.
+ */
+function sumOfCfgReads(file, keys) {
+  const blocks = Object.values(CFG).filter((v) => v && typeof v === 'object');
+  let total = 0;
+  for (const k of keys) {
+    const hit = blocks.find((b) => typeof b[k] === 'number');
+    if (!hit) return 0;
+    total += hit[k];
+  }
+  return total;
+}
+/*
+ * VACUITY, and the first version of this was too weak -- which its own revert
+ * proof showed rather than its passing. It asked only `!caps.length`, so
+ * blinding the ad-hoc detection left the 66 scripted texts behind, a
+ * non-empty population, and the guard reported all-clear over a roster with
+ * 45 texts silently uncovered. That is build 294's rule ("a vacuity
+ * denominator has to count what was MEASURED, not what was found") arriving
+ * on a two-population sweep.
+ *
+ * So EACH KIND has to be non-empty, because each is a separate mechanism and
+ * the guard's whole finding is that they fail differently: a scripted line
+ * carries its own hold beside its own text and 66 of 66 are inside the
+ * ceiling, while an ad-hoc line states its hold in another statement and
+ * every offender the ceiling has ever caught was one of those. Losing sight
+ * of either half is losing the guard, and only the count says which.
+ */
+for (const kind of ['script', 'adhoc']) {
+  if (caps.some((c) => c.kind === kind)) continue;
+  console.error(`captions: no ${kind} caption found, so this guard is asserting nothing about `
+    + 'that half -- the detection has drifted, not the exposure. It reads { text, hold } pairs '
+    + 'and world.bossLine assignments followed by a lineFor.');
+  process.exit(1);
+}
+const capBad = [];
+for (const c of caps) {
+  const longest = c.texts.reduce((a, b) => (b.length > a.length ? b : a));
+  if (c.kind === 'noHold') {
+    capBad.push(`${c.f}:${c.n} sets a caption with no lineFor within three lines, so its hold is `
+      + `whatever the beat around it happens to take and nothing can check it -- `
+      + `${longest.length} characters, "${longest}"`);
+    continue;
+  }
+  const hold = Math.min(...c.holds);
+  const cps = longest.length / hold;
+  if (cps > CAPS_CPS) {
+    capBad.push(`${c.f}:${c.n} shows ${longest.length} characters for ${hold}s, which is `
+      + `${cps.toFixed(1)} a second against CAPS_CPS ${CAPS_CPS} -- "${longest}"`);
+  }
+}
+if (capBad.length) {
+  for (const line of capBad) console.error(`captions: ${line}`);
+  process.exit(1);
+}
+const capWorst = caps.map((c) => {
+  const t = c.texts.reduce((a, b) => (b.length > a.length ? b : a));
+  return { t, cps: t.length / Math.min(...c.holds) };
+}).sort((a, b) => b.cps - a.cps)[0];
+const capTexts = caps.reduce((a, c) => a + c.texts.length, 0);
+console.log(`captions: all ${capTexts} text(s) across ${caps.length} site(s) `
+  + `(${caps.filter((c) => c.kind === 'script').length} scripted, `
+  + `${caps.filter((c) => c.kind === 'adhoc').length} ad-hoc) read at or under CAPS_CPS ${CAPS_CPS}; `
+  + `worst ${capWorst.cps.toFixed(1)} "${capWorst.t}"`);
 /*
  * ---- AND THE PROBE HAS TO BE ABLE TO READ THE TREE IT WAS POINTED AT ----
  *

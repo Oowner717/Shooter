@@ -9705,6 +9705,16 @@ came from before believing the other one covers it.
   the instrument is build 304's mistake. What it wants is the ceiling asserted
   over every line in `tutorial.js` and the boss tables, once, and then the
   handful it catches.
+  **THE COUNT IS WRONG, DYNAMO'S FIGURE IS THE INSTRUMENT'S, AND THE
+  `tutorial.js` HALF OF THAT INSTRUCTION WOULD HAVE BEEN A MISTAKE -- see
+  build 354.** There are THREE over-ceiling captions, not two, and DYNAMO's
+  is not one of them: its 15.1 came off a `--cap 40` smoke run that stopped
+  1.7s after the line went up, and on a full won fight the same line holds
+  its authored 3.42s and reads 7.6. The third (TESSERA, 13.8) was invisible
+  because the probe prints only the fastest caption of one fight. And
+  asserting the ceiling over `tutorial.js` would have reddened SEVEN of the
+  twelve teaching lines, which run to 14.8 under the game's own `holdFor` and
+  are a deliberately different register.
 - **AND WITH THE FIELD RIGHT AND THREE RUNS EACH, THE BOSSES DO SEPARATE --
   WHICH IS THE POSITIVE HALF OF THE NOISE FINDING AND WHERE 7b STARTS.** The
   three era-2 slots, stock, assists only, all reconciled (`remainder 1`):
@@ -9732,3 +9742,171 @@ came from before believing the other one covers it.
   "EXACTLY 90.0s every single time" -- i.e. it was withdrawing -- and that
   measurement was also era 1, so the raise was larger than it needed to be and
   is now the reason the clock clears.
+
+- **BUILD 354 REWORDS THE CAPTIONS OVER THE READING CEILING, AND THE FIRST
+  THING THE SWEEP DID WAS CORRECT BUILD 353'S OWN LIST OF THEM.** 353 named
+  two and recorded them as "two shipped captions over the reading-speed
+  ceiling". Measured properly -- all nine anomalies, full WON fights, every
+  caption transition timestamped -- there were **three**, plus one that is
+  not a caption fault at all, and each of the four is a DIFFERENT mechanism.
+  A list of offenders taken off one probe's "fastest caption of this run" line
+  can only ever hold one per fight, so the second offender in any fight was
+  invisible behind the first by construction.
+- **DYNAMO'S WAS THE INSTRUMENT, NOT THE LINE.** 353 read "IT HAS CLOSED THE
+  CIRCUIT." at 15.1 a second. On a full won fight the same line holds its
+  authored **3.42s and reads 7.6**. The 15.1 came off a `--cap 40` smoke run
+  that stopped 1.7s after the line went up: `fight.mjs` flushes whatever
+  caption is still on screen when the run ends, with whatever hold it had
+  accrued, so **the last caption of a capped or abandoned run is always
+  measured through a truncated window and always reads fast**. It is marked
+  `cut` and refused by the report now. The tell was there in 353's own output
+  and unread -- the same run printed "DID NOT END inside the cap".
+- **THE REAL THREE WERE 14.1, 14.0 AND 13.8, AND NOT ONE OF THEM WAS A LINE
+  SOMEBODY WROTE TOO LONG IN ISOLATION.**
+  - **ORDINAL's "IT IS NOT A WALL. IT NEVER WAS."** -- 31 characters in
+    **2.20s, in three of three runs to the hundredth**, because it was one of
+    only TWO captions in the game with no `lineFor` at all: its hold was
+    `CFG.ordinal.convergeBack`, the seconds the thrown segments take to be
+    reeled back in. **A reel-back time standing in for a reading time.**
+  - **AXIOM's and TESSERA's stage-II arms** -- 48 and 47 characters against
+    the 3.4s each shares with two much shorter siblings. `enterStage` keys the
+    hold on the STAGE (`n >= 4 ? 4.2 : 3.4`) and the length on the TEXT, so
+    the pairing is arbitrary; it is the long arm on the short clock that goes
+    over, at both sites, which is why the same fault appeared twice in two
+    unrelated bosses.
+  **So the reword is the right fix and the measurement is what says so.** In
+  all three the window is owned by something that is not reading -- a physics
+  constant, or a stage number -- so the text is the only lever. Reworded and
+  re-measured on won fights: **9.1, 11.4 and 9.7.**
+- **AND THE FOURTH IS 200 CHARACTERS A SECOND, IS NOT REWORDABLE, AND IS
+  RECORDED RATHER THAN FIXED.** AXIOM's `freed` posts `"<ABILITY> IS YOURS
+  AGAIN."` per clause released, with `lineFor = 2.4`. Measured, a run where
+  two clauses died **0.10s apart**: HAIL's line was up for ONE FRAME before
+  STASIS's replaced it -- 20 characters in 0.10s. The authored pairing is
+  fine (20 over 2.4 is 8.3); what fails is that a caption posted while another
+  is being read clobbers it, and the boss band has no queue. `Hud.showHint`
+  has one for exactly this and build 337 records why ("four controls pressed
+  in a burst spent four captions and showed one"). It is intermittent -- on a
+  later run the four releases were 14, 4 and 11 seconds apart and each got its
+  full 2.42s -- so it fires when a blast or the outro's arrest takes two
+  clauses at once. **Deferred because it is a mechanism and a case, not a
+  reword**, and because the static guard below provably cannot see it: the
+  authored numbers are legal and the fault is a race.
+- **AND THE CEILING ITSELF WAS ONE PROBE'S LITERAL, WHICH IS WHY IT COULD
+  NEITHER ROT NOR BE TRUSTED.** `13` lived in a single `console.log` in
+  `fight.mjs` from the day that probe was written -- build 329's rule verbatim.
+  It is `CAPS_CPS` in `src/tutorial.js` now, beside `holdFor` and `MIN_READ`,
+  because that file IS the reading model; `fight.mjs` reads it out of the
+  SERVED tree inside a `page.evaluate` rather than importing it, so the probe
+  keeps importing nothing from `../src/` and stays aimable at any build --
+  build 347's asymmetry, which build 345's eight-build hash re-take rests on.
+- **...AND IT MUST NOT BE APPLIED TO THE TEACHING LINES, WHICH IS THE HALF
+  THAT WOULD HAVE BEEN REDISCOVERED AS A BUG.** CLAUDE.md's own build-353 note
+  asked for "the ceiling asserted over every line in `tutorial.js` and the
+  boss tables". Measured before doing it: `holdFor` is `1.5 + words / 3.6`,
+  and under the game's own model **SEVEN of the twelve teaching lines run over
+  13 -- to 14.8.** They are not faults, they are a different register in every
+  way that matters: mixed case, two lines, over a quiet field, with the player
+  looking at the button the line names, protected by `MIN_READ` and by
+  `Hud.showHint`'s queue. A boss caption is one line of CAPITALS over a boss
+  fight with nothing queueing it, and capitals are slower to read. So a
+  tighter bound for the louder register is the point, and asserting 13 over
+  `tutorial.js` would have reddened seven shipped lines for no defect. **An
+  instruction in a note is a hypothesis; price it before executing it.**
+- **`holdFor` IS THE RIGHT MODEL AND THE WRONG BOUND, and measuring that is
+  what stopped a 20-site build.** Scored against `holdFor`, **20 of 111** boss
+  captions are under-held -- but twelve of the twenty are short by 0.04 to
+  0.17 seconds, which is a hand-authored hold landing within a tenth of the
+  model rather than a defect. That clustering is itself the finding: the boss
+  band's authors were reading at about `holdFor`'s pace all along. Against
+  `CAPS_CPS` the same sweep flags exactly the four sites above, which is a
+  guard-sized set and agrees with the runtime measurement to the decimal.
+  **A model that the data already tracks to a tenth of a second is a model,
+  not a threshold.**
+- **THE SCRIPTED MECHANISM HAS NEVER PRODUCED AN OFFENDER AND THE AD-HOC ONE
+  PRODUCED ALL OF THEM, which is the durable shape.** A `{ text, hold }` entry
+  authors both numbers in one place and **66 of 66 are inside the ceiling**,
+  worst 11.8. A `world.bossLine = ...` assignment states its hold in a
+  separate statement two lines down -- or, twice, nowhere -- and every
+  offender the ceiling has ever caught was one of those. Same family as
+  `HERO_GAITS`/`HERO_COL` read at the same index and build 313's `solo` field:
+  two things that have to agree, authored apart.
+- **THE GUARD'S WORST-CASE PAIRING IS THE POINT RATHER THAN PEDANTRY.** A
+  ternary of texts beside a ternary of holds has no positional correspondence
+  to read -- at several sites the two do not even have the same arity -- so
+  `check-build` scores the LONGEST text against the SHORTEST hold. An author
+  who wants a long line and a long hold has to give it a branch of its own,
+  which is the honest way to say so.
+- **AND A CAPTION WITH NO HOLD IS REFUSED OUTRIGHT, WITH NO EXEMPTION LIST.**
+  Both of the two that had none turned out to have a window derivable from the
+  beat they ride, so there is nothing to excuse: the wall line takes
+  `C.convergeBack` and CONVERGENCE takes `C.convergePull + C.convergeHold`,
+  which is **2.45s, the figure three runs measured to the hundredth**. Neither
+  changes a frame -- the clocks fire when the beat already cleared the line --
+  and both re-measured live at `lineFor` 2.2 and 2.45 where they had read
+  **-0.02**. What they buy is a number anything can read: it was the absence
+  of one that let a 31-character line sit in a 2.2-second reel-back with
+  nothing able to notice.
+- **MY OWN VACUITY ARM WAS TOO WEAK AND ITS OWN REVERT PROOF IS WHAT SHOWED
+  IT.** The first version asked `!caps.length`, so blinding the AD-HOC
+  detection left the 66 scripted texts behind -- a non-empty population -- and
+  the guard printed all-clear over a roster with **45 texts silently
+  uncovered**. That is build 294's rule ("a vacuity denominator has to count
+  what was MEASURED, not what was found") arriving on a two-population sweep.
+  Each KIND is asserted non-empty now, and both blindings fire. **A vacuity
+  arm over two populations has to name both, or it is a vacuity arm for the
+  bigger one.**
+- **SIX REVERT PROOFS, AND ONE OF THEM CROSS-VALIDATES THE STATIC GUARD
+  AGAINST THE RUNTIME PROBE.** Restoring ORDINAL's 31-character text makes
+  `check-build` print **14.1 a second** -- the same figure `fight.mjs` measured
+  on a live 296-second fight, derived here from `convergeBack` alone. A static
+  guard that independently reproduces a runtime reading to the decimal is a
+  guard whose arithmetic is the game's.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922` either side, both
+  readings in this container with the served BUILD confirmed as 353 and 354 in
+  each heading, all six intermediate marks identical. This build writes a new
+  `lineFor` on ORDINAL's own convergence path -- inside the boss the probe
+  fights, on its hot path -- so build 329's rule applies: an argument from
+  inspection that a caption clock cannot reach a body or a payout is exactly
+  the argument this repo does not accept. An unchanged hash is what "three
+  strings and two clocks reached nothing" looks like measured.
+- **AND THE PROBE THAT FOUND ALL OF THIS IS FOUR LINES OF RECORDER, WHICH IS
+  THE CHEAP LESSON.** `fight.mjs` has always kept the caption population and
+  printed one number off it -- the fastest of the run. Recording every
+  transition with its timestamp, its successor and the `lineFor` in force at
+  the time turned "two captions are too fast" into four attributed mechanisms
+  in one pass, because the SUCCESSOR is what distinguishes a line that is too
+  long from a line that was cut off, and `lineFor` is what distinguishes a
+  line with a clock from one riding a beat. **When a probe reduces a
+  population to its worst member, the thing to add is not a tighter bound but
+  the population.**
+- **AND THE SUITE TURNED UP A FIFTEENTH-DUMP MARGIN WHOSE FORM WAS THE FAULT,
+  NOT ITS NUMBER.** The LOOM rotation arm failed at `got` **0.266 rad/s** on a
+  build whose executable content is three strings and two caption clocks on
+  ORDINAL's convergence path -- so unambiguously the case's, which is builds
+  319 and 351's condition for fixing a margin properly rather than re-running
+  for a green draw. Subtracted fourteen dumps: `got` runs **0.266 to 0.298**
+  while the separation reads **132.5 in all fourteen**, so the geometry is
+  deterministic and only the delivered rate moves (build 321's unpinned-route
+  perturbation of a `paired` type, which that build recorded for LOOM and
+  deliberately did not act on).
+  **The failing conjunct was the DISCRIMINATOR and its shape is the lesson.**
+  `|got - want| * 3 < |got - naive|` -- three times closer to the ask than to
+  the uncompensated figure -- floors at **0.27225**, which is inside the
+  working range: thirteen of fourteen dumps cleared it and the fourteenth did
+  not. **A distance RATIO is hypersensitive where the gap is not.** Even a
+  factor of 2 floors at 0.263, 1.1% under the worst draw, so loosening the
+  factor was not available either.
+  What replaced it is a floor placed IN the gap, and the gap is wide and both
+  ends are known: 0.266 at worst against a `naive` that is computed from
+  `spin`, `grip` and `linearDamping` and is therefore deterministic at 0.189.
+  `got > naive * 1.2` is **17% under the worst working draw and 20% over the
+  broken one**, expressed against `naive` so it follows the config rather than
+  the day's value. Build 319's rule about the gap, and build 349's about a
+  quotient whose denominator is the quantity the claim is about.
+  **Verified by slicing the shipped check out of `regress.mjs` and driving it
+  against all fourteen measured pools plus four broken ones** -- 14/14 pass,
+  0.189 / 0.200 / 0.210 / 0.2268 all fail, and the trait and over-ask
+  conjuncts still bite. Seconds, against thirteen minutes of suite, and what
+  is verified cannot disagree with what ships (build 349's harness, reused a
+  third time).

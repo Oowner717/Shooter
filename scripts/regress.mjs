@@ -38375,9 +38375,31 @@ if (MINE_LINE) {
     r.traits === 0
     // within 15% of the ask, which is 2x the worst of six measured bins
     && Math.abs(S.got / S.want - 1) < 0.15
-    // ...and at least three times closer to the ask than to what the same
-    // blend delivers UNCOMPENSATED, or the arm cannot tell the two apart
-    && Math.abs(S.got - S.want) * 3 < Math.abs(S.got - S.naive),
+    /*
+     * ...and clear of what the same blend delivers UNCOMPENSATED, or the arm
+     * cannot tell the two apart.
+     *
+     * This was `|got - want| * 3 < |got - naive|` -- three times closer to the
+     * ask than to the naive figure -- and build 354 subtracted fourteen dumps
+     * to price it: `got` runs 0.266 to 0.298 while the separation is 132.5 in
+     * all fourteen, and that form puts its floor at 0.27225, so THIRTEEN of
+     * the fourteen cleared it and the fourteenth did not. A distance RATIO is
+     * hypersensitive in a way the gap is not: the factor 3 lands in the middle
+     * of the working range, and even a factor of 2 floors at 0.263, which is
+     * 1.1% under the worst draw.
+     *
+     * The gap itself is wide and both ends are known -- 0.266 at worst against
+     * a `naive` that is computed from the config and therefore deterministic
+     * at 0.189 -- so the bound is a floor placed IN it, x1.2, which is 17%
+     * under the worst working draw and 20% over the broken one. Expressed
+     * against `naive` rather than as a literal so it follows `grip`, `spin`
+     * and `linearDamping` instead of the day's value. Build 319's rule: a
+     * threshold belongs in the gap between working and broken, and build 349's:
+     * a quotient and a product are the same rule only where the denominator
+     * cannot vanish -- here the ratio's denominator is the very quantity the
+     * claim is about.
+     */
+    && S.got > S.naive * 1.2,
     `${S.got} rad/s against an authored ${S.want} over ${S.secs}s (separation ${S.sep}), `
     + `where the same blend with the compensation taken out delivers ${S.naive}. `
     + '`want` scales with the separation and a LOOM\'s grows 3.4x, so the rate is the '

@@ -43,6 +43,38 @@ export function holdFor(text) {
 export const MIN_READ = 1.1;
 
 /**
+ * The most characters a second a line SET IN CAPITALS may be shown at.
+ *
+ * This lived as a bare `13` in one `console.log` in `fight.mjs` from the day
+ * that probe was written, which is build 329's rule verbatim -- a number that
+ * only ever gets printed is only ever read by somebody already looking for
+ * it. It is here because the reading model is here, and `fight.mjs` reads it
+ * out of the SERVED tree rather than importing it, so the probe stays
+ * aimable at any build (build 347's asymmetry, which build 345's eight-build
+ * hash re-take rests on).
+ *
+ * IT IS DELIBERATELY STRICTER THAN `holdFor` AND DELIBERATELY NOT APPLIED TO
+ * THE LINES IN THIS FILE, which is the half that would otherwise be
+ * rediscovered as a bug. Measured: `holdFor` is 1.5 + words / 3.6, about
+ * 215wpm after a beat, and under it SEVEN of the twelve teaching lines run
+ * over 13 -- to 14.8. That is not a fault, because they are a different
+ * register in every way that matters: mixed case, two lines, over a quiet
+ * field, with the player looking at the button the line names, protected by
+ * `MIN_READ` and by the queue in `Hud.showHint`. A boss caption is one line
+ * of CAPITALS over a boss fight with nothing queueing it, and capitals are
+ * measurably slower to read than mixed case -- so a tighter bound for the
+ * louder register is the point rather than an inconsistency.
+ *
+ * Asserted over all 111 boss captions in `check-build.mjs`. It caught four
+ * when it went in at build 354 and each was a different fault: two texts too
+ * long for the stage-keyed hold they share with two shorter siblings
+ * (AXIOM 48 characters and TESSERA 47, both against 3.4s), and the two
+ * captions in the game with no `lineFor` at all, whose hold is therefore
+ * whatever the surrounding beat happens to take.
+ */
+export const CAPS_CPS = 13;
+
+/**
  * The opening, over an empty field. Four lines and then it stops talking: the
  * grip, the shot, the one button that is always yours, and what is coming.
  */

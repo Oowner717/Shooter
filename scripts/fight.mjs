@@ -205,6 +205,7 @@ async function fight(page) {
     const { anomalyEra } = await import('../src/boss.js');
     const { CFG } = await import('../src/config.js');
     const { entryLine } = await import('../src/portal.js');
+    const { CAPS_CPS } = await import('../src/tutorial.js');
     const T = CFG.waves.tier;
     const g = window.__sim;
     const w = g.world;
@@ -229,6 +230,7 @@ async function fight(page) {
       width: Math.round(w.width),
       coreHp: core ? Math.round(core.maxHp) : null,
       hard: w.boss ? +(w.boss.hard || 0).toFixed(3) : null,
+      capsCps: CAPS_CPS,
     };
   }, { n: N, want: ERA === null ? null : Number(ERA) });
   if (!slot.opened) throw new Error(`anomaly ${N} did not open`);
@@ -324,7 +326,20 @@ async function fight(page) {
 
   return page.evaluate((capped) => {
     const rec = window.__fight;
-    if (rec.lastLine) rec.captions.push({ text: rec.lastLine, hold: +rec.lineT.toFixed(2) });
+    /*
+     * `cut`: this one was still up when the run stopped, so its window is the
+     * probe's and not the game's. It is pushed for the record and refused by
+     * the reading-speed report below.
+     *
+     * Build 353 read DYNAMO's "IT HAS CLOSED THE CIRCUIT." at 15.1 a second
+     * and wrote it down as one of two shipped captions over the ceiling. It
+     * is not: that figure came off a `--cap 40` smoke run which stopped 1.7s
+     * after the line went up, and on a full won fight the same line holds its
+     * authored 3.42s and reads 7.6. Measured across all nine anomalies on
+     * full won fights, the real over-ceiling captions were three others.
+     * A truncated window is not a measurement of the line in it.
+     */
+    if (rec.lastLine) rec.captions.push({ text: rec.lastLine, hold: +rec.lineT.toFixed(2), cut: true });
     if (capped) rec.note.push('DID NOT END inside the cap');
     delete rec.was;
     return rec;
@@ -504,14 +519,29 @@ for (const s of stages) {
   console.log(`  stage ${s}        ${num(med(xs))}s   ${share.toFixed(0)}% of the fight`);
 }
 
-// Law 4: nothing goes past the reading speed.
+/*
+ * Law 4: nothing goes past the reading speed.
+ *
+ * The ceiling is read out of the SERVED tree rather than imported, so this
+ * probe stays aimable at any build -- build 347's asymmetry, which build
+ * 345's eight-build hash re-take rests on -- and so a reading taken against
+ * an old commit is judged by that commit's own number.
+ *
+ * `cut` entries are skipped: see the flush above.
+ */
+const CAPS_CPS = lastSlot && lastSlot.capsCps;
+if (!CAPS_CPS) {
+  console.error('fight.mjs: the served tree exports no CAPS_CPS, so there is no reading-speed '
+    + 'ceiling to judge a caption against. It is in src/tutorial.js from build 354.');
+  process.exit(1);
+}
 const worst = runs.flatMap((r) => r.captions)
-  .filter((c) => c.hold > 0.2)
+  .filter((c) => c.hold > 0.2 && !c.cut)
   .map((c) => ({ ...c, cps: c.text.length / c.hold }))
   .sort((a, b) => b.cps - a.cps)[0];
 if (worst) {
   console.log(`\n  fastest caption  ${worst.cps.toFixed(1)} chars/sec `
-    + `${worst.cps > 13 ? 'OVER THE 13 CEILING' : 'ok'}  "${worst.text}"`);
+    + `${worst.cps > CAPS_CPS ? `OVER THE ${CAPS_CPS} CEILING` : 'ok'}  "${worst.text}"`);
 }
 
 // Where the output actually went.

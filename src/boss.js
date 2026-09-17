@@ -1350,7 +1350,21 @@ export class Ordinal extends Boss {
          * rather than a cutscene.
          */
         this.rebuild(world, C.convergeRebuild);
+        /*
+         * The other caption that had no `lineFor`, and its window turned out
+         * to be derivable exactly: `convergePull` 1.9 plus `convergeHold`
+         * 0.55 is the 2.45s three runs measured, to the hundredth, because
+         * the throw below is what replaces the word. Written out DERIVED from
+         * those two rather than as 2.45, so the word stands for precisely as
+         * long as the draw-in it is announcing however either is tuned.
+         *
+         * Eleven characters over 2.45s is 4.5 a second against `CAPS_CPS` 13,
+         * so this one was never at risk -- what it was missing is a number
+         * anything could read, which is what let the caption after it be 31
+         * characters in a 2.2-second reel-back and nothing notice.
+         */
         world.bossLine = 'CONVERGENCE';
+        this.lineFor = C.convergePull + C.convergeHold;
         flash(0.3, TYPE_BY_ID.ordinal.color);
         shake(14);
         audio.boom();
@@ -1486,7 +1500,26 @@ export class Ordinal extends Boss {
       shake(30);
       audio.boom();
       background.surge(2);
-      world.bossLine = 'IT IS NOT A WALL. IT NEVER WAS.';
+      /*
+       * Shortened at build 354, and the window is why rather than taste.
+       *
+       * This caption had no `lineFor` -- one of only two in the game -- so
+       * its hold was whatever the beat around it took: measured at 2.20s in
+       * three of three runs, to the hundredth, because the clear at the foot
+       * of this method fires after `convergeBack` and that constant is 2.2.
+       * A reel-back time is not a reading time. At 31 characters
+       * ("IT IS NOT A WALL. IT NEVER WAS.") that is 14.1 a second against
+       * `CAPS_CPS` 13; at 20 it is 9.1, and the one sentence says what both
+       * of the old ones did -- the second clause was only ever there to say
+       * "and it never was".
+       *
+       * The clock is written out and DERIVED from the same constant the clear
+       * reads, so the two cannot drift: the frame it blanks on is unchanged,
+       * and a later tune of `convergeBack` moves the caption with the beat
+       * instead of leaving it to be cut off by whatever speaks next.
+       */
+      world.bossLine = 'IT WAS NEVER A WALL.';
+      this.lineFor = C.convergeBack;
       return false;
     }
 

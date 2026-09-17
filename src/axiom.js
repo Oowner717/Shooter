@@ -284,9 +284,17 @@ export class Axiom extends Boss {
     this.stage = n;
     this.flare = 1;
     background.setMood(n >= 4 ? 'boss4' : n >= 3 ? 'boss3' : 'boss2');
+    /*
+     * One hold for three texts is the shape that produced the only two boss
+     * captions over `CAPS_CPS`, and both were the STAGE-II arm -- the longest
+     * of the three sharing the shorter of the two clocks. Here it was 48
+     * characters against 3.4s, 14.1 a second; at 39 it is 11.5, and the
+     * claim standing is what the mechanic does (it holds your buttons, and
+     * the arrival script already says IT DOES NOT ARGUE. IT HOLDS).
+     */
     world.bossLine = n >= 4 ? 'THE RULE IS DOWN TO ONE WORD.'
       : n >= 3 ? 'IT IS RESTATING ITSELF WITH LESS.'
-        : 'THE ARGUMENT IS OVER. WHAT IS LEFT IS THE CLAIM.';
+        : 'THE ARGUMENT IS OVER. THE CLAIM STANDS.';
     this.lineFor = n >= 4 ? 4.2 : 3.4;
     ring(this.x, this.y, 20, 500, 0.7, TYPE_BY_ID.axiom.glow, 6);
     ripple(this.x, this.y, 2.2, 620);
