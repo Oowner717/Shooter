@@ -353,7 +353,7 @@ part paints half a line width outside its own geometry (5% fully rigged, 19%
 bare); and the barrel is a rounded rect laid along the aim from `R * 0.16`, so
 its reach is the far CORNER, not the axial tip.
 
-`node scripts/income.mjs [--window 240] [--iters 3] [--rungs 1,7,14,...]
+`node scripts/income.mjs [--waves 6] [--runs 1] [--iters 3] [--rungs 1,7,14,...] [--window S]
 [--spend BYTES] [--seed N] [--rand N] [--grant] [--press]` is
 the newest, and it answers a question none of the others can: **what a run has
 BANKED by the rung it meets each slot on.** Every affordability claim in this
@@ -373,10 +373,19 @@ funds every sampled rung by name instead, which is what rules money out as the
 answer -- fund past what the tree costs and a stall cannot be the purse -- and
 it forces one pass, because under a pinned funding every pass is identical.
 
-**THE WINDOW HAS TO BE SEVERAL TIMES THE RUNG'S OWN WAVE AND THE DEFAULT IS NOT,
-at the top.** A wave is about 5 seconds at rung 1 and **125.8** at rung 49, so a
+**THE WINDOW IS COUNTED IN WAVES FROM BUILD 368 AND WAS A FLAT SPAN OF SECONDS
+BEFORE IT.** A wave is about 5 seconds at rung 1 and **125.8** at rung 49, so a
 240-second window there completed NO wave on either of two runs and its rate
-drew 24.6 and 184 kB/s against 93.4 over 1200 seconds. A dwell the probe could
+drew 24.6 and 184 kB/s against 93.4 over 1200 seconds -- one flat span being
+about forty-eight waves at the bottom of the ladder and zero at the top.
+`--waves N` is the window now: it runs until N waves have SCORED and the seam
+after the last of them has closed, which is the sample size both of the terms
+this probe multiplies are built from, and the seconds are an output. `--window
+S` still forces the old shape, for an attribution comparing equal TIME, and
+`check-build` refuses a build where it is the default. What stops the loop when
+a wave never ends is a flat 1200-second-a-wave runaway guard, measured rather
+than derived -- see build 368 at the foot of this file for why the derivation
+failed. A dwell the probe could
 not price prints `short` and one it measured as unbounded prints `held`, and
 those are different facts: `short` is the probe saying it measured nothing, and
 `left` non-zero beside it says the wave had not finished ARRIVING rather than
@@ -11180,8 +11189,12 @@ came from before believing the other one covers it.
 - **WHAT PHASE 7b NOW HAS AND WHAT IT STILL OWES.** It has the income model
   7a said it needed: what a run holds at each of the seven gate rungs, so
   "the turret each slot actually meets" is a figure rather than a phrase --
-  and the way to get the loadout itself is now one command, `tiers.mjs`
-  reading the measured curve. What it still owes is the seven health numbers
+  and the way to get the loadout itself is one command, `tiers.mjs` against
+  the measured curve. **`tiers.mjs` does not READ that curve, it carries a
+  hand-pasted COPY of these seven numbers -- corrected at build 368**, which
+  also recorded beside them the conditions they were taken under, because a
+  table of numbers with no record of its own conditions cannot be read six
+  builds later. What it still owes is the seven health numbers
   and seven patience clocks, and two cautions carry forward from here: the
   deep anchors are soft, so a boss number tuned against rung 42's 95.8 MB is
   tuned against a draw; and the curve stops at rung 43, meaning a funded run
@@ -11921,3 +11934,136 @@ came from before believing the other one covers it.
   quantity, so an argument from inspection that it cannot reach a body or a
   payout is exactly the argument build 329 records this repo as not accepting.
   An unchanged hash is what "a drawing fix reached nothing" looks like measured.
+
+- **BUILD 368 IS PHASE 1 OF THE INCOME RE-TAKE -- THE INSTRUMENT, NOT THE
+  MEASUREMENT -- AND THE FAULT IT FIXES IS ONE THIS PROBE'S OWN HEADER HAD
+  RECORDED FOR SIX BUILDS WITHOUT ACTING ON IT.** That header says, in
+  capitals, "THE WINDOW HAS TO BE SEVERAL TIMES THE RUNG'S OWN WAVE AND THE
+  DEFAULT IS NOT, at the top" -- and the default stayed a flat span of
+  seconds, with every recorded reading taken at 240. A wave is about 5 seconds
+  at rung 1 and 125.8 at rung 49, so one flat span is about forty-eight waves
+  at the bottom of the ladder and **zero** at the top: build 362's own table
+  holds two rung-49 windows that completed no wave at all and reported 24.6
+  and 184 kB/s against 93.4 over 1200 seconds. That is build 331's and 364's
+  finding -- **a loop bound is a fitted margin wearing a `for` statement's
+  clothes** -- on a probe's window rather than on a case's, and the tell was
+  the same as always: a recorded reading sitting at the bound.
+- **THE WINDOW IS COUNTED IN WAVES, AND THE UNIT IS THE ONE BOTH TERMS
+  ALREADY WANTED.** `--waves N` runs until N waves have SCORED and the seam
+  after the last of them has closed; the seconds are an OUTPUT. The rate is
+  what those waves banked over the seconds they took and the dwell is
+  (wave + seam) / rungs-a-wave, so N waves is the sample size both are built
+  from. The seam clause is load-bearing rather than fussy: a window stopped on
+  the Nth wave's own END has N waves and N-1 seams, and a dwell made of two
+  different sample sizes.
+- **AND THE BOUND IS A RUNAWAY GUARD, MEASURED -- THE DERIVATION FAILED, AND
+  IT FAILED IN A WAY THAT LOOKED RIGHT.** A wave that does not end is a real
+  state the config cannot bound: `emit` refuses to release while
+  `hostileCount >= maxEnemies` and HOLDS the job, and `this.wait += dt` sits
+  BELOW `if (this.jobs.length) { emit; return }`, so a wave whose ask is
+  larger than a field the gun cannot clear never drains its jobs, never starts
+  the `patience` clock and genuinely has no end to wait for.
+  The first version bounded each wave at
+  `ALLOW * (jobsAt * press.open + patience + rest[1] + restCap)`, which reads
+  as that wave's own schedule. **`jobsAt` at ONE rung measured 2, 3 and 140**
+  -- `load` splits a type it cannot form up into singles -- so the derived
+  base spanned 31 to 232 seconds at rung 49 while the thing it was bounding,
+  the HOLD, correlates with neither: at ALLOW 3 it cut a window off at 98.5s
+  having scored NOTHING, and any factor large enough to clear the tail at two
+  jobs bounds a 140-job wave at half an hour. **A derivation whose own spread
+  is 7x on a quantity it does not model is worse than a flat guard, because it
+  looks like it knows something.** Flat 1200 seconds a wave instead, measured
+  at the deepest rung where the tail is: a 1200s window at rung 49, fully
+  funded, scored 5 waves of mean 193.5s and a **worst of 426.8**, so the guard
+  is 2.8x the longest wave this game produces -- and it subsumes the release
+  term the derivation was built out of, because at `press.open` a wave would
+  need **827** job entries for its release alone to reach it, against 140
+  measured. Per wave rather than accumulated, so the slack a quick wave leaves
+  cannot be spent on a later one that has hung.
+- **...AND THE GUARD'S OWN REFUSAL WAS PROVED BY THE BAD DERIVATION BEFORE IT
+  WAS REPLACED**, which is the one thing the failed attempt bought: that
+  window printed `98.5s of 98.5 allowed!` with `0w` and `dwell short`, so the
+  bound, the `!`, the wave count and the two-causes reading all read correctly
+  on a window that had measured nothing. A guard shown to fire is a guard; the
+  factor was the part that was wrong.
+- **`--runs R` POOLS BY SELECTING, NOT BY AVERAGING.** Build 364 measured the
+  rate at rung 42 spanning 5.75 to 65.9 kB/s and at rung 49 10.8 to 648 at one
+  funding, traced the channel to the trait roll, and priced the alternatives:
+  pinning a roll is choosing one (338) and pinning BOTH channels is still not
+  exact, so N cannot be 1. The pooled row is the **median run by rate** and
+  not a mean of the columns, because every column is part of a self-consistent
+  account of one window -- `banked`, `secs` and `rate` reconcile, and
+  `paid/wave` is the product of the three terms beside it -- so an averaged
+  row reconciles against nothing and describes no run. Two clauses on the
+  selection, pulling opposite ways: it selects among the runs that could be
+  PRICED, or one unpriceable window poisons a rung two others priced cleanly
+  (and takes the six rungs below it as collateral, per `blame`); and it prices
+  at all only if a MAJORITY could, or a rung that mostly cannot climb is
+  reported off the one window that did. Every run's figures print under the
+  rung either way -- build 349's rule.
+- **AND THE PER-WAVE PAY SPREAD WITHIN ONE WINDOW IS 260x, WHICH IS WHAT SIZES
+  THE RE-TAKE.** One 1200s window at rung 49 paid
+  `[979kB 3.09MB 50.2MB 254MB 13.1MB]` across five waves -- and the six-wave
+  windows read `[924kB 1.56MB 14.0MB 27.5MB 119MB 121MB]`, the same shape.
+  Build 365 measured 187 kB to 52.5 MB ACROSS windows and concluded that a
+  poor window is poor in every wave; at the ceiling that is no longer true, so
+  six waves is a small sample of its own window as well as of the roll. The
+  re-take's `--waves` and `--runs` are its own decision and this build
+  deliberately does not make it.
+- **A RENAMED LOOP BOUND LEFT A SILENT NaN IN AN AVERAGE, AND READING THE
+  OUTPUT IS WHAT CAUGHT IT.** `field: +(fieldSum / frames)` -- and `frames`
+  was the old fixed bound, gone with it, so `fieldSum / undefined` printed
+  `NaN/57` in the `field/cap` column. Nothing threw, the row was otherwise
+  perfect, and `check-build` and the suite are both blind to a probe's own
+  arithmetic. It is the same shape as every renamed-reader fault in this file
+  and the same discipline caught it: **run the probe once and read every
+  column before believing any of them.**
+- **AND `tiers.mjs` DOES NOT READ THE MEASURED CURVE, WHICH BUILD 362'S OWN
+  PROSE SAID IT DID.** That build's note reads "the way to get the loadout
+  itself is now one command, `tiers.mjs` reading the measured curve"; `EARNED`
+  is a hand-pasted COPY of seven numbers and always was. Corrected, and the
+  CONDITIONS those seven were taken under are recorded beside them for the
+  first time -- build 362, one container, a FIXED 240s window, ONE run a rung,
+  both rolls loose, CORE not owned, and the rung-49 sample unpriceable so the
+  curve has never had an anchor above 42. A table of numbers with no record of
+  its own conditions cannot be read six builds later, which is the fault
+  `income.mjs` fails the build for when a PINNED reading calls itself the
+  curve, and it was sitting in the file that consumes it.
+- **THE WINDOW'S SHAPE DEFAULTS OFF FOR THE SAME REASON A ROLL DOES.**
+  `check-build` already refuses an `income.mjs` whose pinnable rolls default
+  on, because "a pinned reading calling itself the curve is unrecoverable
+  downstream" -- and a FIXED-seconds window is the same silence: it is a
+  different sample size at every rung and `EARNED` carries no record of which
+  shape produced it. One conjunct, reusing that arm's own `loose` test, and it
+  fails for a renamed constant too, naming the drift. Three revert proofs,
+  each with its own message: the window defaulting to 240, the constant
+  renamed, and `--waves` left unclassified.
+- **AND MEASURED AT THE RUNG THE OLD WINDOW COULD NOT REACH, THREE RUNS, THE
+  SAME 200 MB FUNDING BUILD 364 USED:** 6 of 6 waves in 3 of 3 runs, windows
+  of **869.3 / 906.8 / 901.5** seconds, worst single wave 234.4 / 231.7 /
+  257.9 against the 1200s guard (4.7x clear), rates **159 / 287 / 225 kB/s**
+  -- a **1.8x** spread, pooled to the median 225.
+  Build 364's five readings at that rung and that funding were 24.6 and 184
+  kB/s over windows that completed **no wave at all**, 648 over one that saw
+  ONE, and 10.8 and 93.4 over 1200 seconds. So the comparison is two claims
+  and they are worth keeping apart: against the two windows that saw any waves
+  the spread goes **8.6x to 1.8x**, and the other three are a class of reading
+  the wave-counted window **cannot produce** rather than one it improves. The
+  narrowing is not magic and is not the roll being tamed -- six waves is six
+  trait draws in every run, so the windows are means over the same sample size
+  instead of over whatever the clock happened to give (5 and 9 in that pair) --
+  and 1.8x is itself three draws, so it is reported rather than claimed as the
+  rung's spread.
+- **WHAT THIS BUILD DELIBERATELY DID NOT DO IS THE MEASUREMENT.** The economy
+  digest is unmoved and `EARNED`'s seven numbers are untouched -- only their
+  conditions were written down beside them -- so the curve is exactly as stale
+  as build 366 left it and the pin still says so. The re-take is runs a rung at
+  a window several times that rung's own wave, which is now one command and
+  still hours: at six waves a rung-49 window is about 900 game-seconds, and
+  eight rungs x three runs x three passes is the scale build 364 predicted. A
+  single pass over all eight rungs was NOT taken here either, so the claim that
+  equal waves spends the time where the precision is needed rests on two
+  measured points (rung 7 at 33.7s for three waves, rung 49 at about 900 for
+  six) rather than on a table. No `src/` file changed but the BUILD literal, so
+  the ORDINAL hash is not owed -- the instruments with something to say were
+  the probe's own before-and-after at rung 49 and the three revert proofs.

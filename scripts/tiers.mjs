@@ -224,6 +224,50 @@ const TREE_TOTAL = NODES
  * little of it -- the missing node is a real gap in the TURRET phase 7b is
  * about and a tenth of a gap in this curve, which are different claims.
  */
+/*
+ * ---- THE CONDITIONS THESE SEVEN NUMBERS WERE MEASURED UNDER --------------
+ *
+ * Recorded beside them because a measurement describes the day it was taken
+ * on, and a table of numbers with no record of its own conditions is the
+ * exact fault `income.mjs` fails the build for when a PINNED reading calls
+ * itself the curve. The paragraph above says the anchors are measured; this
+ * says by what.
+ *
+ *   taken at   build 362, one container, the tree served locally
+ *   probe      income.mjs --window 240 --iters 3, rungs 1 7 14 21 28 35 42 49
+ *   window     a FIXED 240 seconds a rung -- which build 368 replaced with a
+ *              count of WAVES, because 240s is about forty-eight waves at
+ *              rung 1 and ZERO at rung 49. The rung-49 sample could not be
+ *              priced and rungs 43-48 are collateral of it, so this curve
+ *              has never had an anchor above 42 and its tail is `TAIL`
+ *              below, extrapolated from the last measured pair.
+ *   runs       ONE window a rung, which is a DRAW -- build 364 measured the
+ *              rate at rung 42 spanning 5.75 to 65.9 kB/s and at rung 49
+ *              10.8 to 648 at one funding, with the trait roll as the
+ *              channel. So the deep anchors are single draws of a quantity
+ *              with a factor of sixty in it, and build 368 is what gives the
+ *              probe `--runs`.
+ *   rolls      both loose (no --seed, no --rand), which is what makes them
+ *              anchors rather than an attribution
+ *   turret     funded in bytes, so CORE is NOT owned: it needs NEW FORM,
+ *              which is `currency: 'remainder'` and not payable in bytes.
+ *              Build 364 priced the grant at about a tenth of the rate
+ *              rather than a factor -- a real gap in the TURRET phase 7b is
+ *              about and a small one in this curve.
+ *
+ * ---- AND THEY ARE KNOWN STALE RATHER THAN SUSPECTED STALE ----------------
+ *
+ * Two builds have changed the economy since: 365 found `world.drops` bounded
+ * at `CFG.maxDrops` with `shed` silently discarding the remainder and no
+ * door out but collection, so one EBB wave permanently consumed the salvage
+ * pile and every later wave shed onto a full floor; 366 fixed that ratchet
+ * by letting salvage beyond the intake's reach leave the field. Both move
+ * income at every rung past about 14. `check-build`'s INCOME_PIN was moved
+ * at 366 WITHOUT a re-measure and says so at its own site, so the guard is
+ * silent and these numbers are the last measured ones rather than current.
+ * The re-take is a measurement of hours (runs a rung, at a window several
+ * times that rung's own wave) and wants its own build.
+ */
 const EARNED = [[1, 0], [7, 500014], [14, 1886309], [21, 5456475], [28, 9054201], [35, 40585659], [42, 95804879]];
 /*
  * Past the last anchor, the growth of the last measured pair carries on.

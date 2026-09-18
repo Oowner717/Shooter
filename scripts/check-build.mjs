@@ -1754,8 +1754,9 @@ if (incomeDigest !== INCOME_PIN) {
     + 'MEASURED against the terms above and is now a table about a different game, which '
     + "is exactly how build 145's asserted curve came to be four times too rich without "
     + 'anything failing. Re-measure it -- serve the tree, then run income.mjs with '
-    + '--window 240 --iters 3 -- paste the anchors into tiers.mjs, and move INCOME_PIN '
-    + 'in the same commit with the reason.');
+    + '--iters 3 --runs 3 (the window is counted in WAVES from build 368, so it needs no '
+    + 'seconds) -- paste the anchors into tiers.mjs beside the conditions they were taken '
+    + 'under, and move INCOME_PIN in the same commit with the reason.');
   process.exit(1);
 }
 console.log("income: tiers.mjs's EARNED curve is measured (income.mjs) and the "
@@ -1817,11 +1818,12 @@ if (channels.length < 3) {
   process.exit(1);
 }
 /*
- * What the probe reads that is NOT a roll: which rungs, how long a window,
- * how many passes, what to fund with, and which tree to read. These say what
- * to measure; a roll says which dice were held while measuring it.
+ * What the probe reads that is NOT a roll: which rungs, how big a window and
+ * in which unit, how many runs a rung, how many passes, what to fund with,
+ * and which tree to read. These say what to measure; a roll says which dice
+ * were held while measuring it.
  */
-const INCOME_PLAIN = ['window', 'iters', 'rungs', 'spend', 'url', 'expect'];
+const INCOME_PLAIN = ['waves', 'runs', 'window', 'iters', 'rungs', 'spend', 'url', 'expect'];
 const readFlags = [...new Set([
   ...[...incomeSrc.matchAll(/\bflag\('([a-z]+)'/g)].map((m) => m[1]),
   ...[...incomeSrc.matchAll(/args\.includes\('--([a-z]+)'\)/g)].map((m) => m[1]),
@@ -1849,9 +1851,32 @@ if (pinnedOn.length) {
     + 'conditions. Default it off and pass it explicitly when attributing.');
   process.exit(1);
 }
+/*
+ * ...AND THE WINDOW'S SHAPE DEFAULTS OFF FOR THE SAME REASON A ROLL DOES.
+ *
+ * `--window S` forces a FIXED-seconds window, which is a different sample
+ * size at every rung: about forty-eight waves at rung 1 and ZERO at rung 49,
+ * measured, where a wave is 5 seconds at the bottom of the ladder and 125.8
+ * at the top. So a reading taken under it is an attribution comparing equal
+ * TIME and not the curve -- and `EARNED` carries no record of which shape
+ * produced it, which is the same unrecoverable silence the rolls above are
+ * refused for. The wave-counted window is the default and the seconds one is
+ * passed explicitly. A renamed constant fails here too, naming the drift.
+ */
+const winLine = incomeSrc.match(/^const WINDOW = .*$/m);
+if (!winLine || !loose.test(winLine[0])) {
+  console.error('income: income.mjs\'s WINDOW does not default to null'
+    + (winLine ? '' : ' (no `const WINDOW =` line at all, so the detection has drifted)')
+    + ', so its reading is taken over a FIXED span of seconds while calling itself '
+    + '"(the curve)". A fixed window is about forty-eight waves at rung 1 and zero at '
+    + 'rung 49, so it is a different sample size at every rung and nothing downstream '
+    + 'records which shape an anchor came from. Count the window in WAVES by default '
+    + 'and pass --window explicitly when attributing.');
+  process.exit(1);
+}
 console.log('income: all ' + channels.length + ' of income.mjs\'s pinnable rolls ('
-  + channels.join(', ').toLowerCase() + ') default loose, so its curve is the measurement '
-  + 'and a pin is an attribution');
+  + channels.join(', ').toLowerCase() + ') and its window shape default loose, so its '
+  + 'curve is the measurement and a pin is an attribution');
 
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
