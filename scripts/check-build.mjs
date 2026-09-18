@@ -1560,8 +1560,19 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * never fire again -- which is build 328's `SCALED` rename verbatim, where the
  * guard tested the parent object and passed while the leaf was gone.
  */
-const INCOME_PIN = '66f2f1478cd7';
-const INCOME_AT = 362;
+/*
+ * Moved at build 365 because the TERM LIST widened, which is not the economy
+ * moving and does not oblige a re-measure: `maxEnemies` and `maxDrops` were
+ * added below, so the digest changes although every number the curve was
+ * measured against is what it was. The two cases are told apart by the diff
+ * -- a moved pin beside a changed `incomeTerms` is coverage, a moved pin
+ * beside changed CFG is the economy -- and the reason belongs here either
+ * way, because the message the guard prints asks for the re-measure and a
+ * reader who pastes new anchors for a coverage change has spent thirteen
+ * minutes on nothing.
+ */
+const INCOME_PIN = '40b8ba32b85a';
+const INCOME_AT = 365;
 const TIER_CFG = CFG.waves.tier;
 const incomeTerms = {
   'energy.perMass': CFG.energy.perMass,
@@ -1588,6 +1599,21 @@ const incomeTerms = {
   'waves.rest': CFG.waves.rest,
   'waves.press': CFG.waves.press,
   'waves.threatPerHp': CFG.waves.threatPerHp,
+  /*
+   * THE TWO FIELD CAPS, added at build 365 because the curve is demonstrably
+   * a function of both and neither was watched.
+   *
+   * `maxEnemies` is what `emit` holds the next release against, so it sets
+   * the seam and therefore half the dwell. `maxDrops` is the larger lever
+   * and was the more surprising: `shed` BREAKS on it and silently discards
+   * the rest of a body's salvage, so a saturated drop pile takes raw bytes
+   * a slain body from 12.7-37.2 kB down to 364 B-2.25 kB -- a factor of 35,
+   * measured at one rung and one funding, on the identical authored wave.
+   * A cap that can delete nine tenths of a rung's income belongs in a pin
+   * whose whole job is to notice the economy moving.
+   */
+  'maxEnemies': CFG.maxEnemies,
+  'maxDrops': CFG.maxDrops,
   'tree.total': (() => treeMod.NODES.reduce((sum, n) => {
     if (!n.id || n.repeat || n.dormant || n.currency) return sum;
     let s2 = 0;

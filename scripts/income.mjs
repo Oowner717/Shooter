@@ -463,6 +463,92 @@ async function windowAt(rung, spend, seconds) {
         lastAt = d.at;
         if (endedAt !== null) { seams.push((f - endedAt) / 60); endedAt = null; }
       }
+      /*
+       * The three terms a wave's pay is a PRODUCT of, read off the director
+       * every frame the wave is running and used at its last one -- because
+       * `score()` and `glitchOut` both clear all three, so reading them in
+       * the wave-end branch below reads zeroes.
+       *
+       *   asked  how many bodies the wave QUEUED, after the budget's swell
+       *   made   how many were actually entered -- which is not `asked`,
+       *          because a QUARRY fractures into three, a SPLITTER sheds
+       *          four motes and a REMNANT comes back, and every child
+       *          carries its parent's wave serial
+       *   slain  how many died
+       *   take   what their wreckage was worth RAW, before the intake tax
+       *          and before the depth dividend -- `bank()` accumulates it on
+       *          the one line energy enters a run
+       *
+       * So `paid = slain * (take / slain) * tax`, and a window that banked a
+       * twenty-sixth of another window's can only have killed fewer, killed
+       * cheaper, or been taxed harder. The window's own RATE cannot say
+       * which, and build 364 left that factor unattributed for exactly this
+       * reason.
+       *
+       * `made` IS THE KILL DENOMINATOR AND `asked` IS NOT, measured: the
+       * first version of this split divided by `asked` and read shares of
+       * 1.71, 1.04 and 1.02 -- a kill share over 1, on a working build,
+       * because the children above are slain and were never queued.
+       * `cleared()` divides by `made + queued` and clamps at 1 for the same
+       * reason, four hundred lines up the same file. `asked` is kept because
+       * it is the ROSTER term -- how big a wave the budget bought -- and it
+       * is the one of the two that SWARM doubles.
+       *
+       * One smear, stated rather than corrected: a drop banked after its own
+       * wave has ended is credited to whatever is running when it lands, in
+       * `take` and in `paid` alike (`bank` adds to `take` only while the
+       * director is not resting, so a drop collected during the SEAM reaches
+       * `paid` and not `take`). That is not noise to remove -- delaying
+       * salvage is precisely what EBB does -- so the terms are read as the
+       * wave's account rather than as its bodies' worth.
+       */
+      /*
+       * ...and read only while the wave is STILL RUNNING. `score()` and
+       * `glitchOut` both zero all four of these and both write `resting`, so
+       * a capture that runs unconditionally overwrites the wave's account
+       * with the cleared values on the very frame it ends -- measured, `take`
+       * read 0.00 B and `tax` was unreportable on every row. The last frame
+       * the state held is the reading, which is a rule this repo has now paid
+       * for on five different quantities.
+       */
+      if (cur && !d.resting) {
+        cur.asked = d.asked; cur.made = d.made;
+        cur.slain = d.slain; cur.take = Math.round(d.take);
+        /*
+         * ...and the two readings that separate the ROSTER from the
+         * TRANSPORT, which `take` alone cannot: it counts what was BANKED
+         * raw, so a wave of light bodies and a wave whose salvage never
+         * arrived collapse to the same small number.
+         *
+         *   of     which authored wave the shuffle dealt. `d.wave` is a
+         *          GETTER off `order[at]`, so it has to be read while the
+         *          wave is the running one. A band-5 wave of BULWARKs and
+         *          one of MOTEs weigh the same THREAT -- `load` swells every
+         *          wave until it meets `budgetAt` -- and are worth wildly
+         *          different money, because pay comes off a body's MASS and
+         *          threat off its health.
+         *   drops  salvage still on the floor. Drops do not expire (build
+         *          325 deleted the `ttl`), so a wave whose motes never
+         *          reached the intake leaves them lying there and the pile
+         *          is the transport term made visible.
+         */
+        cur.of = d.wave && d.wave.of
+          ? d.wave.of.map(([t, n]) => `${t}x${n}`).join(',') : '-';
+        cur.drops = w.drops.length;
+        /*
+         * ...and what the pile is WORTH, plus how much of it carries EBB --
+         * the rule that steers a mote away from the machine. A mote copies
+         * its parent's traits at `shed` time and keeps them for life, so an
+         * EBB drop is an EBB drop for ever, whatever the wave that follows
+         * rolled. With no expiry (build 325 deleted the `ttl`) and one door
+         * out (being collected), those two numbers are what turns a CAP into
+         * a RATCHET: a slot taken by a mote that will never arrive is a slot
+         * no later wave can shed into.
+         */
+        cur.dropBytes = Math.round(w.drops.reduce((a, x) => a + (x.bytes || 0), 0));
+        cur.dropEbb = w.drops.filter((x) => (x.traits || [])
+          .some((t) => (t.id || t) === 'ebb')).length;
+      }
       if (lastResting === false && d.resting && cur) {
         cur.dur = +((f - cur.f0) / 60).toFixed(2);
         cur.verdict = cur.teach ? 'unscored' : d.lastVerdict;
@@ -535,6 +621,37 @@ async function windowAt(rung, spend, seconds) {
        * `cur.paid` was captured from build 362 and thrown away.
        */
       paidEach: scored.map((x) => x.paid),
+      /*
+       * ONE ROW PER WAVE, each wave's pay beside ITS OWN rules -- which is
+       * the pairing neither of the two previous versions of this column had,
+       * and the whole of what build 364 got wrong.
+       *
+       * Build 363 printed `d.traits` once after the loop: one of N. Build
+       * 364 replaced it with the de-duplicated SET of every ruleset the
+       * window played, which is N of N and still cannot say WHICH wave had
+       * WHICH -- so a window printing `[869kB 1.98MB ...]` beside
+       * `swarm+mending ebb+armored` was read as "its ebb-free waves paid
+       * 869 kB", and that identification was never in the data. A set is not
+       * a pairing.
+       */
+      waveRows: scored.map((x) => ({
+        asked: x.asked, made: x.made, slain: x.slain, take: x.take,
+        paid: x.paid, dur: x.dur, verdict: x.verdict, rules: x.rules,
+        of: x.of, drops: x.drops, dropBytes: x.dropBytes, dropEbb: x.dropEbb,
+      })),
+      /*
+       * The split, per window, of the product above. Reported as three
+       * numbers and not as one, because they answer three different
+       * questions about a poor window: whether the wave was SENT (asked),
+       * whether it was KILLED (the share), and what the bodies were WORTH
+       * (raw bytes a slain body). `tax` is the fourth and is the intake
+       * multiplied by the depth dividend, recovered as the ratio rather than
+       * read off `CFG`, so a change to either is visible here.
+       */
+      asked: Math.round(mean(scored.map((x) => x.asked))),
+      killShare: +mean(scored.map((x) => (x.made ? x.slain / x.made : NaN))).toFixed(3),
+      perBody: Math.round(mean(scored.map((x) => (x.slain ? x.take / x.slain : NaN)))),
+      tax: +mean(scored.map((x) => (x.take ? x.paid / x.take : NaN))).toFixed(2),
       pulses,
       banked: Math.round(w.earned - earned0),
       rate: +((w.earned - earned0) / seconds).toFixed(1),
@@ -748,6 +865,37 @@ for (let it = 0; it < ITERS; it++) {
       + `${pad(Number.isFinite(dw.dwell) ? dw.dwell.toFixed(1) + (s.waves < 3 ? '+' : '') : dw.why, 8)}  `
       + `${pad(e ? fmt(e.earned) : '--', 14)}  ${pad(s.pulses, 5)}  `
       + `[${s.paidEach.map((b) => fmt(b).replace(' ', '')).join(' ')}] ${s.rules}`);
+  }
+  /*
+   * The split, on its own rows rather than as four more columns on a table
+   * that is already 170 wide. It is the reading build 364 owed: that build
+   * measured the deep-rung rate spanning a factor of sixty at one funding
+   * and traced most of it to EBB, and then found the EBB-FREE waves of a
+   * poor window were themselves 26x poorer than a rich window's -- with
+   * nothing in the window able to say why.
+   *
+   * `paid/wave` is the product of the three terms beside it times `tax`, so
+   * a row reconciles against itself to rounding and a poor row names its own
+   * cause: fewer bodies sent, fewer of them killed, cheaper bodies, or a
+   * harder tax.
+   */
+  console.log('');
+  console.log('  WHAT A WAVE PAID, SPLIT (paid = slain x raw/body x tax; slain = made x kill)');
+  console.log('  rung   w  verdict  asked  made  slain  kill   raw/body       tax'
+    + '       paid  drops  on floor    ebb  rules / authored wave');
+  for (const s of samples) {
+    s.waveRows.forEach((r, i) => {
+      const kill = r.made ? r.slain / r.made : NaN;
+      const per = r.slain ? r.take / r.slain : NaN;
+      const tax = r.take ? r.paid / r.take : NaN;
+      console.log(`  ${pad(s.rung, 4)}  ${pad(i + 1, 2)}  ${pad(r.verdict, 7)}  `
+        + `${pad(r.asked, 5)}  ${pad(r.made, 4)}  ${pad(r.slain, 5)}  `
+        + `${pad(Number.isFinite(kill) ? kill.toFixed(2) : '--', 4)}  `
+        + `${pad(Number.isFinite(per) ? fmt(Math.round(per)) : '--', 9)}  `
+        + `${pad(Number.isFinite(tax) ? tax.toFixed(2) : '--', 5)}  `
+        + `${pad(fmt(r.paid), 9)}  ${pad(r.drops, 5)}  `
+        + `${pad(fmt(r.dropBytes), 9)}  ${pad(r.dropEbb, 3)}  ${r.rules}  ${r.of}`);
+    });
   }
   /*
    * The stop line names the SAMPLE, not just the rung the loop broke at --

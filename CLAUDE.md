@@ -11548,3 +11548,126 @@ came from before believing the other one covers it.
   times, so the tense is the whole of the fault: a reader who greps for the
   default finds five live-sounding statements that it exists. Build 329's
   rule, and the cheap sweep is the tense rather than the figure.
+
+- **BUILD 365 ANSWERS BUILD 364'S OPEN QUESTION AND THE ANSWER IS A CAP, NOT A
+  TRAIT: `world.drops` IS BOUNDED AT 128, `shed` SILENTLY DISCARDS THE
+  REMAINDER, AND NOTHING IN ORDINARY PLAY EVER DRAINS THE PILE.** 364 measured
+  the deep-rung rate spanning a factor of sixty at one funding, traced most of
+  it to the trait draw, and then found the EBB-free waves of a poor window were
+  themselves 26x poorer than a rich window's -- "recorded as the next question
+  rather than answered". It is `enemies.js:4143`,
+  `if (world.drops.length >= CFG.maxDrops) break;`, inside the loop that sheds
+  a body's salvage. A slot is freed only by a mote being COLLECTED, and the
+  only two paths that empty the list are `reset()` and `takeField` (an era
+  change) -- `glitchOut` deliberately leaves the floor alone, and says so.
+  So a mote that can never arrive holds a slot for the rest of the run, and
+  every later body's salvage is dropped on the floor of a function nobody is
+  watching.
+- **THE SPLIT IS THE INSTRUMENT AND IT TOOK THREE VERSIONS, TWO OF THEM MY
+  OWN FAULTS.** A wave's pay is `slain x raw-per-body x tax` and
+  `slain = made x kill`, all four already on the director (`asked`, `made`,
+  `slain`, `take` -- the last being RAW bytes before the intake tax and the
+  depth dividend, accumulated on `bank()`'s own line). Measured at rung 42,
+  one funding, ten waves: the kill share spans **0.65 to 0.90** (1.4x), the
+  tax **1.42 to 2.13** (1.5x), and **raw bytes a slain body spans 1.67 kB to
+  311 kB -- 186x**. So the spread was never the gun and never the tax; it is
+  what a dead body's wreckage was worth by the time it arrived, and the
+  window's own RATE cannot say that.
+  - **`take` READ 0.00 B ON EVERY ROW** because the capture ran
+    unconditionally after `g.update`: `score()` and `glitchOut` both zero all
+    four fields and both write `resting`, so the frame a wave ends overwrites
+    its account with the cleared values. Read only while `!d.resting` -- the
+    last frame the state held, which is a rule this repo has now paid for on
+    five different quantities.
+  - **THE KILL SHARE READ 1.71, 1.04 AND 1.02 -- over 1, on a working
+    build** -- because it divided by `asked`. A QUARRY fractures into three, a
+    SPLITTER sheds four motes and a REMNANT comes back, and every child
+    carries its parent's wave serial, so it is slain and was never queued.
+    `made` is the denominator and `cleared()` has divided by `made + queued`
+    and clamped at 1 for exactly that reason, four hundred lines up the same
+    file. `asked` is kept because it is the ROSTER term and the one of the two
+    SWARM doubles.
+- **AND BUILD 364'S 26x WAS NEVER IN ITS OWN DATA, WHICH IS THE DE-DUPLICATED
+  RULES COLUMN ONE LEVEL ON FROM THE FAULT IT FIXED.** 363 printed `d.traits`
+  once after the loop: one of N. 364 replaced it with
+  `[...new Set(scored.map((x) => x.rules))]` -- N of N, and still no PAIRING,
+  so a window printing `[869kB 1.98MB ...]` beside `swarm+mending ebb+armored`
+  was read as "its ebb-free waves paid 869 kB" when nothing said which wave
+  had which set. **A set is not a pairing.** Paired, one row per wave with its
+  own rules, the picture is different in kind: `swarm+ebb` paid 9.48 MB at an
+  ordinary 25.7 kB a body while `armored+ebb` paid 335 kB and 1.34 MB at 1.67
+  and 3.49 kB -- and `raw/body` varies **7x within one ruleset** (`swarm+
+  mending` 44.0 and 311 kB) and **41x on the identical authored wave under the
+  identical ruleset** (`heraldx1,lurcherx3` at `swarm+armored`: 21.5 MB with
+  28 drops on the floor, 520 kB with 128). The ruleset was never the variable.
+- **THE PILE IS A RATCHET AND THE FLOOR COLUMNS ARE WHAT SHOWED IT.** Rung 21,
+  one 240-second window, thirteen waves, the rung pinned:
+
+  | wave | rules | drops | on floor | of them EBB | raw/body | paid |
+  |---|---|---|---|---|---|---|
+  | 1-5 | no ebb | 53-128 | 116-236 kB | **0** | 207 B - 37.2 kB | 10.9 kB - 1.36 MB |
+  | 6 | **ebb** | 122 | 184 kB | **114** | 32.8 kB | 1.07 MB |
+  | 7 | tethered | **128** | **224 kB** | **128** | 1.71 kB | 43.6 kB |
+  | 8-13 | mixed | **128** | **224 kB** | **128** | 364 B - 2.25 kB | 21.8-65.3 kB |
+
+  One EBB wave, and from the next wave on **every one of the 128 slots is an
+  EBB mote** and stays that way for the rest of the window -- floor pinned to
+  the byte at 224 kB, `raw/body` down from 12.7-37.2 kB to about 700 B, and it
+  never recovers. Rung 14 shows the same onset (first ebb at wave 15, 56 of 64
+  slots; 88 of 128 by wave 16) and rung 7 never saturates at all over
+  twenty-seven waves, 20 to 106 drops -- and it CANNOT, because
+  `CFG.waves.tier.traitFrom` is 10, so a rung below that draws no rule at all
+  and every one of those twenty-seven rows printed `-`. **So the onset is
+  bounded below by the trait floor, and everything above rung 10 is exposed.**
+  **So EBB does not deny its
+  own wave's salvage -- it permanently consumes the salvage pile, and what is
+  denied is every LATER wave.** Which is why build 364's PULSE reading was
+  no answer in either direction: `drawIn`'s disc is 400-575 units round the
+  machine and the motes holding the slots are at the arena edge.
+- **A MOTE KEEPS ITS PARENT'S TRAITS FOR LIFE, WHICH IS WHAT MAKES IT
+  PERMANENT.** `shed` writes `mote.traits = this.traits` with a comment
+  explaining that "EBB is a rule about wreckage, and wreckage is made here
+  rather than released" -- correct, and it means an EBB mote is an EBB mote
+  whatever the wave that follows rolled. The trait is a wave rule with a
+  per-wave lifetime everywhere else in the game (build 327 had to clear
+  `traits` at the wave's end for exactly this class of reason); on a drop it
+  outlives its wave, its rung and every later roll.
+- **AND THE CAP IS THE ONE BOUND IN THIS GAME THAT DROPS WHAT IT CANNOT
+  HOLD.** `emit` refuses to release while `hostileCount >= maxEnemies` and
+  HOLDS the job, under a paragraph saying why -- "a wave is a group, and
+  losing half of it to a cap the player is about to clear would make waves
+  quietly inconsistent" -- and build 333 spent a whole build on the one branch
+  that broke that rule. `maxDrops` breaks it in the one place energy enters a
+  run, and unlike `maxEnemies` and `maxDrift` either side of it in `config.js`
+  it carries **no docstring at all**. It is in the income digest now, because
+  a cap that can delete nine tenths of a rung's income is a term the measured
+  curve is a function of.
+- **NOT FIXED HERE, AND THE THREE CANDIDATES ARE NOT EQUIVALENT.** The cap
+  itself is right -- 128 bodies with physics and draw is a real bound -- and
+  the fault is the ratchet, so the fix is a decision about what happens to
+  salvage nobody collects:
+  (a) **an expiry that BANKS** conserves every byte and changes what EBB
+  MEANS, since an EBB mote would eventually pay;
+  (b) **FIFO eviction** -- evict the oldest to make room for the newest, so
+  the pile can never be permanently owned -- keeps the count bounded and still
+  deletes worth, but deletes the OLDEST rather than the salvage the player
+  just earned;
+  (c) **conserving a body's remainder into its last made drop** is arithmetic
+  rather than design and is worth doing whichever of the two is chosen, but it
+  buys nothing on its own: when the pile is 100% foreign the `break` fires at
+  `i = 0` and there is no drop to merge into.
+  All three move income at every rung past about 14 and (a) and (b) move it a
+  lot, so this is a balance change as well as a fix and authoring it in the
+  build whose subject is the instrument is build 304's mistake. What it also
+  needs is a case, and a case for it cannot be written today without pinning
+  the fault -- so the case and the fix ship together.
+- **WHAT THIS DOES TO THE MEASURED CURVE, WHICH IS THE REASON IT WAS WORTH
+  FINDING NOW.** Phase 7b reads "the turret each slot actually meets" off
+  `income.mjs`'s anchors, and every anchor from about rung 14 up was measured
+  through a saturated pile -- so they are not soft, they are measurements of a
+  run whose economy had been switched off by a trait roll, and their spread is
+  the spread of WHEN the roll happened. Build 364 asked for N runs a rung; the
+  honest answer is that N runs will average over the onset rung and give a
+  number that describes no run. **Re-measure after the fix, not before** -- and
+  the curve in `tiers.mjs` stands in the meantime because it is the only
+  measured one there has ever been, with this note as its caveat.
