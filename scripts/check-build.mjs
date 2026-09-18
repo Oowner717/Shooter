@@ -1204,6 +1204,80 @@ if (doorBad.length || sayWriters < 3) {
   process.exit(1);
 }
 /*
+ * ---- A DISSOLVE IS A RAMP, SO ITS OWN LENGTH HAS TO TRAVEL WITH IT -------
+ *
+ * `Enemy.draw` reads `gone = fizzle / fizzleFor` and scales the body's alpha
+ * by its square. Until build 367 the denominator was `CFG.waves.glitch.fizzle`
+ * -- ONE of the five lengths written in the game -- so the only dissolve that
+ * started at full opacity was the one whose length happened to BE that
+ * constant, and every other kind popped down to somewhere part-way along its
+ * own ramp on the frame it was set. Measured off the alpha channel, an
+ * EMBER's peak went 255 -> 133 in that frame (mean 120.9 -> 63.9) against the
+ * glitch dissolve's 255 -> 255.
+ *
+ * Two arms, because they catch two different failures.
+ *
+ * THE DENOMINATOR. It has to be the body's own recorded length and not a
+ * constant -- a CFG path there is the fault verbatim, whichever path it is.
+ *
+ * THE DOOR. `fizzle` and `fizzleFor` are two numbers that have to agree and
+ * they were authored apart at seven sites, which is `HERO_GAITS`/`HERO_COL`
+ * read at one index and a caption's text and hold written two statements
+ * apart. `Enemy.dissolveOver` is the only thing that may start one.
+ *
+ * Two forms are legitimate and both are derived rather than named: a write of
+ * `0` is a site CLEARING the clock (the constructor, and `takeField`'s
+ * instant teardown, which kills the body in the same statement), and a RHS
+ * that DECREMENTS the clock is a site SHORTENING a dissolve already running --
+ * the evolution's act I, which must not touch `fizzleFor`, because the ramp
+ * is against the length the body was given and simply runs faster.
+ */
+const fizBad = [];
+let fizSeen = 0, fizDoor = 0, fizCalls = 0, fizDen = 0;
+for (const fn of readdirSync(srcDir).filter((n) => n.endsWith('.js')).sort()) {
+  const fbody = readFileSync(new URL(fn, srcDir), 'utf8');
+  const FL = fbody.split('\n');
+  const doorAt = FL.findIndex((ln) => /^\s{2}dissolveOver\(len\)/.test(ln));
+  let doorEnd = -1;
+  if (doorAt >= 0) for (let k = doorAt + 1; k < FL.length; k++) if (FL[k] === '  }') { doorEnd = k; break; }
+  FL.forEach((ln, i) => {
+    if (/^\s*(\*|\/\/|\/\*)/.test(ln)) return;   // prose is not a write (build 355)
+    if (/\.dissolveOver\(/.test(ln)) fizCalls++;
+    if (/clamp\(this\.fizzle \/ \(this\.fizzleFor \|\| 1\)/.test(ln)) fizDen++;
+    if (!/\.fizzle(For)?\s*=[^=]/.test(ln)) return;
+    fizSeen++;
+    if (doorAt >= 0 && i > doorAt && i < doorEnd) { fizDoor++; return; }
+    const rhs = ln.slice(ln.indexOf('=') + 1);
+    if (/^\s*0\s*;/.test(rhs)) return;           // clearing the clock
+    /*
+     * ...and the exemption is a DECREMENT and not "the word fizzle appears".
+     * The first version tested `/\bfizzle\b/` on the right-hand side, which
+     * `E.fizzle`, `H.fizzle`, `C.fizzle` and `G.fizzle` all satisfy -- so five
+     * of the seven sites were exempt and the proof that should have caught a
+     * bypass reported it as an ordinary clock write. An exemption is only as
+     * narrow as its pattern.
+     */
+    if (/\.fizzle\s*-/.test(rhs)) return;       // shortening one already running
+    fizBad.push(fn + ':' + (i + 1) + ' starts a dissolve directly -- go through dissolveOver(len)');
+  });
+}
+if (fizBad.length || fizDoor !== 2 || fizDen !== 1 || fizCalls < 5 || fizSeen < 6) {
+  if (fizDoor !== 2 || fizSeen < 6) {
+    console.error('fizzle: found ' + fizDoor + ' of the door\'s 2 writers across ' + fizSeen
+      + ' clock writes, so this arm is not reading the mechanism it is about'
+      + ' -- the detection has drifted, not the exposure.');
+  }
+  if (fizDen !== 1) {
+    console.error('fizzle: the dissolve ramp is not clamp(this.fizzle / (this.fizzleFor || 1), ...).'
+      + ' A CONSTANT denominator makes every dissolve whose length is not that constant'
+      + ' pop on the frame it is set -- measured, an EMBER 255 -> 133 of peak alpha.');
+  }
+  if (fizCalls < 5) console.error('fizzle: only ' + fizCalls + ' callers of dissolveOver -- seven sites start one.');
+  for (const line of fizBad) console.error('fizzle: ' + line);
+  process.exit(1);
+}
+console.log('fizzle: one door (' + fizCalls + ' callers, ' + fizSeen + ' clock writes), ramp against the body\'s own length');
+/*
  * ...AND NO CASE MAY SIT AFTER THE REPORT, which cost this build a whole
  * suite run to find out.
  *

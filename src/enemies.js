@@ -372,6 +372,15 @@ export class Enemy {
      * whether a field exists.
      */
     this.fizzle = 0;
+    /*
+     * ...and how long it was given, because the dissolve is DRAWN as a ramp
+     * and a countdown alone cannot say where it is on one. `Enemy.draw`
+     * divided `fizzle` by `CFG.waves.glitch.fizzle` for the whole of this
+     * field's life -- ONE of the five lengths written in the game -- so every
+     * shorter dissolve started part-way down its own ramp and popped. See
+     * `dissolveOver`, which is the one door that writes the pair.
+     */
+    this.fizzleFor = 0;
     this.attacking = false;
     this.flash = 0;
     this.dead = false;
@@ -969,7 +978,7 @@ export class Enemy {
      */
     if (this.fizzle > 0) return;
     if (this.y + this.r < entryLine(world, ENTRY_Y) - E.gone * CFG.scale) {
-      this.fizzle = E.fizzle;
+      this.dissolveOver(E.fizzle);
       this.dissolved = true;
       return;
     }
@@ -1006,7 +1015,7 @@ export class Enemy {
     if (this.fizzle > 0) return;   // see rise(): entered once, not per frame
     this.gaitFor += dt;
     if (this.gaitFor >= H.life) {
-      this.fizzle = H.fizzle;
+      this.dissolveOver(H.fizzle);
       this.dissolved = true;
       return;
     }
@@ -2007,7 +2016,7 @@ export class Enemy {
     if (this.fizzle > 0) return;   // see rise(): entered once, not per frame
     this.gaitFor += dt;
     if (this.gaitFor >= C.life) {
-      this.fizzle = C.fizzle;
+      this.dissolveOver(C.fizzle);
       this.dissolved = true;
       return;
     }
@@ -3100,6 +3109,32 @@ export class Enemy {
     }
   }
 
+  /*
+   * ---- GOING (build 367) -------------------------------------------------
+   *
+   * The one door that starts a dissolve. Two numbers have to agree -- the
+   * seconds left and the seconds it was given -- and they were authored apart
+   * at seven sites, which is the shape that has already cost this repo
+   * `HERO_GAITS`/`HERO_COL` read at one index and a caption's text and hold
+   * written two statements apart. `draw` reads the ratio.
+   *
+   * It writes the clock and NOTHING else on purpose: the marks that come with
+   * a going differ per site (`rise` sets `dissolved`, `glitchOut` sets
+   * `spent` and `dissolved` and clears `attacking`, the title's turnover
+   * sets `dissolved` alone), and a door that guessed them would be a second
+   * claim. Build 234's rule: buy the side effect you actually want.
+   *
+   * The evolution's act I shortens a dissolve already running
+   * (`game.js`'s `e.fizzle = Math.max(0, e.fizzle - dt * 1.6)`) and
+   * deliberately does not come through here: the ramp is still against the
+   * length the body was GIVEN, so the fade runs 1 -> 0 either way and simply
+   * runs faster.
+   */
+  dissolveOver(len) {
+    this.fizzle = len;
+    this.fizzleFor = len;
+  }
+
   update(world, dt) {
     /*
      * Dissolving. It steers nothing, heals nothing and answers to nothing --
@@ -3160,7 +3195,7 @@ export class Enemy {
     if (this.isDrop && this.bytes && this.traits && hasTrait(this.traits, 'ebb')) {
       const s = world.shooter;
       if (s && Math.hypot(this.x - s.x, this.y - s.y) > intakeReach(world)) {
-        this.fizzle = CFG.energy.ebbFizzle;
+        this.dissolveOver(CFG.energy.ebbFizzle);
         this.dissolved = true;
         return;
       }
@@ -4237,7 +4272,7 @@ export class Enemy {
      * at once -- there is no explosion anywhere in it, which is the point.
      */
     const gone = this.fizzle > 0
-      ? clamp(this.fizzle / (CFG.waves.glitch.fizzle || 1), 0, 1) : 1;
+      ? clamp(this.fizzle / (this.fizzleFor || 1), 0, 1) : 1;
     const s = (this.spawnIn > 0 ? 1 - this.spawnIn * 0.6 : 1) * (0.72 + gone * 0.28);
 
     ctx.save();
@@ -9144,7 +9179,7 @@ export class Director {
     let fizzled = 0;
     for (const e of world.enemies) {
       if (e.dead || e.isDrop || e.type.id === 'drift' || e.fizzle > 0) continue;
-      e.fizzle = G.fizzle;
+      e.dissolveOver(G.fizzle);
       e.spent = true;
       e.dissolved = true;
       e.attacking = false;

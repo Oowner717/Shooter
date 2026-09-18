@@ -1090,7 +1090,7 @@ export class Game {
       e.spent = true;
       e.dissolved = true;
       e.attacking = false;
-      if (instant) { e.fizzle = 0; e.dead = true; } else e.fizzle = G.fizzle;
+      if (instant) { e.fizzle = 0; e.dead = true; } else e.dissolveOver(G.fizzle);
     }
     if (instant) w.enemies.length = 0;
 
@@ -2823,7 +2823,7 @@ export class Game {
         this.titleT = 0;
         const old = w.enemies.find((e) => e.harmless && !e.dead && !e.fizzle);
         if (old) {
-          old.fizzle = CFG.waves.glitch.fizzle;
+          old.dissolveOver(CFG.waves.glitch.fizzle);
           old.dissolved = true;
         }
       }

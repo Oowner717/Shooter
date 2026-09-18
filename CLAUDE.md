@@ -11805,6 +11805,11 @@ came from before believing the other one covers it.
   every case that measures a body THERE has to be re-read against**, and the
   tell is a measurement coming back null rather than wrong.
 - **RECORDED AND NOT RENDERED: what a distant fleeing mote now LOOKS like.**
+  **BOTH HALVES OF THIS ARE STRUCK -- see build 367, which rendered it.** There
+  IS flight (a dissolving body keeps integrating, measured at 96-99 units over
+  the 0.5s), and what was actually wrong was a POP the paragraph never
+  considered, in four shipped objects rather than in this one. The text stands
+  as written below because the guess is the point.
   A mote shed inside the reach flees, crosses it and dissolves, which reads as
   the wreckage getting away; a mote shed BEYOND it -- a body dying up-field,
   which is most of them -- dissolves on its first frame, so what is drawn is
@@ -11816,3 +11821,103 @@ came from before believing the other one covers it.
   bornFor > k` -- which cannot delete anything reachable and costs at most k
   seconds of one slot; it is a second constant and a picture judgement, so it
   is named here rather than taken.
+
+- **BUILD 367 RENDERS WHAT BUILD 366 RECORDED AS NOT RENDERED, AND BOTH HALVES
+  OF THAT NOTE WERE WRONG: THERE IS FLIGHT, AND THE REAL FAULT IS A POP THAT
+  HAS BEEN IN FOUR SHIPPED OBJECTS SINCE BUILD 307.** `Enemy.draw` computed the
+  dissolve's ramp as `clamp(fizzle / CFG.waves.glitch.fizzle, 0, 1)` and scaled
+  the body's alpha by its square -- and that constant is **ONE of the five
+  dissolve lengths written in the game**, so the only kind that started at full
+  opacity was the one whose length happened to BE the denominator. Measured off
+  the alpha channel, one body, one place, the LENGTH as the only variable:
+
+  | kind | length | `gone` at start | alpha x | measured mean alpha |
+  |---|---|---|---|---|
+  | glitch / takeField / title turnover | 0.9 | 1.000 | 1.000 | **126.4 of 126.4** |
+  | HUSK (`husk`) | 0.7 | 0.778 | 0.605 | **77.9 of 126.5** |
+  | FILAMENT (`chain`) | 0.6 | 0.667 | 0.444 | **57.4 of 126.7** |
+  | EMBER, LANTERN (`rise`) | 0.5 | 0.556 | 0.309 | **40.4 of 126.4** |
+  | EBB drop (366) | 0.5 | 0.556 | 0.309 | **40.4 of 126.4** |
+
+  The measured ratios are 0.616 / 0.453 / 0.320 / 0.320 against an arithmetic
+  0.605 / 0.444 / 0.309 / 0.309 -- the instrument agreeing with the arithmetic
+  rather than with itself, which is what says the reading is of the mechanism.
+  On the frame the clock was set an EMBER's peak alpha went **255 -> 97** and
+  its mean **126.7 -> 40.4**, a 68% loss of brightness in one frame, against
+  the glitch dissolve's 255 -> 255 and 126.4 -> 126.4. The fade then worked
+  perfectly from wherever it had landed, which is why sixty builds of watching
+  it never showed anything: **it is the START that pops, and only against the
+  frame before it.**
+- **AND THE FLIGHT CLAIM WAS FALSE, WITH THE ANSWER IN ONE LINE OF
+  `game.js`.** 366 recorded that a mote shed beyond the reach "dissolves on its
+  first frame, so what is drawn is the half-second `fizzle` and no flight at
+  all". `physicsStep` is `if (b.fizzle > 0) { integrate(b, dt); continue; }` --
+  a dissolving body keeps MOVING, it only stops steering -- so a mote leaving
+  at its shed speed of 220 u/s covers **96.3 and 98.6 units over two runs
+  during its own 0.5s dissolve**, against 78.2 for an ordinary drop dissolved
+  in the same place. So the picture is wreckage thrown outward and fading, not
+  a pop, and **the flight floor that note named as the remedy is not needed**:
+  no new constant, and the paragraph is struck rather than acted on.
+  Both halves of that note were guesses about a picture, written in a build
+  that said in as many words that it had not looked. **The reading cost one
+  probe**; the guesses cost a build's worth of prose that a later reader would
+  have acted on.
+- **THE FIX IS A SECOND NUMBER AND ONE DOOR, because a countdown cannot say
+  where it is on a ramp.** `fizzleFor` is declared beside `fizzle` and
+  `Enemy.dissolveOver(len)` is the only thing that may start one -- seven sites
+  were writing the clock, and a pair of numbers that has to agree authored at
+  seven sites is `HERO_GAITS`/`HERO_COL` read at one index and a caption's text
+  and hold written two statements apart. The door writes the clock and NOTHING
+  else on purpose: the marks that come with a going differ per site (`rise`
+  sets `dissolved`, `glitchOut` sets `spent` and `dissolved` and clears
+  `attacking`, the title's turnover sets `dissolved` alone), and a door that
+  guessed them would be a second claim -- build 234's rule about buying the
+  side effect you actually want.
+  Two exemptions, both derived rather than named: a write of `0` is a site
+  CLEARING the clock (the constructor, and `takeField`'s instant teardown,
+  which kills the body in the same statement), and a DECREMENT is a site
+  SHORTENING a dissolve already running -- the evolution's act I, which must
+  not touch `fizzleFor`, because the ramp is against the length the body was
+  GIVEN and so runs 1 -> 0 either way and simply runs faster.
+- **MY OWN GUARD'S EXEMPTION WAS TOO BROAD AND ITS OWN REVERT PROOF IS WHAT
+  FOUND IT.** The first version exempted any right-hand side matching
+  `/\bfizzle\b/` on the argument that a site reading the clock back is a
+  decrement -- and `E.fizzle`, `H.fizzle`, `C.fizzle` and `G.fizzle` all
+  satisfy it, so **five of the seven sites were exempt** and the proof that
+  should have caught a bypass reported it as an ordinary clock write ("6
+  callers, 7 clock writes", no complaint, all-clear line printed). Narrowed to
+  `/\.fizzle\s*-/`, which is a decrement and nothing else, both bypass proofs
+  then name the file and line. **An exemption is only as narrow as its
+  pattern**, and what caught it was reading the guard's own COUNTS rather than
+  its verdict.
+- **...AND THE EXIT CODE WAS UNREADABLE FOR EVERY ONE OF THOSE PROOFS,
+  because `check-build` exits 1 on a stale REV and every edit makes it
+  stale.** So a revert proof judged on `$?` "fires" whatever the guard does --
+  the bypass proof above exited 1 while printing its all-clear line, which is
+  the worst possible reading. Judge the MESSAGE, and check the revert LANDED
+  first (`grep -c` the replacement before running anything), which is build
+  346's rule and is the only reason the too-broad exemption was visible at all.
+- **THE CASE REPRODUCES THE PRE-367 ARITHMETIC RATHER THAN SIMULATING IT.**
+  The old expression divided by `CFG.waves.glitch.fizzle` whatever the clock
+  was, so writing that length into `fizzleFor` on a body whose dissolve is the
+  shortest in the game IS the old code to the bit: one field, inside the
+  mechanism, with the same body, place and clock either side -- build 314's
+  serial A/B. It reads 126.7 -> 40.4 against the fixed build's 126.4 -> 126.4.
+  And arm 2 drives the game's OWN sites (the gait, the drop's own update, the
+  fuse) rather than calling the door, because a case that calls the method the
+  handler calls tests the logic and not the control.
+- **AND THE FIVE RAMPS COMING OUT IDENTICAL IS THE DISCRIMINATOR, NOT A
+  TAUTOLOGY.** The arm reads each length at 0.75 / 0.5 / 0.25 / 0.02 of its own
+  clock, so with the denominator right every row must read the same four
+  numbers by construction (72.3 > 32.1 > 19.7 > 0) -- and with the denominator
+  a constant they must differ, which revert D reproduces exactly (21.7 > 24.9 >
+  0 > 0 for `rise` against 44.2 > 18.6 > 11.9 > 0 for `husk`). Identical rows
+  are the claim; differing rows are the fault.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922`, all six intermediate
+  marks and all six body counts identical to build 366's, with the served BUILD
+  confirmed as 367 in the probe's own heading. This build adds a field read on
+  every body's draw, a method on `Enemy`, and rewires seven clock sites
+  including `glitchOut`'s and ORDINAL's own field -- and a ramp is a drawing
+  quantity, so an argument from inspection that it cannot reach a body or a
+  payout is exactly the argument build 329 records this repo as not accepting.
+  An unchanged hash is what "a drawing fix reached nothing" looks like measured.

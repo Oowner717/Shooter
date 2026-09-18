@@ -41760,6 +41760,167 @@ if (MINE_LINE) {
     + ` director put back ${dr.putBack}`);
 }
 
+// --- a dissolve is drawn as a ramp, so it has to start at the top -----------
+{
+  const fz = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { CFG } = await import('../src/config.js');
+    const { intakeReach, ENTRY_Y } = await import('../src/enemies.js');
+    const { entryLine } = await import('../src/portal.js');
+    const out = {};
+
+    const world = () => {
+      g.start();
+      g.restart();
+      const w = g.world;
+      w.autoAim = false;
+      w.autoFire = false;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      g.debugClearField();
+      for (const k of ['drops', 'debris', 'projectiles', 'effects', 'mines']) w[k].length = 0;
+      return w;
+    };
+    let w = world();
+
+    /*
+     * Render offscreen and read the ALPHA CHANNEL. `gone` scales
+     * `ctx.globalAlpha`, so alpha is exactly the quantity the claim is about
+     * and the colour is divided out by construction (build 351). A live
+     * screenshot would measure the page's own rAF loop instead (build 211).
+     */
+    const K = 14, S = 320;
+    const shot = (e) => {
+      const c = document.createElement('canvas');
+      c.width = S;
+      c.height = S;
+      const cx = c.getContext('2d');
+      cx.setTransform(K, 0, 0, K, S / 2 - e.x * K, S / 2 - e.y * K);
+      e.draw(cx, w);
+      const px = cx.getImageData(0, 0, S, S).data;
+      let peak = 0, lit = 0, sum = 0;
+      for (let i = 3; i < px.length; i += 4) {
+        if (px[i] > peak) peak = px[i];
+        if (px[i] > 8) { lit++; sum += px[i]; }
+      }
+      return { peak, mean: lit ? +(sum / lit).toFixed(1) : 0 };
+    };
+    const still = (id) => {
+      const e = g.debugSpawn(id, w.width * 0.5, 300);
+      e.vx = 0;
+      e.vy = 0;
+      e.av = 0;
+      e.spawnIn = 0;
+      return e;
+    };
+    const drop = () => { w.enemies.length = 0; };
+
+    // The five lengths written in the game, each read from its own block.
+    out.lens = {
+      glitch: CFG.waves.glitch.fizzle,
+      rise: CFG.rise.fizzle,
+      chain: CFG.chain.fizzle,
+      husk: CFG.husk.fizzle,
+      ebb: CFG.energy.ebbFizzle,
+    };
+
+    // ---- every length starts at full, and every one still reaches zero -----
+    out.ramps = {};
+    for (const [k, len] of Object.entries(out.lens)) {
+      const e = still('lurcher');
+      const full = shot(e);
+      e.dissolveOver(len);
+      const first = shot(e);
+      const rec = e.fizzleFor;
+      const ramp = [];
+      for (const at of [0.75, 0.5, 0.25, 0.02]) { e.fizzle = len * at; ramp.push(shot(e).mean); }
+      out.ramps[k] = { len, rec, full: full.mean, first: first.mean, peak0: full.peak, peak1: first.peak, ramp };
+      drop();
+    }
+
+    /*
+     * ...and the pre-367 arithmetic, REPRODUCED rather than simulated. The old
+     * expression divided by `CFG.waves.glitch.fizzle` whatever the clock was,
+     * so writing that length into `fizzleFor` on a body whose dissolve is the
+     * shortest in the game IS the old code, to the bit. One field, inside the
+     * mechanism, with the same body, place and clock either side.
+     */
+    {
+      const e = still('lurcher');
+      const full = shot(e);
+      e.dissolveOver(CFG.rise.fizzle);
+      e.fizzleFor = CFG.waves.glitch.fizzle;
+      const first = shot(e);
+      out.was = { full: full.mean, first: first.mean, peak0: full.peak, peak1: first.peak };
+      drop();
+    }
+
+    // ---- the door, driven through the game's OWN paths ---------------------
+    // A method called by hand tests the logic and not the control, so each of
+    // these is the site the game reaches: the gait, the drop's own update and
+    // the fuse.
+    out.paths = {};
+    {
+      // `rise`: an EMBER clear of the portal's rim, one frame of the real loop.
+      const e = still('ember');
+      e.y = entryLine(w, ENTRY_Y) - CFG.rise.gone * CFG.scale - e.r - 40;
+      g.update(1 / 60);
+      out.paths.rise = { fizzle: +e.fizzle.toFixed(3), rec: +e.fizzleFor.toFixed(3), want: CFG.rise.fizzle };
+      drop();
+    }
+    {
+      // the EBB drop from build 366: beyond every collector, so it leaves.
+      w = world();
+      const s = w.shooter;
+      const host = g.debugSpawn('bulwark', s.x, Math.max(120, s.y - (intakeReach(w) + 200)));
+      host.traits = [{ id: 'ebb' }];
+      host.counts = false;
+      host.destroy(w);
+      const m = w.drops.find((x) => !x.dead && x.bytes);
+      if (m) { m.vx = 0; m.vy = 0; m.update(w, 1 / 60); }
+      out.paths.ebb = m
+        ? { fizzle: +m.fizzle.toFixed(3), rec: +m.fizzleFor.toFixed(3), want: CFG.energy.ebbFizzle }
+        : null;
+    }
+    {
+      // the fuse: `glitchOut` takes the whole field away.
+      w = world();
+      const e = still('lurcher');
+      w.director.glitchOut(w);
+      out.paths.glitch = { fizzle: +e.fizzle.toFixed(3), rec: +e.fizzleFor.toFixed(3), want: CFG.waves.glitch.fizzle };
+    }
+
+    w = world();
+    delete w.director.update;
+    w.spawnLock = 0;
+    out.putBack = typeof w.director.update === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update');
+    return out;
+  });
+
+  const rs = Object.entries(fz.ramps);
+  const noPop = rs.every(([, r]) => r.first >= r.full * 0.97 && r.peak1 >= r.peak0 * 0.97);
+  const lands = rs.every(([, r]) => r.ramp[3] <= 2 && r.ramp[0] < r.first && r.ramp[2] < r.ramp[1]);
+  const recorded = rs.every(([, r]) => Math.abs(r.rec - r.len) < 1e-9);
+  check('a dissolve starts at full brightness whatever its length',
+    rs.length === 5 && noPop && lands && recorded
+    && fz.was.first < fz.was.full * 0.75,
+    `five lengths in the game (${rs.map(([k, r]) => `${k} ${r.len}`).join(', ')}):`
+    + ` each records its own and starts at ${rs.map(([, r]) => `${r.first}/${r.full}`).join(' ')}`
+    + ` of undissolved mean alpha, falling ${rs.map(([, r]) => r.ramp.join('>')).join(' | ')}`
+    + ` -- against the pre-367 arithmetic on the shortest, which pops`
+    + ` ${fz.was.full} -> ${fz.was.first} (peak ${fz.was.peak0} -> ${fz.was.peak1})`);
+
+  const ps = Object.entries(fz.paths);
+  check('...and the length is recorded by the paths that start one, not by hand',
+    ps.length === 3 && ps.every(([, p]) => p && p.fizzle > 0
+      && Math.abs(p.rec - p.want) < 1e-9 && Math.abs(p.fizzle - p.want) < 1e-9)
+    && fz.putBack,
+    `${ps.map(([k, p]) => `${k} ${p ? `${p.fizzle}/${p.rec} of ${p.want}` : 'MISSING'}`).join(', ')}`
+    + ` -- each through its own site (the gait, the drop's update, the fuse)`
+    + ` rather than by calling the door; director put back ${fz.putBack}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;
