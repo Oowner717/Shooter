@@ -17,7 +17,8 @@
  *
  * ---- what it does, and the three places it could lie ----
  *
- * THE MONEY is MEASURED from build 362 and was asserted before it. `--spend`
+ * THE MONEY is MEASURED from build 362, re-measured at 371 on the economy
+ * builds 365 and 366 left, and was asserted before all of it. `--spend`
  * follows the earned-by-rung curve below, interpolated between anchors and
  * capped at what the whole tree costs, because nobody can spend more than
  * that; what changed is where the anchors come from. They were plan C's
@@ -167,13 +168,16 @@ const TREE_TOTAL = NODES
   }, 0);
 
 /*
- * The earned-by-rung curve, MEASURED -- `scripts/income.mjs`, build 362.
+ * The earned-by-rung curve, MEASURED -- `scripts/income.mjs`, re-measured at
+ * build 371 (and first measured at 362, whose copy this replaces).
  *
  * Anchors to interpolate between, in bytes, taken with the rung pinned and
  * the era derived from it, and integrated from two measured terms: what a
  * rung banks a second off `world.earned`, and how many seconds a rung takes
  * (the verdict mix, surge +2 / clean +1 / stall 0, over the wave plus its
- * measured seam). Iterated to a fixed point from BELOW -- the first pass
+ * measured seam). Iterated -- NOT to a fixed point and NOT
+ * from below, which build 371 measured over five passes and the block
+ * beside the array sets out. The first pass
  * funds every rung with nothing -- so the curve owes nothing to the asserted
  * one it replaces. The long note at the top of this file says what it rests
  * on and where it is a model rather than a measurement; read that before
@@ -225,7 +229,7 @@ const TREE_TOTAL = NODES
  * about and a tenth of a gap in this curve, which are different claims.
  */
 /*
- * ---- THE CONDITIONS THESE SEVEN NUMBERS WERE MEASURED UNDER --------------
+ * ---- THE CONDITIONS THESE EIGHT NUMBERS WERE MEASURED UNDER --------------
  *
  * Recorded beside them because a measurement describes the day it was taken
  * on, and a table of numbers with no record of its own conditions is the
@@ -233,42 +237,81 @@ const TREE_TOTAL = NODES
  * itself the curve. The paragraph above says the anchors are measured; this
  * says by what.
  *
- *   taken at   build 362, one container, the tree served locally
- *   probe      income.mjs --window 240 --iters 3, rungs 1 7 14 21 28 35 42 49
- *   window     a FIXED 240 seconds a rung -- which build 368 replaced with a
- *              count of WAVES, because 240s is about forty-eight waves at
- *              rung 1 and ZERO at rung 49. The rung-49 sample could not be
- *              priced and rungs 43-48 are collateral of it, so this curve
- *              has never had an anchor above 42 and its tail is `TAIL`
- *              below, extrapolated from the last measured pair.
- *   runs       ONE window a rung, which is a DRAW -- build 364 measured the
- *              rate at rung 42 spanning 5.75 to 65.9 kB/s and at rung 49
- *              10.8 to 648 at one funding, with the trait roll as the
- *              channel. So the deep anchors are single draws of a quantity
- *              with a factor of sixty in it, and build 368 is what gives the
- *              probe `--runs`.
- *   rolls      both loose (no --seed, no --rand), which is what makes them
- *              anchors rather than an attribution
+ *   taken at   build 371, one container, the tree served locally at build
+ *              370 -- which is the tree these numbers describe. 371 changes
+ *              only this table and the probe's own `--from`, and the probe
+ *              imports nothing from `../src/`, so the reading is of the
+ *              economy that is still running.
+ *   probe      income.mjs --iters 3, then --from <pass 3> --iters 2,
+ *              rungs 1 7 14 21 28 35 42 49
+ *   window     TWENTY SCORED WAVES a rung, which is the shape build 368 put
+ *              in place of a flat span of seconds and 370 made the default.
+ *              The seconds are an output and run 302s at rung 1 to 2589 at
+ *              rung 49, so every rung is sampled over the same number of
+ *              waves rather than over whatever a clock happened to give.
+ *              All eight rungs priced, so this curve has a rung-49 anchor
+ *              for the first time and `TAIL` below now extrapolates only
+ *              above the ceiling, where nothing plays.
+ *   rolls      all four loose (no --seed, --rand, --grant or --press), which
+ *              is what makes them anchors rather than an attribution
+ *   runs       ONE window a rung, which is still a DRAW and is the whole of
+ *              what is left owing -- see the block below.
  *   turret     funded in bytes, so CORE is NOT owned: it needs NEW FORM,
  *              which is `currency: 'remainder'` and not payable in bytes.
  *              Build 364 priced the grant at about a tenth of the rate
  *              rather than a factor -- a real gap in the TURRET phase 7b is
- *              about and a small one in this curve.
+ *              about and a small one in this curve. Buys read 107 of 107 at
+ *              rungs 35, 42 and 49, so the tree is bought out there and the
+ *              purse is not what holds those rungs.
  *
- * ---- AND THEY ARE KNOWN STALE RATHER THAN SUSPECTED STALE ----------------
+ * ---- AND IT IS THE FIFTH PASS OF A SEQUENCE THAT HAS NOT CONVERGED ------
  *
- * Two builds have changed the economy since: 365 found `world.drops` bounded
- * at `CFG.maxDrops` with `shed` silently discarding the remainder and no
- * door out but collection, so one EBB wave permanently consumed the salvage
- * pile and every later wave shed onto a full floor; 366 fixed that ratchet
- * by letting salvage beyond the intake's reach leave the field. Both move
- * income at every rung past about 14. `check-build`'s INCOME_PIN was moved
- * at 366 WITHOUT a re-measure and says so at its own site, so the guard is
- * silent and these numbers are the last measured ones rather than current.
- * The re-take is a measurement of hours (runs a rung, at a window several
- * times that rung's own wave) and wants its own build.
+ * `income.mjs`'s own header says the fixed point is "iterated from BELOW".
+ * Measured over five passes it is not: the map is DECREASING, so plain
+ * iteration oscillates instead of climbing to a point. Bytes by rung, pass
+ * by pass (pass 1 is unfunded and could price only rungs 1 and 7):
+ *
+ *   rung    p1       p2        p3        p4        p5
+ *      7    493 kB   658 kB    695 kB    340 kB    617 kB
+ *     14    --       8.06 MB   3.16 MB   1.82 MB   1.31 MB
+ *     21    --       33.1 MB   7.26 MB   7.44 MB   4.21 MB
+ *     28    --       73.9 MB   21.7 MB   24.7 MB   15.9 MB
+ *     35    --        144 MB   75.4 MB   89.5 MB   66.8 MB
+ *     42    --        276 MB    205 MB    240 MB    197 MB
+ *     49    --        687 MB    380 MB    462 MB    380 MB
+ *
+ * The cause is that `earned` is the integral of RATE and DWELL, and better
+ * funding collapses the dwell faster than it raises the rate: at rung 49,
+ * pass 2 to pass 3 is rate x2.79 against dwell /12.5 (989.4s a rung to
+ * 79.0). The tell is the discharge column -- rung 49 blew the glitch fuse on
+ * 20 of 20 waves in pass 1, 19 in pass 2 and 1 in pass 3. A poor run walks
+ * DOWN the ladder and banks a great deal per rung because it is standing
+ * still; a funded one climbs and banks less. So funding up means earned
+ * down, which is a decreasing map, and a decreasing map's iterates
+ * alternate: rung 49 reads 687, 380, 462, 380 and rung 42 reads 276, 205,
+ * 240, 197.
+ *
+ * What is landed is PASS 5 -- the last pass of the longest sequence, one
+ * self-consistent curve, exact rather than a per-rung median across passes
+ * that would reconcile against nothing. What it is NOT is a fixed point, and
+ * two things say how far off it might be. The alternating pairs bracket a
+ * damped estimate about 10-25% above it (rung 49 ~420 MB against 380, rung
+ * 42 ~218 against 197, rung 28 ~20.3 against 15.9). And rung 1 is the noise
+ * control, because its funding is 0.00 B in all five passes by construction:
+ * on an identical input its rate reads 3.12 to 3.59 kB/s and its DWELL 12.7
+ * to 18.5 seconds, a spread of x1.46 -- comparable to the step the iteration
+ * is still taking, which is why five passes at one run a rung cannot
+ * separate the two.
+ *
+ * So the next pass on this table is `--runs 3`, which is three times the
+ * hours, and the shape to reach for is DAMPED iteration -- seed pass N+1
+ * with the mean of passes N-1 and N -- because a decreasing map is what
+ * damping exists for. Until then these eight are the best measured curve
+ * there has been (the first on the economy builds 365 and 366 left, and the
+ * first with an anchor at the ceiling), and they are a reading rather than a
+ * settled number.
  */
-const EARNED = [[1, 0], [7, 500014], [14, 1886309], [21, 5456475], [28, 9054201], [35, 40585659], [42, 95804879]];
+const EARNED = [[1, 0], [7, 617033], [14, 1312335], [21, 4210247], [28, 15863661], [35, 66839173], [42, 196810828], [49, 379908991]];
 /*
  * Past the last anchor, the growth of the last measured pair carries on.
  *

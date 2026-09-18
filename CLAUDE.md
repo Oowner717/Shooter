@@ -12468,3 +12468,158 @@ came from before believing the other one covers it.
   against it. Build 335 recorded the same hazard from the operator's side (six
   lenses reviewing HEAD while the subject sat uncommitted); this is it from the
   agent's side, and it cost five agents' work to learn twice.
+
+- **BUILD 371 LANDS THE CURVE AND THE CURVE IS NOT A FIXED POINT: THE MAP IS
+  DECREASING, SO PLAIN ITERATION OSCILLATES RATHER THAN CONVERGING, AND
+  `income.mjs`'S OWN HEADER HAS SAID "ITERATED FROM BELOW" SINCE 362.**
+  Five passes at the twenty-wave default, all eight rungs priced, every roll
+  loose, on the economy builds 365 and 366 left -- so `tiers.mjs`'s `EARNED`
+  is a reading of the game that is actually running for the first time since
+  365, and `check-build`'s `INCOME_PIN` is live again rather than silent over
+  a table it could not vouch for. Bytes by rung, pass by pass (pass 1 is
+  unfunded and could price only rungs 1 and 7):
+
+  | rung | p1 | p2 | p3 | p4 | p5 |
+  |---|---|---|---|---|---|
+  | 7 | 493 kB | 658 kB | 695 kB | 340 kB | **617 kB** |
+  | 14 | -- | 8.06 MB | 3.16 MB | 1.82 MB | **1.31 MB** |
+  | 21 | -- | 33.1 MB | 7.26 MB | 7.44 MB | **4.21 MB** |
+  | 28 | -- | 73.9 MB | 21.7 MB | 24.7 MB | **15.9 MB** |
+  | 35 | -- | 144 MB | 75.4 MB | 89.5 MB | **66.8 MB** |
+  | 42 | -- | 276 MB | 205 MB | 240 MB | **197 MB** |
+  | 49 | -- | 687 MB | 380 MB | 462 MB | **380 MB** |
+
+  **The cause is that `earned` is the integral of RATE and DWELL, and better
+  funding collapses the dwell faster than it raises the rate.** At rung 49,
+  pass 2 to pass 3 is rate **x2.79 against dwell /12.5** (989.4s a rung to
+  79.0), so the product falls. The tell is the discharge column: rung 49 blew
+  the glitch fuse on **20 of 20 waves in pass 1, 19 in pass 2 and 1 in pass
+  3**. A poor run walks DOWN the ladder and banks a great deal per rung
+  because it is standing still; a funded one climbs and banks less. Funding
+  up means earned down, which is a decreasing map -- and a decreasing map's
+  iterates ALTERNATE: rung 49 reads 687, 380, 462, 380 and rung 42 reads 276,
+  205, 240, 197. **The probe's model was wrong in kind rather than in
+  degree**, and three builds of prose ("a lower bound climbing", "approached
+  from BELOW, so the first pass owes nothing to the curve it replaces") were
+  describing an increasing map nobody had checked for.
+- **RUNG 1 IS THE NOISE CONTROL AND ITS FUNDING IS IDENTICAL IN ALL FIVE
+  PASSES BY CONSTRUCTION, WHICH IS WHAT PRICES THE REMAINING UNCERTAINTY.**
+  Nothing sits below it, so its `pick` is 0.00 B every pass -- and on that
+  identical input its rate reads **3.12 to 3.59 kB/s and its DWELL 12.7 to
+  18.5 seconds, a spread of x1.46**. That is comparable to the step the
+  iteration is still taking, so five passes at ONE run a rung cannot separate
+  the oscillation from the draw. The alternating pairs bracket a damped
+  estimate 10-25% above pass 5 (rung 49 ~420 MB against 380, rung 42 ~218
+  against 197, rung 28 ~20.3 against 15.9). **A control whose input cannot
+  vary is worth more than any amount of reasoning about which of two moving
+  numbers is the signal** -- and it was free, sitting in the first row of
+  every table this probe has ever printed.
+- **PASS 5 IS LANDED RATHER THAN A PER-RUNG MEDIAN, and the reason is build
+  370's own ruling one level up.** That build refused to average `poolRuns`'s
+  columns because "every column is part of a self-consistent account of one
+  window, so an averaged row reconciles against nothing". A curve is the same
+  shape of object: pass 5 is one sequence of anchors produced by one funding
+  chain, and a per-rung median across passes is a table no run ever
+  experienced. It is also not available exactly -- only the LAST pass of an
+  invocation prints its array, so pass 4's figures exist at three significant
+  figures and a median would have carried fabricated precision at rung 14.
+  The full table, the bracket and the control are recorded beside the array
+  so a reader can see the uncertainty rather than infer it.
+- **WHAT IS OWED IS `--runs 3` AND DAMPED ITERATION, AND THE SECOND IS THE
+  ONE NOBODY WOULD HAVE THOUGHT OF.** A decreasing map is exactly what
+  damping exists for: seed pass N+1 with the MEAN of passes N-1 and N and the
+  alternation collapses, where plain iteration will alternate for ever
+  whatever N is. So the next pass on this table is not simply "more passes"
+  -- more passes of an oscillating sequence buy nothing -- it is `--runs 3`
+  to get the noise under the step, plus damping to make the step converge.
+  Three times the hours, and a build of its own.
+- **`--from` SEEDS THE FIXED POINT, BECAUSE THE PASSES LIVE INSIDE ONE
+  INVOCATION AND TESTING CONVERGENCE OTHERWISE MEANS A RUN FROM SCRATCH EACH
+  TIME.** `--from '[[rung, earned], ...]'` takes the array a previous run
+  printed, so passes 4 and 5 were a thirty-minute continuation against a
+  seventy-five-minute re-run. It is NOT a pin and does not disqualify the
+  reading -- pass N seeded from pass N-1's curve is exactly what the loop
+  already does between its own passes, with the same arithmetic -- so it is
+  classified in `INCOME_PLAIN` beside `iters` rather than in the rolls
+  condition. What it DOES change is what "N pass(es)" means, so `cond` says
+  `RESUMED on a supplied curve`: a conditions record that counted only one
+  invocation's passes would be the fault that whole block exists to refuse.
+  It refuses non-JSON and a malformed curve with its own message, and SORTS
+  an out-of-order seed for `pick`'s reason -- that reader walks forward and
+  clamps on both ends, so an unsorted curve builds the whole thing out of one
+  sample, which is the fault build 370 fixed for `--rungs`.
+- **A CURVE SHORT OF THE CEILING HAS TO SAY SO, AND THE CONSUMER SIDE OF THAT
+  CLAIM WAS MISSING.** Build 370 stopped `income.mjs` printing a TRUNCATED
+  curve as paste-ready, with the ruling that a stop is an incomplete result
+  rather than a condition -- sound as far as it goes, and pasteable so long
+  as the truncation travels with it. Nothing enforced the second half at the
+  other end, and what it costs is downstream: `spendAt` derives `TAIL` from
+  the LAST TWO anchors and extrapolates every rung above the last, so a curve
+  cut at 14 makes `spendAt(35)` read 101 MB against a measured 40.6 and one
+  cut at 7 makes `TAIL` **infinite**. `check-build` now requires the last
+  anchor to BE `CFG.waves.tier.ceiling` -- where nothing above it plays and
+  the extrapolation reaches nothing -- or the prose beside the array to name
+  the truncation. Not a refusal of a short curve: a refusal of a SILENT one.
+  This build's eight anchors reach 49, which is the first time this curve has
+  had an anchor at the ceiling at all (362's stopped at 42 and rungs 43-48
+  were collateral of an unpriceable rung-49 sample).
+- **...AND THE ESCAPE HATCH WAS STICKY, WHICH ITS OWN REVERT PROOF FOUND
+  BECAUSE THE PASS CASE COULD NOT PASS.** The first version tested a bare
+  `/TRUNCATED/` over the whole file. Two things wrong with that and the proof
+  showed both at once: the word appears NOWHERE in a curve that reaches the
+  ceiling, so the hatch branch had never once been exercised and I had
+  asserted it worked; and once the first truncated curve is pasted the word
+  is in the file for ever, so every LATER truncation is excused by a
+  historical paragraph. `TRUNCATED at rung <lastRung>` ties it to the array
+  actually present -- proved in four directions, including a cut curve whose
+  prose names the WRONG rung, which is the sticky fault as a red case.
+  **A revert proof whose PASS case cannot pass is a finding about the guard**,
+  and it is the half nobody writes: builds 346, 355 and 367 all record
+  checking that a proof FIRES, and none of them records checking that the
+  other branch is reachable.
+- **A `python3` PATCH WHOSE `assert` FAILS WRITES NOTHING, SO THE PROOFS THAT
+  FOLLOWED MEASURED THE OLD ARM AND ONE OF THEM PASSED FOR THE WRONG
+  REASON.** All the asserts run before the single write at the end, so an
+  AssertionError on the third of three patches leaves the file exactly as it
+  was -- and the four revert proofs immediately after it then exercised the
+  version I thought I had replaced, with the sticky hatch still in place, so
+  the wrong-rung case passed. Two disciplines, both cheap: label every assert
+  (`assert s.count(a)==1, 'a'`) so the failing one names itself, and run the
+  BASELINE after a patch and read the line that proves the new code is live.
+  Same family as build 346's "a revert proof whose baseline prints nothing
+  has not measured the revert", on the patch rather than on the revert.
+- **AND `git checkout -- <file>` IS NOT A RESTORE DURING A BUILD IN PROGRESS,
+  WHICH BUILD 353 RECORDED AND I DID AGAIN THREE HUNDRED LINES LATER.** A
+  revert proof restored `tiers.mjs` with `git checkout --` and got the
+  COMMITTED version -- build 362's curve, because the in-progress commit
+  carried only the probe -- silently discarding the whole measurement the
+  build exists to land. 353's note is verbatim: "snapshot the files with `cp`
+  and restore from the snapshot -- `git checkout` is only a restore when the
+  thing you are reverting is committed, and in a build in progress it never
+  is." The snapshot existed and was used two lines above; the `checkout` was
+  a reflex on the line after it. **Recovered from the `cp` snapshot**, which
+  is the argument for taking one even when a commit exists.
+- **THE FIRST THREE-PASS RUN WAS LOST TO A CONTAINER REPROVISION, AND THE
+  DURABLE PART OF THAT IS WHAT IT DID NOT COST.** The repo came back as a
+  fresh clone at the pushed HEAD, which took the untracked `scratchpad/` and
+  the running node process with it -- build 328's finding, and this time the
+  answer was already right: build 370 was committed and pushed, so the loss
+  was fifteen minutes of wall clock and ONE line of measurement (pass 1's
+  stop at rung 8, blamed on a rung-14 sample where 20 waves ended and none
+  scored a climb, dwell floor 564s a rung). **A long measurement is cheap to
+  lose and a build is not**, so the rule is the one 328 states: commit the
+  source edits the moment the mechanism measures, and treat the measurement
+  as re-runnable rather than trying to make the container durable. `--from`
+  is what makes a five-pass sequence re-runnable in pieces.
+- **AND THE FAN-OUT DISCIPLINE, RECORDED HERE BECAUSE IT IS A COST THIS FILE
+  HAS NEVER PRICED.** Build 370's review spent a whole token session: five
+  lenses over a 1200-line probe and then five refuters, and the refuter phase
+  was pure loss -- it read the tree AFTER the fixes, so all five returned
+  `refuted: true` about my own patches. Ten agents for five verdicts that
+  could not be correct by construction. The finding half earned its keep
+  twice over (two lenses independently found the `hold` fault) and the verify
+  half was a reflex. So: **a measurement is worth zero agents** -- this
+  build's five passes are one background node process, hours of wall clock
+  and no tokens at all -- and a review runs against a COMMITTED SHA it names,
+  once, with the fixes after it. A refuter pointed at a tree you are still
+  editing is measuring your own diff.

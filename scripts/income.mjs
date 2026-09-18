@@ -187,6 +187,27 @@ const RUNS = Math.max(1, Number(flag('runs', 1)));
 let ITERS = Number(flag('iters', 3));
 const RUNGS = String(flag('rungs', '')).split(',').filter(Boolean).map(Number);
 /*
+ * `--from '[[rung, earned], ...]'` SEEDS the fixed point instead of starting
+ * it at nothing, and it exists because the sequence is NOT monotone. The
+ * paragraph above says it climbs from below; measured at build 371 it climbs
+ * once and then FALLS -- pass 2 at rung 49 read 687 MB and pass 3 read 380,
+ * because better funding makes the ladder climb FASTER, so the DWELL
+ * collapses (132.7s a rung to 12.8 at rung 14) and `earned` is the integral
+ * of rate AND dwell. Two of the three passes are the only correction the
+ * deep rungs have ever had, so knowing whether a curve has settled means
+ * running a fourth and a fifth -- and without this flag that is a whole
+ * run from scratch each time, because the passes live inside one
+ * invocation.
+ *
+ * It is NOT a pin and does not disqualify the reading: pass N seeded from
+ * pass N-1's curve is exactly what the loop below already does between its
+ * own passes, with the same arithmetic. What it does change is what "N
+ * pass(es)" MEANS, so `cond` says the reading was resumed -- a conditions
+ * record that counted only this invocation's passes would be the fault this
+ * whole block exists to refuse.
+ */
+const FROM = flag('from', null);
+/*
  * `--spend N` funds every sampled rung with N instead of with the previous
  * pass's curve, which turns the probe from "what does the curve settle at"
  * into "given THIS much money, what happens at this rung". It is what asks
@@ -1271,6 +1292,31 @@ if (SEED === null && RAND === null && !GRANT && !PRESS
 }
 
 let funding = SAMPLE.map((rung) => ({ rung, earned: SPEND === null ? 0 : SPEND }));
+if (FROM !== null) {
+  /*
+   * Parsed rather than trusted, and SORTED for `pick`'s own reason (it walks
+   * forward and clamps on both ends, so an out-of-order seed builds the
+   * whole curve out of one sample -- the fault build 370 fixed for --rungs).
+   */
+  let seed;
+  try { seed = JSON.parse(FROM); } catch (e) {
+    console.error(`income: --from is not JSON: ${e.message}. It takes a curve, `
+      + 'e.g. --from \'[[1,0],[7,694769]]\' -- the array a previous run printed.');
+    process.exit(1);
+  }
+  if (!Array.isArray(seed) || !seed.length
+    || seed.some((e) => !Array.isArray(e) || e.length !== 2 || !Number.isFinite(e[0])
+      || !Number.isFinite(e[1]) || e[1] < 0)) {
+    console.error('income: --from takes a non-empty array of [rung, earned] pairs with '
+      + 'finite non-negative numbers. Paste the array a previous run printed.');
+    process.exit(1);
+  }
+  funding = seed.map(([rung, earned]) => ({ rung, earned }))
+    .sort((a, b) => a.rung - b.rung);
+  console.log(`  resumed: the fixed point is seeded from a supplied ${funding.length}-rung `
+    + `curve (${funding.map((f) => `${f.rung}:${fmt(f.earned)}`).join(' ')}), so the `
+    + `${ITERS} pass(es) below are a CONTINUATION and not the whole sequence.`);
+}
 const passes = [];
 for (let it = 0; it < ITERS; it++) {
   const samples = [];
@@ -1485,7 +1531,7 @@ const cut = last.stop
     + "every rung above that anchor is tiers.mjs's TAIL extrapolation and was not measured"
   : '';
 const cond = `window ${WINDOW === null ? `${WAVES} scored wave(s)` : `a FIXED ${WINDOW}s`} a rung`
-  + `, ${RUNS} run(s) a rung, ${passes.length} pass(es)`
+  + `, ${RUNS} run(s) a rung, ${passes.length} pass(es)${FROM === null ? '' : ' RESUMED on a supplied curve'}`
   + `, build ${served.build ?? '?'} rev ${served.rev ?? '?'}, this container${cut}`;
 const why = [];
 if (SEED !== null) why.push(`--seed ${SEED} pins the trait sequence`);
@@ -1507,8 +1553,8 @@ if (why.length) {
   console.log('  reading integrated to, for reading and not for pasting:');
   console.log(`    ${last.curve.map((c) => `${c.rung}: ${fmt(c.earned)}`).join('   ')}`);
 } else {
-  console.log('  For tiers.mjs\'s EARNED, whose copy is MEASURED (build 362) and known');
-  console.log('  STALE (build 366 moved the economy pin without re-measuring). Bytes, and');
+  console.log('  For tiers.mjs\'s EARNED, whose copy is MEASURED and whose own block');
+  console.log('  records what it was taken under and what it still owes. Bytes, and');
   console.log('  the probe\'s own integral -- read the passes above before pasting one in,');
   console.log('  and paste the comment WITH the array.');
   console.log(`  // measured: ${cond}`);

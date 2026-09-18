@@ -1689,6 +1689,24 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * owed. What it costs is in CLAUDE.md under build 370; what it needs is this
  * probe as it now stands, three passes, at the twenty-wave default.
  */
+/*
+ * ---- AND THE CURVE LANDED AT BUILD 371, WITH THIS PIN STILL UNMOVED -----
+ *
+ * It ran -- five passes at the twenty-wave default, all eight rungs priced,
+ * every roll loose -- and `tiers.mjs`'s EARNED is that reading rather than
+ * 362's. This pin does not move BECAUSE the economy did not: the digest is
+ * still what 366 left, so the curve and the terms it is a function of now
+ * agree for the first time since 365, and the guard is live again rather
+ * than silent over a table it could not vouch for.
+ *
+ * What it does not mean is that the number is settled. The sequence does not
+ * converge -- the map is DECREASING, because better funding collapses the
+ * DWELL faster than it raises the rate, so earned-by-rung falls as funding
+ * rises and the iterates alternate (rung 49 read 687, 380, 462, 380 MB). The
+ * full table, the noise control and the damping the next pass wants are
+ * beside the array in `tiers.mjs`. What is owed is `--runs 3`, which is
+ * three times the hours, and that is a build of its own.
+ */
 const INCOME_PIN = 'd305b7b056b2';
 const INCOME_AT = 366;
 const TIER_CFG = CFG.waves.tier;
@@ -1780,13 +1798,63 @@ if (incomeDigest !== INCOME_PIN) {
     + "is exactly how build 145's asserted curve came to be four times too rich without "
     + 'anything failing. Re-measure it -- serve the tree, then run income.mjs with '
     + '--iters 3 --runs 3 (the window is counted in WAVES from build 368, so it needs no '
-    + 'seconds) -- paste the anchors into tiers.mjs beside the conditions they were taken '
-    + 'under, and move INCOME_PIN in the same commit with the reason.');
+    + 'seconds, and --from continues a sequence rather than re-running it) -- paste the '
+    + 'anchors into tiers.mjs beside the conditions they were taken under, and move '
+    + 'INCOME_PIN in the same commit with the reason.');
   process.exit(1);
 }
-console.log("income: tiers.mjs's EARNED curve is measured (income.mjs) and the "
-  + Object.keys(incomeTerms).length + ' economy terms it is a function of are unmoved at '
-  + incomeDigest);
+/*
+ * ---- AND A CURVE SHORT OF THE CEILING HAS TO SAY SO ---------------------
+ *
+ * Build 370 found `income.mjs` printing a TRUNCATED curve as paste-ready and
+ * fixed it on the probe side, with the ruling that a stop is an incomplete
+ * result rather than a condition -- sound as far as it goes, and pasteable so
+ * long as the truncation travels with it. This is the consumer side of the
+ * same claim, because what the truncation costs is downstream and is not
+ * small: `spendAt` derives `TAIL` from the LAST TWO anchors and extrapolates
+ * every rung above the last, so a curve cut at 14 makes `spendAt(35)` read
+ * 101 MB against a measured 40.6, and one cut at 7 makes `TAIL` infinite.
+ *
+ * So either the last anchor IS the ladder's ceiling -- where nothing above it
+ * plays and the extrapolation reaches nothing -- or the prose beside the
+ * array names the truncation AND THE RUNG, which is the form the probe's own
+ * `cut` string emits ("TRUNCATED at rung N"). Not a refusal of a short curve:
+ * a refusal of a SILENT one.
+ *
+ * The rung is in the pattern because a bare word is STICKY: the first build
+ * to paste a truncated curve leaves "TRUNCATED" in the file for ever, and
+ * every later truncation is then excused by a historical paragraph. Naming
+ * the rung ties the escape hatch to the array actually present. Found by the
+ * revert proof for the hatch itself -- the pass case could not pass, because
+ * the word appears nowhere in a curve that reaches the ceiling, so the arm
+ * shipped with one branch never once exercised.
+ */
+const earnedArr = earnedSrc.match(/^const EARNED = (\[.*\]);$/m);
+if (!earnedArr) {
+  console.error("income: cannot find tiers.mjs's `const EARNED = [...];` on one line, so "
+    + 'the truncation arm below is measuring nothing. The detection has drifted, not the '
+    + 'exposure.');
+  process.exit(1);
+}
+const earnedPairs = JSON.parse(earnedArr[1]);
+const lastRung = earnedPairs[earnedPairs.length - 1][0];
+const saysCut = new RegExp('TRUNCATED at rung ' + lastRung + '\\b').test(earnedSrc);
+if (lastRung !== TIER_CFG.ceiling && !saysCut) {
+  console.error("income: tiers.mjs's EARNED stops at rung " + lastRung + ' against a ladder '
+    + 'ceiling of ' + TIER_CFG.ceiling + ', and nothing beside it says "TRUNCATED at rung ' + lastRung + '". `spendAt` '
+    + 'extrapolates every rung above the last anchor from `TAIL`, which is the last measured '
+    + 'PAIR -- so rungs ' + (lastRung + 1) + '-' + TIER_CFG.ceiling + ' are a projection '
+    + 'wearing a measurement\'s clothes. Either measure to the ceiling or record the '
+    + 'truncation beside the array, which is what income.mjs\'s own conditions comment '
+    + 'emits.');
+  process.exit(1);
+}
+console.log("income: tiers.mjs's EARNED curve is measured (income.mjs), its "
+  + earnedPairs.length + ' anchors reach rung ' + lastRung
+  + (lastRung === TIER_CFG.ceiling ? ' (the ceiling, so TAIL reaches nothing that plays)'
+    : ' and the truncation is recorded')
+  + ', and the ' + Object.keys(incomeTerms).length + ' economy terms it is a function of '
+  + 'are unmoved at ' + incomeDigest);
 
 /*
  * ---- ...AND THE CURVE IS THE READING WITH EVERY ROLL LOOSE --------------
@@ -1848,7 +1916,7 @@ if (channels.length < 3) {
  * and which tree to read. These say what to measure; a roll says which dice
  * were held while measuring it.
  */
-const INCOME_PLAIN = ['waves', 'runs', 'window', 'iters', 'rungs', 'spend', 'url', 'expect'];
+const INCOME_PLAIN = ['waves', 'runs', 'window', 'iters', 'rungs', 'spend', 'url', 'expect', 'from'];
 const readFlags = [...new Set([
   ...[...incomeSrc.matchAll(/\bflag\('([a-z]+)'/g)].map((m) => m[1]),
   ...[...incomeSrc.matchAll(/args\.includes\('--([a-z]+)'\)/g)].map((m) => m[1]),
