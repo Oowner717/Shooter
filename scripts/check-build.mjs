@@ -1878,6 +1878,83 @@ console.log('income: all ' + channels.length + ' of income.mjs\'s pinnable rolls
   + channels.join(', ').toLowerCase() + ') and its window shape default loose, so its '
   + 'curve is the measurement and a pin is an attribution');
 
+/*
+ * ---- ...AND THE CONDITIONS TRAVEL WITH THE NUMBERS -----------------------
+ *
+ * The two arms above refuse a BUILD whose probe would take a pinned reading
+ * by default. They say nothing about a reading taken under a pin passed
+ * explicitly -- which is the ordinary way to use those flags -- and that
+ * reading ends in a paste-ready `const EARNED = [...]` line whose whole
+ * failure mode is being pasted somewhere that has no record of how it was
+ * taken. `tiers.mjs` held such a copy for six builds; build 368 wrote its
+ * conditions in by hand, which is a copy of a copy.
+ *
+ * So `income.mjs` prints the conditions WITH the array and prints NO
+ * paste-ready line at all for a reading that is not of the curve, and this
+ * arm is what stops that being tidied away. It is static because the claim is
+ * structural -- build 349's split: a second door is a check-build question
+ * and a measurement is a case question -- and `regress.mjs` does not cover
+ * `scripts/` at all, so nothing else can see it.
+ *
+ * The disqualifying set is DERIVED from the rolls arm's own `channels` plus
+ * the three conditions that are not rolls (the window's shape, a pinned
+ * funding, a repeated rung), so a fifth pinnable roll added to that curve
+ * condition fails here until the refusal learns about it -- one edit, not
+ * two that can be made one at a time. The guard variable's own name is read
+ * off the source rather than restated, for the same reason.
+ */
+const anchorAt = incomeSrc.indexOf('---- the anchors');
+const anchorSrc = anchorAt < 0 ? '' : incomeSrc.slice(anchorAt);
+const guardName = anchorSrc.match(/if \((\w+)\.length\) \{/);
+const elseAt = guardName ? anchorSrc.indexOf('} else {', guardName.index) : -1;
+/*
+ * ...and the else block is bounded at its own closing brace rather than run
+ * to the end of the file, which is how the first version of this arm passed
+ * its own revert proof: with the EARNED log moved OUT of the else and left
+ * unconditional two lines below it, an unbounded slice still contained it and
+ * the arm reported all clear on exactly the bypass it exists to refuse.
+ */
+const elseEnd = elseAt < 0 ? -1 : anchorSrc.indexOf('\n}', elseAt + 8);
+const pasteBlock = elseAt < 0 ? '' : anchorSrc.slice(elseAt, elseEnd < 0 ? undefined : elseEnd);
+if (anchorAt < 0 || !guardName || elseAt < 0 || !/const EARNED = \[/.test(anchorSrc)) {
+  console.error('income: cannot find income.mjs\'s anchors block, the list it refuses on, or '
+    + 'its paste-ready EARNED line ('
+    + [anchorAt < 0 ? 'no "---- the anchors" heading' : null,
+      guardName ? null : 'no `if (<list>.length) {`',
+      elseAt < 0 ? 'no `} else {` under it' : null,
+      /const EARNED = \[/.test(anchorSrc) ? null : 'no `const EARNED = [` log'].filter(Boolean)
+      .join('; ')
+    + '). The detection has drifted, not the exposure: re-point it at whatever the probe '
+    + 'now uses to decide whether a reading may be pasted into tiers.mjs.');
+  process.exit(1);
+}
+const anchorNeeds = [...channels, 'WINDOW', 'SPEND', 'REPEATED'];
+const anchorMiss = anchorNeeds.filter((s) => !new RegExp('if \\([^)]*\\b' + s
+  + '\\b[^)]*\\)\\s*' + guardName[1] + '\\.push\\(').test(anchorSrc));
+if (anchorMiss.length) {
+  console.error('income: income.mjs\'s anchors block does not disqualify a reading taken '
+    + 'under ' + anchorMiss.join(', ') + ', so one taken that way still prints a '
+    + 'paste-ready EARNED line -- and the line carries no record of the condition, so '
+    + 'nothing downstream can tell. Push a reason onto `' + guardName[1] + '` for each. '
+    + '(The set is derived: the rolls arm\'s own channels, plus the window\'s shape, a '
+    + 'pinned funding and a repeated rung.)');
+  process.exit(1);
+}
+if (!/const EARNED = \[/.test(pasteBlock) || !/\/\/ measured:/.test(pasteBlock)) {
+  console.error('income: income.mjs prints its paste-ready EARNED line '
+    + (/const EARNED = \[/.test(pasteBlock) ? 'without a `// measured:` conditions comment '
+      + 'beside it, so the numbers travel and the conditions do not -- which is exactly '
+      + 'how tiers.mjs came to hold six builds of anchors with no record of their window, '
+      + 'runs or rolls'
+      : 'OUTSIDE the `} else {` that is supposed to withhold it, so a reading under a pin, '
+      + 'a fixed window or a pinned funding still offers itself for pasting')
+    + '.');
+  process.exit(1);
+}
+console.log('income: income.mjs states the conditions with its anchors and withholds a '
+  + 'paste-ready curve for a reading taken under any of ' + anchorNeeds.length + ' ('
+  + anchorNeeds.join(', ').toLowerCase() + ')');
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {

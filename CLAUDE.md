@@ -400,9 +400,18 @@ reading calling itself the curve is unrecoverable downstream, because EARNED is
 a table of numbers with no record of its conditions. Two traps: `--rand` alone
 pins the traits too (the restart draws `runSeed` off the stream), and a
 repeated `--rungs` entry is the several-windows-at-one-rung idiom and makes the
-anchors meaningless, which it now says under them.
+anchors meaningless.
+**AND THE ANCHORS BLOCK SAYS SO ITSELF FROM BUILD 369 RATHER THAN LEAVING IT TO
+THIS PARAGRAPH.** It prints the conditions the reading was taken under, and for
+one that is not of the curve -- any of the four rolls pinned, `--window`,
+`--spend`, or a repeated rung -- it names the condition and prints NO
+paste-ready `const EARNED` line at all, only the integral for reading. A
+qualified run prints a `// measured:` comment immediately above the array, so
+the conditions travel WITH the numbers instead of being written in by hand
+afterwards. Until then every one of those readings offered itself for pasting,
+the repeated rung doing so under its own `NOT ANCHORS` heading.
 Its findings, the faults it had first, and what phase 7b still owes are at the
-foot of this file under builds 362, 363 and 364.
+foot of this file under builds 362 to 369.
 
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
@@ -12067,3 +12076,146 @@ came from before believing the other one covers it.
   six) rather than on a table. No `src/` file changed but the BUILD literal, so
   the ORDINAL hash is not owed -- the instruments with something to say were
   the probe's own before-and-after at rung 49 and the three revert proofs.
+
+- **BUILD 369 TAKES THE EIGHT-RUNG TABLE BUILD 368 OWED, AND THE FIXED WINDOW
+  SAMPLED THIRTY-TWO WAVES AT RUNG 1 AND EXACTLY ONE AT RUNG 49.** 368 counted
+  the window in waves and recorded its own gap in as many words: "a single pass
+  over all eight rungs was NOT taken here either, so the claim that equal waves
+  spends the time where the precision is needed rests on two measured points
+  rather than on a table." Both passes, same container, same 200 MB funding at
+  every rung (more than the whole tree costs), one run a rung, rolls loose,
+  served build confirmed in each heading:
+
+  | rung | wave+seam (fixed run) | waves in a FIXED 240s | seconds for SIX waves |
+  |---|---|---|---|
+  | 1 | 7.5s | **32** | 44 |
+  | 7 | 8.2s | **29** | 54.6 |
+  | 14 | 9.7s | **25** | 69 |
+  | 21 | 14.7s | **16** | 78.5 |
+  | 28 | 25.8s | **9** | 181.8 |
+  | 35 | 53.4s | **4** | 352.7 |
+  | 42 | 115.3s | **2** | 462.1 |
+  | 49 | 164.2s | **1** | 866.2 |
+
+  (The second column is the FIXED run's own wave+seam, so the third divides
+  into 240 to give the second; the wave-counted run measures the same rung's
+  wave slightly differently on its own draw -- 144.3s at rung 49 against
+  164.2 -- which is the roll and is why the claim below is the COUNT.)
+  So the flat span is a **32x** spread in sample size across the ladder and the
+  wave-counted one is a 19.7x spread in seconds -- the same total attention,
+  moved to where a wave is expensive. At rung 49 the fixed window scored ONE
+  wave with **114 job entries still to let out** and the next wave 75.8s into
+  its own run; the wave-counted window scored six in 866s with a worst wave of
+  162.7s against the 1200s-a-wave guard, 7.4x clear.
+- **...AND THE RATES EITHER SIDE ARE NOT AN ATTRIBUTION, WHICH IS WORTH SAYING
+  BECAUSE THE NUMBER IS SO LARGE.** The fixed window read **12.3 kB/s** at
+  rung 49 against the wave-counted **376** -- a factor of 31 at one funding.
+  That is NOT 31x of sample-size error: build **363** measured that rung and
+  funding spanning **10.8 to 648 kB/s** across five windows (and 364 traced
+  most of the channel to the trait draw), so both readings are inside the
+  known spread and neither run can be compared with the other.
+  What the table above claims is the SAMPLE SIZE, which is a count and not a
+  draw. The rate spread is why one wave is worthless, and that was already
+  established; this build does not re-establish it.
+- **THE VERDICT MIX MOVES WITH THE RUNG AND SO A FUNDED RUN STALLS TWO THIRDS
+  OF ITS WAVES THROUGH THE 28-42 BAND.** Surges/cleans/stalls over six waves:
+  **6/0/0** at rung 1, 4/2/0 at 7, 1/5/0 at 14, 1/4/1 at 21, **2/0/4** at 28,
+  1/1/4 at 35, **2/0/4** at 42, 4/1/1 at 49. Every rung had 200 MB to spend --
+  the whole tree is 113 MB -- so this is not the purse: it is the plateau, in
+  the band where the tree's dearest prices sit, measured at the one funding
+  that rules money out. Note rung 49 climbs FREELY again (4 surges of 6), which
+  is build 363's finding re-confirmed at a wave-counted window.
+- **AND THE LARGEST SINGLE PAYOUT AT RUNG 1 IS THE WAVE WITH NO HOSTILES IN
+  IT.** `{ of: [], drift: 22, dwell: 8, band: 1 }` -- the bonus wave -- paid
+  **166 kB and 202 kB** on its two appearances against **30.3 to 63.6 kB** for
+  the four authored waves in the same window, so 3x to 5x, and it scores a
+  SURGE by construction because `standing()` counts hostiles and there are
+  none. `CFG.energy.drift` is a flat `kB(6)` a harmless body and 22 of them is
+  132 kB before the dividend, which is the arithmetic agreeing with the
+  measurement. Not a fault -- it is that wave's own documented purpose, and its
+  `dwell: 8` means it is over in eight seconds -- but it means a shallow rung's
+  `paid/wave` is mostly DRIFT rather than wave salvage, and any reading of the
+  bottom of the ladder has to know which of the two it is looking at.
+- **`paid/wave` IS BANKED-DURING-THE-WAVE AND NOT EARNED-BY-THE-WAVE, AND A
+  ROW CAN READ ZERO ON A WAVE THAT KILLED THIRTY-TWO BODIES.** Measured at
+  rung 7: a wave with `slain 32` read **`raw/body 0.00 B, tax --, paid 0.00
+  B`** with **36 drops and 36 kB still on the floor**, and the next wave read
+  75.2 kB. `take` accrues on `bank()`, which fires when a mote is COLLECTED
+  rather than when a body dies, so the salvage of anything killed near a
+  wave's end is booked to the wave after it. The WINDOW's rate is unaffected
+  (the total is the same either way) and the per-wave split lags by the
+  collection time. Attributing a mote to its parent's wave would need a wave
+  serial on a drop and `tagBody` refuses `harmless`, so this is recorded
+  rather than fixed -- read a single `paid/wave` row against the one below it.
+- **THE ANCHORS BLOCK STATES THE CONDITIONS IT WAS TAKEN UNDER, AND WITHHOLDS A
+  PASTE-READY CURVE FOR A READING THAT IS NOT OF THE CURVE.** Two arms in
+  `check-build` already refuse a BUILD whose probe would take a pinned reading
+  by DEFAULT (builds 364 and 368), on the stated ground that "a pinned reading
+  calling itself the curve is unrecoverable downstream, because EARNED is a
+  table of numbers with no record of its conditions". Neither reaches a pin
+  passed EXPLICITLY, which is the ordinary way to use those flags -- and the
+  run ends in a paste-ready `const EARNED = [...]` line under an invitation to
+  paste it. **Demonstrated rather than argued, on this build's own first
+  measurement**: the `--spend 200 MB` pass above printed that line under a
+  heading which had already said, in the same output, that the fixed point does
+  not apply to it.
+  Five conditions disqualify a reading and each prints its own sentence: any
+  of the four pinnable rolls, a fixed-seconds window, a pinned funding, and a
+  repeated `--rungs` entry. A disqualified run prints the integral for READING
+  and no paste-ready line at all; a qualified one prints a `// measured:`
+  comment immediately above the array, so pasting the conditions with the
+  numbers is one copy rather than a discipline. Verified in both directions at
+  runtime plus the multi-reason path (three reasons, each on its own line).
+- **...AND THE PROBE ALREADY KNEW ABOUT ONE OF THE FIVE AND PRINTED THE LINE
+  ANYWAY.** A repeated `--rungs` entry has printed `NOT ANCHORS: ... the
+  interpolation below has nothing to interpolate. Read the rows.` since build
+  364 -- four output lines above the paste-ready `EARNED` it then printed, the
+  three prose lines inviting the paste sitting between them. That is
+  build 351's ruling on a conjunct that cannot fail for the reason it is about,
+  arriving in a READOUT rather than in a case, and the paragraph behind it said
+  so out loud: "said out loud rather than refused -- a probe that prints a
+  table nobody can read and exits 0 is this repo's own scar." **A warning
+  nothing acts on is the same scar**, and the tell is a refusal whose own
+  output still hands over the thing it is refusing.
+- **THE DISQUALIFYING SET IS DERIVED FROM THE ROLLS ARM'S OWN CHANNELS, so a
+  fifth pinnable roll fails the build until the refusal learns about it.**
+  `check-build` reads the channels off `income.mjs`'s "(the curve)" condition
+  the way build 364's arm already does, adds the three conditions that are not
+  rolls, and requires an `if (<channel>) <list>.push(` for each -- reading the
+  list's own VARIABLE NAME off the source rather than restating it. One edit
+  rather than two that can be made one at a time, which is the
+  hand-kept-list rule. Four revert proofs, each on its own conjunct with its
+  own message: the `// measured:` comment removed, the `EARNED` log moved out
+  of its guard, one disqualifier dropped (named), and the vacuity arm with the
+  block's heading renamed.
+- **AND THE FIRST VERSION OF THAT ARM PASSED ITS OWN BYPASS PROOF, BECAUSE THE
+  SLICE IT READ RAN TO THE END OF THE FILE.** It took the guarded block as
+  `anchorSrc.slice(elseAt)` -- everything after `} else {` -- so moving the
+  `EARNED` log OUT of the else and leaving it unconditional two lines below
+  still left it inside the slice, and the arm reported all clear on exactly
+  the bypass it exists to refuse. Bounded at the else's own closing brace, the
+  proof fires. **A revert proof that does not fire is a finding about the
+  guard, not a formality** -- and the only reason it was caught is that all
+  four proofs were read as MESSAGES rather than exit codes (build 367's rule:
+  `check-build` exits 1 on a stale REV, so every proof "fires" on `$?`).
+  The landing check was wrong too -- a backtick inside a single-quoted `grep`
+  pattern matches nothing -- so it reported the patch as not applied when it
+  had applied. Two instrument faults on one proof, and both read as the
+  opposite of what was happening.
+- **`--spend` DOES NOT DEFEAT THE PLATEAU, WHICH IS THE ONE CLAIM THIS TABLE
+  MAKES ABOUT BALANCE.** 107 buys and CORE at 0 levels at every rung of both
+  passes -- 200 MB against a 113 MB tree, so the tree is bought out and the
+  remaining node is behind the NEW FORM remainder rather than behind money
+  (build 363). So every stall in the 28-42 band above is a stall with the best
+  turret bytes can buy, and the answer to it is not the purse.
+- **What this build did NOT do is the re-take.** The curve in `tiers.mjs` is
+  still build 362's, still known stale, and both passes here are `--spend`
+  runs and therefore not curves at all -- which the anchors block now says
+  itself rather than leaving to a note. The re-take is N runs a rung at a
+  wave-counted window with the funding from the fixed point, and the table
+  above is what prices it: six waves a rung is 44 to 866 seconds, so one pass
+  over eight rungs is about 2,100 game-seconds and three runs of three passes
+  is nine times that. No `src/` file changed but the BUILD literal, so the
+  ORDINAL hash is not owed; the instruments with something to say were the two
+  passes, the runtime verification of both anchor branches, and the four revert
+  proofs.

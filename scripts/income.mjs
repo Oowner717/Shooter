@@ -287,8 +287,13 @@ const SAMPLE = RUNGS.length ? RUNGS : [1, ...gates.gates];
  * window would otherwise cost. It is a real idiom and it breaks the curve:
  * `pick` interpolates over the sampled rungs and a duplicate makes that
  * arithmetic meaningless, so the anchors printed under it are not anchors.
- * Said out loud rather than refused -- a probe that prints a table nobody can
- * read and exits 0 is this repo's own scar.
+ *
+ * Said out loud AND refused from build 369: it is one of the five conditions
+ * that disqualify a reading as the curve, so the anchors block prints no
+ * paste-ready line under it. Until then it was said out loud and the line was
+ * printed anyway, four output lines under its own `NOT ANCHORS` heading -- a
+ * that prints a table nobody can read and exits 0 is this repo's own scar,
+ * and so is a warning nothing acts on.
  */
 const REPEATED = SAMPLE.length !== new Set(SAMPLE).size;
 
@@ -1118,15 +1123,64 @@ for (let it = 0; it < ITERS; it++) {
 
 const last = passes[passes.length - 1];
 console.log(`\n---- the anchors ${'-'.repeat(58)}`);
-if (REPEATED) {
-  console.log('  NOT ANCHORS: --rungs repeats a rung, so this is several windows at one');
-  console.log('  rung and the interpolation below has nothing to interpolate. Read the');
-  console.log('  rows.');
+/*
+ * WHAT CONDITIONS THESE WERE TAKEN UNDER, PRINTED WITH THEM, because the
+ * numbers travel and the conditions do not. `tiers.mjs` held a hand-pasted
+ * copy of this line for six builds with no record of the window, the runs or
+ * the rolls behind it; build 368 wrote them in by hand, which is a copy of a
+ * copy and goes stale the same way. So the qualified branch below emits the
+ * conditions as a COMMENT ABOVE the array, and pasting both is one copy.
+ *
+ * And a reading whose conditions disqualify it as the curve prints NO
+ * paste-ready line at all. The probe already knew about one such condition --
+ * a repeated `--rungs` entry -- and printed the line anyway, under its own
+ * `NOT ANCHORS` heading: a refusal that refuses nothing, which is build 351's
+ * ruling on a conjunct that cannot fail for the reason it is about, arriving
+ * in a readout rather than in a case. Demonstrated rather than argued: a
+ * `--spend 200 MB` run over the eight gate rungs printed a paste-ready
+ * `EARNED` under a heading that had already said, in the same output, that
+ * the fixed point does not apply to it.
+ *
+ * Disqualifying, each because it makes the reading about something other than
+ * what a run with the dice free banks: any of the four pinnable rolls
+ * (`check-build` refuses a build where one of them DEFAULTS on, for the same
+ * reason this refuses a reading taken under one), a fixed-seconds window (a
+ * different number of waves at every rung -- see the window paragraph above),
+ * a pinned funding (a given turret rather than the fixed point), and a
+ * repeated rung. REPORTED rather than refused, because each is sample size
+ * and therefore the reader's judgement: the passes, the runs a rung, the
+ * waves a rung, and whether every sampled rung could be priced at all.
+ */
+const cond = `window ${WINDOW === null ? `${WAVES} scored wave(s)` : `a FIXED ${WINDOW}s`} a rung`
+  + `, ${RUNS} run(s) a rung, ${passes.length} pass(es)`
+  + `, build ${served.build ?? '?'} rev ${served.rev ?? '?'}, this container`;
+const why = [];
+if (SEED !== null) why.push(`--seed ${SEED} pins the trait sequence`);
+if (RAND !== null) why.push(`--rand ${RAND} pins the wave shuffle and every per-body roll`);
+if (GRANT) why.push('--grant hands the run the NEW FORM remainder');
+if (PRESS) why.push('--press fires PULSE on cooldown');
+if (WINDOW !== null) why.push(`--window ${WINDOW} is a flat span of seconds, so the sample size `
+  + 'is a different number of waves at every rung');
+if (SPEND !== null) why.push(`--spend ${fmt(SPEND)} pins the funding, so this is a given turret `
+  + 'rather than the fixed point');
+if (REPEATED) why.push('--rungs repeats a rung, so the interpolation has nothing to interpolate');
+console.log(`  taken under: ${cond}`);
+console.log(`  priced: ${last.curve.length} of ${SAMPLE.length} sampled rung(s)`
+  + `${last.stop ? `, and the curve stops at rung ${last.stop} -- see the stop line above` : ''}`);
+if (why.length) {
+  console.log(`  NOT THE CURVE, so there is no paste-ready line: ${why[0]}`);
+  for (const w of why.slice(1)) console.log(`    ...and ${w}`);
+  console.log('  The curve is this probe with every flag named above left OFF. What THIS');
+  console.log('  reading integrated to, for reading and not for pasting:');
+  console.log(`    ${last.curve.map((c) => `${c.rung}: ${fmt(c.earned)}`).join('   ')}`);
+} else {
+  console.log('  For tiers.mjs\'s EARNED, whose copy is MEASURED (build 362) and known');
+  console.log('  STALE (build 366 moved the economy pin without re-measuring). Bytes, and');
+  console.log('  the probe\'s own integral -- read the passes above before pasting one in,');
+  console.log('  and paste the comment WITH the array.');
+  console.log(`  // measured: ${cond}`);
+  console.log(`  const EARNED = [${last.curve.map((c) => `[${c.rung}, ${c.earned}]`).join(', ')}];`);
 }
-console.log('  For tiers.mjs\'s EARNED, which is asserted today and which its own header');
-console.log('  asks to have a measured curve driven into. Bytes, and the probe\'s own');
-console.log('  integral -- read the passes above before pasting one in.');
-console.log(`  const EARNED = [${last.curve.map((c) => `[${c.rung}, ${c.earned}]`).join(', ')}];`);
 if (errs.length) console.log(`\n  page errors: ${errs.length}\n    ${errs.slice(0, 5).join('\n    ')}`);
 
 await browser.close();
