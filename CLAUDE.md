@@ -11671,3 +11671,148 @@ came from before believing the other one covers it.
   number that describes no run. **Re-measure after the fix, not before** -- and
   the curve in `tiers.mjs` stands in the meantime because it is the only
   measured one there has ever been, with this note as its caveat.
+
+- **BUILD 366 FIXES THE RATCHET, AND THE MEASUREMENT REFUTED TWO OF BUILD
+  365'S THREE CANDIDATES OUTRIGHT AND POINTED AT A FOURTH IT HAD NOT LISTED.**
+  365 found that `world.drops` is bounded at `CFG.maxDrops` 128, that `shed`
+  **breaks** on that bound and silently discards the rest of a body's salvage
+  in the one place energy enters a run, and that a slot comes back only when
+  its mote is COLLECTED -- so an EBB mote, which flees for ever, holds a slot
+  for the rest of the run. Its three candidates were (a) an expiry that banks,
+  (b) FIFO eviction, (c) conserving the remainder, and its ruling was that all
+  three "move income at every rung past ~14, so this is a balance change as
+  well as a fix". **That ruling is wrong and one probe settled it.** 128 motes
+  laid across the field under a funded turret, nothing else arriving, the
+  TRAIT as the only switch:
+
+  | arm | laid | left after 90s | banked | median distance |
+  |---|---|---|---|---|
+  | rung 21, era 1, ordinary | 128 | **0** | 2.99 MB | -- |
+  | rung 21, era 1, EBB | 128 | **128** | **0** | **1352** |
+  | rung 32, era 2, ordinary | 128 | **0** | 5.29 MB | -- |
+  | rung 32, era 2, EBB | 128 | **128** | **0** | **1928** |
+
+  An ordinary floor drains 123 -> 14 -> 1 -> 0 across 0/6/12/18 seconds. An
+  EBB floor is pinned at 128 for the whole ninety, at a median 1352 and 1928
+  units against a PULSE disc of 575 and an INTAKE that needs a touch. **So
+  the cap is a TRANSIENT in ordinary play and permanent only under EBB**, and
+  a drain is therefore nearly free rather than a balance change.
+- **AND A SECOND ARM REFUTED THE EXPIRY AND THE EVICTION TOGETHER.** The same
+  128 ordinary motes with INTAKE **not** owned: they walk to the turret, sit
+  at a median **34 units**, and after **150 seconds** read **128 of 128 still
+  standing and 0 B banked**. That is `drawIn`'s own documented design -- "the
+  way to bank it is to destroy it... A floor you have not cleared is a pile
+  physically on top of you, eating your own rounds until you spend some on it"
+  -- and `autoTarget` walks `world.enemies`, so an auto-firing run never picks
+  a drop and clears that pile only by accident. So a CLOCK long enough to be
+  safe for a fleeing mote deletes the pile the design is about (and for a run
+  without INTAKE deletes essentially all salvage), and EVICTION BY AGE evicts
+  that same pile first, which one press still banks. Both refuted by
+  measurement rather than by argument -- and (c) was never a drain at all: it
+  conserves the partial case and does nothing when the floor is 100% foreign,
+  which is the ratchet.
+- **WHAT SURVIVES IS REACH, AND IT IS THE ONE PREDICATE THAT MAKES THE FIX
+  PROVABLY NON-LOSSY.** The pile and the fled motes differ by distance (34
+  against 1352), and distance is exactly "can anything still have it":
+  `intakeReach(world)` is `max(CFG.energy.pulse, 340 * up.pulseR)` -- 400
+  stock, 575 fully bought -- and PULSE's disc is the only collector with a
+  reach at all, since INTAKE takes what is touching and a round takes what it
+  hits. So **an EBB drop beyond that reach leaves the field**: `fizzle` plus
+  `dissolved`, the mark `rise` and `tumble` carry, so it pays nothing and
+  counts nothing. Nothing a press could still take is deleted, and the
+  measurement says so rather than the author: of the 128, the **nearest EBB
+  mote was 288 units at era 1 and 536 at era 2, both inside 575, and both
+  survive the rule** -- re-measured after the fix, 128 goes to **4 left at
+  307/353/357** and **2 left at 574/577/577**, i.e. the survivors are exactly
+  the ones inside the disc.
+- **AND THE TRAIT'S OWN DESIGN IS UNTOUCHED, WHICH IS WHY THIS IS A FIX
+  RATHER THAN A NERF.** EBB denies its own wave's wreckage and always did --
+  measured 0 B banked from 128 fleeing motes over ninety seconds either side
+  of the change -- so the delta is entirely that LATER waves can shed again.
+  That second half is what its line does not say and had no bound at all.
+- **`intakeReach` HAS ONE OWNER, BECAUSE THE EXPRESSION WAS ABOUT TO BE
+  AUTHORED TWICE.** `abilities.js` computed `Math.max(CFG.energy.pulse, 340 *
+  up.pulseR)` inline and now calls it; the guard against a drifting copy is
+  that there is one. Its own paragraph already recorded the last time that
+  number was three numbers ("the blast scaled with SHOCKFRONT, the held ring
+  was a literal 340 under a comment claiming it was the same line, and the
+  intake was a flat 400").
+- **AND `CFG.energy.pulse` IS AN INCOME TERM NOW, so the pin fired and is
+  moved with the reason.** Build 362's digest pins the terms the measured
+  curve is a function of; the reach decides which salvage can be had **at
+  all** rather than only what one press collects, so it belongs in it. The
+  digest moves 40b8ba32b85a -> d305b7b056b2 for two reasons at once -- a term
+  added, and the behaviour that term governs changed -- and the pin is moved
+  to say "the next disagreement is a NEW one" and nothing else. **The curve in
+  `tiers.mjs` is KNOWN stale rather than suspected stale**, and the re-take is
+  the next build for build 364's reason: the deep-rung rate spans 10.8 to 648
+  kB/s at one funding, so one window a rung is a draw from a distribution with
+  a factor of sixty in it and the anchors want N runs a rung. Moving a pin
+  without a re-measure is the thing a pin exists to stop, so it says so at the
+  site rather than reading as a re-baseline.
+- **THREE REVERT PROOFS, EACH ON ITS OWN CONJUNCT, AND THE THIRD IS THE ONE
+  WORTH HAVING.** The dissolve removed fails both arms. A CLOCK in place of
+  the reach (`bornFor > 1.5`) reads **6/6 EBB motes dissolved INSIDE the
+  reach** and collapses the ratchet control to 0 -- the refutation above,
+  reproduced as a red case. And the `dissolved` mark dropped for a `destroy()`
+  banks **113,120 B** for salvage that was never collected, and pays
+  **1,034,240 B** on the pinned-floor control: without that mark the fix would
+  pay you for wreckage you never had, which is the one way this change could
+  have been worse than the fault.
+- **THE CASE'S A/B IS THE TRAIT, WITH THE MOTES PINNED, and pinning is what
+  makes distance the one variable.** The fizzle decision is taken in
+  `Enemy.update` off the body's own position, so holding a mote's x/y each
+  frame turns a walk into a place: six EBB motes at `reach + 120` read 6/6
+  gone and 0 B banked, six ORDINARY motes in the same place 0/6, and six EBB
+  motes at 0.6 of the reach 0/6. The ratchet arm fills the floor to 128 with
+  fleeing motes, waits, and asks a fresh ordinary body what it can shed: **14
+  motes and 113 kB against 0 and 0** with the same floor pinned inside the
+  reach. It buys INTAKE deliberately -- without the node nothing collects and
+  `paid` is 0 whether the floor drained or not, which is a control that cannot
+  fail -- and it counts LIVE drops, because `w.drops.length` still holds the
+  dissolved ones until `Game.sweep` walks the list.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922`, all six
+  intermediate marks and all six body counts identical to build 365's, with
+  the served BUILD confirmed as 366 in the probe's own heading. This build
+  puts a NEW BRANCH in `Enemy.update` -- every body, every frame, on
+  `fight.mjs`'s own hot path -- and moves PULSE's reach expression into a
+  function. Both reduce to the identity for a body that is not a fleeing
+  drop, by inspection, which is exactly the argument build 329 records this
+  repo as not accepting. Note the 365 side is the figure recorded earlier in
+  this same container and was NOT re-taken from a worktree.
+- **AND ONE SMALL NUMBER IS UNATTRIBUTED AND SAID TO BE: the EBB arm banks
+  46.7 kB after the fix where it banked 0 before**, at era 1 only (era 2 reads
+  0.0 either way). It is 1.6% of the ordinary arm's 2.99 MB and it is in the
+  favourable direction, and the check that matters is the one it answers
+  rather than the one it raises: dissolving 124 motes would bank about 2.9 MB
+  if `dissolved` were not honoured, and revert proof C measures exactly that,
+  so 46.7 kB is nowhere near it and the mark is holding. The likely channel is
+  128 motes grinding against each other and `resolvePair` billing
+  `impactDamage`, which build 231 already records as how a mine with no damage
+  at all first measured 1,207 -- but that is inference and the number is
+  reported rather than explained.
+- **AND THE ONE CASE THE FIX TURNED RED IS THE TRAIT'S OWN, WHICH IS THE
+  INTERACTION WORTH WRITING DOWN.** "EBB sends the wreckage the other way"
+  spawns a body at y 260 and reads its motes' mean distance from the turret
+  before and after -- and that geometry puts them about 690-830 units out,
+  past a stock reach of 400, so under the new rule the traited motes LEFT and
+  the arm read `null -> null`: no mote to measure, reported as the trait not
+  working. Its reach is held wide for that arm now (`w.up.pulseR = 10`,
+  cleared by the block's own restart) with the reason at the site, because the
+  arm's subject is the STEERING and the leaving has a case of its own: 729 ->
+  586 untraited against **830 -> 978** traited, both non-null, which is the
+  claim it always made. **A rule about where a body may no longer be is a rule
+  every case that measures a body THERE has to be re-read against**, and the
+  tell is a measurement coming back null rather than wrong.
+- **RECORDED AND NOT RENDERED: what a distant fleeing mote now LOOKS like.**
+  A mote shed inside the reach flees, crosses it and dissolves, which reads as
+  the wreckage getting away; a mote shed BEYOND it -- a body dying up-field,
+  which is most of them -- dissolves on its first frame, so what is drawn is
+  the half-second `fizzle` and no flight at all. That is bounded and cheap (it
+  never holds a slot) and it may well read as wreckage crumbling rather than
+  as a pop, but **it was not rendered and looked at**, which is this repo's
+  own standing rule for anything whose subject is a picture. The fix if it is
+  ever wanted is a flight floor ANDed with the reach -- `beyond reach AND
+  bornFor > k` -- which cannot delete anything reachable and costs at most k
+  seconds of one slot; it is a second constant and a picture judgement, so it
+  is named here rather than taken.

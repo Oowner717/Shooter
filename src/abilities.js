@@ -11,7 +11,7 @@ import { TAU, clamp, rand, spread, smoothstep, rgba, drawGlow, segClosest } from
 import { spark, dot, ring, ripple, shake, flash, Shock } from './fx.js';
 import { CFG } from './config.js';
 import { fire, clampAim } from './projectiles.js';
-import { applyBlast, ENTRY_Y, drawIn } from './enemies.js';
+import { applyBlast, ENTRY_Y, drawIn, intakeReach } from './enemies.js';
 import { audio } from './audio.js';
 import { yardHold, holdBelow, shielded } from './yard.js';
 
@@ -1119,7 +1119,9 @@ export const ABILITIES = [
       // ...never inside the blast. `CFG.energy.pulse` is authored a little
       // wider than the stock 340, and that promise has to survive SHOCKFRONT
       // or the widened blast flings energy out of the band that collects it.
-      drawIn(world, Math.max(CFG.energy.pulse, R));
+      // ...and that expression has ONE owner now: `intakeReach` is also what
+      // decides when a fleeing EBB mote is beyond anything that could take it.
+      drawIn(world, intakeReach(world));
       /*
        * Three rings on three clocks, not two on one.
        *

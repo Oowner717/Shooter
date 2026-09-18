@@ -12672,6 +12672,21 @@ if (!GUN_LINE) {
     const drift = (id) => {
       g.debugClearField();
       w.drops.length = 0;
+      /*
+       * THE REACH, HELD WIDE, because this arm is about the STEERING.
+       *
+       * From build 366 a fleeing EBB mote past `intakeReach` leaves the field
+       * -- `fizzle` and `dissolved`, so it pays nothing and frees the slot it
+       * would otherwise hold for the rest of the run. The body here dies at
+       * y 260 and its wreckage is about 690 units from the turret by the time
+       * the throw has spent itself, which is well past a stock 400: measured,
+       * the traited arm read `null -> null` because there was no mote left to
+       * measure. That rule has its own case and this one is not it, so the
+       * reach is held wide enough that nothing leaves and what is left is the
+       * steering, which is what the trait's line is about. `reset()` rebuilds
+       * `world.up` from its defaults, so the block's own restart clears it.
+       */
+      w.up.pulseR = 10;
       d.setTier(30);
       d.traits = id ? [TRAITS.find((t) => t.id === id)] : [];
       const body = g.debugSpawn('bulwark', w.width / 2, 260);
@@ -41588,6 +41603,161 @@ if (MINE_LINE) {
     + ` takes ${gr.shieldedAbove.host}/${gr.shieldedAbove.ball},`
     + ` against ${gr.shieldedBelow.host}/${gr.shieldedBelow.ball} for the same`
     + ` body at ${gr.belowY}; era back to ${gr.era1}, director put back ${gr.putBack}`);
+}
+
+// --- salvage that has left the field frees its slot --------------------------
+{
+  const dr = await page.evaluate(async () => {
+    const g = window.__sim;
+    const S = 1 / 60;
+    const { intakeReach } = await import('../src/enemies.js');
+    const { CFG } = await import('../src/config.js');
+    const out = {};
+
+    const world = () => {
+      g.start();
+      g.restart();
+      const w = g.world;
+      w.round = 'standard';
+      w.autoAim = false;
+      w.autoFire = false;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      g.debugClearField();
+      w.drops.length = 0;
+      w.debris.length = 0;
+      w.projectiles.length = 0;
+      w.effects.length = 0;
+      w.mines.length = 0;
+      // INTAKE owned, so a mote that reaches the turret is BANKED rather than
+      // lying there: the arm's claim is that a later body's wreckage reaches
+      // the purse, and without the node nothing collects it and `paid` is 0
+      // whether the floor drained or not.
+      g.debugGiveBytes(50e6);
+      g.buy('intake');
+      return w;
+    };
+
+    // A mote at a chosen distance, held there: the fizzle decision is taken in
+    // `Enemy.update` off the body's own position, so pinning it is what makes
+    // the distance the arm's one variable rather than a walk.
+    const pinned = (w, n, dist, ebb) => {
+      const s = w.shooter;
+      const e = g.debugSpawn('bulwark', s.x, Math.max(120, s.y - dist));
+      e.traits = ebb ? [{ id: 'ebb' }] : [];
+      e.counts = false;
+      e.destroy(w);
+      const made = w.drops.filter((x) => !x.dead && x.bytes).slice(0, n);
+      for (const m of made) { m.px = s.x; m.py = Math.max(120, s.y - dist); }
+      return made;
+    };
+    const hold = (w, list, secs) => {
+      const earned0 = w.earned;
+      for (let f = 0; f < 60 * secs; f++) {
+        for (const m of list) {
+          if (m.dead) continue;
+          m.x = m.px; m.y = m.py; m.vx = 0; m.vy = 0;
+        }
+        g.update(S);
+      }
+      return {
+        gone: list.filter((m) => m.dead || !m.bytes).length,
+        of: list.length,
+        banked: Math.round(w.earned - earned0),
+      };
+    };
+
+    // 1. THE TRAIT is the switch: same place, same motes, one field differs.
+    {
+      const w = world();
+      out.reach = Math.round(intakeReach(w));
+      const far = out.reach + 120;
+      const ebb = pinned(w, 6, far, true);
+      out.farEbb = hold(w, ebb, 3);
+      const w2 = world();
+      const ord = pinned(w2, 6, far, false);
+      out.farOrd = hold(w2, ord, 3);
+    }
+
+    // 2. ...and REACH is the boundary, not a clock.
+    {
+      const w = world();
+      const near = pinned(w, 6, Math.round(out.reach * 0.6), true);
+      out.nearEbb = hold(w, near, 3);
+    }
+
+    // 3. THE RATCHET: the floor is bounded and `shed` BREAKS on that bound, so
+    //    a slot that never comes back is every later body's wreckage thrown
+    //    away. Saturate it, wait, then ask a fresh body what it could shed.
+    const ratchet = (dist) => {
+      const w = world();
+      const s = w.shooter;
+      const y = Math.max(120, s.y - dist);
+      const held = [];
+      for (let i = 0; i < 40 && w.drops.length < CFG.maxDrops; i++) {
+        const e = g.debugSpawn('bulwark', s.x, y);
+        e.traits = [{ id: 'ebb' }];
+        e.counts = false;
+        e.destroy(w);
+        for (const m of w.drops) if (!held.includes(m)) { m.px = s.x; m.py = y; held.push(m); }
+      }
+      const filled = w.drops.filter((x) => !x.dead && x.bytes).length;
+      hold(w, held, 3);
+      const after = w.drops.filter((x) => !x.dead && x.bytes).length;
+      // A fresh ordinary body, near the machine, where its salvage is wanted.
+      // LIVE drops either side: `w.drops.length` still holds the dissolved
+      // ones until `Game.sweep` walks the list, so the raw length reads a
+      // count the floor does not have.
+      const live = () => w.drops.filter((x) => !x.dead && x.bytes).length;
+      const before = live();
+      const earned0 = w.earned;
+      const fresh = g.debugSpawn('bulwark', s.x, s.y - 160);
+      fresh.traits = [];
+      fresh.counts = false;
+      fresh.destroy(w);
+      const shed = live() - before;
+      for (let f = 0; f < 60 * 8; f++) g.update(S);
+      return {
+        filled, after, shed,
+        paid: Math.round(w.earned - earned0),
+        putBack: typeof w.director.update === 'function'
+          && !Object.prototype.hasOwnProperty.call(w.director, 'update'),
+      };
+    };
+    out.drained = ratchet(out.reach + 120);
+    out.pinnedFloor = ratchet(Math.round(out.reach * 0.6));
+
+    const w = g.world;
+    delete w.director.update;
+    w.spawnLock = 0;
+    out.putBack = typeof w.director.update === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update');
+    return out;
+  });
+
+  check('a fleeing mote that is past every collector leaves the field',
+    dr.farEbb.of >= 4 && dr.farEbb.gone === dr.farEbb.of
+    && dr.farEbb.banked === 0
+    && dr.farOrd.of >= 4 && dr.farOrd.gone === 0
+    && dr.nearEbb.of >= 4 && dr.nearEbb.gone === 0,
+    `reach ${dr.reach}: at ${dr.reach + 120} units ${dr.farEbb.gone}/${dr.farEbb.of}`
+    + ` EBB motes dissolve and bank ${dr.farEbb.banked} B -- dissolved, so it`
+    + ` pays nothing -- against ${dr.farOrd.gone}/${dr.farOrd.of} ordinary in the`
+    + ` same place, and ${dr.nearEbb.gone}/${dr.nearEbb.of} EBB inside the reach`
+    + ` at ${Math.round(dr.reach * 0.6)}, which one press still banks`);
+
+  check('...so the salvage floor is not a ratchet and a later body can shed',
+    dr.drained.filled >= 100 && dr.drained.after <= 8 && dr.drained.shed >= 4
+    && dr.drained.paid > 0
+    && dr.pinnedFloor.filled >= 100 && dr.pinnedFloor.after >= 100
+    && dr.pinnedFloor.shed === 0 && dr.pinnedFloor.paid === 0
+    && dr.putBack,
+    `floor filled to ${dr.drained.filled} of ${dr.drained.filled} and drains to`
+    + ` ${dr.drained.after}, so a fresh body sheds ${dr.drained.shed} motes and`
+    + ` pays ${dr.drained.paid} B -- against a floor pinned INSIDE the reach,`
+    + ` which holds ${dr.pinnedFloor.after} and leaves that body`
+    + ` ${dr.pinnedFloor.shed} motes and ${dr.pinnedFloor.paid} B;`
+    + ` director put back ${dr.putBack}`);
 }
 
 // --- report -----------------------------------------------------------------

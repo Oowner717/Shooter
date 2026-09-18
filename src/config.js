@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '365';
+export const BUILD = '366';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '365';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'b8c4ea1';
+export const REV = 'e2f156b';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -3336,6 +3336,15 @@ export const CFG = {
      * proportion to its own depth.
      */
     pull: 26,
+    /*
+     * How long a fleeing EBB mote takes to dissolve once it is past
+     * `intakeReach` -- see the note in `Enemy.update`. Cosmetic: the mote is
+     * already beyond every collector in the game by the time this starts, so
+     * the number decides how the leaving READS and nothing else. It is
+     * `CFG.rise.fizzle`'s half second, which is what the two harmless gaits
+     * that leave the field already dissolve over.
+     */
+    ebbFizzle: 0.5,
     // Attached objects sit on the intake. Five is as bad as it gets.
     tax: 0.78, // multiplier per attached object
     taxFloor: 0.3,

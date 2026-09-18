@@ -1571,8 +1571,27 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * reader who pastes new anchors for a coverage change has spent thirteen
  * minutes on nothing.
  */
-const INCOME_PIN = '40b8ba32b85a';
-const INCOME_AT = 365;
+/*
+ * ---- MOVED AT BUILD 366 WITHOUT A RE-MEASURE, AND THAT IS ON THE RECORD ---
+ *
+ * 40b8ba32b85a was build 365's, and 366 moved it two ways at once: it added
+ * `energy.pulse` to the terms above (the reach is now what decides which
+ * salvage can be had at all) and it changed the behaviour that term governs
+ * (a fleeing EBB mote past the reach leaves the field instead of holding a
+ * slot for the rest of the run). So the curve in `tiers.mjs` is KNOWN stale
+ * rather than suspected stale, and this pin is moved to say "the next
+ * disagreement is a NEW one" and nothing else.
+ *
+ * What the re-take owes, and why it is not this build: build 364 measured the
+ * deep-rung rate spanning 10.8 to 648 kB/s at ONE funding and one rung, so a
+ * single window per rung is a draw from a distribution with a factor of sixty
+ * in it -- the anchors want N runs a rung at a window several times that
+ * rung's own wave, which is hours rather than the thirteen minutes the
+ * message below quotes. Build 365's own ruling is that the re-take comes
+ * AFTER the fix; this is the fix, and the re-take is the build after it.
+ */
+const INCOME_PIN = 'd305b7b056b2';
+const INCOME_AT = 366;
 const TIER_CFG = CFG.waves.tier;
 const incomeTerms = {
   'energy.perMass': CFG.energy.perMass,
@@ -1614,6 +1633,15 @@ const incomeTerms = {
    */
   'maxEnemies': CFG.maxEnemies,
   'maxDrops': CFG.maxDrops,
+  /*
+   * ...and the REACH, added at build 366, because it is now what decides
+   * which salvage is banked AT ALL rather than only what one press collects.
+   * A fleeing EBB mote past `intakeReach` leaves the field, so this number
+   * sets the line between wreckage a run can still have and wreckage that
+   * is gone -- and every byte on the far side of it was, before 366, a slot
+   * held for the rest of the run.
+   */
+  'energy.pulse': CFG.energy.pulse,
   'tree.total': (() => treeMod.NODES.reduce((sum, n) => {
     if (!n.id || n.repeat || n.dormant || n.currency) return sum;
     let s2 = 0;

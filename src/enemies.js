@@ -3113,6 +3113,58 @@ export class Enemy {
       if (this.fizzle <= 0) this.dead = true;
       return;
     }
+    /*
+     * ---- SALVAGE THAT HAS LEFT GOES, or the floor is a RATCHET -----------
+     *
+     * `world.drops` is bounded at `CFG.maxDrops` and `shed` BREAKS on that
+     * bound -- the rest of a body's salvage is discarded, silently, in the
+     * one place energy enters a run. A slot comes back only when its mote is
+     * COLLECTED, and only `reset()` and an era change empty the list at all
+     * (`glitchOut` deliberately leaves the floor alone and says so). So a
+     * mote that can never be collected holds a slot for the rest of the run
+     * and every later body's wreckage is thrown away.
+     *
+     * EBB is the one rule that makes one. Its single reader reflects a drop's
+     * steering target through the drop itself, so the mote flees, for ever --
+     * and `shed` writes the wave's rules onto the mote it makes, so an EBB
+     * mote is an EBB mote whatever the wave after it rolled. Measured at
+     * build 366, 128 motes laid across the field under a funded turret, 90
+     * seconds, nothing else arriving: ORDINARY drains to ZERO inside about
+     * eighteen seconds and banks 2.99 MB at era 1 and 5.29 MB at era 2, and
+     * EBB reads 128 of 128 still standing and 0 B banked, at a median 1352
+     * units from the machine at era 1 and 1928 at era 2. So the trait does
+     * not deny its own wave's salvage -- that wreckage was never collectable
+     * -- it consumes the pile and denies every LATER wave, which is not what
+     * its own line says and has no bound at all.
+     *
+     * The test is REACH and nothing else, which makes the fix provably
+     * non-lossy: beyond `intakeReach` no collector in the game can have it,
+     * so nothing a press could still take is deleted. The nearest EBB mote
+     * of those 128 measured 288 units at era 1 and 536 at era 2 -- both
+     * inside a fully-bought 575 -- and both survive this rule.
+     *
+     * It is NOT a clock. An expiry is what build 325 deleted (`Enemy.ttl`,
+     * dead since build 107) and it would delete the design `drawIn`'s own
+     * docstring is about: with no INTAKE a mote walks to the turret and lies
+     * there until you spend a round on it, and measured at build 366 that
+     * pile is 128 of 128 still standing after 150 SECONDS at a median 34
+     * units -- so a clock long enough to be safe for the far case deletes
+     * the near one, which is the whole of "a floor you have not cleared is a
+     * pile physically on top of you". Nor is it eviction by age: the oldest
+     * drop is that pile, and one PULSE still banks it.
+     *
+     * `dissolved` is what makes it a LEAVING rather than a death -- the mark
+     * `rise` and `tumble` carry, so it pays nothing and counts nothing --
+     * and the fizzle is the same half-second dissolve they use.
+     */
+    if (this.isDrop && this.bytes && this.traits && hasTrait(this.traits, 'ebb')) {
+      const s = world.shooter;
+      if (s && Math.hypot(this.x - s.x, this.y - s.y) > intakeReach(world)) {
+        this.fizzle = CFG.energy.ebbFizzle;
+        this.dissolved = true;
+        return;
+      }
+    }
     if (this.spawnIn > 0) this.spawnIn = Math.max(0, this.spawnIn - dt * 2.2);
     if (this.bornFor < 10) this.bornFor += dt;
     this.flash = Math.max(0, this.flash - dt * 4.5);
@@ -8270,6 +8322,19 @@ function bank(world, amount, x, y) {
  *
  * @returns how many were taken, so the caller can decide whether to say so.
  */
+/**
+ * How far anything in this game can reach a mote, in world units.
+ *
+ * PULSE's disc is the only collector with a REACH -- INTAKE takes what is
+ * touching the turret and a round takes what it hits -- so this is the whole
+ * of it: 400 stock and 575 with both levels of REACH owned. `abilities.js`
+ * passed this expression inline and it is now read in two places, so it has
+ * one owner; a number authored twice is a number that drifts.
+ */
+export function intakeReach(world) {
+  return Math.max(CFG.energy.pulse, 340 * (world.up.pulseR || 1));
+}
+
 export function drawIn(world, radius) {
   const s = world.shooter;
   const r2 = radius * radius;
