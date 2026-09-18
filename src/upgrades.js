@@ -478,8 +478,12 @@ export const UPGRADES = {
       needs: (g) => g.owned('recast') > 0,
       needsLine: 'Needs the NEW FORM.',
       apply: scale('damage', 1.35), icon: MARK.core },
-    // Two levels, not the default three. tree.js reads `u.levels ?? 3`, so an
-    // uncapped node is sold three times whatever the author intended.
+    // Two levels, and it is written out because every node's is: `levels` has
+    // been mandatory since build 224, when `levelsOf` stopped defaulting it to
+    // three and `check-build` began failing the build for a node that declares
+    // none. This comment said "tree.js reads `u.levels ?? 3`" for a hundred and
+    // forty builds after that stopped being true, in the file whose own
+    // docstring caused the eight nodes that shipped sold three times.
     { id: 'tracer', name: 'TRACER', levels: 2, line: '+35% round speed.', apply: scale('speed', 1.35) , icon: MARK.tracer },
     { id: 'ricochet', name: 'RICOCHET', levels: 3, line: '+1 bounce off the arena edges.', apply: bump('bounces', 1) , icon: MARK.ricochet },
     { id: 'heavy', name: 'HEAVY', levels: 2, line: '2x knockback on every hit.', apply: scale('impulse', 2) , icon: MARK.heavy },
@@ -487,8 +491,8 @@ export const UPGRADES = {
     /*
      * ONE level, because the node is named after the number it produces.
      * `CFG.rounds.arc.jumps` is 4, so one more is the fifth link the row is
-     * selling. It had no `levels` at all, and `tree.js` reads `u.levels ?? 3`
-     * -- so the tree sold three and an ARC made SEVEN jumps. SECOND GROWTH,
+     * selling. It had no `levels` at all, and `tree.js` read `u.levels ?? 3`
+     * then -- so the tree sold three and an ARC made SEVEN jumps. SECOND GROWTH,
      * authored later against the same shape ("+1 patch"), does carry its cap.
      */
     { id: 'fifthlink', name: 'FIFTH LINK', levels: 1, line: 'ARC jumps 1 more time.', apply: bump('arcJumps', 1) , icon: MARK.fifthlink },
@@ -651,8 +655,8 @@ export const UPGRADES = {
       line: '+1 patch of burning ground at once.',
       apply: bump('patchCap', 1), icon: MARK.secondgrowth },
     /*
-     * Two levels, written out. It had none, and `tree.js` reads
-     * `u.levels ?? 3` -- so it was sold three times and a fully bought SPALL
+     * Two levels, written out. It had none, and `tree.js` read
+     * `u.levels ?? 3` then -- so it was sold three times and a fully bought SPALL
      * threw 14 * 1.6^3 = 57 projectiles in one frame, from up to four mines
      * at once with PAIRED CHARGE. That is the HOT LOAD trap CLAUDE.md
      * records, on a node that also happens to be a particle budget.
@@ -662,8 +666,8 @@ export const UPGRADES = {
       line: '+55% spall pellet blast radius.',
       apply: scale('spallBurst', 1.55), icon: MARK.splinter },
     /*
-     * Two levels, written out. It had none, and `tree.js` reads
-     * `u.levels ?? 3` -- so it was sold three times and a fully bought LODE
+     * Two levels, written out. It had none, and `tree.js` read
+     * `u.levels ?? 3` then -- so it was sold three times and a fully bought LODE
      * reached 94 * 1.4^3 = 258 units and pushed 2.74x as hard. At two it is
      * 184 units and 1.96x, which is still the widest field any mine makes.
      *
@@ -751,7 +755,7 @@ export const UPGRADES = {
       apply: set('wardPush', true), icon: MARK.heavemark },
     /*
      * Two levels, written out -- 0.64 of every cooldown. It had none, and
-     * `tree.js` reads `u.levels ?? 3`, so the one node in this branch that
+     * `tree.js` read `u.levels ?? 3` then, so the one node in this branch that
      * touches all eight buttons was the one node in this branch with no cap:
      * 0.8^3 = 0.512, half of every clock on the bar, against neighbours that
      * all name their own number (STANDOFF 2, EDGED 2, FORK 1, SHOCKFRONT 2).

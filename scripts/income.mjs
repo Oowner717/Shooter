@@ -2,7 +2,7 @@
  * income.mjs -- what a run has BANKED by the rung it meets each slot on.
  *
  *   node scripts/income.mjs [--rungs 1,7,14,21,28,35,42,49] [--window 120]
- *                           [--iters 3] [--spend BYTES]
+ *                           [--iters 3] [--spend BYTES] [--seed N] [--rand N] [--grant]
  *                           [--url URL] [--expect NNN]
  *
  * The one number this repo has never measured, and the reason phase 7b of
@@ -116,6 +116,56 @@ const RUNGS = String(flag('rungs', '')).split(',').filter(Boolean).map(Number);
  * so it forces one pass and says so rather than printing three copies.
  */
 const SPEND = flag('spend', null) === null ? null : Number(flag('spend', 0));
+/*
+ * ---- THE TWO RANDOM CHANNELS, PINNABLE ONE AT A TIME ---------------------
+ *
+ * Both default OFF and the measured curve is taken with both loose, because
+ * pinning a roll is choosing one (build 338) and an anchor taken under a pin
+ * is an anchor for that roll. They exist to ATTRIBUTE the spread, which is a
+ * different question from what the curve settles at, and they turn a
+ * deep-rung A/B from unreadable into exact.
+ *
+ * `--seed N` writes `world.runSeed` after the restart, which is the TRAIT
+ * sequence: `traitsFor` is `traitAt(runSeed, cycle, index, slot)`, so a
+ * pinned seed makes the window see the same rules in the same order.
+ * `--rand N` replaces Math.random with a fresh xorshift32 at the top of
+ * every window, which is everything else -- the wave shuffle, and every
+ * per-body route, side, scale, health and spawn-x roll.
+ *
+ * THE TRAP, AND IT IS WHY THE VARYING CELL NEEDS `--seed` EXPLICITLY:
+ * `restart()` draws the run's seed off Math.random, so `--rand` ALONE pins
+ * the trait sequence too and collapses the two cells into one. To vary the
+ * traits with everything else held, pass `--rand R` with a DIFFERENT
+ * `--seed` per run.
+ */
+const SEED = flag('seed', null) === null ? null : Number(flag('seed', 0));
+const RAND = flag('rand', null) === null ? null : Number(flag('rand', 0));
+/*
+ * `--grant` puts `recast` in the LEDGER before the buying loop, which is the
+ * one thing that makes CORE reachable: it is the tree's only node behind a
+ * `needs` PREDICATE, it needs the NEW FORM, and the NEW FORM is
+ * `currency: 'remainder'` and not payable in bytes at all -- so every funded
+ * window this probe has ever taken is short of CORE's x3.32, the largest
+ * single node in the tree by multiplier. The ledger and not the flag,
+ * because `owned()` counts `world.ledger` and reads nothing else (build
+ * 266). Off by default: whether the modelled turret owns the remainder is
+ * the curve's decision and not a probe default.
+ */
+const GRANT = args.includes('--grant');
+/*
+ * `--press` presses PULSE the instant it recharges, which is the OTHER half
+ * of what the curve models. The probe shoots and has never pressed anything,
+ * and one trait makes that the difference between a wave paying and a wave
+ * paying nothing: EBB reverses a mote's steering for the whole of its life
+ * and drops do not expire, so an EBB wave's salvage runs to the arena edge
+ * and is never banked -- and EBB's own docstring names the answer, "PULSE
+ * and INTAKE still overrule it, because taking energy in by hand is the
+ * answer to this and it should keep working". So the loose reading is the
+ * income of a run that never answers, which is a FLOOR, and pressing on
+ * cooldown is the ceiling. Off by default for `--grant`'s reason: whether
+ * the modelled run presses is the curve's decision, not a probe default.
+ */
+const PRESS = args.includes('--press');
 const URL = flag('url', 'http://127.0.0.1:8099/index.html');
 // Which tree is this reading? `scripts/served.mjs` carries the whole finding;
 // the short version is that this container's http-server serves its own CWD
@@ -183,6 +233,16 @@ const gates = await page.evaluate(async () => {
   return { gates: T.gates.slice(), ceiling: T.ceiling, eraGate: T.eraGate, bossEvery: T.bossEvery };
 });
 const SAMPLE = RUNGS.length ? RUNGS : [1, ...gates.gates];
+/*
+ * `--rungs 42,42,42,42` is how several windows are taken at ONE rung in one
+ * launch, which is what an attribution needs and what the browser launch per
+ * window would otherwise cost. It is a real idiom and it breaks the curve:
+ * `pick` interpolates over the sampled rungs and a duplicate makes that
+ * arithmetic meaningless, so the anchors printed under it are not anchors.
+ * Said out loud rather than refused -- a probe that prints a table nobody can
+ * read and exits 0 is this repo's own scar.
+ */
+const REPEATED = SAMPLE.length !== new Set(SAMPLE).size;
 
 /**
  * One window: fund the rung, pin it, drive it, and report what it banked.
@@ -193,13 +253,31 @@ const SAMPLE = RUNGS.length ? RUNGS : [1, ...gates.gates];
  * flaky cases and three probes in this repo have each paid for.
  */
 async function windowAt(rung, spend, seconds) {
-  return page.evaluate(async ({ rung, spend, seconds, line }) => {
+  return page.evaluate(async ({ rung, spend, seconds, line, seed, rand, grant, press }) => {
     const { CFG } = await import('../src/config.js');
     const { NODES } = await import('../src/tree.js');
     const g = window.__sim;
     const w = g.world;
     const S = 1 / 60;
+    /*
+     * A fresh stream per window, installed BEFORE the restart, because the
+     * restart's own `runSeed` draw comes off it -- so this pins the trait
+     * sequence as well unless `seed` varies. xorshift32, the same generator
+     * `fight.mjs` installs for the canonical hash and `titleRandom` runs the
+     * scenery on; a fresh closure each window is how the state is reset.
+     */
+    if (rand !== null) {
+      let x = (Number(rand) + 0x9e3779b9) >>> 0 || 1;
+      Math.random = () => {
+        x ^= x << 13; x >>>= 0;
+        x ^= x >>> 17;
+        x ^= x << 5; x >>>= 0;
+        return x / 4294967296;
+      };
+    }
     g.restart();
+    // AFTER the restart, which is the one writer that would overwrite it.
+    if (seed !== null) w.runSeed = Number(seed) | 0;
     w.phase = 'staging';
     g.debugTeachAll();
 
@@ -208,6 +286,15 @@ async function windowAt(rung, spend, seconds) {
     w.era = era === 2 ? 1 : 2;
     w.newForm = era === 2 ? 'done' : 'armed';
     g.setEra(era);
+
+    /*
+     * The remainder, if this run is modelled as having answered for it. Only
+     * the LEDGER is written: `world.newForm` is already 'done' at era 2 four
+     * lines above, and setting the flag is not owning the node -- `owned()`
+     * counts `world.ledger` and reads nothing else, which is why a probe that
+     * set the flag measured CORE at zero levels and read as a broken loop.
+     */
+    if (grant) w.ledger.push('recast');
 
     // The loadout: the damage line first, then the rest of the tree in tree
     // order. `poor` stops the line; `maxed` skips it.
@@ -281,6 +368,7 @@ async function windowAt(rung, spend, seconds) {
      */
 
     const { hostileCount } = await import('../src/enemies.js');
+    const { ABILITIES } = await import('../src/abilities.js');
     const d = w.director;
     d.setTier(rung);
     d.hold = true;
@@ -326,7 +414,9 @@ async function windowAt(rung, spend, seconds) {
      * reported one wave and had seen two. Worse at the top, where it is the
      * difference between a sample and nothing at all.
      */
-    let cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: 0, earned0: w.earned };
+    const ruleset = () => (d.traits || []).map((t) => t.id || t).join('+') || '-';
+    let cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: 0, earned0: w.earned,
+      rules: ruleset() };
     let endedAt = null;
     let lastAt = d.at;
     let lastResting = d.resting;
@@ -345,6 +435,21 @@ async function windowAt(rung, spend, seconds) {
      * number in the window says so unless the jobs and the field are read.
      */
     let fieldSum = 0;
+    /*
+     * PULSE, through `useAbility` -- the handler the button and the keyboard
+     * both call, not `Abilities.trigger` underneath it, which is the rule a
+     * shipped AUTO AIM fault paid for. It refuses when the slot is spent, so
+     * asking every frame is a press the instant it recharges; the count comes
+     * off the slot's own charges, because the handler returns nothing.
+     *
+     * The count is also the check on the loop: a fully bought turret owns
+     * STANDING ORDER's two levels, so PULSE's clock is 7 * 0.64 and a
+     * 300-second window holds 67 of them -- measured 68, which is the
+     * arithmetic agreeing with the instrument rather than the instrument
+     * agreeing with itself.
+     */
+    const pulseAt = ABILITIES.findIndex((a) => a.id === 'pulse');
+    let pulses = 0;
     const earned0 = w.earned;
     const frames = Math.round(seconds * 60);
     for (let f = 0; f < frames; f++) {
@@ -353,7 +458,8 @@ async function windowAt(rung, spend, seconds) {
       d.hold = true;
       g.update(S);
       if (d.at !== lastAt && !d.resting) {
-        cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: f, earned0: w.earned };
+        cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: f, earned0: w.earned,
+          rules: ruleset() };
         lastAt = d.at;
         if (endedAt !== null) { seams.push((f - endedAt) / 60); endedAt = null; }
       }
@@ -376,6 +482,11 @@ async function windowAt(rung, spend, seconds) {
        */
       if (d.lastVerdict === 'glitch') { glitches++; d.lastVerdict = null; }
       fieldSum += hostileCount(w);
+      if (press && pulseAt >= 0) {
+        const had = w.abilities.slots[pulseAt].charges;
+        g.useAbility(pulseAt);
+        if (w.abilities.slots[pulseAt].charges < had) pulses++;
+      }
       lastResting = d.resting;
     }
 
@@ -393,21 +504,38 @@ async function windowAt(rung, spend, seconds) {
        */
       core: bought.filter((x) => x === 'core').length,
       /*
-       * The wave rules IN FORCE, reported because the rate at a deep rung is
-       * not reproducible and this is the candidate.
+       * The wave rules the window ACTUALLY PLAYED, one entry per wave and
+       * de-duplicated -- reported because the rate at a deep rung is not
+       * reproducible and this is the candidate.
        *
-       * `restart()` re-rolls `world.runSeed` and `traitsFor` is seeded off
-       * it, so every window draws its own -- and SWARM doubles a wave's
-       * bodies while halving their health, which is most of what a rung banks
-       * a second. Measured over two 1200-second windows at one spend, the
-       * rate at rung 42 read 8.88 and 65.9 kB/s and at rung 49 93.4 and 10.8:
-       * a factor of 7 to 9, in opposite directions, over twenty game-minutes
-       * each. The seed is deliberately NOT pinned (build 338: pinning one is
-       * choosing a roll), so the honest fix is runs, not a longer window --
-       * and a reader cannot see which roll a figure came from unless it is
-       * printed beside it.
+       * `restart()` re-rolls `world.runSeed` and `traitsFor` is
+       * `traitAt(runSeed, cycle, index, slot)`, so every window draws its own
+       * sequence -- and SWARM doubles a wave's bodies while halving their
+       * health, which is most of what a rung banks a second. Measured over
+       * two 1200-second windows at one spend, the rate at rung 42 read 8.88
+       * and 65.9 kB/s and at rung 49 93.4 and 10.8: a factor of 7 to 9, in
+       * opposite directions, over twenty game-minutes each.
+       *
+       * BUILD 363 READ `d.traits` HERE, ONCE, AFTER THE LOOP -- which is the
+       * rules of the LAST wave and not of the window. A rung's traits are
+       * drawn per wave, so a window with nine waves had nine sets and the
+       * column printed one of them, in the build whose own note says a reader
+       * "cannot see which roll a figure came from unless it is printed beside
+       * it". Same fault as a probe that reduces a population to its worst
+       * member: the column was the population's last element.
        */
-      traits: (d.traits || []).map((t) => t.id || t).join('+') || '-',
+      rules: [...new Set(scored.map((x) => x.rules))].join(' '),
+      /*
+       * What each scored wave paid, which the window's own RATE cannot say --
+       * and the difference between the two readings is the whole of this
+       * build's finding. A rate of 7 kB/s against 328 over the same 300
+       * seconds is either every wave paying a fortieth or one wave in four
+       * paying everything, and those want different re-takes: the first is
+       * answered by runs, the second cannot be answered by runs at all.
+       * `cur.paid` was captured from build 362 and thrown away.
+       */
+      paidEach: scored.map((x) => x.paid),
+      pulses,
       banked: Math.round(w.earned - earned0),
       rate: +((w.earned - earned0) / seconds).toFixed(1),
       waves: scored.length, surge: n('surge'), clean: n('clean'), stall: n('stall'),
@@ -454,7 +582,7 @@ async function windowAt(rung, spend, seconds) {
       jobsLeft: d.jobs.length,
       purseLeft: Math.round(w.bytes),
     };
-  }, { rung, spend, seconds, line: LINE });
+  }, { rung, spend, seconds, line: LINE, seed: SEED, rand: RAND, grant: GRANT, press: PRESS });
 }
 
 // ---- the passes -----------------------------------------------------------
@@ -563,6 +691,17 @@ console.log(`  rungs ${SAMPLE.join(' ')} -- window ${WINDOW}s -- ${ITERS} pass(e
   + (forced ? ` (--spend pins the funding, so the fixed point does not apply: not ${forced})` : ''));
 console.log(`  ladder: bossEvery ${gates.bossEvery}, ceiling ${gates.ceiling}, `
   + `eraGate ${gates.eraGate}, gates ${gates.gates.join(' ')}`);
+/*
+ * Which of the two random channels this reading was taken under, printed
+ * because a curve taken under a pin is a curve for that roll and nothing in
+ * the table itself says so. Both loose is the curve; anything else is an
+ * attribution.
+ */
+console.log(`  rolls: traits ${SEED === null ? 'loose' : `pinned seed ${SEED}`}`
+  + `, everything else ${RAND === null ? 'loose' : `pinned rand ${RAND}`}`
+  + `${GRANT ? ' -- NEW FORM granted, so CORE is buyable' : ''}`
+  + `${PRESS ? ' -- PULSE pressed on cooldown' : ''}`
+  + `${SEED === null && RAND === null && !GRANT && !PRESS ? '  (the curve)' : '  (an attribution, not the curve)'}`);
 
 let funding = SAMPLE.map((rung) => ({ rung, earned: SPEND === null ? 0 : SPEND }));
 const passes = [];
@@ -596,7 +735,7 @@ for (let it = 0; it < ITERS; it++) {
    * than climbs is not a rung that holds, it is one that loses ground.
    */
   console.log('  rung era      funded buy/core       rate  waves  su/cl/st   gl  wave s  seam s'
-    + '  field/cap  left  unended  dwell s     earned here  rules');
+    + '  field/cap  left  unended  dwell s     earned here  pulse  paid/wave and rules');
   for (const s of samples) {
     const dw = dwell.find((d) => d.rung === s.rung);
     const e = curve.find((c) => c.rung === s.rung);
@@ -607,7 +746,8 @@ for (let it = 0; it < ITERS; it++) {
       + `${pad(Number.isFinite(s.rest) ? s.rest : '--', 6)}  `
       + `${pad(`${s.field}/${s.cap}`, 9)}  ${pad(s.jobsLeft, 4)}  ${pad(s.openS, 7)}  `
       + `${pad(Number.isFinite(dw.dwell) ? dw.dwell.toFixed(1) + (s.waves < 3 ? '+' : '') : dw.why, 8)}  `
-      + `${pad(e ? fmt(e.earned) : '--', 14)}  ${s.traits}`);
+      + `${pad(e ? fmt(e.earned) : '--', 14)}  ${pad(s.pulses, 5)}  `
+      + `[${s.paidEach.map((b) => fmt(b).replace(' ', '')).join(' ')}] ${s.rules}`);
   }
   /*
    * The stop line names the SAMPLE, not just the rung the loop broke at --
@@ -636,6 +776,11 @@ for (let it = 0; it < ITERS; it++) {
 
 const last = passes[passes.length - 1];
 console.log(`\n---- the anchors ${'-'.repeat(58)}`);
+if (REPEATED) {
+  console.log('  NOT ANCHORS: --rungs repeats a rung, so this is several windows at one');
+  console.log('  rung and the interpolation below has nothing to interpolate. Read the');
+  console.log('  rows.');
+}
 console.log('  For tiers.mjs\'s EARNED, which is asserted today and which its own header');
 console.log('  asks to have a measured curve driven into. Bytes, and the probe\'s own');
 console.log('  integral -- read the passes above before pasting one in.');

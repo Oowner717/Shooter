@@ -2633,9 +2633,24 @@ export class Enemy {
        * Only the wreckage -- the bodies still close as they always did, or
        * the trait would be a rest rather than a rule. The mote steers at a
        * point reflected through itself, so it uses the same steering it
-       * already had and simply wants the opposite thing; PULSE and INTAKE
-       * still overrule it, because taking energy in by hand is the answer to
-       * this and it should keep working.
+       * already had and simply wants the opposite thing.
+       *
+       * PULSE AND INTAKE OVERRULE IT INSIDE A DISC AND THE DISC IS THE WHOLE
+       * OF THE COUNTER, which is narrower than this paragraph used to claim.
+       * It read "PULSE and INTAKE still overrule it, because taking energy in
+       * by hand is the answer to this and it should keep working" -- true of
+       * the mechanism (`drawIn` absorbs every drop inside
+       * `max(CFG.energy.pulse, 340 * up.pulseR)`, so 400 stock and 575 fully
+       * bought) and false about its reach: the era-2 field is 1481 units deep
+       * and a mote shed by a body dying up-field is outside that disc before
+       * EBB touches it. Measured at build 364, rung 42, era 2, a window whose
+       * waves were three-fifths EBB: 68 presses of PULSE over 300 seconds
+       * took the run's income from 14.1 kB/s to 10.9, which is not an answer
+       * in either direction. What the disc answers is salvage shed NEAR the
+       * machine; what EBB denies is salvage that has to travel, and that is
+       * the part no press reaches. Left as it is -- a counter with a reach is
+       * a design and this one is legible on the screen -- but a line offering
+       * it as THE answer is the shape build 319's FLINT entry paid for.
        */
       if (this.isDrop && this.traits && hasTrait(this.traits, 'ebb')) {
         tx = this.x * 2 - tx;

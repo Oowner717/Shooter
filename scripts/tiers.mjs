@@ -199,14 +199,30 @@ const TREE_TOTAL = NODES
  * those agreeing with it to 0.66% was a coincidence. Re-taking the curve
  * wants N runs a rung, not a longer window.
  *
+ * BUILD 364 CONFIRMED THE CANDIDATE AND PRICED THE ALTERNATIVE. A 2x2 at rung
+ * 42 with a pin per random channel: the trait sequence held and the wave
+ * shuffle left free reads 140 to 247 kB/s (1.8x) against 6.76 to 328 (48x)
+ * with both loose, so the trait draw is the channel and the wave draw is
+ * worth 1.8x of it. And pinning BOTH is not exact, so N cannot be 1: a
+ * residual 1.08x survives between windows in one page, and any intervention
+ * worth measuring re-routes the pinned stream by changing the pacing. What
+ * moves is the PER-WAVE pay, 187 kB to 52.5 MB, and a poor window is poor in
+ * every wave -- which is what makes runs the right instrument rather than a
+ * hopeless one.
+ *
  * And the funded turret has never included CORE. It needs NEW FORM, NEW FORM
  * is `currency: 'remainder'` -- one per anomaly reconciled under the era
  * hold, not payable in bytes -- so the loop above skips it and has to.
  * Measured, 107 buys and 0 CORE levels at every spend. That is four levels at
  * x1.35, x3.32, the largest single node in the tree by multiplier, and its
  * 5.32 MB is affordable from rung 28 up: it was never the purse. Granting the
- * remainder is a decision the re-take has to make, and it would move every
- * anchor from 28 up.
+ * remainder is a decision the re-take has to make. **Build 364 priced it and
+ * it is worth about a tenth rather than a factor**: granted through the
+ * ledger, buys go 107 to 111 and the rate moves 9.43 to 10.5 kB/s at one roll
+ * and 256 against 248 and 230 at another. At that rung income is gated by
+ * salvage ARRIVING and not by bodies dying, so a damage multiplier buys very
+ * little of it -- the missing node is a real gap in the TURRET phase 7b is
+ * about and a tenth of a gap in this curve, which are different claims.
  */
 const EARNED = [[1, 0], [7, 500014], [14, 1886309], [21, 5456475], [28, 9054201], [35, 40585659], [42, 95804879]];
 /*

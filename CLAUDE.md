@@ -354,7 +354,7 @@ bare); and the barrel is a rounded rect laid along the aim from `R * 0.16`, so
 its reach is the far CORNER, not the axial tip.
 
 `node scripts/income.mjs [--window 240] [--iters 3] [--rungs 1,7,14,...]
-[--spend BYTES]` is
+[--spend BYTES] [--seed N] [--rand N] [--grant] [--press]` is
 the newest, and it answers a question none of the others can: **what a run has
 BANKED by the rung it meets each slot on.** Every affordability claim in this
 repo reads through `tiers.mjs`'s EARNED anchors, and until build 362 those were
@@ -381,8 +381,19 @@ not price prints `short` and one it measured as unbounded prints `held`, and
 those are different facts: `short` is the probe saying it measured nothing, and
 `left` non-zero beside it says the wave had not finished ARRIVING rather than
 merely being long. A `+` on a dwell means it was read from under three waves.
+**FOUR PINS, ALL OFF BY DEFAULT, AND THE READING WITH ALL FOUR LOOSE IS THE
+CURVE.** `--seed N` holds the trait sequence, `--rand N` the wave shuffle and
+every per-body roll, `--grant` gives the run the NEW FORM remainder so CORE is
+buyable, `--press` presses PULSE on cooldown. They exist to ATTRIBUTE the
+spread rather than to measure the curve, the heading says which reading it
+took, and `check-build` fails the build for one that defaults on -- a pinned
+reading calling itself the curve is unrecoverable downstream, because EARNED is
+a table of numbers with no record of its conditions. Two traps: `--rand` alone
+pins the traits too (the restart draws `runSeed` off the stream), and a
+repeated `--rungs` entry is the several-windows-at-one-rung idiom and makes the
+anchors meaningless, which it now says under them.
 Its findings, the faults it had first, and what phase 7b still owes are at the
-foot of this file under builds 362 and 363.
+foot of this file under builds 362, 363 and 364.
 
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
@@ -11349,3 +11360,191 @@ came from before believing the other one covers it.
   is that the probe now prints the cause, the trait roll, the unended seconds
   and CORE's level count, so a reader who quotes it has the mechanism in front
   of them.
+
+- **BUILD 364 ATTRIBUTES THE DEEP-RUNG RATE SPREAD AND IT IS THE TRAIT DRAW,
+  WHICH IS WHAT BUILD 363 NAMED AS THE CANDIDATE AND LABELLED AS INFERENCE.**
+  Two pins on `income.mjs`, one per random channel, and a 2x2 at rung 42 over
+  300-second windows with the funding, the rung, the era and the loadout all
+  held:
+
+  | cell | traits | everything else | rate, kB/s | spread |
+  |---|---|---|---|---|
+  | A | loose | loose | 7.59 · 241 · 6.76 · 328 | **48x** |
+  | B | pinned | loose | 140 · 247 · 200 · 175 | **1.8x** |
+  | C | varied | pinned | 362 · 179 · 14.1 · 7.86 | **46x** |
+  | D | pinned | pinned | 248 · 230 | 1.08x |
+
+  **B against A is the whole of the attribution and it is the clean cell.**
+  The trait sequence pinned and the wave shuffle and every per-body roll left
+  free, four windows read 140 to 247 -- so the wave draw, varying as freely as
+  it ever does, is worth 1.8x of a 48x spread. All four saw the identical three
+  trait sets (`armored+tethered mending+swarm ebb+armored`) and all four ran
+  differently: mean wave lengths 81.4, 85.4, 93.2 and 61.2 seconds, which is
+  what says the free channel really was free rather than accidentally
+  repeating.
+- **...AND C IS CONFOUNDED, WHICH IS `fight.mjs`'S OWN FINDING ARRIVING IN A
+  SECOND PROBE.** Pinning `Math.random` fixes the ORDER of the draws and not
+  which call consumes which: a trait that changes how long a wave takes
+  changes when `shuffle` is next called, so the stream is re-routed and C's
+  windows did not play the same waves -- 3, 5, 5 and 3 of them, against a
+  pinned order. `fight.mjs` records exactly this ("the seed fixed the dice,
+  but the *number of frames* that had gone by before the fight started...
+  was still whatever the last few hundred milliseconds happened to
+  produce"). So C corroborates the sign and cannot carry the claim; A and B
+  do.
+- **AND D IS NOT EXACT, WHICH MAKES THE PREMISE THIS BUILD OPENED WITH
+  FALSE.** Both channels pinned, two windows in one page: 248 and 230 kB/s,
+  with 3 waves against 2. The plan was that pinning both makes a deep-rung
+  A/B exact and therefore one window a side -- it does not, for two reasons
+  and the second is structural. There is a residual 1.08x that is NOT
+  attributed -- the two windows saw 3 waves and 2, so something outside both
+  pinned channels differs between two windows of one page, and `restart()` is
+  not a reset of everything a probe can leave behind. And **any intervention
+  worth measuring re-routes the pinned stream by changing the pacing**, which
+  is C's confound pointed at the thing under test rather than at the control.
+  So there is no cheap deep-rung A/B, and the phase-7b
+  re-take is N runs a rung and cannot be made N=1 by holding the dice.
+- **THE WINDOW'S RATE CANNOT SAY WHETHER ONE WAVE PAID EVERYTHING, AND
+  `cur.paid` HAD BEEN CAPTURED AND THROWN AWAY SINCE BUILD 362.** Returned
+  now, and it is the reading that sizes the re-take: per wave the pay runs
+  **187 kB to 52.5 MB**, and the two ends of the spread are
+  `[397kB 307kB 622kB 869kB 1.98MB]` against `[52.5MB 21.3MB 36.7MB]`
+  (the second with PULSE pressed, which was worth 5% of it). So it
+  is not one wave in four paying everything -- every wave in a poor window is
+  poor -- which is the answer that makes runs the right instrument. Had it
+  been the other shape, no number of runs would have converged.
+- **EBB IS A LARGE PART OF IT AND DEMONSTRABLY NOT ALL OF IT.** Over the
+  eight windows whose traits varied, the share of a window's DISTINCT trait
+  sets that carry EBB against its rate: **0.00 -> 328, 0.25 -> 241,
+  0.33 -> 362, 0.40 -> 179, 0.60 -> 14.1, 0.67 -> 7.59, 0.67 -> 7.86 and
+  0.75 -> 6.76** -- monotone with
+  one inversion, and a cliff of 12.7x between 0.40 and 0.60. The mechanism is
+  one line: EBB's single reader reflects a drop's steering target through the
+  drop itself, every frame for the whole of its life, and build 325 deleted
+  the `ttl` that used to end a drop -- so the salvage of an unanswered EBB
+  wave runs to the arena edge and is never banked. What says it is not all of
+  it is the within-window reading: in the EBB-heavy window the two EBB-free
+  waves paid 869 kB and 1.98 MB against the three EBB waves' 307 to 622 kB, a
+  factor of 3, while that window's own rate is a twenty-fifth of a low-EBB
+  one. Its two EBB-free waves mean 1.42 MB against the rich window's 36.8 MB
+  a wave, so
+  **the EBB-free waves of a poor window are themselves 26x poorer** than the
+  waves of a rich one, and that factor is unattributed. Recorded as the next
+  question rather than answered.
+- **AND PULSE IS NOT THE ANSWER TO IT, MEASURED, ON A DOCSTRING THAT SAID IT
+  WAS.** EBB's own paragraph read "PULSE and INTAKE still overrule it,
+  because taking energy in by hand is the answer to this and it should keep
+  working". The mechanism is real -- `drawIn` absorbs every drop inside
+  `max(CFG.energy.pulse, 340 * up.pulseR)`, which is 400 stock and 575 fully
+  bought -- and the reach is the whole of the counter: the era-2 field is
+  **1481** units deep, so a mote shed by a body dying up-field is outside
+  that disc before EBB touches it. Measured at the EBB-heavy roll, **68
+  presses over 300 seconds took the rate from 14.1 kB/s to 10.9** -- not an
+  answer in either direction, and 68 is `300 / (7 * 0.64)` to the press, which
+  is PULSE's cooldown with STANDING ORDER's two levels owned, so the count
+  agreeing with the arithmetic is what says the loop pressed on cooldown
+  rather than sometimes -- and at a low-EBB roll 362 to 381, which is
+  inside the residual. INTAKE is no better and for the same reason: its own
+  row reads "data is taken in on contact", and an EBB mote never reaches
+  contact. What the disc answers is salvage shed NEAR the machine; what EBB
+  denies is salvage that has to travel. The trait is left exactly as it is,
+  because a counter with a reach is a design; the paragraph
+  offering it as THE answer is build 319's FLINT entry, where a codex line
+  named the worst answer available as the answer.
+- **CORE IS WORTH ABOUT A TENTH AT RUNG 42, WHICH CLOSES BUILD 363'S OPEN
+  QUESTION WITH A MEASUREMENT.** That build found the funded turret has never
+  owned CORE -- the tree's only node behind a `needs` PREDICATE, gated on the
+  NEW FORM, which is `currency: 'remainder'` and not payable in bytes -- and
+  recorded that granting it "would move every anchor from rung 28 up".
+  Granted through the LEDGER (`owned()` counts `world.ledger` and reads
+  nothing else, build 266) the buys go 107 to 111 and the rate moves
+  **9.43 -> 10.5 kB/s (+11%)** at one roll and **256 against 248 and 230** at
+  another: the same sign twice, and nothing like the x3.32 the multiplier
+  suggests. The reason is the finding above -- at that rung income is gated
+  by salvage ARRIVING and not by bodies dying, so a damage multiplier buys
+  very little of it. So the model being short of CORE is a real gap in the
+  TURRET phase 7b is about and a tenth of a gap in the CURVE, and those are
+  different claims about one missing node.
+- **THE PINS ARE FLAGS, THEY DEFAULT LOOSE, AND THE GUARD IS ON THE
+  DEFAULT.** `--seed` pins the trait sequence, `--rand` the wave shuffle and
+  every per-body roll, `--grant` the remainder, `--press` PULSE on cooldown;
+  all four off, so the measured curve is unchanged and every anchor it has
+  ever produced is still an anchor for a run with the dice free. A channel
+  that defaulted ON would be a pinned reading calling itself the curve --
+  which is this repo's most expensive recurring shape, and `tiers.mjs`'s
+  EARNED is a table of numbers with no record of the conditions it was taken
+  under, so nothing downstream could ever tell. Build 362's digest pins the
+  economy the curve is a function of and says nothing about that.
+  **DERIVED from the probe's own definition of the curve**: the heading
+  prints "(the curve)" behind a condition that enumerates the channels, so
+  that condition IS the definition -- and the guard read 3 channels before
+  `--press` was written and 4 after, with no edit, which is the derivation
+  demonstrated rather than claimed.
+- **...AND A CONDITION IS AN ENUMERATION, WHICH THE FIRST DRAFT OF THAT ARM
+  CLAIMED OTHERWISE ABOUT.** It said a fourth channel "added and left out of
+  it" would fail; it would not -- the channel set comes OFF the condition, so
+  one never put there is invisible, which is the hand-kept-list shape one
+  level up. Closed from the other direction: every flag the probe reads must
+  be in that condition or named in `INCOME_PLAIN` as what to MEASURE rather
+  than which dice to hold, so a new flag fails the build until somebody
+  classifies it. Build 338's ruling -- the fix for a value that can be
+  omitted is to make the omission impossible to write, not to document it.
+  Four revert proofs, each on its own conjunct with its own message.
+- **THE `rules` COLUMN PRINTED ONE OF N, IN CODE I WROTE LAST BUILD, UNDER A
+  NOTE SAYING A READER "CANNOT SEE WHICH ROLL A FIGURE CAME FROM UNLESS IT IS
+  PRINTED BESIDE IT".** It read `d.traits` once, after the loop -- the rules
+  of the LAST wave -- and a rung's traits are drawn per wave, so a window with
+  nine waves had nine sets and the column showed the ninth. Build 354's rule
+  exactly ("when a probe reduces a population to its worst member, the thing
+  to add is the population"), and the whole attribution above is unreadable
+  without the fix: the EBB shares are counted off that column.
+- **`--rand` ALONE PINS BOTH CHANNELS, AND THE VARYING CELL NEEDS `--seed`
+  EXPLICITLY.** `restart()` draws the run's seed off `Math.random`, so a
+  pinned stream hands out a pinned `runSeed` too and cells C and D collapse
+  into one. Written at the flag, because the trap is invisible at the call
+  site: the two flags read as independent and one contains the other.
+- **AND A REPEATED `--rungs` ENTRY IS THE REPEAT-WINDOW IDIOM AND BREAKS THE
+  CURVE.** `--rungs 42,42,42,42` is how four windows are taken at one rung in
+  one browser launch, which is what an attribution needs; `pick` interpolates
+  over the sampled rungs and a duplicate makes that arithmetic meaningless,
+  so it printed anchors of 720 MB and 1.07 GB beside perfectly good rows. Said
+  out loud under the anchors rather than refused -- a probe that prints a
+  table nobody can read and exits 0 is this repo's own scar.
+- **AND THE SUITE TURNED UP A LOOP BOUND SITTING IN THE MIDDLE OF ITS OWN
+  BIMODAL DRAW, ON A BUILD WHOSE ONLY EXECUTABLE CHANGE IS THE BUILD
+  LITERAL.** The QUARRY `roll` arm walked a body for a flat `secs` of 110 and
+  asserted it arrived; build 363's dump reads `arrived at 110s`, which IS the
+  bound, and 364 read the side release as `nulls over 381`. Measured, twelve
+  QUARRY draws through the same helper: the crossing is **56.5 to 70.1
+  seconds**, and **all twelve rolled an ordinary route**. The second mode is
+  `loiter`, whose `dawdle` is 0.55 and which `roll` inherits deliberately
+  (build 318: for it that is a slower approach rather than a broken claim), so
+  the same crossings there are 103 to 127 by arithmetic -- and the two
+  readings that failed are at 110 and over 110, which is that mode and nothing
+  else. So the flat bound sat between the two, which is build 321's bimodal
+  tail on a `for` statement rather than on a threshold, and the 1.8x is real
+  behaviour the case has to tolerate rather than a roll to pin away. The
+  dawdled crossing is INFERRED and not measured: the twelve draws missed it,
+  which at a weight of 10 in 100 is a 28% outcome.
+  DERIVED now, per walk, from the depth the body actually has left over the
+  closing speed its own type delivers against `linearDamping` **with the
+  dawdle that body actually rolled** -- `e.route.dawdle`, read off the body,
+  so no constant is copied out of the module-private route table -- times
+  `hypot(1, CFG.roll.slant)` for the path the traverse lengthens and 1.6. It
+  reads 85 to 108 seconds against arrivals of 56 to 70, **0 nulls in 18 draws
+  and a worst usage of 0.68 of the budget**, it grows with the dawdle when one
+  is rolled (the LURCHER control drew 113 and 129 against 62 to 66), and it
+  moves with the era and the field instead of being right at one of them. Both
+  figures are printed. Build 331 made exactly this fix to VEIL's gait arm and
+  the rule is worth stating once more: **a loop bound is a fitted margin
+  wearing a `for` statement's clothes**, and the tell is a recorded arrival
+  equal to the bound.
+- **AND FOUR PRESENT-TENSE CLAIMS ABOUT A READER DELETED AT BUILD 224, ALL IN
+  THE FILE WHOSE DOCSTRING CAUSED THE BUG.** `upgrades.js` said "`tree.js`
+  reads `u.levels ?? 3`" at four sites and "Two levels, not the default
+  three" at a fifth -- 140 builds after `levelsOf` stopped defaulting and
+  `check-build` began failing the build for a node that declares none. Every
+  one sits in a past-tense narrative about a node that shipped sold three
+  times, so the tense is the whole of the fault: a reader who greps for the
+  default finds five live-sounding statements that it exists. Build 329's
+  rule, and the cheap sweep is the tense rather than the figure.

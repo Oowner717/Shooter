@@ -31508,13 +31508,40 @@ if (MINE_LINE) {
      * thin, is a run that can never climb again. So `roll` keeps the closing
      * march and replaces the ROUTE.
      */
-    const walk = (id, x0, secs) => {
+    /*
+     * ---- AND THE BUDGET IS DERIVED, because 110 seconds was inside its own
+     * draw ----------------------------------------------------------------
+     *
+     * It was a flat `secs` of 110 and the arrivals it has printed are 54.6,
+     * 64.8 and 110 -- the last of which IS the bound, so the case was sitting
+     * on it a build before it went red, on a build whose only source change
+     * was the BUILD literal. A loop bound is a fitted margin wearing a `for`
+     * statement's clothes (build 331 found the same thing in VEIL's gait arm)
+     * and the parameter here is the ROUTE: `roll` replaces the route's
+     * steering and keeps its `dawdle`, deliberately, so one body in ten rolls
+     * `loiter` and closes at 0.55 of the rest. That is a 1.8x swing on the
+     * quantity the bound is about and nothing to do with the claim.
+     *
+     * So each walk prices its own: the depth it actually has left, over the
+     * closing speed its own type delivers against `linearDamping` WITH the
+     * dawdle it actually rolled, times the path the slant lengthens
+     * (`hypot(1, slant)`) and a margin. It moves with the era, the field and
+     * the config instead of being right at one of them, and both figures are
+     * printed so the next reader can see the headroom without writing a
+     * probe.
+     */
+    const walk = (id, x0) => {
       clear();
       const e = g.debugSpawn(id, x0, 260);
       e.staged = false;
       e.spawnIn = 0;
       e.hp = 1e9;
       e.maxHp = 1e9;
+      const k = (e.type.accel || 100) / 100;
+      const closing = (e.cruise * k) / (k + CFG.physics.linearDamping)
+        * (e.route && e.route.dawdle ? e.route.dawdle : 1);
+      const depth = w.shooter.y - e.y - (e.r + w.shooter.r + CFG.shooter.grabPad);
+      const secs = (depth / closing) * Math.hypot(1, CFG.roll.slant) * 1.6;
       let flips = 0;
       let prev = 0;
       let minX = Infinity;
@@ -31531,16 +31558,17 @@ if (MINE_LINE) {
         if (s > 90) minAv = Math.min(minAv, Math.abs(e.av));
         if (arrive === null && e.attacking) { arrive = +(s / 60).toFixed(1); break; }
       }
-      return { flips, turns, crossed: +(maxX - minX).toFixed(0), minAv: +minAv.toFixed(3), arrive };
+      return { flips, turns, crossed: +(maxX - minX).toFixed(0), minAv: +minAv.toFixed(3), arrive,
+        budget: +secs.toFixed(1), dawdle: e.route && e.route.dawdle ? e.route.dawdle : 1 };
     };
     out.band = +(Q.r + CFG.physics.edgeEase).toFixed(0);
     out.width = +w.width.toFixed(0);
-    out.mid = walk('quarry', w.width * 0.5, 110);
-    out.side = walk('quarry', w.width * 0.18, 110);
+    out.mid = walk('quarry', w.width * 0.5);
+    out.side = walk('quarry', w.width * 0.18);
     // The control for the held spin: an ordinary body's own `av` is damped to
     // nothing, so a floor of 1.8 on one and 0.5 on the other is the same
     // instrument reading a one and a zero.
-    out.plain = walk('lurcher', w.width * 0.5, 110);
+    out.plain = walk('lurcher', w.width * 0.5);
 
     // ---- an endless chain is refused -------------------------------------
     /*
@@ -31677,9 +31705,10 @@ if (MINE_LINE) {
     && r.mid.arrive !== null && r.side.arrive !== null
     && r.mid.crossed > 250 && r.plain.flips === 0,
     `from the middle it turned ${r.mid.flips} time(s) at x ${r.mid.turns.join(', ')} and arrived at `
-    + `${r.mid.arrive}s having crossed ${r.mid.crossed} of ${r.width}; from a side, ${r.side.flips} at `
-    + `${r.side.turns.join(', ')} and ${r.side.arrive}s over ${r.side.crossed}. The band is `
-    + `${r.band} in from each edge; a LURCHER turned ${r.plain.flips} times`);
+    + `${r.mid.arrive}s of a derived ${r.mid.budget} (dawdle ${r.mid.dawdle}) having crossed `
+    + `${r.mid.crossed} of ${r.width}; from a side, ${r.side.flips} at ${r.side.turns.join(', ')} `
+    + `and ${r.side.arrive}s of ${r.side.budget} (dawdle ${r.side.dawdle}) over ${r.side.crossed}. `
+    + `The band is ${r.band} in from each edge; a LURCHER turned ${r.plain.flips} times`);
 
   check('...and the spin is held against the damping, which nothing else is',
     r.mid.minAv > 1.8 && r.side.minAv > 1.8 && r.plain.minAv < 0.5,

@@ -1634,6 +1634,97 @@ console.log("income: tiers.mjs's EARNED curve is measured (income.mjs) and the "
   + Object.keys(incomeTerms).length + ' economy terms it is a function of are unmoved at '
   + incomeDigest);
 
+/*
+ * ---- ...AND THE CURVE IS THE READING WITH EVERY ROLL LOOSE --------------
+ *
+ * Build 364 gave `income.mjs` a pin per random channel -- `--seed` for the
+ * trait sequence, `--rand` for the wave shuffle and every per-body roll,
+ * `--grant` for the NEW FORM remainder -- because the rate at a deep rung
+ * spans a factor of sixty at one funding and attributing that needs the
+ * channels held one at a time. Every one of them makes the reading a
+ * DIFFERENT claim: a curve taken under a pin is a curve for that roll, and a
+ * curve taken with CORE granted is a curve for a turret the bytes did not
+ * buy.
+ *
+ * Nothing above can see it. The digest pins the economy the curve is a
+ * function of; it says nothing about the conditions the measurement was
+ * taken under, and the anchors in `tiers.mjs` are a table of numbers with no
+ * record of which roll produced them. So the guard is on the DEFAULT: a
+ * channel that defaults ON is a pinned reading that calls itself the curve,
+ * which is this repo's most expensive recurring shape -- `u.levels ?? 3`
+ * sold eight nodes three times, an omitted `band` read as 9 kB against
+ * 4 MB, and five types would have worn another type's shared block.
+ *
+ * DERIVED from the probe's own definition of the curve rather than from a
+ * list of three: the heading prints "(the curve)" behind a condition that
+ * enumerates the channels, so that condition IS the definition.
+ *
+ * ...AND A CONDITION IS AN ENUMERATION, so on its own it cannot see a fourth
+ * channel that was never put in it -- the hand-kept-list shape one level up,
+ * and the first draft of this arm claimed otherwise. What closes that is the
+ * other direction: every flag the probe reads is either a roll (and must be
+ * in the condition) or is named below as what to MEASURE rather than which
+ * dice to hold. A new flag fails the build until it is classified, which is
+ * build 338's ruling -- the fix for a value that can be omitted is to make
+ * the omission impossible to write, not to document it.
+ */
+const incomeSrc = readFileSync(new URL('income.mjs', probeDir), 'utf8');
+const curveMark = incomeSrc.match(/\?\s*'\s*\(the curve\)'/);
+const curveCond = curveMark
+  ? incomeSrc.slice(0, curveMark.index).match(/\$\{([^{}]*)$/)
+  : null;
+if (!curveCond) {
+  console.error('income: income.mjs no longer prints "(the curve)" behind a condition, so '
+    + 'there is nothing to derive the pinnable channels from and this arm is asserting '
+    + 'nothing. The detection has drifted, not the exposure -- re-point it at whatever '
+    + 'the probe now uses to say a reading is the curve rather than an attribution.');
+  process.exit(1);
+}
+const channels = [...new Set(curveCond[1].match(/\b[A-Z][A-Z0-9_]*\b/g) || [])];
+if (channels.length < 3) {
+  console.error('income: derived only ' + channels.length + ' pinnable channel(s) from '
+    + "income.mjs's curve condition (" + channels.join(', ') + ') and there are at least '
+    + 'three -- the trait seed, the random stream and the remainder grant. The detection '
+    + 'has drifted, not the exposure.');
+  process.exit(1);
+}
+/*
+ * What the probe reads that is NOT a roll: which rungs, how long a window,
+ * how many passes, what to fund with, and which tree to read. These say what
+ * to measure; a roll says which dice were held while measuring it.
+ */
+const INCOME_PLAIN = ['window', 'iters', 'rungs', 'spend', 'url', 'expect'];
+const readFlags = [...new Set([
+  ...[...incomeSrc.matchAll(/\bflag\('([a-z]+)'/g)].map((m) => m[1]),
+  ...[...incomeSrc.matchAll(/args\.includes\('--([a-z]+)'\)/g)].map((m) => m[1]),
+])];
+const unclassified = readFlags.filter((f) => !INCOME_PLAIN.includes(f)
+  && !channels.includes(f.toUpperCase()));
+if (unclassified.length) {
+  console.error('income: income.mjs reads --' + unclassified.join(', --') + ' and it is '
+    + 'neither in the condition behind "(the curve)" nor named in INCOME_PLAIN above. '
+    + 'If it holds a roll it belongs in that condition, or a reading taken under it '
+    + 'calls itself the curve; if it only says what to measure, name it here. A flag '
+    + 'that is neither is a third thing nobody chose.');
+  process.exit(1);
+}
+const loose = /(?:flag\('[a-z]+', null\)|args\.includes\()/;
+const pinnedOn = channels.filter((c) => {
+  const m = incomeSrc.match(new RegExp('^const ' + c + ' = .*$', 'm'));
+  return !m || !loose.test(m[0]);
+});
+if (pinnedOn.length) {
+  console.error('income: ' + pinnedOn.join(', ') + ' does not default to loose in '
+    + 'income.mjs, so the reading that probe calls "(the curve)" is taken with a roll '
+    + 'CHOSEN and every anchor it produces is an anchor for that roll -- silently, '
+    + "because tiers.mjs's EARNED is a table of numbers with no record of its "
+    + 'conditions. Default it off and pass it explicitly when attributing.');
+  process.exit(1);
+}
+console.log('income: all ' + channels.length + ' of income.mjs\'s pinnable rolls ('
+  + channels.join(', ').toLowerCase() + ') default loose, so its curve is the measurement '
+  + 'and a pin is an attribution');
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {
