@@ -183,6 +183,30 @@ const TREE_TOTAL = NODES
  * fails the build when one of them moves, because a measured constant
  * describes the day it was taken on and this one is what every affordability
  * claim in the repo reads through. Re-measure and move the pin together.
+ *
+ * ---- AND THE DEEP ANCHORS ARE SINGLE DRAWS, MEASURED AT BUILD 363 ----
+ *
+ * Distrust everything from rung 28 up, for two reasons that are both about
+ * the probe rather than the ladder.
+ *
+ * The RATE at a deep rung is not reproducible. Measured at one funding across
+ * five windows, rung 49 read 10.8, 24.6, 93.4, 184 and 648 kB/s -- a factor
+ * of 60, and no narrower over twenty game-minutes than over four -- and rung
+ * 42 read 5.75 to 65.9. The candidate is the wave rules, which `restart()`
+ * re-rolls per window, so each anchor above is ONE roll. A slope taken off
+ * two such windows is worthless: the rung 42-to-49 growth read 1.138 a rung
+ * on one and 1.014 on the next, and `TAIL` below is 1.13055, so the first of
+ * those agreeing with it to 0.66% was a coincidence. Re-taking the curve
+ * wants N runs a rung, not a longer window.
+ *
+ * And the funded turret has never included CORE. It needs NEW FORM, NEW FORM
+ * is `currency: 'remainder'` -- one per anomaly reconciled under the era
+ * hold, not payable in bytes -- so the loop above skips it and has to.
+ * Measured, 107 buys and 0 CORE levels at every spend. That is four levels at
+ * x1.35, x3.32, the largest single node in the tree by multiplier, and its
+ * 5.32 MB is affordable from rung 28 up: it was never the purse. Granting the
+ * remainder is a decision the re-take has to make, and it would move every
+ * anchor from 28 up.
  */
 const EARNED = [[1, 0], [7, 500014], [14, 1886309], [21, 5456475], [28, 9054201], [35, 40585659], [42, 95804879]];
 /*
@@ -449,9 +473,48 @@ for (let r = 0; r < RUNS; r++) {
       // tree, in tree order -- parents first, so an arm is open before its
       // leaves are reached. This is where a large budget stops helping.
       const { NODES } = await import('../src/tree.js');
-      for (const n of NODES) {
-        if (!n.id || n.repeat || n.dormant || n.currency) continue;
-        while (g.buy(n.id) === 'ok') bought.push(n.id);
+      /*
+       * PASSES until one buys nothing, not one pass -- build 302's rule.
+       *
+       * A node gated on a `needs` PREDICATE rather than on a parent is
+       * refused while its gate is shut, and a single walk of `NODES` never
+       * comes back for it. It is a latent trap rather than a live fault, and
+       * measuring which is the whole of the note below: `buys` is 107 and
+       * `core` 0 with one pass and with eight, identically, at any spend.
+       *
+       * ---- AND CORE IS NOT BOUGHT AT ALL, WHICH IS NOT THIS LOOP ----
+       *
+       * There is exactly one `needs`-predicate chain in the tree and it is
+       * the damage line's second half: CORE needs NEW FORM owned, and NEW
+       * FORM is `currency: 'remainder'` -- one remainder per anomaly
+       * reconciled under the era hold, `CFG.ordinal.recast` of them, and NOT
+       * payable in bytes at all. The loop skips every `currency` node and has
+       * to: a probe that handed over 200 MB has bought nothing towards it.
+       * So CORE's four levels at x1.35 -- x3.32, the largest single node in
+       * the tree by multiplier -- are missing from every funded window this
+       * probe has ever taken, at every spend, and no pass count reaches them.
+       * Setting `world.newForm` does not do it either: `owned()` reads the
+       * LEDGER, which is why build 266 records that anything needing NEW FORM
+       * writes `recast` into the ledger rather than setting the flag.
+       *
+       * That is a statement about what this probe MODELS -- a turret funded
+       * in bytes -- and a run standing at rung 35 or 42 has answered five or
+       * six gates and can certainly own NEW FORM, so the model is short of
+       * the turret those slots actually meet. Granting the remainder is a
+       * decision the curve's re-take has to make and this build does not: it
+       * would move every anchor from rung 28 up, which is the rung CORE's
+       * 5.32 MB first becomes affordable at.
+       *
+       * The passes stay because the trap is real and they cost nothing; the
+       * cap is a backstop so a future gate cycle cannot spin.
+       */
+      for (let pass = 0; pass < 8; pass++) {
+        let any = false;
+        for (const n of NODES) {
+          if (!n.id || n.repeat || n.dormant || n.currency) continue;
+          while (g.buy(n.id) === 'ok') { bought.push(n.id); any = true; }
+        }
+        if (!any) break;
       }
       if (w.round !== 'standard') w.round = 'standard';
 

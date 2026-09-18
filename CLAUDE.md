@@ -353,7 +353,8 @@ part paints half a line width outside its own geometry (5% fully rigged, 19%
 bare); and the barrel is a rounded rect laid along the aim from `R * 0.16`, so
 its reach is the far CORNER, not the axial tip.
 
-`node scripts/income.mjs [--window 240] [--iters 3] [--rungs 1,7,14,...]` is
+`node scripts/income.mjs [--window 240] [--iters 3] [--rungs 1,7,14,...]
+[--spend BYTES]` is
 the newest, and it answers a question none of the others can: **what a run has
 BANKED by the rung it meets each slot on.** Every affordability claim in this
 repo reads through `tiers.mjs`'s EARNED anchors, and until build 362 those were
@@ -367,9 +368,21 @@ purchase policy, and drives a synthetic window: bytes a second off
 seconds a rung takes from the verdict mix over the wave plus its measured seam.
 Earned-by-rung is the integral of the two, and the whole curve is iterated to a
 fixed point from BELOW, so the first pass owes nothing to the curve it
-replaces. Thirteen minutes for three passes over eight rungs. Its findings, the
-faults it had first, and what phase 7b still owes are at the foot of this file
-under build 362.
+replaces. Thirteen minutes for three passes over eight rungs. `--spend BYTES`
+funds every sampled rung by name instead, which is what rules money out as the
+answer -- fund past what the tree costs and a stall cannot be the purse -- and
+it forces one pass, because under a pinned funding every pass is identical.
+
+**THE WINDOW HAS TO BE SEVERAL TIMES THE RUNG'S OWN WAVE AND THE DEFAULT IS NOT,
+at the top.** A wave is about 5 seconds at rung 1 and **125.8** at rung 49, so a
+240-second window there completed NO wave on either of two runs and its rate
+drew 24.6 and 184 kB/s against 93.4 over 1200 seconds. A dwell the probe could
+not price prints `short` and one it measured as unbounded prints `held`, and
+those are different facts: `short` is the probe saying it measured nothing, and
+`left` non-zero beside it says the wave had not finished ARRIVING rather than
+merely being long. A `+` on a dwell means it was read from under three waves.
+Its findings, the faults it had first, and what phase 7b still owes are at the
+foot of this file under builds 362 and 363.
 
 `node scripts/regress.mjs` asserts the things this game has actually got wrong:
 stale field reads (the class of bug that stopped the turret firing for three
@@ -11075,6 +11088,10 @@ came from before believing the other one covers it.
   stops a curve is a rung whose window scored no climb at all: the dwell there
   is unbounded and nothing above it is reachable, which the probe says in
   those words rather than dividing by zero.
+  **That last sentence is the CONFLATION build 363 had to unpick**: a window
+  that completed no wave and a window whose every wave stalled both returned
+  one `Infinity` and printed one word, and only the second of them is a
+  measurement. The stop at 43 was the first kind, at the CEILING sample.
   **And the first pass reproduces `tiers.mjs`'s own recorded figure**, which is
   the instrument agreeing with a seventeen-build-old measurement it was
   written to replace: that header says a stock turret "banks 4,417 in fifteen
@@ -11161,6 +11178,15 @@ came from before believing the other one covers it.
   second one is either the top of the ladder being genuinely unclimbable or
   the window being too short to catch a climb there, and which it is wants
   one long window at rung 43 before anybody tunes TERMINUS.
+  **THE SECOND CAUTION IS STRUCK AND ITS MECHANISM WAS WRONG -- see build
+  363.** The ladder is climbable at the top: at rung 49, fully funded, a
+  1200-second window scores 1 surge, 2 cleans and 2 stalls. The window was
+  too short, and the stop was never at 43 -- it is the CEILING sample that
+  could not be priced, and `pick` interpolating toward it takes 43 to 48 with
+  it. The first caution stands and is far worse than "soft": measured at one
+  funding, the rate at rung 49 spans **10.8 to 648 kB/s** across five windows
+  and at rung 42 5.75 to 65.9, so the deep anchors are single draws of a
+  quantity with a factor of 60 in it -- and a longer window does not narrow it.
 - **THE WHOLE MEASUREMENT IS THIRTEEN MINUTES, WHICH IS WHY IT IS A PROBE
   AND NOT A BOT RUN.** Three passes over eight rungs at a 240-second window
   each -- 5,760 game-seconds of ladder -- runs in about the time one suite
@@ -11185,3 +11211,141 @@ came from before believing the other one covers it.
   as rather than left to be found. Found by grepping the writers of a field
   before believing a sentence about it, which is the cheapest check in this
   repo and has now paid three builds running.
+
+
+- **BUILD 363 ANSWERS THE ONE QUESTION BUILD 362 LEFT OPEN AND THEN FINDS A
+  WORSE ONE: THE TOP OF THE LADDER IS CLIMBABLE, AND THE RATE UP THERE VARIES
+  BY A FACTOR OF SIXTY AT ONE SPEND.** 362's note said the curve's stop was
+  "either the top of the ladder being genuinely unclimbable or the window being
+  too short to catch a climb there, and which it is wants one long window".
+  It is the window -- and answering it took three faults out of the probe and
+  turned up a fourth thing that is not a fault at all.
+  Measured at rung 49, funded with 200 MB (more than the whole tree costs),
+  across five windows:
+
+  | window | waves | su/cl/st | wave s | unended s | rate | rules |
+  |---|---|---|---|---|---|---|
+  | 240s | 0 | -- | -- | (all 240) | 24.6 kB/s | -- |
+  | 240s | 0 | -- | -- | (all 240) | 184 kB/s | -- |
+  | 240s | 1 | 0/1/0 | 77.5 | 160.6 | **648 kB/s** | mending+armored |
+  | 1200s | 5 | 1/2/2 | 125.8 | -- | 93.4 kB/s | -- |
+  | 1200s | 9 | **6/2/1** | 122.4 | 48.6 | **10.8 kB/s** | -- |
+
+  So the ladder climbs at its ceiling -- six surges of nine waves on one run --
+  and **nothing about the top had been measured**: the rate spans 10.8 to 648
+  kB/s, a factor of 60, over windows of four and twenty game-minutes at ONE
+  funding. Rung 42 is calmer and not calm: 5.75, 6.02, 8.88, 9.01, 9.53 and
+  then 65.9 kB/s.
+- **SO THE CORROBORATION THIS BUILD ALMOST SHIPPED WAS A RATIO BETWEEN TWO
+  SINGLE DRAWS, AND RE-MEASURING IS WHAT CAUGHT IT.** `tiers.mjs` carries the
+  35-to-42 growth above its last anchor as `TAIL`, 1.13055 a rung, and the
+  first 1200-second run accumulated 27.9 MB by rung 42 and 68.9 by 49 --
+  **1.13797 a rung, 0.66% apart**, which I wrote up as the extrapolation being
+  corroborated at the ceiling. The second 1200-second run reads 270 MB and 297
+  MB: **1.014 a rung.** Both terms of `earned = rate x dwell` are draws of the
+  spread above, so a slope taken from two single windows is worth nothing, and
+  the fact that one of them landed within 0.66% of the shipped figure is the
+  coincidence that makes this shape dangerous. Struck rather than kept with a
+  caveat. **A ratio between two single draws is a coin toss** -- and this file
+  has recorded that six times, about bodies, rounds and clouds, and this is
+  the first time it arrived as a slope.
+- **AND WHAT THE NEXT BUILD OWES IS RUNS, NOT A LONGER WINDOW, which is the
+  opposite of what 362 asked for.** A longer window fixes the wave COUNT: at
+  240 seconds rung 49 saw no end at all twice, because a wave there is 77 to
+  136 seconds and `unended` -- seconds the wave in progress had been running
+  when the window closed -- reads 101.5 and 160.6. It does not fix the rate,
+  which is as wide at 1200 seconds as at 240. The candidate is the one
+  confound the probe deliberately does not pin: `restart()` re-rolls
+  `world.runSeed`, `traitsFor` is seeded off it, and SWARM doubles a wave's
+  bodies while halving their health -- measured, one run drew `ebb+armored` at
+  rung 42 and `mending+armored` at rung 49, each window rolling its own. The
+  roll is PRINTED now rather than pinned, because build 338's rule is that
+  pinning a seed is choosing a roll. So a re-take is N runs a rung at a window
+  several times that rung's own wave, and the anchors above rung 35 should be
+  read as single draws until it happens.
+- **ONE `Infinity` FOR THREE CONDITIONS, AND ONE WORD PRINTED FOR ALL OF
+  THEM -- which is what put the wrong mechanism into 362's note.** `dwellOf`
+  returned `Infinity` for no wave completed, for no seam closed, and for every
+  wave stalling; the table printed `never` and the stop line stated the third
+  of those whichever had happened. Two are the probe saying it measured
+  nothing and one is a measurement. They are `short` and `held` now, with
+  their own stop sentences, and **both were proved able to read a one before
+  either was believed**: fully funded at 240s rung 49 reads `short` and names
+  the cause, and a bare gun at rungs 35 and 42 over 180s reads `held` with
+  three completed waves and no climbs. **A readout that cannot tell two facts
+  apart will be quoted as whichever one the reader already believes.**
+- **THE STOP WAS NEVER AT RUNG 43: IT WAS THE CEILING SAMPLE, AND `pick` TAKES
+  THE SIX RUNGS BELOW IT DOWN AS COLLATERAL.** `pick` interpolates, so at the
+  lower sample's own rung the weight is exactly 0 and the value is that
+  sample's finite dwell, and one rung up the weight is non-zero and
+  `a + (Infinity - a) * t` is infinite. Sampling 1, 7 ... 42, 49 with rung 49
+  unpriceable therefore breaks the accumulation at **43**, six rungs below the
+  sample that caused it -- and 362 read the break rung as the finding.
+  `blame()` names the SAMPLE now and the message says which rungs are
+  collateral. **A loop that breaks reports where it stopped, which is not
+  where the fault is.**
+- **EVERY WINDOW SILENTLY DROPPED ITS FIRST WAVE, AND THE COLUMN ADDED TO
+  MEASURE SOMETHING ELSE IS WHAT EXPOSED IT.** `lastAt` was initialised to
+  `d.at` and a wave is entered on `d.at !== lastAt`, so the wave the window
+  OPENS on never satisfied that test: no `cur`, nothing pushed when it ended,
+  no `endedAt` and therefore no first seam either. The bias is one whole wave
+  per window -- invisible where a window holds eighteen and most of the
+  reading where it holds two. Measured either side at 240s: rung 42 goes 1
+  wave to **3** and rung 49 goes 0 to **1**, so at the top it was the
+  difference between a sample and nothing at all. `cur` is seeded from the
+  wave the warm-up landed on. **`ladder-probe.mjs`, which this loop was
+  modelled on, uses a `lastAt = -2` sentinel and has never had the fault**,
+  and `tiers.mjs`'s own wave counter carries a comment about the same class of
+  fault being fixed THERE ("the first wave's length counts too... a zero from
+  an instrument that had never been shown to read anything else").
+- **THE BUYING LOOP WAS ONE PASS WHERE BUILD 302 ALREADY WROTE DOWN WHY IT
+  MUST BE MANY -- AND FIXING IT CHANGES NOTHING, FOR A REASON THAT IS THE REAL
+  FINDING.** A node gated on a `needs` PREDICATE rather than on a parent is
+  refused while its gate is shut and a single walk of `NODES` never comes back
+  for it; there is exactly one such chain and it is the damage line's second
+  half, `core` at upgrades.js:477 needing `recast` at :1029. So the reading
+  looked obvious and was wrong: **NEW FORM is `currency: 'remainder'`**, one
+  per anomaly reconciled under the era hold, and the policy skips every
+  `currency` node and has to, because a probe that handed over 200 MB has
+  bought nothing towards it. Measured, one pass against eight: **107 buys and
+  0 CORE levels either way, at every spend.** Setting `world.newForm` does not
+  do it either -- `owned()` reads the LEDGER, which is why build 266 records
+  that anything needing NEW FORM writes `recast` into the ledger rather than
+  setting the flag.
+  **What that means for 7b is the part worth carrying**: CORE's four levels at
+  x1.35 -- **x3.32, the largest single node in the tree by multiplier** -- are
+  missing from every funded window either probe has ever taken, and its 5.32 MB
+  is affordable from rung 28 up, so this was never the purse. A run standing
+  at rung 35 or 42 has answered five or six gates and can certainly own NEW
+  FORM, so **the model is short of the turret those slots actually meet**,
+  which is the exact phrase phase 7b exists to make true. Granting the
+  remainder is a decision the re-take has to make and this build does not. The
+  passes stay because the trap is real and cost nothing, and `core` is a
+  COLUMN now, so a 0 there at a spend past 5.32 MB says "remainder, not
+  money" to the next reader instead of nothing.
+- **AND THE SAME LOOP IS IN `tiers.mjs`, WHICH IS WHERE `income.mjs` COPIED IT
+  FROM.** Both fixed. The general shape, and it is the lesson of the whole
+  build: **a probe written by copying a sibling inherits that sibling's
+  unfixed faults and does not inherit the fixes made elsewhere.** All three of
+  income.mjs's faults were ones this repo had already met -- the one-pass buy
+  loop (build 302 fixed it in three regress cases and never in `tiers.mjs`),
+  the dropped first wave (fixed in `tiers.mjs`'s own counter, with a comment
+  explaining it, and absent from `ladder-probe.mjs` by a sentinel), and only
+  the conflated `Infinity` was new. Grepping the sibling for the shape of your
+  own fix is the cheap half; grepping it for the shapes it has ALREADY fixed
+  is the half nobody does.
+- **`--spend BYTES` FUNDS EVERY SAMPLED RUNG BY NAME, WHICH IS WHAT RULES
+  MONEY OUT AS THE ANSWER.** The fixed point asks "what does the curve settle
+  at"; this asks "given THIS much, what happens here" -- fund past what the
+  tree costs and a stall cannot be the purse. It forces ONE pass and says so,
+  because under a pinned funding every pass is identical and three copies of
+  one table reads as a converged sequence. `tiers.mjs`'s own header has used
+  the word for seventeen builds.
+- **No new `check-build` arm, deliberately.** What can rot in silence here is
+  the measured CURVE, and build 362's 25-term digest already pins that. The
+  rest of this build is a probe's readout, and a guard pinned to a readout's
+  shape needs a vacuity arm to survive the shape being tidied -- which is what
+  build 355's caption guard cost one build later. What keeps it honest instead
+  is that the probe now prints the cause, the trait roll, the unended seconds
+  and CORE's level count, so a reader who quotes it has the mechanism in front
+  of them.

@@ -2,7 +2,8 @@
  * income.mjs -- what a run has BANKED by the rung it meets each slot on.
  *
  *   node scripts/income.mjs [--rungs 1,7,14,21,28,35,42,49] [--window 120]
- *                           [--iters 3] [--url URL] [--expect NNN]
+ *                           [--iters 3] [--spend BYTES]
+ *                           [--url URL] [--expect NNN]
  *
  * The one number this repo has never measured, and the reason phase 7b of
  * `docs/rebalance.html` cannot be written without it: "seven numbers measured
@@ -103,8 +104,18 @@ const flag = (name, def) => {
   return i >= 0 ? args[i + 1] : def;
 };
 const WINDOW = Number(flag('window', 120));
-const ITERS = Number(flag('iters', 3));
+let ITERS = Number(flag('iters', 3));
 const RUNGS = String(flag('rungs', '')).split(',').filter(Boolean).map(Number);
+/*
+ * `--spend N` funds every sampled rung with N instead of with the previous
+ * pass's curve, which turns the probe from "what does the curve settle at"
+ * into "given THIS much money, what happens at this rung". It is what asks
+ * whether a rung the curve stopped below is held by the purse or by the
+ * ladder: fund it with the whole tree and money can no longer be the answer.
+ * The fixed point is meaningless under it -- every pass funds identically --
+ * so it forces one pass and says so rather than printing three copies.
+ */
+const SPEND = flag('spend', null) === null ? null : Number(flag('spend', 0));
 const URL = flag('url', 'http://127.0.0.1:8099/index.html');
 // Which tree is this reading? `scripts/served.mjs` carries the whole finding;
 // the short version is that this container's http-server serves its own CWD
@@ -208,9 +219,48 @@ async function windowAt(rung, spend, seconds) {
         if (got === 'poor') break;
         if (got === 'ok') bought.push(id);
       }
-      for (const n of NODES) {
-        if (!n.id || n.repeat || n.dormant || n.currency) continue;
-        while (g.buy(n.id) === 'ok') bought.push(n.id);
+      /*
+       * PASSES until one buys nothing, not one pass -- build 302's rule.
+       *
+       * A node gated on a `needs` PREDICATE rather than on a parent is
+       * refused while its gate is shut, and a single walk of `NODES` never
+       * comes back for it. It is a latent trap rather than a live fault, and
+       * measuring which is the whole of the note below: `buys` is 107 and
+       * `core` 0 with one pass and with eight, identically, at any spend.
+       *
+       * ---- AND CORE IS NOT BOUGHT AT ALL, WHICH IS NOT THIS LOOP ----
+       *
+       * There is exactly one `needs`-predicate chain in the tree and it is
+       * the damage line's second half: CORE needs NEW FORM owned, and NEW
+       * FORM is `currency: 'remainder'` -- one remainder per anomaly
+       * reconciled under the era hold, `CFG.ordinal.recast` of them, and NOT
+       * payable in bytes at all. The loop skips every `currency` node and has
+       * to: a probe that handed over 200 MB has bought nothing towards it.
+       * So CORE's four levels at x1.35 -- x3.32, the largest single node in
+       * the tree by multiplier -- are missing from every funded window this
+       * probe has ever taken, at every spend, and no pass count reaches them.
+       * Setting `world.newForm` does not do it either: `owned()` reads the
+       * LEDGER, which is why build 266 records that anything needing NEW FORM
+       * writes `recast` into the ledger rather than setting the flag.
+       *
+       * That is a statement about what this probe MODELS -- a turret funded
+       * in bytes -- and a run standing at rung 35 or 42 has answered five or
+       * six gates and can certainly own NEW FORM, so the model is short of
+       * the turret those slots actually meet. Granting the remainder is a
+       * decision the curve's re-take has to make and this build does not: it
+       * would move every anchor from rung 28 up, which is the rung CORE's
+       * 5.32 MB first becomes affordable at.
+       *
+       * The passes stay because the trap is real and they cost nothing; the
+       * cap is a backstop so a future gate cycle cannot spin.
+       */
+      for (let pass = 0; pass < 8; pass++) {
+        let any = false;
+        for (const n of NODES) {
+          if (!n.id || n.repeat || n.dormant || n.currency) continue;
+          while (g.buy(n.id) === 'ok') { bought.push(n.id); any = true; }
+        }
+        if (!any) break;
       }
     }
     if (w.round !== 'standard') w.round = 'standard';
@@ -230,6 +280,7 @@ async function windowAt(rung, spend, seconds) {
      * sent is band 1's. Both are fixed by the next pass funding it.
      */
 
+    const { hostileCount } = await import('../src/enemies.js');
     const d = w.director;
     d.setTier(rung);
     d.hold = true;
@@ -261,11 +312,39 @@ async function windowAt(rung, spend, seconds) {
 
     const waves = [];
     const seams = [];
-    let cur = null;
+    /*
+     * SEEDED with the wave the warm-up landed on, and build 362 did not seed
+     * it -- so every window silently dropped its FIRST wave, and the seam
+     * after it with it.
+     *
+     * `lastAt` below is initialised to `d.at`, and a wave is entered on
+     * `d.at !== lastAt`, so the wave the window OPENS on never satisfied that
+     * test: no `cur`, therefore nothing pushed when it ended, therefore no
+     * `endedAt` and no first seam either. The bias is one whole wave per
+     * window, which is invisible where a window holds fifteen and is most of
+     * the reading where it holds two -- a 240-second window at rung 42
+     * reported one wave and had seen two. Worse at the top, where it is the
+     * difference between a sample and nothing at all.
+     */
+    let cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: 0, earned0: w.earned };
     let endedAt = null;
     let lastAt = d.at;
     let lastResting = d.resting;
     let glitches = 0;
+    /*
+     * The two readings that say WHY a wave did not end, which the first
+     * version of this probe did not take and which cost build 362's note its
+     * mechanism. `Director.update` is `if (this.jobs.length) { emit; return }`
+     * and `this.wait += dt` is BELOW that -- so `patience` (26s), the clause
+     * whose whole job is that "one object loitering out of reach can never
+     * stall the run", does not start until the wave is fully let out. And
+     * `emit` refuses to release while `hostileCount >= maxEnemies` and HOLDS
+     * the job rather than dropping it. So a wave whose ask is larger than a
+     * field the gun cannot clear below the cap does not end LATE, it does not
+     * end: the jobs never drain, the patience clock never starts, and no
+     * number in the window says so unless the jobs and the field are read.
+     */
+    let fieldSum = 0;
     const earned0 = w.earned;
     const frames = Math.round(seconds * 60);
     for (let f = 0; f < frames; f++) {
@@ -296,6 +375,7 @@ async function windowAt(rung, spend, seconds) {
        * writes it fresh at the end of every wave.
        */
       if (d.lastVerdict === 'glitch') { glitches++; d.lastVerdict = null; }
+      fieldSum += hostileCount(w);
       lastResting = d.resting;
     }
 
@@ -304,6 +384,30 @@ async function windowAt(rung, spend, seconds) {
     const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : NaN);
     return {
       rung, era, spend, buys: bought.length,
+      /*
+       * CORE's levels, reported because it is the one node in the tree behind
+       * a `needs` PREDICATE rather than a parent and therefore the one a
+       * buying loop can silently never reach. A count of 0 at a spend past
+       * its price is this loop broken again; the general figure is `buys`,
+       * and a total cannot say which node is missing.
+       */
+      core: bought.filter((x) => x === 'core').length,
+      /*
+       * The wave rules IN FORCE, reported because the rate at a deep rung is
+       * not reproducible and this is the candidate.
+       *
+       * `restart()` re-rolls `world.runSeed` and `traitsFor` is seeded off
+       * it, so every window draws its own -- and SWARM doubles a wave's
+       * bodies while halving their health, which is most of what a rung banks
+       * a second. Measured over two 1200-second windows at one spend, the
+       * rate at rung 42 read 8.88 and 65.9 kB/s and at rung 49 93.4 and 10.8:
+       * a factor of 7 to 9, in opposite directions, over twenty game-minutes
+       * each. The seed is deliberately NOT pinned (build 338: pinning one is
+       * choosing a roll), so the honest fix is runs, not a longer window --
+       * and a reader cannot see which roll a figure came from unless it is
+       * printed beside it.
+       */
+      traits: (d.traits || []).map((t) => t.id || t).join('+') || '-',
       banked: Math.round(w.earned - earned0),
       rate: +((w.earned - earned0) / seconds).toFixed(1),
       waves: scored.length, surge: n('surge'), clean: n('clean'), stall: n('stall'),
@@ -323,6 +427,31 @@ async function windowAt(rung, spend, seconds) {
        */
       rest: +mean(seams).toFixed(1),
       seams: seams.length,
+      field: +(fieldSum / frames).toFixed(1),
+      cap: CFG.maxEnemies,
+      /*
+       * Seconds the wave in progress had been running when the window CLOSED,
+       * and the one column that turns a wave count of 0 into a number.
+       *
+       * The window opens on a wave's first frame, so nothing is partial at
+       * the start and this is the whole of the window's unaccounted time. A
+       * mean wave length cannot say why a window saw no end -- at rung 49 the
+       * mean is 125.8s and a 240s window still saw none, twice, because the
+       * distribution has a tail -- and the alternative is arithmetic on the
+       * means, which is a derivation where a measurement was available.
+       */
+      openS: cur ? +((frames - cur.f0) / 60).toFixed(1) : 0,
+      /*
+       * Jobs still to be let out on the window's LAST FRAME -- a snapshot of
+       * whichever wave was in progress when it closed, and nothing more. Read
+       * it beside `waves`: non-zero with `waves` at 0 says the one wave this
+       * window ever saw had not finished ARRIVING, so `patience` had not
+       * started and there was never going to be an end to see. Non-zero with
+       * waves completed says only that the next wave was still coming out,
+       * which is the ordinary state at any instant -- measured 55 at rung 42
+       * on a window whose dwell priced perfectly.
+       */
+      jobsLeft: d.jobs.length,
       purseLeft: Math.round(w.bytes),
     };
   }, { rung, spend, seconds, line: LINE });
@@ -357,22 +486,41 @@ function pick(samples, key, rung) {
  * The integral: earned by rung N is the sum below it of rate x dwell.
  *
  * Dwell is (wave + rest) / rungs-a-wave, and rungs-a-wave is the verdict mix
- * the window measured -- 2 for a surge, 1 for a clean, 0 for a stall. A rung
- * whose window scored NOTHING is a rung the run cannot climb off, so the
- * dwell is unbounded; the curve stops there and says so rather than dividing
- * by zero.
+ * the window measured -- 2 for a surge, 1 for a clean, 0 for a stall.
+ *
+ * ---- and an unpriceable sample has TWO causes, which build 362 conflated ----
+ *
+ * The first version returned one `Infinity` for three conditions and printed
+ * one word (`never`) for all of them, and the stop line then stated ONE of
+ * them -- "no wave scored a climb, so the dwell is unbounded" -- whichever
+ * had actually happened. They are different facts:
+ *
+ *   HELD   waves completed and none of them scored. The rung does not let go,
+ *          the dwell really is unbounded, and that is a MEASUREMENT.
+ *   SHORT  no wave completed, or only one boundary was seen so no seam
+ *          closed. The dwell is UNKNOWN. Nothing was measured, and the window
+ *          or the wave's own arrival is the thing to look at -- `jobsLeft`
+ *          says which.
+ *
+ * Reading the second as the first is what put the wrong mechanism into build
+ * 362's note. A readout that cannot tell two facts apart will be quoted as
+ * whichever one the reader already believes.
  */
 function integrate(samples) {
   const dwellOf = (s) => {
     const steps = s.surge * 2 + s.clean;
-    if (!s.waves || steps <= 0) return Infinity;
+    if (!s.waves) return { dwell: Infinity, why: 'short' };
     // A seam that never closed inside the window is a seam this window cannot
     // price: the mean of an empty list is NaN, and the dwell it would give is
     // a number with nothing behind it.
-    if (!Number.isFinite(s.rest)) return Infinity;
-    return (s.waveSec + s.rest) / (steps / s.waves);
+    if (!Number.isFinite(s.rest)) return { dwell: Infinity, why: 'short' };
+    if (steps <= 0) return { dwell: Infinity, why: 'held' };
+    return { dwell: (s.waveSec + s.rest) / (steps / s.waves), why: null };
   };
-  const dwell = samples.map((s) => ({ rung: s.rung, dwell: dwellOf(s), rate: s.rate }));
+  const dwell = samples.map((s) => {
+    const { dwell: dw, why } = dwellOf(s);
+    return { rung: s.rung, dwell: dw, why, rate: s.rate };
+  });
   const curve = [{ rung: 1, earned: 0 }];
   let acc = 0;
   let stop = null;
@@ -386,17 +534,42 @@ function integrate(samples) {
   return { curve, dwell, stop };
 }
 
+/**
+ * Which sample stopped the curve, and why -- which is NOT the stop rung.
+ *
+ * `pick` interpolates, so a sample whose dwell is `Infinity` poisons every
+ * rung between it and the sample BELOW it: at the lower sample's own rung the
+ * interpolation weight is exactly 0 and the value is that sample's finite
+ * dwell, and one rung up the weight is non-zero and the product is infinite.
+ * So sampling 1, 7, ... 42, 49 with rung 49 unpriceable stops the curve at
+ * 43, and build 362 read that as the ladder ending at 43. It is the CEILING
+ * sample that could not be priced, and the six rungs between are collateral.
+ */
+function blame(dwell, stop) {
+  const bad = dwell.filter((d) => !Number.isFinite(d.dwell) && d.rung >= stop);
+  return bad.length ? bad[0] : dwell.find((d) => !Number.isFinite(d.dwell)) || null;
+}
+
+/*
+ * Forced before the heading prints, not after: the heading names the pass
+ * count and a correction UNDER it leaves two numbers in the readout with the
+ * wrong one first.
+ */
+let forced = null;
+if (SPEND !== null && ITERS !== 1) { forced = ITERS; ITERS = 1; }
+
 console.log(`income: serving build ${served.build ?? '?'} rev ${served.rev ?? '?'}`);
-console.log(`  rungs ${SAMPLE.join(' ')} -- window ${WINDOW}s -- ${ITERS} pass(es)`);
+console.log(`  rungs ${SAMPLE.join(' ')} -- window ${WINDOW}s -- ${ITERS} pass(es)`
+  + (forced ? ` (--spend pins the funding, so the fixed point does not apply: not ${forced})` : ''));
 console.log(`  ladder: bossEvery ${gates.bossEvery}, ceiling ${gates.ceiling}, `
   + `eraGate ${gates.eraGate}, gates ${gates.gates.join(' ')}`);
 
-let funding = SAMPLE.map((rung) => ({ rung, earned: 0 }));
+let funding = SAMPLE.map((rung) => ({ rung, earned: SPEND === null ? 0 : SPEND }));
 const passes = [];
 for (let it = 0; it < ITERS; it++) {
   const samples = [];
   for (const rung of SAMPLE) {
-    const spend = Math.max(0, Math.round(pick(funding, 'earned', rung)));
+    const spend = SPEND !== null ? SPEND : Math.max(0, Math.round(pick(funding, 'earned', rung)));
     samples.push(await windowAt(rung, spend, WINDOW));
   }
   const { curve, dwell, stop } = integrate(samples);
@@ -405,21 +578,59 @@ for (let it = 0; it < ITERS; it++) {
 
   console.log(`\n---- pass ${it + 1} of ${ITERS} `
     + `${'-'.repeat(52)}`);
-  console.log('  rung era      funded buys       rate  waves  su/cl/st  wave s  seam s   dwell s'
-    + '     earned here');
+  /*
+   * `gl` is printed BESIDE the mix and not inside it, and neither reconciles
+   * against `waves` -- which is the honest shape and was worth two attempts.
+   *
+   * The mix can be SHORT of `waves`: `glitchOut` writes `lastVerdict`, so a
+   * wave a discharge ended is scored and is in none of surge/clean/stall.
+   * And `gl` can EXCEED `waves`: it counts DISCHARGES, seen per frame, while
+   * `waves` counts wave ENDS, seen on the resting edge -- measured 4 against
+   * 3 at rung 35, so they are not two views of one population. Leaving `gl`
+   * out entirely was the first version and it was worse: a reader who cannot
+   * reconcile a row from its own numbers assumes the probe dropped one.
+   * Folding it into the mix was the second and it was wrong in the other
+   * direction: a slash-separated list reads as a partition.
+   *
+   * It is the one verdict that takes a rung AWAY, so a rung with more `gl`
+   * than climbs is not a rung that holds, it is one that loses ground.
+   */
+  console.log('  rung era      funded buy/core       rate  waves  su/cl/st   gl  wave s  seam s'
+    + '  field/cap  left  unended  dwell s     earned here  rules');
   for (const s of samples) {
     const dw = dwell.find((d) => d.rung === s.rung);
     const e = curve.find((c) => c.rung === s.rung);
     console.log(`  ${pad(s.rung, 4)} ${pad(s.era, 3)} ${pad(fmt(s.spend), 11)} `
-      + `${pad(s.buys, 4)} ${pad(fmt(s.rate) + '/s', 10)} ${pad(s.waves, 6)}  `
-      + `${pad(s.surge, 2)}/${pad(s.clean, 2)}/${pad(s.stall, 2)}  ${pad(s.waveSec, 6)}  `
+      + `${pad(`${s.buys}/${s.core}`, 7)} ${pad(fmt(s.rate) + '/s', 10)} ${pad(s.waves, 6)}  `
+      + `${pad(s.surge, 2)}/${pad(s.clean, 2)}/${pad(s.stall, 2)}  ${pad(s.glitches, 3)}  `
+      + `${pad(s.waveSec, 6)}  `
       + `${pad(Number.isFinite(s.rest) ? s.rest : '--', 6)}  `
-      + `${pad(Number.isFinite(dw.dwell) ? dw.dwell.toFixed(1) + (s.waves < 3 ? '+' : '') : 'never', 8)}  `
-      + `${pad(e ? fmt(e.earned) : '--', 14)}`);
+      + `${pad(`${s.field}/${s.cap}`, 9)}  ${pad(s.jobsLeft, 4)}  ${pad(s.openS, 7)}  `
+      + `${pad(Number.isFinite(dw.dwell) ? dw.dwell.toFixed(1) + (s.waves < 3 ? '+' : '') : dw.why, 8)}  `
+      + `${pad(e ? fmt(e.earned) : '--', 14)}  ${s.traits}`);
   }
+  /*
+   * The stop line names the SAMPLE, not just the rung the loop broke at --
+   * see `blame`. And it names which of the two causes, because build 362's
+   * note quoted the wrong one: `held` is a measurement of a rung that will
+   * not let go, `short` is this probe saying it measured nothing.
+   */
   if (stop) {
-    console.log(`  the curve stops at rung ${stop}: no wave at or below it scored a climb, `
-      + 'so the dwell there is unbounded and nothing above it is reachable');
+    const b = blame(dwell, stop);
+    const at = b ? b.rung : stop;
+    if (b && b.why === 'short') {
+      const bs = samples.find((x) => x.rung === at);
+      console.log(`  the curve stops at rung ${stop}, and the sample that stopped it is rung ${at}: `
+        + `NOTHING WAS MEASURED there -- ${bs && !bs.waves ? 'no wave ended' : 'no seam closed'} `
+        + `inside ${WINDOW}s${bs && bs.openS ? `, one wave having run ${bs.openS}s of it` : ''}`
+        + `${bs && bs.jobsLeft ? `, with ${bs.jobsLeft} job(s) still to let out, so it had not `
+          + 'finished ARRIVING and its patience clock had not started' : ''}`);
+      console.log(`  every rung from ${stop} to ${at} is interpolated toward that sample, `
+        + 'so they are collateral rather than measured: this is a window, not a verdict');
+    } else {
+      console.log(`  the curve stops at rung ${stop}, and the sample that stopped it is rung ${at}: `
+        + 'waves ended there and none scored a climb, so the rung does not let go');
+    }
   }
 }
 
