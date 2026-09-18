@@ -1664,6 +1664,31 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * message below quotes. Build 365's own ruling is that the re-take comes
  * AFTER the fix; this is the fix, and the re-take is the build after it.
  */
+/*
+ * ---- AND THE RE-TAKE CAME AND WENT WITHOUT MOVING THIS, AT BUILD 370 -----
+ *
+ * The note above says "the re-take is the build after it". The re-take ran and
+ * found the PROBE wrong before it could find a curve, so this pin is unmoved
+ * in both halves: the economy has not changed since 366, and the anchors in
+ * `tiers.mjs` are still 362's and still known stale.
+ *
+ * What it found, because a reader arriving here should not have to guess why
+ * there is no new curve: `d.hold` pins the CLIMB and not the RUNG -- it has
+ * one reader, `score`'s `else if (!this.hold)`, while `glitchOut` does
+ * `this.tier--` and then clears the hold -- so every window that discharged
+ * walked DOWN the ladder while crediting its rate, its wave length and its
+ * seam to the rung in its label. Measured off the readings the fault itself
+ * produced: a six-wave window at rung 21 recorded six discharges and ended on
+ * rung 15. Worst exactly where the anchors are softest, because a well-funded
+ * pass barely discharges. Three more went with it -- a `held` verdict that
+ * was a censored reading at the six-wave default, a pooling rule that priced
+ * a rung without a majority, and a truncated curve that still printed itself
+ * as paste-ready.
+ *
+ * So the next disagreement here is still a NEW one, and the curve is still
+ * owed. What it costs is in CLAUDE.md under build 370; what it needs is this
+ * probe as it now stands, three passes, at the twenty-wave default.
+ */
 const INCOME_PIN = 'd305b7b056b2';
 const INCOME_AT = 366;
 const TIER_CFG = CFG.waves.tier;
@@ -1954,6 +1979,106 @@ if (!/const EARNED = \[/.test(pasteBlock) || !/\/\/ measured:/.test(pasteBlock))
 console.log('income: income.mjs states the conditions with its anchors and withholds a '
   + 'paste-ready curve for a reading taken under any of ' + anchorNeeds.length + ' ('
   + anchorNeeds.join(', ').toLowerCase() + ')');
+
+/*
+ * ---- ...AND THE POOLING RULE IS DRIVEN RATHER THAN READ ------------------
+ *
+ * `poolRuns` states two halves in its own docstring -- select among the runs
+ * that could be PRICED, and price the rung only on a STRICT MAJORITY -- and
+ * from build 368 to 370 the code kept NEITHER. It was
+ * `ok.length * 2 >= runs.length ? ok : runs`, which is two faults in one
+ * expression: `>=` is at least HALF and not a majority, so an even split
+ * priced the rung; and below the threshold it did not refuse but took the
+ * median of ALL the runs, so whether a mostly-unpriceable rung got priced
+ * depended on where the one good window happened to land in the RATE
+ * ordering. Measured over ten arrangements, three were wrong -- 1 of 3 with
+ * the priced run in the MIDDLE read PRICED, and so did 1 of 2 and 2 of 4.
+ *
+ * A REGEX ON THE EXPRESSION IS NOT THE GUARD. The rule is a verdict over a
+ * population, and that expression has now been written two ways that look
+ * equally plausible in a diff. So both functions are sliced out of the probe
+ * by brace matching and DRIVEN, which is build 349's harness idiom -- what is
+ * verified cannot disagree with what ships -- pointed at a node-side probe
+ * `regress.mjs` has no way to reach.
+ *
+ * The two `runs.length === 1` arrangements are in the list deliberately: that
+ * arm returns before either term is read, so a curve measured at `--runs 1`
+ * is the same curve under any version of this rule, and the guard is what
+ * says so rather than a paragraph claiming it.
+ */
+const poolFns = (() => {
+  const src = readFileSync(new URL('income.mjs', probeDir), 'utf8');
+  const cut = (name) => {
+    const i = src.indexOf(`function ${name}(`);
+    if (i < 0) return null;
+    const j = src.indexOf('{', i);
+    let d = 0;
+    for (let k = j; k < src.length; k++) {
+      if (src[k] === '{') d += 1;
+      else if (src[k] === '}' && (d -= 1) === 0) return src.slice(i, k + 1);
+    }
+    return null;
+  };
+  const a = cut('dwellOf');
+  const b = cut('poolRuns');
+  if (!a || !b) return null;
+  try {
+    return new Function(`${a}\n${b}\nreturn { dwellOf, poolRuns };`)();
+  } catch (e) { return null; }
+})();
+if (!poolFns) {
+  console.error('income: check-build cannot slice dwellOf/poolRuns out of income.mjs, so '
+    + 'the pooling rule below is asserted against nothing. The detection has drifted, not '
+    + 'the exposure -- re-point it at whatever those two are called now.');
+  process.exit(1);
+}
+/*
+ * A run is a priceable one when a wave completed, a seam closed and something
+ * climbed -- which is what `dwellOf` reads, so the arrangements are built out
+ * of its own three terms rather than out of a flag this guard invents.
+ */
+const poolRun = (rate, ok) => ({ rate, waves: ok ? 6 : 0, rest: ok ? 2 : NaN,
+  surge: ok ? 3 : 0, clean: 0, waveSec: 10 });
+const POOL_CASES = [
+  ['one run, priceable', [[10, 1]], true],
+  ['one run, unpriceable', [[10, 0]], false],
+  ['3 of 3', [[10, 1], [20, 1], [30, 1]], true],
+  ['2 of 3, a majority', [[10, 1], [20, 0], [30, 1]], true],
+  ['1 of 3, the priced run in the MIDDLE by rate', [[10, 0], [20, 1], [30, 0]], false],
+  ['1 of 3, the priced run lowest by rate', [[10, 1], [20, 0], [30, 0]], false],
+  ['1 of 2', [[10, 1], [20, 0]], false],
+  ['2 of 2', [[10, 1], [20, 1]], true],
+  ['2 of 4, an even split', [[10, 1], [20, 1], [30, 0], [40, 0]], false],
+  ['3 of 4, a majority', [[10, 1], [20, 1], [30, 1], [40, 0]], true],
+];
+if (!POOL_CASES.some((c) => c[2]) || !POOL_CASES.some((c) => !c[2])) {
+  console.error('income: the pooling arm expects one verdict for every arrangement, so it '
+    + 'cannot tell a rule that prices everything from one that refuses everything.');
+  process.exit(1);
+}
+const poolBad = [];
+for (const [label, spec, want] of POOL_CASES) {
+  const runs = spec.map(([rate, ok]) => poolRun(rate, ok));
+  let got = null;
+  try { got = Number.isFinite(poolFns.dwellOf(poolFns.poolRuns(runs)).dwell); }
+  catch (e) { poolBad.push(`${label}: the pool threw -- ${e.message}`); continue; }
+  if (got !== want) {
+    poolBad.push(`${label}: the pool ${got ? 'PRICES' : 'refuses'} the rung where the rule `
+      + `says ${want ? 'price' : 'refuse'}`);
+  }
+}
+if (poolBad.length) {
+  for (const line of poolBad) console.error(`income: ${line}`);
+  console.error('income: `poolRuns` selects among the runs it could PRICE and prices a rung '
+    + 'only on a STRICT majority. Both halves are in its own docstring and neither was kept '
+    + 'by the code from build 368 to 370; a deep anchor priced off the one window that '
+    + 'happened to climb is the roll that flatters it, which is the whole reason `--runs` '
+    + 'exists. Fix the rule, not this list.');
+  process.exit(1);
+}
+console.log(`income: income.mjs's pooling rule is DRIVEN over ${POOL_CASES.length} `
+  + 'arrangements -- it refuses a rung without a strict majority, and both one-run cases '
+  + 'are in it, so a --runs 1 curve is the same curve under any version of the rule');
 
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];

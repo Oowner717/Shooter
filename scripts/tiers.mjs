@@ -293,7 +293,24 @@ function spendAt(tier) {
   for (let i = 1; i < EARNED.length; i++) {
     const [t0, e0] = EARNED[i - 1];
     const [t1, e1] = EARNED[i];
-    if (tier <= t1) return Math.round(e0 + ((e1 - e0) * (tier - t0)) / (t1 - t0));
+    /*
+     * CLAMPED like the extrapolation branch above it, and it never was.
+     *
+     * Only the `tier >= last[0]` branch clamped, which has never mattered
+     * because the last anchor (95.8 MB at rung 42) is well under the tree's
+     * own cost -- so nothing interpolated could exceed it. An EIGHTH anchor
+     * at rung 49 moves rungs 43-48 out of the clamped branch, and if that
+     * anchor is above `TREE_TOTAL` the `spend` column climbs past the whole
+     * tree and then FALLS at rung 49, the only rung still reaching the clamp.
+     * Measured with a rung-49 anchor of 300 MB: 42: 95.8 -> 43: 125.0 -> ...
+     * -> 48: 270.8 -> 49: 133.1 MB. No measured figure moves (the buy loop
+     * stops when nothing is affordable), so it is the READOUT that would have
+     * been nonsense -- which is the only thing a funding column is for.
+     */
+    if (tier <= t1) {
+      return Math.min(TREE_TOTAL,
+        Math.round(e0 + ((e1 - e0) * (tier - t0)) / (t1 - t0)));
+    }
   }
   return 0;
 }

@@ -135,7 +135,39 @@ const flag = (name, def) => {
  * two shapes a reading was taken under, because a table that does not record
  * its own conditions cannot be read six builds later.
  */
-const WAVES = Math.max(1, Number(flag('waves', 6)));
+/*
+ * ---- ...AND SIX WAVES COULD NOT PRICE THE DEEP RUNGS ---------------------
+ *
+ * The default was 6 from build 368 and it was chosen for the RATE: six waves
+ * is a reasonable sample of what a wave banks. The DWELL wants something the
+ * rate does not -- a CLIMB -- and climbs are rare exactly where the ladder is
+ * hardest, so the window that samples the rate adequately reports the dwell
+ * as unbounded and the curve stops.
+ *
+ * Measured at build 370, rung 21 funded with what the fixed point gave it
+ * (882 kB), everything else loose:
+ *
+ *   6 waves   0 surge / 0 clean / 6 stall, TWICE over, on two passes -- the
+ *             dwell reads `held`, the curve stops at rung 15, and rungs 28,
+ *             35 and 49 were priced perfectly and thrown away as collateral
+ *   20 waves  0 surge / 2 clean / 17 stall + 1 glitch -- dwell 280.0s
+ *
+ * So the rung climbs about one wave in ten and six waves sees none of them
+ * 0.9^6 = 53% of the time. Rung 42 is the same story: `held` at six waves,
+ * 1/2/12 and a dwell of 317.5s at twenty. `held` was NOT a property of those
+ * rungs and the curve that stopped below them was not a statement about the
+ * ladder -- which is precisely what build 362 read off its own stop line and
+ * what `dwellOf`'s note now says in its own words.
+ *
+ * TWENTY is the measured-adequate number rather than a round one: at a climb
+ * rate of one in ten it sees at least one climb 88% of the time, where six
+ * sees one 47% of the time. It costs what it says it costs -- rung 21 took
+ * 559s of game time and rung 42 took 1270s -- and that is the point of
+ * counting the window in waves: the seconds go where the precision is
+ * needed. Raise it further for a rung that still reads `held`; the stop line
+ * says so and prints the floor.
+ */
+const WAVES = Math.max(1, Number(flag('waves', 20)));
 const WINDOW = flag('window', null) === null ? null : Number(flag('window', 0));
 /*
  * `--runs R` takes R windows at every sampled rung, because one window is a
@@ -280,7 +312,29 @@ const gates = await page.evaluate(async () => {
   const T = CFG.waves.tier;
   return { gates: T.gates.slice(), ceiling: T.ceiling, eraGate: T.eraGate, bossEvery: T.bossEvery };
 });
-const SAMPLE = RUNGS.length ? RUNGS : [1, ...gates.gates];
+/*
+ * ---- ASCENDING, because `pick` walks forward and clamps on both ends ----
+ *
+ * `pick` returns `samples[0]` below the first rung and `samples[last]` above
+ * the last, then walks forward looking for the first bound above the rung it
+ * was asked for -- all three of which are only correct for an ascending list.
+ * `--rungs` is taken in the order typed, and `--rungs 49,42` is a perfectly
+ * ordinary attribution invocation, as is appending a rung to an existing
+ * list. Measured on the sliced function: handed 14,7,1 every rung from 1 to
+ * 14 returns the TOP sample's dwell and rate, so the whole curve is built
+ * from one sample; handed 1,14,7, rungs 10 and 14 read 20 where ascending
+ * reads 28.57 and 40.
+ *
+ * Sorted rather than refused, because the measurements are the same
+ * measurements whatever order they were asked for and only the interpolation
+ * cares -- and the reorder is PRINTED, so a reader who meant something by the
+ * order finds out. The sibling misuse (a repeated rung) is caught and
+ * disqualifies the reading; that this one was not is the asymmetry that
+ * makes it a fault rather than a matter of likelihood.
+ */
+const ASKED = RUNGS.length ? RUNGS : [1, ...gates.gates];
+const SAMPLE = [...ASKED].sort((a, b) => a - b);
+const RESORTED = ASKED.join(',') !== SAMPLE.join(',');
 /*
  * `--rungs 42,42,42,42` is how several windows are taken at ONE rung in one
  * launch, which is what an attribution needs and what the browser launch per
@@ -426,6 +480,43 @@ async function windowAt(rung, spend, want, seconds) {
     d.setTier(rung);
     d.hold = true;
     g.debugClearField();
+    /*
+     * ---- `hold` PINS THE CLIMB AND NOT THE RUNG, so the rung has to be
+     * ---- RE-ASSERTED and not only the flag ----------------------------
+     *
+     * `d.hold` has exactly ONE reader in the game -- `score`'s climb branch,
+     * `else if (!this.hold)` (src/enemies.js:9495) -- so it stops the ladder
+     * going UP and nothing else. A glitch discharge is the one verdict that
+     * takes a rung AWAY, and `glitchOut` does `this.tier--` and then clears
+     * the hold, under the game's own comment: "A step back re-arms the climb
+     * even under HOLD. The pin holds the climb, not the relief."
+     *
+     * So re-asserting `hold` every frame -- which both loops below did, for
+     * the stated reason that a discharge would otherwise unpin the climb --
+     * restored exactly the relief that would have climbed the rung back, and
+     * left the decrement standing. A window walked DOWN one rung per
+     * discharge, for good, while its rate, its wave length and its seam were
+     * all credited to the rung in the LABEL.
+     *
+     * Measured off the readings this fault produced, which is how it was
+     * found: pass 1 at rung 21 recorded SIX discharges over six waves, so
+     * that window ended at rung 15 and reported itself as 21; the same pass
+     * at rung 49 recorded six, and a twenty-wave window at rung 42 recorded
+     * seven, ending at 35. Only a well-funded pass escaped it -- pass 3
+     * read `gl` 0 at seven of eight rungs -- which is why the corruption was
+     * worst exactly where the ladder is hardest and the anchors are softest.
+     *
+     * `setTier` is the machinery's setter and does not gate, which is what a
+     * probe wants; it also raises `peak`, so the rung stays reachable. The
+     * re-pins are COUNTED and reported, because a pin that had to fire is a
+     * discharge the window absorbed, and a reader who cannot see that number
+     * cannot tell a rung that held from one that was held.
+     */
+    let repins = 0;
+    const pin = () => {
+      d.hold = true;
+      if (d.tier !== rung) { d.setTier(rung); repins += 1; }
+    };
 
     /*
      * Drive past the opening TEACH beats -- authored, exempt from the wave
@@ -443,7 +534,9 @@ async function windowAt(rung, spend, want, seconds) {
     let warm = 0;
     let wasResting = d.resting;
     while (warm < 60 * 600) {
-      d.hold = true;
+      // The warm-up is inside the pin too: a discharge while driving past the
+      // teach beats dropped the rung before the window had even opened.
+      pin();
       g.update(S);
       warm++;
       const fresh = wasResting && !d.resting;
@@ -470,6 +563,23 @@ async function windowAt(rung, spend, want, seconds) {
     const ruleset = () => (d.traits || []).map((t) => t.id || t).join('+') || '-';
     let cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: 0, earned0: w.earned,
       rules: ruleset() };
+    /*
+     * ...and the SEEDED wave needs the verdict cleared too, which the loop's
+     * own clear cannot do for it.
+     *
+     * The clear that stops an unscoreable wave inheriting the previous one's
+     * verdict sits in the wave-START branch, and this wave is seeded from
+     * OUTSIDE the loop -- so wave 1 of every window never passed it and could
+     * still be handed whatever the warm-up's last wave left in the field. It
+     * is the likeliest one to need it: band 1 holds five waves of which one is
+     * the drift-only bonus, and the warm-up drives until a non-teach wave
+     * STARTS, so there is always a real verdict sitting there.
+     *
+     * Found by walking the fix's own code path rather than by a reading --
+     * which is the half of "render the line" that applies to a branch: ask
+     * which callers reach it, not only whether it works when reached.
+     */
+    d.lastVerdict = null;
     let endedAt = null;
     let lastAt = d.at;
     let lastResting = d.resting;
@@ -557,13 +667,50 @@ async function windowAt(rung, spend, want, seconds) {
     let scoredN = 0;
     let f = 0;
     while (f < deadline) {
-      // Re-asserted every frame: `glitchOut` clears the hold on its own line,
-      // so one discharge would unpin the rung for the rest of the window.
-      d.hold = true;
+      // Re-asserted every frame, BOTH of them: `glitchOut` clears the hold
+      // AND decrements the rung, and this used to restore only the flag.
+      pin();
       g.update(S);
       if (d.at !== lastAt && !d.resting) {
         cur = { at: d.at, teach: !!(d.wave && d.wave.teach), f0: f, earned0: w.earned,
           rules: ruleset() };
+        /*
+         * ---- AN UNSCOREABLE WAVE MUST NOT INHERIT THE LAST ONE'S VERDICT --
+         *
+         * `Director.score` returns null for `!wave || wave.teach ||
+         * this.asked === 0` (src/enemies.js:9365) and never reaches the line
+         * that writes `lastVerdict`, which has three writers in the whole
+         * game -- the constructor, `glitchOut` and `score` -- and is cleared
+         * between waves by NOTHING, not even `reset()`.
+         *
+         * The drift-only bonus wave is exactly that case: `{ of: [], drift:
+         * 22, dwell: 8, band: 1 }` asks for no hostiles, `load` excludes
+         * harmless from `asked`, it is not `teach`, and it still goes resting.
+         * So the wave-end branch below read the PREVIOUS wave's verdict off a
+         * field nobody had rewritten, recorded the bonus wave as scored,
+         * added its 1 or 2 to `steps` and spent one of the window's N waves
+         * on it. Seen in build 370's own first run at rungs 1 and 7: rows
+         * with `asked 0  made 0  slain 0` carrying a verdict of `clean`.
+         * `steps/waves` rises, so the DWELL FALLS, and band 1 is drawn at
+         * rungs 1, 7 and 14 -- the bottom of the curve every anchor above it
+         * is accumulated from.
+         *
+         * Clearing it at the wave's START is what makes the absence legible:
+         * `score` writes it at the wave's END, so the previous wave's verdict
+         * has already been consumed by the branch below. A null verdict is
+         * then a wave that could not be scored, and it falls out of `scored`,
+         * out `steps` and out of `scoredN` -- while its SECONDS and its PAY
+         * stay in the window's rate, which is right: the bonus wave really
+         * does pay (60.6 kB at rung 1, the largest single payout there) and
+         * really does take time. It is the CLIMB it cannot contribute.
+         *
+         * The game's own comment above that early return names this wave and
+         * says it "was a free rung every cycle -- observed climbing 15 to 16
+         * for shooting nothing", which is the same fault on the ladder rather
+         * than in the probe. Build 369's note that it "scores a SURGE by
+         * construction" is wrong in both halves and is struck.
+         */
+        d.lastVerdict = null;
         lastAt = d.at;
         if (endedAt !== null) { seams.push((f - endedAt) / 60); endedAt = null; }
         // The guard is per WAVE, so it is re-armed from here rather than
@@ -793,7 +940,25 @@ async function windowAt(rung, spend, want, seconds) {
       rate: +((w.earned - earned0) / (f / 60)).toFixed(1),
       waves: scored.length, surge: n('surge'), clean: n('clean'), stall: n('stall'),
       glitches,
-      waveSec: +mean(scored.map((x) => x.dur)).toFixed(1),
+      /*
+       * How many discharges the pin had to ABSORB, and the rung the window
+       * actually finished on. Both, because they answer different questions:
+       * `repins` says the window was held rather than that it held, and
+       * `tierEnd` is the flat assertion that the pin worked -- it must equal
+       * the rung in the label, and before build 370 it did not.
+       */
+      repins,
+      tierEnd: d.tier,
+      /*
+       * RAW, with the rounding done where it is printed. Both terms of the
+       * dwell's numerator were stored at `toFixed(1)` -- the figures the
+       * `wave s` and `seam s` columns show -- and then summed and divided in
+       * `dwellOf`, which is build 313's "round for the message, divide the
+       * raw" broken on the quantity the curve is made of. Small (a 0.1s
+       * quantum on each term is about 1.3% of rung 1's 7.5s dwell and noise
+       * at the deep rungs) and the rule does not scale with the magnitude.
+       */
+      waveSec: mean(scored.map((x) => x.dur)),
       /*
        * The LONGEST wave, beside the mean -- which is what the allowance
        * above has to clear, and what a mean cannot say. Build 362 already
@@ -814,7 +979,7 @@ async function windowAt(rung, spend, want, seconds) {
        * dominant term of the dwell and the config cannot see it -- measured
        * 0.8s at rung 1 against tens of seconds where the field stands.
        */
-      rest: +mean(seams).toFixed(1),
+      rest: mean(seams),  // RAW, for the reason on `waveSec` above
       seams: seams.length,
       field: +(fieldSum / Math.max(1, f)).toFixed(1),
       cap: CFG.maxEnemies,
@@ -885,8 +1050,15 @@ function pick(samples, key, rung) {
  * them -- "no wave scored a climb, so the dwell is unbounded" -- whichever
  * had actually happened. They are different facts:
  *
- *   HELD   waves completed and none of them scored. The rung does not let go,
- *          the dwell really is unbounded, and that is a MEASUREMENT.
+ *   HELD   waves completed and none of them scored. The dwell is at least
+ *          what one climb would have given, which the reading CARRIES as its
+ *          floor -- and it is a MEASUREMENT only in the limit of a window
+ *          long enough that a climb would have shown. Build 370 measured
+ *          that limit and the default was under it: rung 21 read `held`
+ *          twice at six waves and priced at 280.0s over twenty, at one
+ *          funding, because it climbs two waves in twenty. So `held` at a
+ *          small window is a CENSORED observation wearing a measurement's
+ *          clothes, which is this same paragraph's own fault one level in.
  *   SHORT  no wave completed, or only one boundary was seen so no seam
  *          closed. The dwell is UNKNOWN. Nothing was measured, and the window
  *          or the wave's own arrival is the thing to look at -- `jobsLeft`
@@ -903,7 +1075,24 @@ function dwellOf(s) {
     // price: the mean of an empty list is NaN, and the dwell it would give is
     // a number with nothing behind it.
   if (!Number.isFinite(s.rest)) return { dwell: Infinity, why: 'short' };
-  if (steps <= 0) return { dwell: Infinity, why: 'held' };
+  /*
+   * ...AND `held` CARRIES THE FLOOR IT IS, because at a small window it is a
+   * CENSORED reading and not the measurement the paragraph above calls it.
+   *
+   * With `steps` at 0 the quotient is unbounded, and what the window actually
+   * observed is that the climb rate is under one in `waves` -- so the dwell
+   * is AT LEAST the value one climb would have given, `(waveSec + rest) *
+   * waves`. Measured at build 370, rung 21 funded with 882 kB: 0 climbs of 6
+   * on two separate passes (`held`), and 2 of 20 at the same funding, dwell
+   * 280.0s. At six waves a rung that climbs one wave in ten reads `held`
+   * about 53% of the time, so `held` there is a coin toss and not a property
+   * of the rung. The floor is what makes that visible.
+   */
+  if (steps <= 0) {
+    return { dwell: Infinity, why: 'held',
+      floor: Number.isFinite(s.rest) ? (s.waveSec + s.rest) * s.waves : NaN,
+      waves: s.waves };
+  }
   return { dwell: (s.waveSec + s.rest) / (steps / s.waves), why: null };
 }
 
@@ -916,26 +1105,78 @@ function dwellOf(s) {
  * and `rate` reconcile; `paid/wave` is the product of the three terms beside
  * it). An averaged row reconciles against nothing.
  *
- * Selected among the runs that could be PRICED, and only if a MAJORITY of
- * them could. Both halves matter and pull opposite ways: without the filter
- * one unpriceable window poisons a rung two others priced cleanly (the
- * interpolation then takes the six rungs below it as well -- see `blame`);
- * without the majority rule a rung that mostly cannot climb is reported off
- * the one window that did, which is choosing the roll that flatters it.
+ * Selected among the runs that could be PRICED, and only if a STRICT
+ * MAJORITY of them could. Both halves matter and pull opposite ways: without
+ * the filter one unpriceable window poisons a rung two others priced cleanly
+ * (the interpolation then takes the six rungs below it as well -- see
+ * `blame`); without the majority rule a rung that mostly cannot climb is
+ * reported off the one window that did, which is choosing the roll that
+ * flatters it. Both are stated as they were from build 368 and NEITHER was
+ * kept by the code until build 370 -- see the site below.
  */
 function poolRuns(runs) {
   const ok = runs.filter((s) => Number.isFinite(dwellOf(s).dwell));
   if (runs.length === 1) return { ...runs[0], runs, priced: ok.length };
-  const from = ok.length * 2 >= runs.length ? ok : runs;
-  const sorted = [...from].sort((a, b) => a.rate - b.rate);
+  /*
+   * A STRICT majority, and a REFUSAL rather than a fall-through -- build 370,
+   * and the paragraph above had described both halves correctly while the code
+   * did neither.
+   *
+   * It was `ok.length * 2 >= runs.length ? ok : runs`, which is two faults in
+   * one expression. `>=` is AT LEAST HALF and not a majority, so an even split
+   * priced the rung. And below the threshold it did not refuse -- it took the
+   * median of ALL the runs, so whether a mostly-unpriceable rung got priced
+   * depended on where the one good window happened to land in the RATE
+   * ordering, which is exactly the "choosing the roll that flatters it" the
+   * paragraph above exists to refuse.
+   *
+   * Measured by slicing both versions out and driving them over ten
+   * arrangements: three change and seven are identical. 1 of 3 with the priced
+   * run in the MIDDLE went PRICED and is now unpriceable; 1 of 2 and 2 of 4
+   * likewise. Every case that satisfies the stated rule is untouched, AND SO
+   * ARE BOTH `runs.length === 1` CASES -- which is what says a curve measured
+   * at `--runs 1` is the same curve under this code, because that arm returns
+   * before either term is read.
+   */
+  if (ok.length * 2 <= runs.length) {
+    /*
+     * WHICH unpriceable run represents a refused rung, chosen rather than
+     * taken in array order. The row's `why` is what the stop line reports and
+     * `held` and `short` are different facts -- `held` measured waves and no
+     * climb, `short` measured nothing -- so a rung where two windows were
+     * held and one saw no wave at all must not report "NOTHING WAS MEASURED"
+     * because the short one happened to be first in the array. `held` is the
+     * more informative of the two and wins; the row is still ONE window's and
+     * the caption below says so rather than calling it a median.
+     */
+    const bad = runs.filter((x) => !Number.isFinite(dwellOf(x).dwell));
+    const rep = bad.find((x) => dwellOf(x).why === 'held') || bad[0];
+    return { ...rep, runs, priced: ok.length, refused: true };
+  }
+  const sorted = [...ok].sort((a, b) => a.rate - b.rate);
   const med = sorted[(sorted.length - 1) >> 1];
   return { ...med, runs, priced: ok.length };
 }
 
 function integrate(samples) {
+  /*
+   * ...AND IT CARRIES `floor` AND `waves`, because the stop line reads them
+   * off whatever `blame` hands back and this map is what `blame` walks.
+   *
+   * The first version of build 370's floor rebuilt each entry as
+   * `{rung, dwell, why, rate}` and dropped both -- so the stop line, whose
+   * whole subject is that a `held` reading is a CENSORED one carrying a lower
+   * bound, rendered "undefined wave(s) ended there ... so the dwell is at
+   * least (no seam, so unpriced) a rung", and the fallback named a cause
+   * `dwellOf` cannot produce for a `held` sample. Measured live on a rung-42
+   * window before the fix. That is build 368's `fieldSum / frames` verbatim
+   * -- a dropped field leaving a silent `undefined` in a readout -- in the
+   * readout added to stop a different silence, which is why the rule is to
+   * RENDER the line and not only to drive the function behind it.
+   */
   const dwell = samples.map((s) => {
-    const { dwell: dw, why } = dwellOf(s);
-    return { rung: s.rung, dwell: dw, why, rate: s.rate };
+    const { dwell: dw, why, floor, waves } = dwellOf(s);
+    return { rung: s.rung, dwell: dw, why, floor, waves, rate: s.rate };
   });
   const curve = [{ rung: 1, earned: 0 }];
   let acc = 0;
@@ -981,6 +1222,12 @@ console.log(`  rungs ${SAMPLE.join(' ')} -- `
     : `window a FIXED ${WINDOW}s a rung (an attribution's shape, not the curve's)`)
   + ` -- ${RUNS} run(s) a rung -- ${ITERS} pass(es)`
   + (forced ? ` (--spend pins the funding, so the fixed point does not apply: not ${forced})` : ''));
+if (RESORTED) {
+  console.log(`  ...--rungs was typed ${ASKED.join(',')} and is SORTED above: \`pick\` walks `
+    + 'forward and clamps on both ends, so a descending or out-of-order list builds the '
+    + 'whole curve out of one sample. The measurements are the same; only the '
+    + 'interpolation cares.');
+}
 console.log(`  ladder: bossEvery ${gates.bossEvery}, ceiling ${gates.ceiling}, `
   + `eraGate ${gates.eraGate}, gates ${gates.gates.join(' ')}`);
 /*
@@ -994,6 +1241,34 @@ console.log(`  rolls: traits ${SEED === null ? 'loose' : `pinned seed ${SEED}`}`
   + `${GRANT ? ' -- NEW FORM granted, so CORE is buyable' : ''}`
   + `${PRESS ? ' -- PULSE pressed on cooldown' : ''}`
   + `${SEED === null && RAND === null && !GRANT && !PRESS ? '  (the curve)' : '  (an attribution, not the curve)'}`);
+/*
+ * ...AND THE ROLLS ARE NOT THE WHOLE VERDICT, so the line above cannot be it.
+ *
+ * That parenthetical is about the four ROLLS, and it prints "(the curve)" for
+ * a reading whose window, funding or rung list disqualifies it -- which is
+ * two statements in one readout, two lines apart, and the heading above has
+ * already said `--spend pins the funding` when that is why. Build 369 found
+ * the same shape one level down (a `NOT ANCHORS` warning printed four lines
+ * above a paste-ready curve) and the rule is that a refusal whose own output
+ * still offers the thing is not a refusal.
+ *
+ * A SECOND LINE rather than a rewording of the first, and the reason is the
+ * guard: `check-build` derives the pinnable channel set from the condition
+ * behind "(the curve)" and then requires each channel to DEFAULT LOOSE.
+ * `WINDOW` and `SPEND` would pass that; `REPEATED` is COMPUTED off the rung
+ * list and has no default to be loose, so folding the three in would fail
+ * the build for a readout's wording. The anchors block at the foot is the
+ * authoritative verdict -- it enumerates all seven reasons and withholds the
+ * paste-ready line -- and this is the pointer to it from the top.
+ */
+if (SEED === null && RAND === null && !GRANT && !PRESS
+  && (WINDOW !== null || SPEND !== null || REPEATED)) {
+  console.log('  ...but the rolls are not the whole verdict: '
+    + [WINDOW !== null ? 'the window is a fixed span of seconds' : null,
+      SPEND !== null ? 'the funding is pinned' : null,
+      REPEATED ? 'a rung is repeated' : null].filter(Boolean).join(', ')
+    + ' -- so this is NOT the curve. The anchors at the foot say so in full.');
+}
 
 let funding = SAMPLE.map((rung) => ({ rung, earned: SPEND === null ? 0 : SPEND }));
 const passes = [];
@@ -1028,7 +1303,7 @@ for (let it = 0; it < ITERS; it++) {
    * It is the one verdict that takes a rung AWAY, so a rung with more `gl`
    * than climbs is not a rung that holds, it is one that loses ground.
    */
-  console.log('  rung era      funded buy/core       rate    win s  waves  su/cl/st   gl'
+  console.log('  rung era      funded buy/core       rate    win s  waves  su/cl/st   gl  pin'
     + '  wave s  seam s  field/cap  left  unended  dwell s     earned here  pulse'
     + '  paid/wave and rules');
   for (const s of samples) {
@@ -1038,8 +1313,9 @@ for (let it = 0; it < ITERS; it++) {
       + `${pad(`${s.buys}/${s.core}`, 7)} ${pad(fmt(s.rate) + '/s', 10)} `
       + `${pad(s.secs + (s.stop === 'allowance' ? '!' : ''), 8)} ${pad(s.waves, 6)}  `
       + `${pad(s.surge, 2)}/${pad(s.clean, 2)}/${pad(s.stall, 2)}  ${pad(s.glitches, 3)}  `
-      + `${pad(s.waveSec, 6)}  `
-      + `${pad(Number.isFinite(s.rest) ? s.rest : '--', 6)}  `
+      + `${pad(s.repins, 3)}${s.tierEnd === s.rung ? ' ' : '!'} `
+      + `${pad(Number.isFinite(s.waveSec) ? s.waveSec.toFixed(1) : '--', 6)}  `
+      + `${pad(Number.isFinite(s.rest) ? s.rest.toFixed(1) : '--', 6)}  `
       + `${pad(`${s.field}/${s.cap}`, 9)}  ${pad(s.jobsLeft, 4)}  ${pad(s.openS, 7)}  `
       + `${pad(Number.isFinite(dw.dwell) ? dw.dwell.toFixed(1) + (s.waves < 3 ? '+' : '') : dw.why, 8)}  `
       + `${pad(e ? fmt(e.earned) : '--', 14)}  ${pad(s.pulses, 5)}  `
@@ -1055,13 +1331,33 @@ for (let it = 0; it < ITERS; it++) {
     if (s.runs) {
       console.log('       runs: ' + s.runs.map((r) => {
         const rd = dwellOf(r);
-        return `${fmt(r.rate)}/s over ${r.secs}s, ${r.allowS}s a wave guard`
+        /*
+         * `banked` is IN the line, because its own comment says the three of
+         * them "reconcile against each other in one row, which is the form
+         * this repo prefers to a guard on a probe's arithmetic" -- and it was
+         * in no row, so that stated defence did not exist in the output. It
+         * is the numerator of the rate beside its denominator; a row where
+         * `banked / secs` is not `rate` is an arithmetic fault visible
+         * without a guard, which is the whole claim.
+         *
+         * `jobsAt` is a SNAPSHOT and is labelled one: `load()` writes it once
+         * per wave, so it is the wave that was loaded when the window closed
+         * and not a property of the window. The guard paragraph above records
+         * that figure spanning 2, 3 and 140 at ONE rung, which is the spread
+         * that makes an unlabelled snapshot misleading -- the one-of-N shape
+         * the `rules` column was fixed for twice.
+         */
+        return `${fmt(r.banked)} in ${r.secs}s = ${fmt(r.rate)}/s`
+          + `, ${r.allowS}s a wave guard`
           + `${r.stop === 'allowance' ? '!' : ''}, ${r.waves}w`
-          + `, worst ${r.durMax}s, ${r.jobsAt} job(s), dwell `
+          + `, worst ${r.durMax}s, ${r.jobsAt} job(s) at close, dwell `
           + `${Number.isFinite(rd.dwell) ? rd.dwell.toFixed(1) : rd.why}`;
       }).join('  |  ')
         + `   (${s.priced} of ${s.runs.length} priced`
-        + `${s.runs.length > 1 ? '; the pooled row is the median by rate' : ''})`);
+        + `${s.runs.length > 1 ? (s.refused
+          ? '; the row above is ONE unpriceable window, not a median -- the rung is '
+            + 'refused for want of a strict majority'
+          : '; the pooled row is the median by rate') : ''})`);
     }
   }
   /*
@@ -1116,7 +1412,14 @@ for (let it = 0; it < ITERS; it++) {
         + 'so they are collateral rather than measured: this is a window, not a verdict');
     } else {
       console.log(`  the curve stops at rung ${stop}, and the sample that stopped it is rung ${at}: `
-        + 'waves ended there and none scored a climb, so the rung does not let go');
+        + `${b.waves} wave(s) ended there and NONE scored a climb, so the dwell is at `
+        + `least ${Number.isFinite(b.floor) ? `${Math.round(b.floor)}s` : '(no seam, so unpriced)'} `
+        + 'a rung -- A FLOOR, not a rung that never lets go');
+      console.log(`  ...and at ${b.waves} wave(s) that is a CENSORED reading: a rung climbing `
+        + `less often than once in ${b.waves} reads this way whatever its real dwell is. `
+        + `Measured at build 370, rung 21 funded with 882 kB read 0 climbs of 6 on two `
+        + `passes and 2 of 20 at the same funding (dwell 280.0s), so at six waves this is `
+        + `a coin toss. Give it more waves before reading it as the ladder's end.`);
     }
   }
 }
@@ -1151,9 +1454,39 @@ console.log(`\n---- the anchors ${'-'.repeat(58)}`);
  * and therefore the reader's judgement: the passes, the runs a rung, the
  * waves a rung, and whether every sampled rung could be priced at all.
  */
+/*
+ * ---- ...AND A TRUNCATED CURVE SAYS SO IN THE COMMENT ---------------------
+ *
+ * The final pass can STOP -- its top sample unpriceable, and every rung
+ * between it and the sample below it collateral -- and the array printed
+ * below then ends at whatever anchor survived. Nothing said so: `why`
+ * enumerated seven disqualifiers and had no term for `last.stop`, so a
+ * fully-loose run whose deep sample was `held` fell into the paste branch and
+ * offered a SHORT array under a `// measured:` comment naming only the
+ * window, the runs, the passes and the tree.
+ *
+ * What that costs is downstream and it is not small: `tiers.mjs` derives
+ * `TAIL` from the LAST TWO entries of whatever array is pasted and
+ * extrapolates every rung above it. Measured by running the shipped curve
+ * through `spendAt` truncated at each anchor -- cut at 35 and `spendAt(42)`
+ * returns the whole tree; cut at 14 and `spendAt(35)` reads 101 MB against a
+ * measured 40.6 MB; cut at 7 and `e0` is 0, so `TAIL` is Infinity.
+ *
+ * It is NOT a disqualifier, which is the distinction: a pin is a condition
+ * the reading was taken under and makes the whole reading something else, and
+ * a stop is an incomplete result that is sound as far as it goes. Build 362's
+ * curve was truncated at 42 and was pasted, correctly, with the truncation
+ * recorded by hand in `tiers.mjs`'s own block. So the comment carries it and
+ * the line is still offered -- the silence was the fault, not the paste.
+ */
+const cut = last.stop
+  ? `, TRUNCATED at rung ${last.curve[last.curve.length - 1].rung}: the curve stopped at `
+    + `rung ${last.stop} (sample ${blame(last.dwell, last.stop)?.rung ?? '?'} unpriceable), so `
+    + "every rung above that anchor is tiers.mjs's TAIL extrapolation and was not measured"
+  : '';
 const cond = `window ${WINDOW === null ? `${WAVES} scored wave(s)` : `a FIXED ${WINDOW}s`} a rung`
   + `, ${RUNS} run(s) a rung, ${passes.length} pass(es)`
-  + `, build ${served.build ?? '?'} rev ${served.rev ?? '?'}, this container`;
+  + `, build ${served.build ?? '?'} rev ${served.rev ?? '?'}, this container${cut}`;
 const why = [];
 if (SEED !== null) why.push(`--seed ${SEED} pins the trait sequence`);
 if (RAND !== null) why.push(`--rand ${RAND} pins the wave shuffle and every per-body roll`);

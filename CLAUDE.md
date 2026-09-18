@@ -12121,7 +12121,7 @@ came from before believing the other one covers it.
   OF ITS WAVES THROUGH THE 28-42 BAND.** Surges/cleans/stalls over six waves:
   **6/0/0** at rung 1, 4/2/0 at 7, 1/5/0 at 14, 1/4/1 at 21, **2/0/4** at 28,
   1/1/4 at 35, **2/0/4** at 42, 4/1/1 at 49. Every rung had 200 MB to spend --
-  the whole tree is 113 MB -- so this is not the purse: it is the plateau, in
+  the whole tree is 133.1 MB -- so this is not the purse: it is the plateau, in
   the band where the tree's dearest prices sit, measured at the one funding
   that rules money out. Note rung 49 climbs FREELY again (4 surges of 6), which
   is build 363's finding re-confirmed at a wave-counted window.
@@ -12204,7 +12204,7 @@ came from before believing the other one covers it.
   opposite of what was happening.
 - **`--spend` DOES NOT DEFEAT THE PLATEAU, WHICH IS THE ONE CLAIM THIS TABLE
   MAKES ABOUT BALANCE.** 107 buys and CORE at 0 levels at every rung of both
-  passes -- 200 MB against a 113 MB tree, so the tree is bought out and the
+  passes -- 200 MB against a 133.1 MB tree, so the tree is bought out and the
   remaining node is behind the NEW FORM remainder rather than behind money
   (build 363). So every stall in the 28-42 band above is a stall with the best
   turret bytes can buy, and the answer to it is not the purse.
@@ -12219,3 +12219,252 @@ came from before believing the other one covers it.
   ORDINAL hash is not owed; the instruments with something to say were the two
   passes, the runtime verification of both anchor branches, and the four revert
   proofs.
+
+- **BUILD 370 IS THE RE-TAKE AND IT SHIPS NO CURVE, BECAUSE THE PROBE COULD NOT
+  HAVE MEASURED ONE: `d.hold` PINS THE CLIMB AND NOT THE RUNG, SO EVERY WINDOW
+  THAT DISCHARGED WALKED DOWN THE LADDER UNDER ITS OWN LABEL.** Build 353 shipped
+  the boss instrument and no table for the same reason and said so in the same
+  words. `hold` has exactly ONE reader in the game -- `score`'s climb branch,
+  `else if (!this.hold)` at `enemies.js:9495` -- so it stops the ladder going UP
+  and nothing else, while `glitchOut` does `this.tier--` and THEN clears the
+  hold, under the game's own comment: *"A step back re-arms the climb even under
+  HOLD. The pin holds the climb, not the relief."* The probe re-asserted `hold`
+  every frame of both its loops, for the stated reason that a discharge would
+  otherwise unpin the climb -- so it restored exactly the relief that would have
+  climbed the rung back and left the decrement standing, permanently.
+  **Found in readings already in hand rather than by reading the code**, which is
+  why the `gl` column earns its place: pass 1 at rung 21 recorded SIX discharges
+  over six waves, so that window ended at **rung 15** and reported itself as 21;
+  the same pass at rung 49 recorded six; a twenty-wave window at rung 42 recorded
+  seven and ended at **35**. A window's rate, wave length and seam were all
+  credited to the rung in the label.
+  **It is worst exactly where the anchors are softest.** A well-funded pass
+  barely discharges -- pass 3 read `gl` 0 at seven of eight rungs -- so the
+  corruption is concentrated in the under-funded passes, which are the ones the
+  fixed point climbs THROUGH, and at the deep rungs, which are the ones phase 7b
+  needs. `setTier` is the machinery's setter and does not gate, which is what a
+  probe wants, so the pin re-asserts the rung and not only the flag. The re-pins
+  are COUNTED and the ending tier is asserted against the label (`pin` column, a
+  `!` if they ever disagree): measured after, a rung-42 window absorbed **4
+  discharges with 4 re-pins and finished on 42**.
+- **AND `held` AT SIX WAVES WAS A CENSORED READING WEARING A MEASUREMENT'S
+  CLOTHES, WHICH IS BUILD 363'S OWN `short`/`held` SPLIT ONE LEVEL IN.** That
+  build's docstring says `held` means "the rung does not let go, the dwell really
+  is unbounded, and that is a MEASUREMENT". It is a measurement only in the limit
+  of a window long enough that a climb would have shown. Measured at rung 21
+  funded with what the fixed point gave it (882 kB), everything else loose:
+
+  | window | mix | dwell |
+  |---|---|---|
+  | 6 waves, pass 1 | 0 surge / 0 clean / 5 stall, 6 discharges | `held` |
+  | 6 waves, pass 2 | 0 / 0 / 6 | `held` |
+  | 6 waves, another roll | **0 / 3 / 3** | **41.4s** |
+  | 20 waves | **0 / 2 / 17**, 1 discharge | **280.0s** |
+
+  So the rung climbs about one wave in ten and six waves sees none of them 53% of
+  the time -- a coin toss, drawn twice. Rung 42 is the same story: `held` at six
+  waves, 1/2/12 and a dwell of **317.5s** at twenty. **So the curve stopping at
+  rung 15 was never a statement about the ladder**, which is precisely what build
+  362 read off its own stop line. `--waves` defaults to **20** now, which is the
+  measured-adequate number rather than a round one (at one climb in ten it sees a
+  climb 88% of the time against six waves' 47%), and a `held` reading CARRIES the
+  floor it is -- `(waveSec + rest) * waves`, the value one climb would have given
+  -- so the censoring is visible. The floor brackets the truth: pass 2's
+  six-wave `held` at rung 21 reads a floor of **247s** against the 280.0s twenty
+  waves measured.
+- **THE POOLING RULE WAS "AT LEAST HALF" AND, BELOW THE THRESHOLD, FELL THROUGH
+  INSTEAD OF REFUSING.** `poolRuns` states two halves in its own docstring --
+  select among the runs that could be PRICED, and price the rung only on a
+  MAJORITY -- and from build 368 to 370 the code kept neither. It was
+  `ok.length * 2 >= runs.length ? ok : runs`: `>=` is at least HALF, so an even
+  split priced the rung, and below the threshold it took the median of ALL the
+  runs, so whether a mostly-unpriceable rung got priced depended on where the one
+  good window landed in the RATE ordering -- which is the "choosing the roll that
+  flatters it" that same paragraph exists to refuse. Measured by slicing both
+  versions out and driving them over ten arrangements: **three change and seven
+  are identical**, the three being 1 of 3 with the priced run in the MIDDLE, 1 of
+  2, and 2 of 4. **Both `runs.length === 1` arrangements are identical**, which
+  is what says a curve measured at `--runs 1` is the same curve under either
+  rule, because that arm returns before either term is read.
+  **The guard is the rule DRIVEN, not a regex on the expression**, because the
+  rule is a verdict over a population and that expression has now been written
+  two ways that look equally plausible in a diff. `check-build` slices both
+  functions out by brace matching and runs all ten -- build 349's harness idiom
+  (what is verified cannot disagree with what ships) pointed at a node-side probe
+  `regress.mjs` has no way to reach. Its revert proof names exactly the three
+  arrangements the standalone harness predicted, which is a static guard
+  independently reproducing a measurement.
+- **`integrate` DROPPED THE FLOOR IT WAS GIVEN, AND THAT WAS MY OWN BUG FROM
+  TWENTY MINUTES EARLIER.** The map rebuilt each entry as
+  `{rung, dwell, why, rate}`, and `blame` returns an element of THAT array, so
+  the stop line whose whole subject is the censoring rendered **"undefined
+  wave(s) ended there ... so the dwell is at least (no seam, so unpriced) a
+  rung"** -- and the fallback named a cause `dwellOf` cannot produce for a `held`
+  sample. Seen live on a rung-42 window. That is build 368's `fieldSum / frames`
+  verbatim, a dropped field leaving a silent `undefined` in a readout, **inside
+  the readout added to stop a different silence.** The cause is that I drove
+  `dwellOf` in isolation and never rendered the sentence: **drive the function
+  AND render the line**, because a template reads fields the function's own test
+  never touches.
+- **A CURVE THAT STOPPED STILL PRINTED A PASTE-READY `EARNED`, AND THE
+  `// measured:` COMMENT RECORDED NO TRUNCATION.** `why` enumerated seven
+  disqualifiers and had no term for `last.stop`, so a fully-loose run whose deep
+  sample was `held` fell into the paste branch and offered a SHORT array. What
+  that costs is downstream and is not small: `tiers.mjs` derives `TAIL` from the
+  LAST TWO entries of whatever array is pasted and extrapolates every rung above
+  it, so measured against the shipped curve -- cut at 35 and `spendAt(42)`
+  returns the whole tree; cut at 14 and `spendAt(35)` reads **101 MB against a
+  measured 40.6 MB**; cut at 7 and `e0` is 0, so `TAIL` is **Infinity**.
+  It is NOT made a disqualifier, and the distinction is the point: a pin is a
+  condition the reading was taken under and makes the whole reading something
+  else, while a stop is an incomplete result that is sound as far as it goes.
+  Build 362's curve was truncated at 42 and was pasted, correctly, with the
+  truncation recorded by hand. So the comment carries it now and the line is
+  still offered -- **the silence was the fault, not the paste.**
+- **`pick` ASSUMES ASCENDING SAMPLES AND NOTHING SORTED `--rungs`.** It clamps on
+  `samples[0]` and `samples[last]` and then walks forward, all three of which are
+  correct only for an ascending list, and `--rungs 49,42` is an ordinary
+  attribution invocation. Measured on the sliced function: handed 14,7,1 every
+  rung from 1 to 14 returns the TOP sample's dwell and rate, so the whole curve
+  is built out of one sample; handed 1,14,7, rungs 10 and 14 read 20 where
+  ascending reads 28.57 and 40. Sorted rather than refused -- the measurements
+  are the same measurements whatever order they were asked for, and only the
+  interpolation cares -- with the reorder PRINTED. **The sibling misuse (a
+  repeated rung) has been caught and disqualifying since 369, and that this one
+  was not is the asymmetry that makes it a fault rather than a matter of
+  likelihood.**
+- **AND A REFUSED RUNG'S ROW IS ONE WINDOW, CAPTIONED AS A MEDIAN.** Below the
+  majority threshold the pool returns an unpriceable run, so every column of that
+  row -- rate, seconds, mix, field, paid/wave, rules -- is one arbitrary
+  window's, while the caption claimed "the pooled row is the median by rate" for
+  any R > 1. Worse, the row's `why` is what the stop line reports and `held` and
+  `short` are different facts, so a rung where two windows were held and one saw
+  no wave at all could print "NOTHING WAS MEASURED" because the short one came
+  first in the array. The representative is CHOSEN now (`held` beats `short`,
+  being the informative one) and the caption says it is one refused window.
+- **THE ROLLS LINE SAID "(the curve)" FOR A READING ITS OWN HEADING HAD ALREADY
+  DISQUALIFIED, two lines apart.** That parenthetical is about the four ROLLS and
+  printed it under `--spend`, `--window` or a repeated rung -- which is build
+  369's finding one level up (a `NOT ANCHORS` warning four output lines above a
+  paste-ready curve) and the same rule: a refusal whose own output still offers
+  the thing is not a refusal. A SECOND line rather than a rewording of the first,
+  and the reason is the guard: `check-build` derives the pinnable channel set
+  from the condition behind "(the curve)" and then requires each channel to
+  DEFAULT LOOSE, and `REPEATED` is COMPUTED off the rung list and has no default
+  to be loose -- so folding the three in would fail the build for a readout's
+  wording. Driven over six arrangements, including the one where the rolls line
+  already says "attribution" so the second line stays quiet.
+- **WHAT THE FAN-OUT WAS WORTH, AND IT IS THE CLEAREST CASE YET.** Five read-only
+  lenses over the probe, launched BEFORE the long run on the ground that every
+  income build so far found an instrument fault AFTER the measurement (362 shipped
+  three, 364 the one-of-N rules column, 365 the drop ratchet, 368 a silent NaN).
+  **Two independent lenses converged on the `hold` fault**, with the mechanism,
+  the line and the game's own comment -- and unlike build 318's convergence it
+  was right about the mechanism as well as the file. A third caught my own
+  twenty-minute-old dropped floor, the truncated paste and the unsorted `pick`,
+  and verified the pooling fix by slicing it out and driving it over R=1..5,
+  which is the method I had used independently. The standing rule still held in
+  two directions: every mechanism above was re-measured here before being acted
+  on, and one lens noted it had been **reviewing a tree that changed under it**
+  (`income.mjs` grew 1212 -> 1271 lines mid-review), which is build 335's
+  wrong-tree caveat arriving from the agent's own side.
+- **AND THE CURVE IS STILL NOT MEASURED, WHICH IS THE HONEST DELIVERABLE.** Run A
+  (six waves, one run a rung, three passes) converged and priced 8 of 8, printing
+  `[[1,0],[7,536984],[14,1815414],[21,5691087],[28,18801839],[35,70728044],
+  [42,391991146],[49,855732363]]` -- and it is NOT pasted, because it was measured
+  through the tier fault above and its own pass 3 carries a discharge at rung 35.
+  `tiers.mjs`'s anchors therefore stay build 362's, still known stale (build 366
+  moved the economy pin without re-measuring and says so at its own site), and
+  `INCOME_PIN` does not move because the economy did not.
+  Two conditions the re-take has to record when it lands, both measured here and
+  neither a fault: the drop floor is **pinned at 128 with `ebb` 0 from wave two
+  on at every rung of an unfunded pass** -- `CFG.maxDrops` binding and `shed`'s
+  documented silent `break`, with build 366's fix correctly scoped to the reach
+  test because a pile AT the machine is collectable in principle -- and the
+  no-hostile bonus wave is still the largest single payout at rung 1 (60.6 kB
+  against 18-42 kB for the authored waves), so a shallow rung's `paid/wave` is
+  mostly DRIFT.
+- **AND THE `terms` LENS FOUND THE FIFTH FAULT, WHICH IS THE ONE I HAD THE
+  EVIDENCE FOR AND MISREAD: AN UNSCOREABLE WAVE INHERITED THE PREVIOUS WAVE'S
+  VERDICT.** `Director.score` returns null for `!wave || wave.teach ||
+  this.asked === 0` and never reaches the line that writes `lastVerdict`, which
+  has three writers in the whole game -- the constructor, `glitchOut` and
+  `score` -- and is cleared between waves by NOTHING, not even `reset()`. The
+  drift-only bonus wave (`{ of: [], drift: 22, dwell: 8, band: 1 }`) is exactly
+  that case: no hostiles, `load` excludes harmless from `asked`, not `teach`,
+  and it still goes resting. So the probe recorded it as SCORED wearing the last
+  real wave's verdict, added its 1 or 2 to `steps`, and spent one of the
+  window's N waves on it. **It is in build 370's own first run in plain sight**
+  -- rungs 1 and 7 carry rows reading `asked 0  made 0  slain 0` with a verdict
+  of `clean` -- and build 369's note called that wave "a SURGE by construction
+  because `standing()` counts hostiles and there are none", which is wrong in
+  both halves and is struck. `steps/waves` rises, so the DWELL FALLS, and band 1
+  is drawn at rungs 1, 7 and 14: the bottom of the curve that every anchor above
+  it is accumulated from.
+  Cleared at the wave's START, which is what makes the absence legible -- `score`
+  writes the field at the wave's END, so the previous verdict has already been
+  consumed. The wave's SECONDS and its PAY stay in the rate, which is right: it
+  really does pay and really does take time, and it is the CLIMB it cannot
+  contribute. The game's own comment above that early return names this wave and
+  says it "was a free rung every cycle -- observed climbing 15 to 16 for shooting
+  nothing", which is the same fault on the ladder rather than in the probe.
+- **AND TWO MORE, BOTH THE REPO'S OWN RULES BROKEN ON THE QUANTITY THE CURVE IS
+  MADE OF.** `waveSec` and `rest` were stored at `toFixed(1)` -- the figures the
+  `wave s` and `seam s` columns print -- and then summed and divided in
+  `dwellOf`, which is build 313's "round for the message, divide the raw" on the
+  dwell's own numerator (about 1.3% of rung 1's 7.5s dwell, noise at the deep
+  rungs, and the rule does not scale with the magnitude). And `spendAt`'s
+  INTERPOLATION branch never clamped at `TREE_TOTAL` while its extrapolation
+  branch always did -- which has never mattered, because the last anchor is 95.8
+  MB and nothing interpolated could exceed the tree; an EIGHTH anchor at rung 49
+  moves rungs 43-48 out of the clamped branch, and measured with a rung-49 anchor
+  of 300 MB the `spend` column climbs 95.8 -> 125.0 -> ... -> 270.8 MB and then
+  FALLS to 133.1 at rung 49, the only rung still reaching the clamp. No measured
+  figure moves, so it is the READOUT that would have been nonsense -- which is
+  the only thing a funding column is for. **The next curve will have that eighth
+  anchor**, so it is fixed ahead of it rather than after.
+- **AND `TREE_TOTAL` IS 133.1 MB WHERE THIS FILE SAID 113 IN THREE PLACES**, two
+  of them in build 369's entry as a claim about the CURRENT tree ("200 MB against
+  a 113 MB tree, so the tree is bought out"). Measured two ways that agree --
+  `tiers.mjs`'s own `TREE_TOTAL` and `check-build`'s `tree.total`, which use
+  different filters -- at **133,075,800**. Build 304's 113.1 MB is left alone as
+  the record of that build; the two live claims are corrected. The reason it
+  matters here rather than being a tidy-up is that the clamp finding above turns
+  on exactly this number: a reader pricing it off the notes is 15% low and would
+  conclude the clamp still binds when it does not. Build 329's rule, and it was
+  MY copy that went stale, one build after writing it.
+- **RECORDED AND NOT ACTED ON, each with its reason.** The pooled row is selected
+  on `rate` alone while a rung's contribution to the integral is `dwell x rate`,
+  and the two factors vary independently -- so the median-by-rate window is not
+  the median-by-bytes-per-rung window. The label is honest ("the pooled row is
+  the median by rate"), so this is visible rather than hidden, and changing the
+  selection key is a decision about what a pooled rung MEANS rather than a
+  correction. And the warm-up's 600-second bound is silent on timeout, which
+  would open the window mid-wave: the exact fault the boundary above it exists to
+  prevent, probably unreachable, and a silent failure mode rather than a bounded
+  one for a run of hours.
+  **Two of that list WERE acted on, because each was a claim the output did not
+  keep rather than a judgement.** `banked` had no reader anywhere while its own
+  comment said it, `secs` and `rate` "reconcile against each other in one row,
+  which is the form this repo prefers to a guard on a probe's arithmetic" -- so
+  the stated defence against a rate-arithmetic fault did not exist in the output;
+  the per-run line reads `<banked> in <secs>s = <rate>/s` now, which is the
+  numerator beside its denominator. And `jobsAt` is LABELLED a snapshot ("job(s)
+  at close") rather than printed as though it were a property of the window.
+  Six returned fields still have no reader and are left, named here.
+- **AND A REFUTE STAGE POINTED AT A TREE YOU ARE ACTIVELY FIXING REFUTES YOUR
+  OWN FIXES' FINDINGS.** All five refuters came back `refuted: true`, each saying
+  in effect "this describes the pre-fix state, and the expression it quotes
+  exists in the file only inside the comment documenting its own fix" -- because
+  the lenses ran against the working tree while I was patching it, and the
+  refuters ran after. The verdicts are artefacts of the schedule and not of the
+  findings, every one of which was measured here before being acted on. One
+  refuter got it right and is the model: it separated the two by naming the
+  commit -- "the defect was real at committed HEAD abe5bde (build 369)" -- and
+  reported its verdict as a STATUS rather than a correction.
+  So the rule for a review run DURING a build: a verdict that does not name the
+  tree it read is unusable, and the honest shape is to review committed HEAD and
+  fix afterwards, or to pass the reviewers the commit and ask for a status
+  against it. Build 335 recorded the same hazard from the operator's side (six
+  lenses reviewing HEAD while the subject sat uncommitted); this is it from the
+  agent's side, and it cost five agents' work to learn twice.
