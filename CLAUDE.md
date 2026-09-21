@@ -12704,3 +12704,179 @@ came from before believing the other one covers it.
   agents: it is one background node process, which is what 371 established as
   the responsible shape. `tiers.mjs`'s anchors are unchanged and `INCOME_PIN` is
   unmoved, because the economy did not change and neither did the curve.
+
+- **BUILD 373 RAN THE DAMPED RE-TAKE, AND IT SHIPS NO CURVE BECAUSE THE
+  PURCHASE POLICY BOTH PROBES SHARE IS A NON-MONOTONE FUNCTION OF THE PURSE:
+  22.9 MB BOUGHT HALF THE GUN 20.9 MB DID.** Three `--runs 3 --iters 1` passes
+  at twenty scored waves a rung, ~2.2 hours each, seeded from build 371's
+  landed curve and chained by hand through the blend so a container loss cost
+  one pass rather than the sequence. All three priced 8 of 8 rungs, 3 of 3
+  runs at every rung, `unended 0` everywhere, and build 370's tier pin held
+  (`gl` 2 and `pin` 2 at the deep rungs, the ladder never walked). The curve
+  is still not landed, which is build 353's and 368's precedent -- the
+  instrument, then the table -- and this time the instrument at fault was one
+  neither build had looked at.
+- **IT WAS FOUND IN A COLUMN THE PROBE HAS PRINTED ALL ALONG, BY READING IT
+  ACROSS PASSES RATHER THAN DOWN ONE.** `buy/core` at rung 28: **63 levels
+  with 15.9 MB in pass 1, 38 with 25.2 MB in pass 2, 31 with 22.3 MB in pass
+  3.** More money, fewer levels, and no run-to-run randomness in it (both
+  trials of every purse are identical to the level). Nothing in the suite or
+  `check-build` could see it, and the figures for all three passes were in
+  front of me before I noticed the ordering -- **a table read one row at a
+  time is a different instrument from the same table read one column at a
+  time.**
+- **MEASURED PROPERLY, BOTH ALLOCATORS OVER 183 PURSES ON A LOG GRID IN ONE
+  CONTAINER**, at rung 28, damage multiplier and level count per purse:
+
+  | | damage dips | worst factor | level dips | of those, explained by a damage RISE |
+  |---|---|---|---|---|
+  | declaration-order `while` | **2** | **2.0x** | 46 | 7 |
+  | cheapest-first | **0** | -- | 4 | **4 of 4** |
+
+  At the purses the passes actually used: **22.91 MB goes from 36 levels at
+  x3.176 to 84 at x6.353**, 25.12 MB from 45 at x4.002 to 85 at x6.353, and
+  15.85 MB from 64 to 77. So the hole is a factor of two in the damage
+  multiplier spanning about 21-27 MB, and OUTSIDE it there is a systematic
+  bias of about a fifth of the tree's levels at every purse. Every
+  affordability reading either probe has produced -- seventeen builds of them
+  -- was taken against an under-built turret, and rungs 28 and up of this
+  build's own re-take were funded inside the hole.
+  The four remaining level dips are the damage SPINE rising (x1.26 -> 1.588 at
+  0.224 MB, -> 2 at 0.447, -> 2.52 at 0.708, -> 3.176 at 1.00): a spine level
+  costing more than several peripheral ones is stage 1's priority working, not
+  an artefact, and it is asserted as such rather than eyeballed.
+- **`tiers.mjs`'S OWN DOCSTRING DIAGNOSED THIS FAULT, FIXED IT IN STAGE 1, AND
+  STAGE 2 WAS WRITTEN TWENTY LINES LOWER WITH THE SAME DISEASE.** That
+  paragraph reads "Skipping made the table non-monotone: at tier 3 the
+  leftovers reached DOUBLE TAP, at tier 4 a second FEED ate them first, and
+  **the richer turret came out holding strictly less than the poorer one**" --
+  the exact symptom, named, with its own ruling ("a priority list is a thing
+  you save up for, and a calibration column has to be comparable down its
+  whole length"). And stage 2's own comment says **"This is where a large
+  budget stops helping"**, which is the thought, not followed. This repo's
+  most expensive recurring shape: a rule written down is not a rule applied.
+- **AND STAGE 1'S RULING IS THE OPPOSITE OF STAGE 2'S, WHICH IS WHY THE FIX IS
+  NOT A CONTRADICTION.** The LINE is a priority order, so it stops at the
+  first entry it cannot afford and must NOT skip down the list. Stage 2 has no
+  priority -- it is whatever the line could not absorb -- so for it the rule
+  is cheapest-next-level-first. The two stages want opposite rules for the
+  same reason, and only one of them had been given its.
+- **CHEAPEST-FIRST IS MONOTONE BY CONSTRUCTION RATHER THAN BY MEASUREMENT**, and
+  that is the argument for it rather than the numbers above. A price is
+  `cost + step * have`, so taking the least-cost next level each time walks ONE
+  purse-INDEPENDENT sequence in non-decreasing price, and the purse only
+  decides how long a prefix of it is affordable -- which is also why stopping
+  at the first unaffordable level is correct rather than conservative: nothing
+  after it in a sorted list is affordable either. It subsumes build 302's
+  multi-pass rule, which this loop used to carry: a node gated on a `needs`
+  PREDICATE is reconsidered on every iteration, so a gate that opens mid-spend
+  is picked up with no pass count to choose and no cap to be a backstop for.
+- **THE GUARD IS DRIVEN, NOT SHAPE-PINNED -- AND MONOTONICITY WAS TOO WEAK A
+  CLAIM, WHICH ITS OWN REVERT PROOF SHOWED.** Build 370's idiom: the allocator
+  is sliced out of each probe by its sentinels and run against a synthetic
+  two-node tree (one node priced 1/5/9, one priced 1 a level) with a fake buy
+  door. The first version asserted only that the level count never falls and
+  that a bigger purse buys a SUPERSET -- and reversing the comparator to buy
+  the DEAREST level first **passed it**, because with a break on the first
+  unaffordable level any sort order comes out monotone on that tree while
+  buying 1 level at a purse of 5 where 5 are affordable.
+  What pins cheapest-first is OPTIMALITY, and it has an oracle computed a
+  completely different way: a node's level prices only rise, so flattening
+  every level price into one list, sorting it ascending and taking the longest
+  affordable prefix is the most levels any allocator could buy -- no
+  simulation and no buy door. With it, dearest-first fails 20 of 41 purses
+  (first at 2) and tree-order-with-skip fails 16 (first at 6, bought 2 where 6
+  were affordable -- the historical fault's own figure). **Ask what property
+  actually distinguishes the right rule from the wrong ones, and measure the
+  broken end until it fails.**
+  Six proofs in all, each on its own conjunct with its own message: dearest
+  first, tree order with skip, the two copies drifting apart, the sentinel
+  renamed, the draining `while` restored, and the vacuity arm (an allocator
+  that buys nothing).
+- **AND THE GUARD FAILED THE BUILD FOR ITS OWN DOCSTRING ON ITS FIRST RUN.**
+  The arm refuses the draining `while (g.buy(...))` form, and the docstring at
+  the fixed site QUOTES that expression to say what was replaced -- so a sweep
+  over the whole file named `income.mjs` as still carrying the fault. Build
+  344's rule from the other side (a `grep -c` that PASSED because documentation
+  contained the string it was looking for) and build 355's door arm, which had
+  to learn the same thing. It reads lines of CODE only.
+  A second trap in the same arm: `read` in `check-build.mjs` is a `const`
+  declared BELOW the income block, so calling it there is a TDZ
+  `ReferenceError` -- the same shape as `config.js`'s authoring helpers and
+  build 324's `RESPAWN_KEYS`. Anything reached from a point in the file has
+  its dependencies above it.
+- **WHAT THE RE-TAKE IS STILL WORTH IS EVERYTHING ABOUT THE ITERATION, BECAUSE
+  NONE OF THAT IS ABOUT THE POLICY.** Build 372's damping was derived from
+  build 371's pairs and had never been run on a real sequence; it works.
+  Settling went **29.4% -> 9.5% -> 7.6% on the mean** and 87.2% -> 17.6% ->
+  24.0% at worst, and the ALTERNATION is visible in the signs, which is what
+  says the first two passes were still the iterate rather than noise: pass 1
+  measured its middle rungs **+78 / +174 / +117%** against its seed and pass 2
+  measured **-32 / -35 / -23%** against its raised one -- same rungs, opposite
+  direction, half the amplitude. By pass 3 the signs were mixed and the
+  magnitudes incoherent (rung 21 moved 0.8% between neighbours that moved 48%
+  and 22%), which is the coherent signal dropping under the per-rung noise.
+- **AND THE NOISE FLOOR HAS A NUMBER NOW, OFF THE PROBE'S OWN FREE CONTROL.**
+  Rung 1 is funded with 0.00 B in every pass by construction, so its pooled
+  row is a repeated measurement of one input: rate **3.32 / 3.53 / 3.43 kB/s**
+  but dwell **17.2 / 12.1 / 13.6 s**, so the rate x dwell product that feeds
+  the integral reads **57.1 / 42.7 / 38.8 -- a spread of x1.47**. A settling
+  figure is half a measured gap, so a fully settled rung 7 -- whose integral is
+  rung 1's contribution alone -- would still read about 12%, and pass 3's rung
+  7 read 5%. **The plateau at 7-8% is the instrument's resolution at three
+  runs a rung, not convergence error**, and that is the number the next
+  re-take's stopping criterion should be read against rather than a threshold
+  chosen for it.
+- **THE HASH IS NOT OWED AND WAS NOT RUN.** This build changes
+  `scripts/income.mjs`, `scripts/tiers.mjs`, `scripts/check-build.mjs` and the
+  BUILD literal; no executable `src/` line moves, so there is nothing for the
+  ORDINAL probe to measure and the reading would be a formality -- the same
+  call builds 345 to 349, 360 and 372 made. What had something to say is the
+  183-purse A/B, the shipped probes' own `buy` columns either side (`tiers.mjs`
+  at tier 28 reads **77 levels with 15.9 MB** where the sweep measured 64,
+  which is the fix cross-validated from a second code path), the six revert
+  proofs and the suite.
+- **What is owed: the curve, on the fixed policy.** `tiers.mjs` still holds
+  build 371's eight anchors and its docstring now records them as stale on TWO
+  counts -- the economy, since build 366 moved `INCOME_PIN` without
+  re-measuring, and now the policy. They stay because a measured curve beats
+  an asserted one even stale, which is build 366's own ruling. The re-take is
+  three `--runs 3` passes at twenty waves a rung, about 2.2 hours each,
+  `--from`-seeded in chunks, zero agents; and it should read its stopping
+  criterion against the x1.47 control above rather than against a number
+  chosen for it.
+- **AND THE SUITE TURNED UP A RECOVERY TEST WHOSE INSTRUMENT INVERTED ITS OWN
+  CLAIM: THE BETTER THE PRESS WORKED, THE LIKELIER THE CASE WAS TO GO RED.**
+  776 of 777 on a build whose only changes are in `scripts/` and the BUILD
+  literal -- builds 319 and 351's condition for fixing a margin properly
+  rather than re-running for a green draw -- and the failing line was the KITE
+  press arm reading `buying nulls` with every other figure in it healthy (713
+  of a 720 cap, 461 units of displacement, 6 of 6 surviving, the ANVIL control
+  at 0). Two faults, and the second is the interesting one.
+  The recovery test was `Math.max(...errs) < 30` over all six bodies, and a
+  kite OSCILLATES about its station: measured, the resting error across the
+  six is 53/51/24/24/20/17 on one trial and 58/47/24/24/19/18 on another, so
+  the constant sat INSIDE the residual band. Profiled at five-second
+  intervals, two of three trials converge to exactly 0 by t=20 and read 16.6s
+  and 14.6s; the third leaves two bodies oscillating at 22-36 for the whole
+  eighty-second window and caught a lucky frame at 66.3s standalone and none
+  at all in the suite.
+  **And `null` was failing the conjunct that wanted a LARGE number.** The claim
+  is that a press buys time (`back > 6`), so a line kept away for the whole
+  window -- the press working better than ever -- recorded `null` and failed.
+  `rest` is the residual taken on the frame before the press and `home` is
+  `max(rest, 10)`, so the question asked is the one the claim makes (is the
+  line back to where the press found it) with a floor for a line that happens
+  to be settled to the unit; and the null is CLAMPED at the window. Five
+  trials read 13.8 / 11.3 / 11.3 / 11.3 / 13.9 against the floor of 6, with
+  `rest` ranging 0 to 26 and `home` following it, which is the derivation
+  working rather than a number that happened to fit.
+- **...AND THE CLAMP WAS ONE LINE FROM A VACUITY, WHICH ONLY MEASURING THE
+  BROKEN END FOUND.** Clamped unconditionally, a press that does NOTHING also
+  fails to get home, reads 80s and satisfies `back > 6` -- so the fix for a
+  null that failed would have handed a pass to the very build the arm exists
+  to catch. It is clamped only when the line was actually thrown
+  (`far > 100`), and measured with the impulse zeroed the arm now reads
+  `thrown 0-27, speed 9-12 of 720, back null` and fails on three conjuncts at
+  once. **A clamp is an assertion about the tail, so measure the tail it is
+  hiding.**

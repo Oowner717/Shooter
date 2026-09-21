@@ -2178,6 +2178,172 @@ console.log(`income: income.mjs's pooling rule is DRIVEN over ${POOL_CASES.lengt
   + 'arrangements -- it refuses a rung without a strict majority, and both one-run cases '
   + 'are in it, so a --runs 1 curve is the same curve under any version of the rule');
 
+/*
+ * ---- ...AND THE PURCHASE POLICY IS DRIVEN FOR MONOTONICITY --------------
+ *
+ * Both probes fund a turret in two stages: the damage LINE in priority order,
+ * stopping at the first entry it cannot afford, and then whatever is left on
+ * the rest of the tree. Stage 2 was `for (const n of NODES) while (g.buy(...)
+ * === 'ok')` -- every level of one node drained before the next node was
+ * looked at, in declaration order -- and that made the funded turret a
+ * NON-MONOTONE function of the purse: measured at rung 28 over 183 purses,
+ * 46 dips in level count and 2 in the damage multiplier, worst factor exactly
+ * 2, so 22.9 MB bought 36 levels at x3.176 where 20.9 MB bought 64 at x6.353.
+ * Every affordability reading either probe has ever produced was taken
+ * against a turret under-built by about a fifth of its levels, and build
+ * 373's own re-take of the income curve was voided by it.
+ *
+ * So the rule is not pinned as a SHAPE, it is DRIVEN -- build 370's idiom for
+ * the pooling rule, which had been written two plausible-looking ways. The
+ * allocator is sliced out of each probe by its own sentinels and run against
+ * a synthetic two-node tree chosen to expose the old fault (one early node
+ * priced 1/5/9 and one cheap node priced 1 a level: the old loop buys FOUR
+ * levels with a purse of 4 and TWO with a purse of 6). The claim asserted is
+ * the strong one -- not merely that the level count never falls, but that the
+ * purchases at a larger purse CONTAIN those at a smaller one, which is what
+ * makes every multiplier monotone as well as the count.
+ *
+ * The two copies must also be byte-identical, because a policy that differs
+ * between the probe that measures the curve and the probe that reads it is
+ * two models wearing one name.
+ */
+const POLICY_OPEN = '/* ---- cheapest-first: ONE allocator, byte-identical in both probes ---- */';
+const POLICY_SHUT = '/* ---- end cheapest-first ---- */';
+const policySrc = {};
+for (const f of ['scripts/income.mjs', 'scripts/tiers.mjs']) {
+  const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  const a = src.indexOf(POLICY_OPEN);
+  const b = src.indexOf(POLICY_SHUT);
+  if (a < 0 || b < a) {
+    console.error(`policy: ${f} has no cheapest-first allocator between its sentinels `
+      + `(${POLICY_OPEN.trim()} ... ${POLICY_SHUT.trim()}): the detection has drifted, not `
+      + 'the exposure. Re-point this arm at whatever now allocates the leftover budget.');
+    process.exit(1);
+  }
+  if (src.indexOf(POLICY_OPEN, a + 1) >= 0) {
+    console.error(`policy: ${f} has more than one cheapest-first allocator. There is one `
+      + 'leftover-budget rule per probe and the two probes share it.');
+    process.exit(1);
+  }
+  /*
+   * Lines of CODE only. The docstring at the fixed site QUOTES the expression
+   * it replaced, so a sweep over the whole file fails the build for its own
+   * documentation -- which is build 344's `grep -c` passing because the prose
+   * contained the string it was looking for, and build 355's door arm having
+   * to learn the same thing.
+   */
+  const code = src.split('\n')
+    .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n');
+  if (/while\s*\(\s*g\.buy\s*\(/.test(code)) {
+    console.error(`policy: ${f} still drains a node with \`while (g.buy(...))\`, which is `
+      + 'the declaration-order allocator build 373 measured as non-monotone in the purse '
+      + '(22.9 MB bought half the gun 20.9 MB did). Take the cheapest next level instead.');
+    process.exit(1);
+  }
+  policySrc[f] = src.slice(a + POLICY_OPEN.length, b);
+}
+if (policySrc['scripts/income.mjs'] !== policySrc['scripts/tiers.mjs']) {
+  console.error('policy: income.mjs and tiers.mjs allocate the leftover budget differently, '
+    + 'so the probe that MEASURES the income curve and the probe that READS it are funding '
+    + 'two different turrets. The two blocks between the sentinels must be identical.');
+  process.exit(1);
+}
+{
+  /*
+   * The synthetic tree: `a` is priced 1, 5, 9 and `b` is priced 1 a level.
+   * The old allocator drains `a` first, so a purse of 6 buys a1 + a2 and
+   * nothing else -- two levels -- where a purse of 4 buys a1 + b1 + b2 + b3.
+   */
+  const TREE = [{ id: 'a', cost: 1, step: 4, levels: 3 },
+    { id: 'b', cost: 1, step: 0, levels: 8 }];
+  const priceOf = (n, have) => n.cost + (n.step || 0) * have;
+  const levelsOf = (n) => n.levels;
+  const alloc = new Function('w', 'NODES', 'levelsOf', 'priceOf', 'g', 'bought',
+    policySrc['scripts/income.mjs']);
+  const spend = (purse) => {
+    const w = { bytes: purse, ledger: [] };
+    const bought = [];
+    const g = {
+      buy(id) {
+        const n = TREE.find((x) => x.id === id);
+        const have = w.ledger.filter((x) => x === id).length;
+        if (have >= n.levels) return 'maxed';
+        const p = priceOf(n, have);
+        if (p > w.bytes) return 'poor';
+        w.bytes -= p; w.ledger.push(id); return 'ok';
+      },
+    };
+    alloc(w, TREE, levelsOf, priceOf, g, bought);
+    return bought.slice().sort();
+  };
+  /*
+   * THE ORACLE, and it is what gives this arm any discriminating power.
+   *
+   * Monotonicity alone is too weak: because the allocator STOPS at the first
+   * level it cannot afford, any sort order comes out monotone on this tree --
+   * measured, reversing the comparator to buy the DEAREST level first passes
+   * a monotonicity-only check while buying 1 level at a purse of 5 where 5
+   * are affordable. What pins cheapest-first is OPTIMALITY, and that has an
+   * independent oracle computed a completely different way: a node's level
+   * prices only rise, so flattening every level price into one list, sorting
+   * it ascending and taking the longest affordable prefix is the largest
+   * number of levels any allocator could buy. No simulation, no buy door.
+   */
+  const best = (purse) => {
+    const prices = [];
+    for (const n of TREE) for (let h = 0; h < n.levels; h++) prices.push(priceOf(n, h));
+    prices.sort((a, b) => a - b);
+    let spent = 0, k = 0;
+    for (const x of prices) { if (spent + x > purse) break; spent += x; k++; }
+    return k;
+  };
+  const grid = [];
+  for (let purse = 0; purse <= 40; purse++) grid.push({ purse, got: spend(purse), max: best(purse) });
+  const bad = [];
+  for (const row of grid) {
+    if (row.got.length !== row.max) {
+      bad.push(`a purse of ${row.purse} bought ${row.got.length} level(s) where ${row.max} `
+        + 'were affordable');
+    }
+  }
+  for (let i = 1; i < grid.length; i++) {
+    const lo = grid[i - 1], hi = grid[i];
+    if (hi.got.length < lo.got.length) {
+      bad.push(`${hi.purse} bought ${hi.got.length} where ${lo.purse} bought ${lo.got.length}`);
+      continue;
+    }
+    // Containment: every level the smaller purse bought is still bought.
+    const pool = hi.got.slice();
+    const missing = lo.got.filter((id) => {
+      const at = pool.indexOf(id);
+      if (at < 0) return true;
+      pool.splice(at, 1); return false;
+    });
+    if (missing.length) {
+      bad.push(`${hi.purse} dropped ${missing.join(',')} that ${lo.purse} had`);
+    }
+  }
+  if (bad.length) {
+    console.error(`policy: the shared allocator is NOT optimal-and-monotone in the purse `
+      + `over the synthetic tree -- ${bad.length} check(s) fail, first: ${bad[0]}. `
+      + 'A run handed more money must never come away with a smaller turret; take the '
+      + 'cheapest next level each time: that buys as many levels as the purse can reach, '
+      + 'and walks one purse-independent sequence so a bigger purse can only extend it.');
+    process.exit(1);
+  }
+  if (grid[grid.length - 1].got.length <= grid[1].got.length) {
+    console.error('policy: the synthetic tree buys no more at a purse of 40 than at 1, so '
+      + 'this arm is vacuous -- it would pass for an allocator that buys nothing. Check '
+      + 'the fake buy door and the price table.');
+    process.exit(1);
+  }
+  console.log(`policy: the leftover-budget allocator is byte-identical in both probes and `
+    + `DRIVEN over ${grid.length} purses -- at every one it buys every level the purse can `
+    + `reach (${grid[grid.length - 1].got.length} at 40, ${grid[1].got.length} at 1) and a `
+    + `bigger purse buys a superset of a smaller one (the old declaration-order loop bought `
+    + `4 levels at a purse of 4 and 2 at 6)`);
+}
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {

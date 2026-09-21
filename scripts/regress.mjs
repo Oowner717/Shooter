@@ -39395,21 +39395,59 @@ if (MINE_LINE) {
       }
       for (let f = 0; f < 60 * 45; f++) g.update(1 / 60);
       const live = made.filter((e) => !e.dead && !e.staged);
+      /*
+       * WHAT "HOME" MEANS IS MEASURED HERE, NOT WRITTEN DOWN, and both halves
+       * of that cost a red case at build 373 -- on a build whose only changes
+       * were in `scripts/`, which is the condition under which a failure is
+       * unambiguously the case's own.
+       *
+       * A kite oscillates about its station, so the line is never exactly on
+       * it: measured over three trials the resting error across six bodies is
+       * 53/51/24/24/20/17, 58/47/24/24/19/18 and 65/36/26/24/24/16 -- and the
+       * recovery test was `Math.max(...errs) < 30`, a constant sitting INSIDE
+       * that band. Two of three trials converged to exactly 0 and read 16.6s
+       * and 14.6s; the third left two bodies oscillating at 22-36 for the
+       * whole window and read 66.3s on a lucky frame and `null` in the suite.
+       * `rest` is that residual, taken on the frame before the press, so the
+       * question asked is the one the claim makes: is the line back to where
+       * the press found it. The floor of 10 is for a line that happens to be
+       * settled to the unit, which would otherwise make `home` unreachable.
+       *
+       * AND A NULL USED TO FAIL THE ARM THAT WANTED A LARGE NUMBER. The claim
+       * is that a press BUYS TIME (`back > 6`), and a line kept away for the
+       * whole 80-second window recorded `null` -- so the better the press
+       * worked the likelier the case was to go red. It is clamped at the
+       * window with `returned` beside it, which is the floor the claim wants
+       * and keeps the two outcomes legible.
+       */
+      const rest = Math.max(...live.map((e) => Math.abs(e.y - E.standHeight(w, e))));
+      const home = Math.max(rest, 10);
       for (const e of live) e.applyDamage(w, 1, 0, -1, 3000, 0, 0, true, 'pulse');
       g.update(1 / 60);
       const left = live.map((e) => Math.hypot(e.vx, e.vy));
+      const WIN = 80;
       let far = 0, backAt = null;
-      for (let f = 0; f < 60 * 80; f++) {
+      for (let f = 0; f < 60 * WIN; f++) {
         g.update(1 / 60);
         const on = live.filter((e) => !e.dead);
         if (!on.length) break;
         const errs = on.map((e) => Math.abs(e.y - E.standHeight(w, e)));
         far = Math.max(far, ...errs);
-        if (far > 100 && backAt === null && Math.max(...errs) < 30) backAt = +(f / 60).toFixed(1);
+        if (far > 100 && backAt === null && Math.max(...errs) <= home) backAt = +(f / 60).toFixed(1);
       }
       out.press = {
         n: live.length, speed: +Math.min(...left).toFixed(0), cap: CFG.physics.thrownSpeed,
-        thrown: +far.toFixed(0), back: backAt, alive: live.filter((e) => !e.dead).length,
+        /*
+         * Clamped ONLY when the press actually threw the line. Clamping
+         * unconditionally would make a press that does nothing read 80s and
+         * satisfy `back > 6` -- the vacuity the clamp was one line away from
+         * introducing, and measured: with the impulse zeroed this reads
+         * `back null` and the arm fails, where the unconditional clamp read
+         * 80 and passed.
+         */
+        thrown: +far.toFixed(0), back: backAt === null ? (far > 100 ? WIN : null) : backAt,
+        returned: backAt !== null, rest: +rest.toFixed(0), home: +home.toFixed(0),
+        alive: live.filter((e) => !e.dead).length,
       };
       // the control: the one body in the game that refuses every shove
       bare();
@@ -39568,7 +39606,9 @@ if (MINE_LINE) {
     && r.press.anvil === 0,
     `${r.press.n} standing, a 3000-impulse press leaves them at ${r.press.speed} of a `
     + `thrownSpeed cap of ${r.press.cap} (it is the lightest body in the game), displacing `
-    + `the line ${r.press.thrown} units and buying ${r.press.back}s -- ${r.press.alive} of `
+    + `the line ${r.press.thrown} units and buying ${r.press.back}s`
+    + `${r.press.returned ? '' : '+ (never home inside the window)'} against a resting `
+    + `residual of ${r.press.rest} -- ${r.press.alive} of `
     + `${r.press.n} survived, so it is time and not a kill. An ANVIL takes ${r.press.anvil}`);
 
   check('more of them than the wall has room for spread across it rather than piling up',

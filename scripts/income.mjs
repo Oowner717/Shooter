@@ -424,7 +424,7 @@ const REPEATED = SAMPLE.length !== new Set(SAMPLE).size;
 async function windowAt(rung, spend, want, seconds) {
   return page.evaluate(async ({ rung, spend, want, seconds, line, seed, rand, grant, press }) => {
     const { CFG } = await import('../src/config.js');
-    const { NODES } = await import('../src/tree.js');
+    const { NODES, priceOf, levelsOf } = await import('../src/tree.js');
     const g = window.__sim;
     const w = g.world;
     const S = 1 / 60;
@@ -476,13 +476,44 @@ async function windowAt(rung, spend, want, seconds) {
         if (got === 'ok') bought.push(id);
       }
       /*
-       * PASSES until one buys nothing, not one pass -- build 302's rule.
+       * CHEAPEST NEXT LEVEL FIRST, AND THE REASON IS MONOTONICITY.
        *
-       * A node gated on a `needs` PREDICATE rather than on a parent is
-       * refused while its gate is shut, and a single walk of `NODES` never
-       * comes back for it. It is a latent trap rather than a live fault, and
-       * measuring which is the whole of the note below: `buys` is 107 and
-       * `core` 0 with one pass and with eight, identically, at any spend.
+       * This was `for (const n of NODES) while (g.buy(n.id) === 'ok')` --
+       * every level of one node drained before the next node was looked at,
+       * in declaration order -- and it made the funded turret a NON-MONOTONE
+       * function of the purse. Measured at rung 28 over 183 purses on a log
+       * grid, both allocators in one container: the old one dips in LEVEL
+       * COUNT at 46 of them and in the DAMAGE MULTIPLIER at 2, worst factor
+       * exactly 2 -- 22.9 MB bought 36 levels at x3.176 where 20.9 MB bought
+       * 64 at x6.353. A run handed MORE money came away with HALF the gun,
+       * and rungs 28 and up of build 373's own re-take were funded inside
+       * that hole, which is what voided it.
+       *
+       * Cheapest-first is monotone BY CONSTRUCTION rather than by
+       * measurement: a price is `cost + step * have`, so taking the
+       * least-cost next level each time walks one purse-INDEPENDENT sequence
+       * in non-decreasing price, and the purse only decides how long a prefix
+       * of it is affordable. Measured on the same grid: 0 damage dips, 4
+       * level dips, and all 4 are purses where the damage multiplier RISES --
+       * a spine level costing more than several peripheral ones, which is
+       * stage 1's priority and not an artefact. Every purse comes away weakly
+       * better in both (15.8 MB: 64 levels -> 77; 22.9 MB: 36 -> 84).
+       *
+       * It also subsumes build 302's multi-pass rule, which this loop used to
+       * carry: a node gated on a `needs` PREDICATE is reconsidered on every
+       * iteration, so a gate that opens mid-spend is picked up with no pass
+       * count to choose and no cap to be a backstop for.
+       *
+       * AND IT IS STAGE 1'S OWN RULING, APPLIED WHERE IT BELONGS. The LINE
+       * above stops at the first entry it cannot afford and deliberately does
+       * NOT skip down the list, because there the order IS the priority and
+       * "a priority list is a thing you save up for" -- its docstring records
+       * finding the identical symptom, that "the richer turret came out
+       * holding strictly less than the poorer one", and fixing it there. This
+       * stage has no priority: it is whatever the line could not absorb. So
+       * the rule for it is the opposite one, and the comment that used to sit
+       * here said "this is where a large budget stops helping" without ever
+       * following the thought.
        *
        * ---- AND CORE IS NOT BOUGHT AT ALL, WHICH IS NOT THIS LOOP ----
        *
@@ -506,18 +537,26 @@ async function windowAt(rung, spend, want, seconds) {
        * decision the curve's re-take has to make and this build does not: it
        * would move every anchor from rung 28 up, which is the rung CORE's
        * 5.32 MB first becomes affordable at.
-       *
-       * The passes stay because the trap is real and they cost nothing; the
-       * cap is a backstop so a future gate cycle cannot spin.
        */
-      for (let pass = 0; pass < 8; pass++) {
-        let any = false;
+      /* ---- cheapest-first: ONE allocator, byte-identical in both probes ---- */
+      for (;;) {
+        const have = (id) => w.ledger.filter((x) => x === id).length;
+        const cands = [];
         for (const n of NODES) {
           if (!n.id || n.repeat || n.dormant || n.currency) continue;
-          while (g.buy(n.id) === 'ok') { bought.push(n.id); any = true; }
+          const h = have(n.id);
+          if (h >= levelsOf(n)) continue;
+          cands.push({ id: n.id, p: priceOf(n, h) });
         }
-        if (!any) break;
+        cands.sort((a, b) => a.p - b.p);
+        let got = false;
+        for (const c of cands) {
+          if (c.p > w.bytes) break;
+          if (g.buy(c.id) === 'ok') { bought.push(c.id); got = true; break; }
+        }
+        if (!got) break;
       }
+      /* ---- end cheapest-first ---- */
     }
     if (w.round !== 'standard') w.round = 'standard';
     w.autoAim = true;
