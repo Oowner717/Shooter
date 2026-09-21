@@ -1916,7 +1916,8 @@ if (channels.length < 3) {
  * and which tree to read. These say what to measure; a roll says which dice
  * were held while measuring it.
  */
-const INCOME_PLAIN = ['waves', 'runs', 'window', 'iters', 'rungs', 'spend', 'url', 'expect', 'from'];
+const INCOME_PLAIN = ['waves', 'runs', 'window', 'iters', 'rungs', 'spend', 'url', 'expect',
+  'from', 'damp'];
 const readFlags = [...new Set([
   ...[...incomeSrc.matchAll(/\bflag\('([a-z]+)'/g)].map((m) => m[1]),
   ...[...incomeSrc.matchAll(/args\.includes\('--([a-z]+)'\)/g)].map((m) => m[1]),
@@ -2044,8 +2045,37 @@ if (!/const EARNED = \[/.test(pasteBlock) || !/\/\/ measured:/.test(pasteBlock))
     + '.');
   process.exit(1);
 }
-console.log('income: income.mjs states the conditions with its anchors and withholds a '
-  + 'paste-ready curve for a reading taken under any of ' + anchorNeeds.length + ' ('
+/*
+ * AND THE RELAXATION WEIGHT IS IN THE CONDITIONS, which is the one thing
+ * that makes two otherwise identical invocations print two different tables.
+ *
+ * `--damp` is not a disqualifier (it holds no dice and funds nothing by hand
+ * -- it is how the fixed point is SOUGHT, so it is in INCOME_PLAIN), and a
+ * damped reading is therefore paste-ready. Which means the procedure has to
+ * travel WITH the numbers: undamped, the sequence oscillates and the last
+ * pass is one iterate of an alternating pair; damped, it converges. A pasted
+ * curve whose comment cannot say which is a curve nobody can re-take.
+ *
+ * Narrow on purpose, and the other two procedure flags are covered where
+ * they already were: `--iters` is in `cond` as the pass count and `--from`
+ * as RESUMED, both since the builds that added them. This asserts the third
+ * rather than deriving a rule over all of INCOME_PLAIN -- most of that list
+ * is scope (which rungs, how many waves) and belongs in the table, not in a
+ * claim about the procedure.
+ */
+const condSrc = incomeSrc.match(/const cond = ([\s\S]*?);\n/);
+if (!condSrc || !/\bDAMP\b/.test(condSrc[1])) {
+  console.error('income: income.mjs\'s conditions string '
+    + (condSrc ? 'does not record the relaxation weight (DAMP), so a damped reading and an '
+      + 'UNDAMPED one -- one convergent, one oscillating -- print the same `// measured:` '
+      + 'comment beside two different curves. Interpolate DAMP into `cond`.'
+      : 'cannot be found (`const cond = ...;`): the detection has drifted, not the '
+      + 'exposure. Re-point this arm at whatever now builds the conditions record.'));
+  process.exit(1);
+}
+
+console.log('income: income.mjs records the relaxation weight and states the conditions '
+  + 'with its anchors, withholding a paste-ready curve for a reading taken under any of ' + anchorNeeds.length + ' ('
   + anchorNeeds.join(', ').toLowerCase() + ')');
 
 /*

@@ -12623,3 +12623,84 @@ came from before believing the other one covers it.
   and no tokens at all -- and a review runs against a COMMITTED SHA it names,
   once, with the fixes after it. A refuter pointed at a tree you are still
   editing is measuring your own diff.
+
+- **BUILD 372 GIVES THE FIXED POINT A RELAXATION WEIGHT, BECAUSE BUILD 371
+  MEASURED THE MAP AS DECREASING AND PLAIN ITERATION CANNOT CONVERGE ON ONE.**
+  371 landed the curve and found the sequence ALTERNATES -- rung 42 read 276,
+  205, 240, 197 MB and rung 49 read 687, 380, 462, 380 -- with the mechanism
+  measured rather than argued: `earned` is the integral of RATE and DWELL, and
+  better funding collapses the dwell faster than it raises the rate (rung 49
+  pass 2 to 3 is rate x2.79 against dwell /12.5, 989.4s a rung down to 79.0,
+  and the discharge column is the tell -- 19 of 20 waves blew the fuse at that
+  funding and 1 of 20 at the next). So more passes of an oscillating sequence
+  buy nothing, whatever N is, and three builds of this probe's own prose said
+  "iterated from BELOW", which describes an increasing map nobody had checked
+  for. `--damp W` is the under-relaxation: the next funding is
+  `was + (measured - was) * W` per rung, default **0.5**, and **W = 1 is plain
+  iteration** -- the pre-372 behaviour, kept reachable and named in the
+  conditions as what it is.
+- **THE WEIGHT IS DERIVED OFF BUILD 371'S OWN PAIRS, NOT CHOSEN.** For
+  `f' = -k` the damped map has `g' = 1 - W(1 + k)`, so convergence wants
+  `W < 2 / (1 + k)`. Measured from 371's rung-42 sequence read as successive
+  applications -- f(276) = 205, f(205) = 240, f(240) = 197 -- **k runs 0.49 to
+  1.23**, so W = 0.5 gives `g'` between **+0.25 and -0.12** (convergent across
+  the whole observed range) where W = 1 gives -0.25 to **-1.25** and diverges
+  at the top of it. A weight picked by eye would have been a constant fitted to
+  one afternoon; this one follows the two figures the previous build recorded.
+- **THE BLEND IS AGAINST THE FUNDING THE PASS ACTUALLY RAN AT, READ BACK
+  THROUGH `pick`** -- the same call the pass itself made -- so the two terms of
+  the mean are the INPUT and the OUTPUT of one map application and not two
+  arbitrary curves. `funding` is reassigned immediately afterwards, so the order
+  at that site is load-bearing. (For the iterate sequence this is the same thing
+  as 371's note asked for, "the mean of passes N-1 and N", stated in the form
+  that does not need two curves kept.)
+- **PROVED IN BOTH DIRECTIONS OFF THE PROBE'S OWN `spend` COLUMN, which IS the
+  funding, so the arithmetic is checkable by hand and needed no new readout.**
+  Undamped, rungs 1 and 7 at 3 waves: pass 1 measured **578 kB** at rung 7 and
+  pass 2 ran at **578 kB** -- the identity. Damped at 0.5 from a supplied
+  `--from '[[1,0],[7,600000]]'` at 6 waves: pass 1 ran at **600 kB** and pass 2
+  at **544 kB**, i.e. the measured 488 kB and the seed averaged, with the
+  settling line reading **9.4% then 2.2%** -- converging, monotone, on a real
+  rung. And four bad weights (0, 1.5, -0.5, `abc`) refuse **before a browser
+  launches**.
+- **THE SETTLING LINE IS THE ITERATE'S OWN MOVEMENT AND IS READ AGAINST THE
+  PROBE'S FREE NOISE CONTROL.** Per pass rather than once at the end, because a
+  background run is read while it is still going. What makes it interpretable is
+  build 371's control: **rung 1 is funded with 0.00 B in every pass by
+  construction** (nothing sits below it), so its rate and dwell are repeated
+  measurements of ONE input and were measured at x1.15 and x1.46 across five
+  passes -- a worst move under that is a sequence settled as far as one run a
+  rung can see, and above it the movement is the iteration. Rungs whose previous
+  funding was zero are SKIPPED rather than reported as an infinite move, which
+  is also what keeps rung 1 out of the reading.
+- **AND THE ZERO START COSTS A PASS, WHICH THE SHORT RUN DEMONSTRATED BY
+  ACCIDENT.** The w=0.5 verification reported "nothing to compare" on TWO
+  passes, which looked like the readout being dead: pass 1's rung-7 dwell read
+  `held` at 3 waves -- the censored reading 371 documented -- so its curve
+  stopped at rung 2 and the funding at rung 7 stayed 0, and `pick` clamps a
+  rung above a short curve's top anchor to that anchor. Not a damping fault, and
+  the reason the re-take seeds from the landed curve: at zero funding most rungs
+  are unpriceable (371's pass 1 priced 1 and 7 alone), so a first step out of
+  nothing is a pass spent climbing whatever the weight is.
+- **IT IS NOT A PIN AND DOES NOT DISQUALIFY A READING, AND THAT IS EXACTLY WHY
+  THE CONDITIONS HAVE TO CARRY IT.** It holds no dice and funds nothing by hand
+  -- it is how the fixed point is SOUGHT -- so it is in `INCOME_PLAIN` beside
+  `--iters` and `--from` and a damped curve is paste-ready. Which means the
+  procedure must travel WITH the numbers: undamped, the last pass is one iterate
+  of an alternating pair; damped, it is a converged one. `check-build` refuses an
+  `income.mjs` whose `cond` does not interpolate `DAMP`, with a vacuity arm for
+  the detection drifting -- three revert proofs, each with its own message (the
+  term dropped, `const cond` renamed, and `damp` left unclassified, which the
+  build-364 arm catches as "a flag that is neither is a third thing nobody
+  chose"). Narrow on purpose: the other two procedure flags are already in
+  `cond` as the pass count and as RESUMED, and most of `INCOME_PLAIN` is SCOPE
+  rather than procedure, so deriving a rule over the whole list would refuse for
+  a readout's wording.
+- **WHAT THIS BUILD DELIBERATELY DOES NOT DO IS THE MEASUREMENT.** Build 368's
+  precedent -- the instrument, then the table -- and the cost is why: at
+  `--runs 3` a pass is about three times 371's ~15 minutes, so the re-take is
+  hours of wall clock and belongs in its own build, driven in `--from`-seeded
+  chunks so a container loss costs one chunk rather than the sequence. Zero
+  agents: it is one background node process, which is what 371 established as
+  the responsible shape. `tiers.mjs`'s anchors are unchanged and `INCOME_PIN` is
+  unmoved, because the economy did not change and neither did the curve.

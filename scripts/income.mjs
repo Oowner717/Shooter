@@ -207,6 +207,47 @@ const RUNGS = String(flag('rungs', '')).split(',').filter(Boolean).map(Number);
  * whole block exists to refuse.
  */
 const FROM = flag('from', null);
+
+/*
+ * `--damp W` is the RELAXATION WEIGHT on the fixed point, and 0.5 is the
+ * default because plain iteration provably does not converge on this map.
+ *
+ * Build 371 measured five passes at eight rungs and the sequence ALTERNATES:
+ * rung 42 read 276, 205, 240, 197 MB and rung 49 read 687, 380, 462, 380.
+ * The cause is measured rather than argued -- `earned` is the integral of
+ * RATE and DWELL, and better funding collapses the dwell faster than it
+ * raises the rate (rung 49 pass 2 to pass 3 is rate x2.79 against dwell
+ * /12.5, 989.4s a rung down to 79.0, with the discharge column as the tell:
+ * 19 of 20 waves blew the fuse at that funding and 1 of 20 at the next). So
+ * f is DECREASING, and a decreasing map with |f'| > 1 oscillates for ever
+ * however many passes are spent on it. Three builds of this probe's own
+ * prose said "iterated from BELOW", which describes an increasing map
+ * nobody had checked for.
+ *
+ * Damped, the next funding is `was + (measured - was) * W` per rung, so
+ * g' = 1 - W(1 + k) for f' = -k. Measured off build 371's own pairs, k runs
+ * about 0.5 to 1.25 at rung 42, so W = 0.5 gives g' between +0.25 and -0.12
+ * -- convergent across the whole observed range, where W = 1 (plain
+ * iteration, the pre-372 behaviour, kept reachable) gives -0.25 to -1.25 and
+ * diverges at the top of it.
+ *
+ * It is NOT a pin and does not disqualify a reading: it holds no dice and
+ * funds nothing by hand, it is how the fixed point is SOUGHT. So it is in
+ * `INCOME_PLAIN` beside `--iters` and `--from`, and `cond` records which
+ * weight was used -- a conditions record that did not would leave two
+ * different procedures printing the same table.
+ *
+ * Seed with `--from` where a curve already exists. At zero funding most
+ * rungs are unpriceable (build 371's pass 1 priced 1 and 7 alone), so an
+ * undamped first step out of nothing is a pass spent climbing; a supplied
+ * curve starts the sequence where the last one left it.
+ */
+const DAMP = Number(flag('damp', 0.5));
+if (!(DAMP > 0 && DAMP <= 1)) {
+  console.error(`income: --damp takes a relaxation weight in (0, 1], not ${flag('damp', 0.5)}. `
+    + '0.5 is the default and converges on this map; 1 is plain iteration, which oscillates.');
+  process.exit(1);
+}
 /*
  * `--spend N` funds every sampled rung with N instead of with the previous
  * pass's curve, which turns the probe from "what does the curve settle at"
@@ -1328,7 +1369,28 @@ for (let it = 0; it < ITERS; it++) {
   }
   const { curve, dwell, stop } = integrate(samples);
   passes.push({ samples, curve, dwell, stop });
-  funding = curve;
+  /*
+   * The blend is taken against the funding this pass ACTUALLY RAN AT, read
+   * back through `pick` -- the same call the pass itself made, so the two
+   * terms of the mean are the input and the output of one map application
+   * and not two arbitrary curves. `funding` is reassigned afterwards, so the
+   * order here is load-bearing.
+   *
+   * `moved` is the iterate's own movement and is the stopping criterion: a
+   * rung whose funding is unchanged is a rung the sequence has settled. Rungs
+   * whose previous funding was zero are skipped rather than reported as an
+   * infinite move -- rung 1 is 0.00 B in every pass by construction (nothing
+   * sits below it), which is also what makes it the probe's free noise
+   * control.
+   */
+  const moved = [];
+  const next = curve.map(({ rung, earned }) => {
+    const was = Math.max(0, pick(funding, 'earned', rung));
+    const blend = DAMP === 1 ? earned : was + (earned - was) * DAMP;
+    if (was > 0) moved.push({ rung, rel: Math.abs(blend - was) / was });
+    return { rung, earned: Math.max(0, Math.round(blend)) };
+  });
+  funding = next;
 
   console.log(`\n---- pass ${it + 1} of ${ITERS} `
     + `${'-'.repeat(52)}`);
@@ -1468,6 +1530,28 @@ for (let it = 0; it < ITERS; it++) {
         + `a coin toss. Give it more waves before reading it as the ladder's end.`);
     }
   }
+  /*
+   * THE SETTLING LINE, which is what says whether another pass is worth its
+   * hour. Printed per pass rather than once at the end, because a background
+   * run is read while it is still going.
+   *
+   * Read it against the probe's own noise floor: rung 1 is funded with
+   * 0.00 B in every pass by construction, so its rate and dwell are repeated
+   * measurements of ONE input, and build 371 measured them at x1.15 and
+   * x1.46 across five passes. A worst move under that is a sequence that has
+   * settled as far as one run a rung can see it; above it, the movement is
+   * the iteration and another pass will move it again.
+   */
+  if (moved.length) {
+    const worst = moved.reduce((m, x) => (x.rel > m.rel ? x : m));
+    const mean = moved.reduce((t, x) => t + x.rel, 0) / moved.length;
+    console.log(`  settling: the funding for the next pass moved by ${(worst.rel * 100).toFixed(1)}%`
+      + ` at worst (rung ${worst.rung}) and ${(mean * 100).toFixed(1)}% on the mean of`
+      + ` ${moved.length} rung(s)${DAMP === 1 ? ', UNDAMPED' : `, damped at w=${DAMP}`}`);
+  } else {
+    console.log('  settling: nothing to compare -- no sampled rung had a non-zero funding, so '
+      + 'this is the first pass out of nothing');
+  }
 }
 
 const last = passes[passes.length - 1];
@@ -1532,6 +1616,7 @@ const cut = last.stop
   : '';
 const cond = `window ${WINDOW === null ? `${WAVES} scored wave(s)` : `a FIXED ${WINDOW}s`} a rung`
   + `, ${RUNS} run(s) a rung, ${passes.length} pass(es)${FROM === null ? '' : ' RESUMED on a supplied curve'}`
+  + `, ${DAMP === 1 ? 'UNDAMPED (plain iteration, which oscillates on this map)' : `damped at w=${DAMP}`}`
   + `, build ${served.build ?? '?'} rev ${served.rev ?? '?'}, this container${cut}`;
 const why = [];
 if (SEED !== null) why.push(`--seed ${SEED} pins the trait sequence`);
