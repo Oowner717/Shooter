@@ -14462,45 +14462,104 @@ if (!GUN_LINE) {
     out.of = sigs.length;
 
     // ...and so is where the debris goes. Binned by direction: an even ring
-    // would fill every bin, lobes leave some empty, and WHICH are empty has to
-    // change from one detonation to the next or the lobes are decoration.
+    // spreads evenly across the bins, lobes concentrate into a few of them,
+    // and WHICH ones has to change from one detonation to the next or the
+    // lobes are decoration.
     /*
-     * EIGHT bursts, not two, and the statistic is the concentration.
+     * THE STATISTIC IS A GOODNESS-OF-FIT AGAINST UNIFORM, AND THE CONJUNCT
+     * THIS REPLACES WAS A COIN TOSS ON A BUILD WITH THE LOBES SWITCHED OFF.
      *
-     * This drew two and required BOTH to leave one of twelve 30-degree bins
-     * empty, which is a property of a single random draw rather than of the
-     * effect: measured over 200 detonations, a burst fills all twelve about
-     * once in 200, so two draws failed roughly one run in a hundred and the
-     * case was on the flake list for three builds. It is about 33 particles
-     * spread over 12 bins -- an empty bin is likely, not certain.
+     * It asserted the WORST of eight bursts' peak-over-mean above 1.8, on the
+     * reasoning that the worst of eight is a statement about every burst
+     * rather than about a lucky one. Measured at BOTH ends -- 2000 trials of
+     * eight bursts with the lobes on, and 2000 with `lobeSpread` widened to
+     * PI, which makes every spark's direction uniform and is therefore the
+     * even ring the claim is against -- that quantity reads working 1.45 to
+     * 2.55 and even-ring 1.45 to 2.55. The two populations ARE THE SAME
+     * POPULATION, and the conjunct passed 54.7% of even-ring draws: a peak
+     * over twelve bins from about 33 particles is mostly sampling noise, and
+     * taking the MINIMUM of eight draws of it selects for the noisiest.
      *
-     * What is actually being claimed is that the debris goes in LOBES rather
-     * than an even ring, and the honest measure of that is how far the busiest
-     * direction is above the mean: an even ring is 1.0 by construction, and
-     * the measured floor over 200 bursts is 2.18 (p5 2.55, median 3.27). The
-     * worst of eight is asserted, so it is a statement about every burst
-     * rather than about a lucky one.
+     * What was discriminating was the BARE DIRECTION beside it, at 26.4%, so
+     * the whole case passed 17.0% of even-ring trials -- one run in six green
+     * on a build where the effect is absent -- while failing 0.2% of working
+     * ones, which is the flake it was on the list for. The conjunct that was
+     * going red was not the conjunct doing the work. Measured on the same
+     * 2000 trials, the replacement passes 100.0% working and 0.0% even.
+     *
+     * Chi-square against uniform reads all twelve bins rather than the
+     * busiest one, and its broken end is PREDICTED as well as measured:
+     * E[chi2] is the degrees of freedom, 12 - 1 = 11, for any uniform draw
+     * whatever the particle count -- and the even-ring arm measures 11.6 to
+     * 11.7 (the 5% over is the embers, which all rise). So the bound is twice
+     * the bin count's own df and follows the bin count rather than a number
+     * somebody fitted. Averaged over 32 bursts it reads working 32.56 to
+     * 41.07 against even-ring 9.13 to 14.92 -- 33% under the worst working
+     * draw of 2000 and 47% over the worst broken one.
+     *
+     * `fx.quality` is PINNED, and that is a pin on the sample size rather
+     * than on the mechanism: the governor decides how many particles a device
+     * can afford and `along()` picks the same way whatever it decides. It
+     * matters because at 0.45 a burst is 14-16 particles over 12 bins and the
+     * two ends OVERLAP outright (working 13.3 to 23.6 against even-ring 11.6
+     * to 19.3) -- the lobes are still there and there is no longer enough
+     * data per burst to see them. The suite reaches this case at whatever
+     * quality eleven thousand lines of cases have driven it to, measured as a
+     * draw of 1 / 0.7 / 0.45, so an unpinned reading is a different
+     * measurement every run. Restored, and the restore is asserted.
+     *
+     * The other two conjuncts are kept and are about different claims. The
+     * bare direction is the picture the concentration produces -- 0 of 2000
+     * working trials under the floor of six against 1468 of 2000 even-ring
+     * ones, so it discriminates as well as holds. The distinctness is the
+     * "different every time" half of the title and DOES NOT discriminate,
+     * reading 8 of 8 at both ends, so it is a guard against the burst
+     * becoming deterministic rather than evidence of lobes -- named here
+     * rather than trusted.
+     *
+     * One note for whoever reverts this: `lobeQOk` CANNOT FAIL where the
+     * ambient quality is already 1, which is every fresh page -- `wasQ` is 1,
+     * the restore is a no-op, and dropping it still reads true. Its revert
+     * proof has to drive the ambient down first, which is what the suite
+     * arrives with anyway.
      */
+    const BINS = 12;
+    const wasQ = fx.quality;
+    fx.quality = 1;
     const lobeSig = () => {
       fx.reset();
       heFx(315, 560, R);
-      const bins = new Array(12).fill(0);
+      const bins = new Array(BINS).fill(0);
       for (const p of fx.particles.active) {
         const sp = Math.hypot(p.vx, p.vy);
         if (sp < 40) continue;
-        bins[(((Math.atan2(p.vy, p.vx) + TAU) % TAU) / TAU * 12) | 0]++;
+        bins[(((Math.atan2(p.vy, p.vx) + TAU) % TAU) / TAU * BINS) | 0]++;
       }
       return bins;
     };
     const lobes = [];
-    for (let i = 0; i < 8; i++) lobes.push(lobeSig());
-    const peakOf = (b) => Math.max(...b) / Math.max(1, b.reduce((a, x) => a + x, 0) / 12);
-    out.lobeWorstPeak = Math.min(...lobes.map(peakOf));
-    // ...and most of them leave a direction bare, which is the picture the
-    // concentration produces. Six of eight, against a per-burst rate of 199
-    // in 200 -- clear of the truth rather than sitting on it.
-    out.lobeWithGap = lobes.filter((b) => b.some((x) => x === 0)).length;
-    out.lobeDistinct = new Set(lobes.map((b) => b.join(','))).size;
+    for (let i = 0; i < 32; i++) lobes.push(lobeSig());
+    const chiOf = (b) => {
+      const n = b.reduce((a, x) => a + x, 0);
+      const e = n / BINS;
+      return e ? b.reduce((a, x) => a + ((x - e) * (x - e)) / e, 0) : 0;
+    };
+    out.lobeDf = BINS - 1;
+    out.lobeBursts = lobes.length;
+    out.lobeParts = Math.round(lobes.reduce((a, b) =>
+      a + b.reduce((x, y) => x + y, 0), 0) / lobes.length);
+    out.lobeChi = +(lobes.reduce((a, b) => a + chiOf(b), 0) / lobes.length).toFixed(2);
+    // REPORTED and not asserted: the two ends of this one are the same
+    // population, which is what the paragraph above is about. It is kept
+    // because it is the figure a reader can picture and because twelve builds
+    // of dumps carry it.
+    const peakOf = (b) => Math.max(...b) / Math.max(1, b.reduce((a, x) => a + x, 0) / BINS);
+    out.lobeWorstPeak = Math.min(...lobes.slice(0, 8).map(peakOf));
+    out.lobeWithGap = lobes.slice(0, 8).filter((b) => b.some((x) => x === 0)).length;
+    out.lobeDistinct = new Set(lobes.slice(0, 8).map((b) => b.join(','))).size;
+    fx.quality = wasQ;
+    out.lobeQ = wasQ;
+    out.lobeQOk = fx.quality === wasQ;
 
     // ---- it has a tail, where the old one was over in a sixth of a second --
     fx.reset();
@@ -14548,10 +14607,14 @@ if (!GUN_LINE) {
    * "different every time" has to mean to be visible at 390px.
    */
   check('...and the debris is thrown along lobes, in a different pattern each time',
-    r.lobeWorstPeak > 1.8 && r.lobeWithGap >= 6 && r.lobeDistinct === 8,
-    `over eight bursts the weakest still puts ${r.lobeWorstPeak.toFixed(1)}x the mean `
-    + `into one direction (an even ring is 1.0), ${r.lobeWithGap}/8 left a direction `
-    + `bare, and ${r.lobeDistinct}/8 patterns were distinct`);
+    r.lobeChi > r.lobeDf * 2 && r.lobeWithGap >= 6 && r.lobeDistinct === 8 && r.lobeQOk,
+    `over ${r.lobeBursts} bursts of about ${r.lobeParts} particles the direction `
+    + `histogram scores chi2 ${r.lobeChi} against uniform, where an even ring gives `
+    + `${r.lobeDf} by construction (and measures 11.7 with the lobes switched off); `
+    + `the weakest of the first eight put ${r.lobeWorstPeak.toFixed(1)}x the mean into `
+    + `one direction, REPORTED and not asserted because an even ring reaches 2.55 too; `
+    + `${r.lobeWithGap}/8 left a direction bare and ${r.lobeDistinct}/8 patterns were `
+    + `distinct; quality ${r.lobeQ} restored ${r.lobeQOk}`);
 
   check('...and it has a tail, where the old burst was over in a sixth of a second',
     r.life > 0.6, `the last of it goes out at ${r.life}s`);

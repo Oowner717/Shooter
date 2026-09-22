@@ -13529,3 +13529,107 @@ came from before believing the other one covers it.
   with the min reported, priced against a measured EVEN-RING control -- and
   `fx.quality` is NOT the channel, checked: 0.45 produced both 2.3 and 1.5
   and quality 1 produced both 1.8 and 2.9.
+
+- **BUILD 379 REPLACES THE LOBE CASE'S STATISTIC, AND THE CONJUNCT THAT HAD
+  BEEN GOING RED WAS NOT THE ONE DOING THE WORK.** Build 378 priced the flake
+  off twelve dumps and recorded the fix as "the MEAN of the eight with the min
+  reported, priced against a measured EVEN-RING control". The control is one
+  config value: `CFG.rounds.explosive.fx.lobeSpread` widened from 0.5 to PI
+  makes `along()` return `lobe + uniform(-PI, PI)`, which is uniform on the
+  circle -- the mechanism switched off with the body, the counts, the embers
+  and everything else identical. Measured at both ends, 2000 trials of eight
+  bursts each at pinned quality:
+
+  | | peak > 1.8 | gaps >= 6 | the whole case |
+  |---|---|---|---|
+  | lobes ON | 99.8% | 100.0% | **99.8%** |
+  | even ring | **54.7%** | 26.4% | **17.0%** |
+
+  So the case was green **one run in six on a build where the effect is
+  absent**, and the conjunct that kept failing -- the peak -- was a coin toss
+  at the broken end while the BARE DIRECTION beside it did all of the
+  discriminating. The peak's two populations are the same population: working
+  1.45 to 2.55 and even-ring 1.45 to 2.55, over 2000 trials each. **Build
+  378's diagnosis was right about the bound being misplaced and wrong about
+  which conjunct to fix** -- the mean-of-eight it recommended is that same
+  statistic averaged, and it separates by 8.4% (working lo 2.727 against
+  even-ring hi 2.516), which is a margin rather than a discriminator.
+- **WHAT REPLACED IT IS A GOODNESS-OF-FIT, AND ITS BROKEN END IS PREDICTED
+  RATHER THAN MERELY MEASURED.** Chi-square against uniform reads all twelve
+  bins instead of the busiest one, and `E[chi2]` is the degrees of freedom --
+  `bins - 1` = 11 -- for ANY uniform draw whatever the particle count, so the
+  bound is `2 * df`, derived from the bin count the case itself declares
+  rather than from a number somebody fitted. The even-ring arm measures
+  **11.6 to 11.7**, agreeing with that arithmetic to 6% (the excess is the
+  embers, which all rise). Averaged over 32 bursts: **working 32.56 to 41.07
+  against even-ring 9.13 to 14.92**, so 22 sits 33% under the worst working
+  draw of 2000 and 47% over the worst broken one, and the case passes 100.0%
+  / 0.0%. Three statistics were compared at three sample sizes before
+  choosing: peak-over-mean separates 8-27%, the top-three-bins share 13-28%,
+  chi-square 60-132%.
+- **AND `fx.quality` IS THE CHANNEL FOR WHETHER THE CLAIM IS MEASURABLE AT
+  ALL, WHICH BUILD 378 CHECKED AND CLEARED ON THE WRONG STATISTIC.** Its note
+  reads "`fx.quality` is NOT the channel, checked: 0.45 produced both 2.3 and
+  1.5 and quality 1 produced both 1.8 and 2.9" -- true of the min-of-8 peak,
+  which is so noisy that nothing shows through it. Measured on a statistic
+  that can see: `n(base)` scales every particle count by quality, so a burst
+  is 30-33 particles at 1 and **14-16 at the governor's floor of 0.45**, and
+  at 0.45 the two ends OVERLAP outright (working 13.3 to 23.6 against
+  even-ring 11.6 to 19.3). The lobes are still there; there is no longer
+  enough data per burst to see them. The suite reaches this case at whatever
+  quality eleven thousand lines have driven it to -- build 351 measured that
+  as a draw of 1 / 0.7 / 0.45 -- so an unpinned reading is a different
+  measurement every run, and the revert proof reads **21.98 / 23.49 / 25.46 /
+  26.62 against a bound of 22 on a WORKING build**, one of four red.
+  **Pinning quality here is a pin on the SAMPLE SIZE and not on the
+  mechanism**: the governor decides how many particles a device can afford
+  and `along()` picks the same way whatever it decides. That is build 198's
+  ruling pointed the other way -- a governor case must be synthetic, and a
+  case that is not about the governor must not inherit its draw.
+- **A CONJUNCT THAT CANNOT FAIL ON A FRESH PAGE IS A REVERT PROOF THAT CANNOT
+  FIRE, AND MINE DID NOT.** The restore is asserted (`lobeQOk`), and dropping
+  `fx.quality = wasQ` left the case GREEN reporting "restored true" -- because
+  `wasQ` is 1 on a fresh page, so the restore is a no-op and the harness runs
+  on a fresh page. Driving the ambient to 0.45 first, the same revert reads
+  "restored false" and the control beside it "restored true", so both branches
+  are reachable. Build 371 recorded the mirror image (a proof whose PASS case
+  could not pass); this is a proof whose FAIL case could not fail, and the
+  tell is the same -- **read the figure the conjunct is about, not the
+  verdict.** The vacuity is written at the site, because the next person to
+  revert it will meet it too.
+- **THE SUITE'S TAIL IS STILL NOT REPRODUCED AND IS RECORDED AS SUCH.**
+  Standalone at quality 1 the min-of-8 peak reads at or under 1.8 in **1 of
+  1000** trials (6 in 1000 at 0.7, 8 in 1000 at 0.45); twelve suite dumps show
+  **2 of 12**. Ruled out by reading: nothing in `regress.mjs` mutates
+  `CFG.rounds.explosive.fx`, the two cases that pin `fx.quality` both restore
+  it, and `R` being a SCALED entry cancels out of `size = min(cap, sqrt(r /
+  R))`. So the channel was not found. What the build does about it is the only
+  thing available -- pin the one channel it CAN, take a statistic with 33% of
+  margin instead of none, and **RECORD the quality and the particle count in
+  the detail**, so the next disagreement is diagnosable from a dump rather
+  than from an afternoon of probes. Which is build 320's whole point arriving
+  on the case that has cost the most re-runs.
+  **And it paid on its first run: the shipping suite reached this case at
+  quality 0.45**, so without the pin it would have been reading 14-16
+  particles a burst -- the regime where the two ends overlap -- and with it
+  the burst is 33 and the chi2 is 42.86 against a bound of 22. That narrows
+  the unreproduced tail without closing it: at 0.45 the old statistic reads at
+  or under 1.8 in 8 of 1000 standalone, so twelve runs all drawn there would
+  give 2 or more reds about 0.4% of the time against 0.007% at quality 1.
+- **The two kept conjuncts are about different claims and one of them does not
+  discriminate.** The bare direction is the picture the concentration produces
+  and holds at the pin -- 0 of 2000 working trials under the floor of six and
+  4 of 2000 under seven -- while catching 73.6% of even-ring draws. The
+  distinctness is the "different every time" half of the title and reads **8
+  of 8 at BOTH ends**, so it is a guard against the burst becoming
+  deterministic rather than evidence of lobes: named in the docstring rather
+  than trusted, which is build 319's rule about a conjunct that cannot fail
+  for the reason the case is about.
+- **No `check-build` arm, deliberately, and the hash is not owed.** What can
+  go wrong here is a runtime property of a distribution, and the case now
+  holds both ends with four revert proofs; a static arm would have to pin the
+  SHAPE of the statistic, which is what build 370 refused in favour of driving
+  the rule and what cost build 355 a vacuity arm one build later. The build
+  changes `scripts/regress.mjs` and the BUILD literal and no executable `src/`
+  line, so there is nothing for the ORDINAL probe to measure -- the same call
+  builds 345-349, 360, 372, 374 and 378 made.
