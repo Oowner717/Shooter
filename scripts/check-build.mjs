@@ -2209,22 +2209,30 @@ console.log(`income: income.mjs's pooling rule is DRIVEN over ${POOL_CASES.lengt
  */
 const POLICY_OPEN = '/* ---- cheapest-first: ONE allocator, byte-identical in both probes ---- */';
 const POLICY_SHUT = '/* ---- end cheapest-first ---- */';
+/*
+ * THE FILE SET IS DERIVED, not named. Build 373 wrote this arm for the two
+ * probes that had the allocator; build 374 gave `fight.mjs` a `--spend` so a
+ * boss can be measured against the turret its slot actually meets, and a
+ * third copy arrived. A hand-written list of two would have let it in
+ * unguarded -- the hand-kept-list shape -- so any `scripts/*.mjs` carrying
+ * the sentinels is held to the same block, and the draining form is refused
+ * in EVERY script whether it carries them or not, because a file that
+ * reverted the allocator and lost the sentinel with it would otherwise drop
+ * out of the set rather than fail.
+ */
 const policySrc = {};
-for (const f of ['scripts/income.mjs', 'scripts/tiers.mjs']) {
-  const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-  const a = src.indexOf(POLICY_OPEN);
-  const b = src.indexOf(POLICY_SHUT);
-  if (a < 0 || b < a) {
-    console.error(`policy: ${f} has no cheapest-first allocator between its sentinels `
-      + `(${POLICY_OPEN.trim()} ... ${POLICY_SHUT.trim()}): the detection has drifted, not `
-      + 'the exposure. Re-point this arm at whatever now allocates the leftover budget.');
-    process.exit(1);
-  }
-  if (src.indexOf(POLICY_OPEN, a + 1) >= 0) {
-    console.error(`policy: ${f} has more than one cheapest-first allocator. There is one `
-      + 'leftover-budget rule per probe and the two probes share it.');
-    process.exit(1);
-  }
+/*
+ * ...AND THIS FILE IS EXCLUDED BY DERIVING WHICH FILE IT IS (`SELF`, which
+ * build 345 already declared for its own sweep), because the
+ * refusal below searches for a pattern this file CONTAINS as a regex literal.
+ * Build 345 recorded exactly this for its own positional-parser sweep -- and
+ * before that, three times on the process side, where `pgrep -f` and
+ * `pkill -f` matched the shell running them. An exemption list of one is
+ * still a list; `import.meta.url` cannot go stale.
+ */
+const scriptNames = readdirSync(new URL('.', import.meta.url))
+  .filter((f) => f.endsWith('.mjs') && f !== SELF).sort();
+const codeOf = (src) => src.split('\n')
   /*
    * Lines of CODE only. The docstring at the fixed site QUOTES the expression
    * it replaced, so a sweep over the whole file fails the build for its own
@@ -2232,21 +2240,84 @@ for (const f of ['scripts/income.mjs', 'scripts/tiers.mjs']) {
    * contained the string it was looking for, and build 355's door arm having
    * to learn the same thing.
    */
-  const code = src.split('\n')
-    .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n');
-  if (/while\s*\(\s*g\.buy\s*\(/.test(code)) {
-    console.error(`policy: ${f} still drains a node with \`while (g.buy(...))\`, which is `
+  .filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join('\n');
+for (const name of scriptNames) {
+  const f = `scripts/${name}`;
+  const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  if (/while\s*\(\s*g\.buy\s*\(/.test(codeOf(src))) {
+    console.error(`policy: ${f} drains a node with \`while (g.buy(...))\`, which is `
       + 'the declaration-order allocator build 373 measured as non-monotone in the purse '
       + '(22.9 MB bought half the gun 20.9 MB did). Take the cheapest next level instead.');
     process.exit(1);
   }
+  const a = src.indexOf(POLICY_OPEN);
+  if (a < 0) continue;
+  const b = src.indexOf(POLICY_SHUT);
+  if (b < a) {
+    console.error(`policy: ${f} opens a cheapest-first allocator and never shuts it `
+      + `(${POLICY_SHUT.trim()} is missing): the detection has drifted, not the exposure.`);
+    process.exit(1);
+  }
+  if (src.indexOf(POLICY_OPEN, a + 1) >= 0) {
+    console.error(`policy: ${f} has more than one cheapest-first allocator. There is one `
+      + 'leftover-budget rule per probe and the probes share it.');
+    process.exit(1);
+  }
   policySrc[f] = src.slice(a + POLICY_OPEN.length, b);
 }
-if (policySrc['scripts/income.mjs'] !== policySrc['scripts/tiers.mjs']) {
-  console.error('policy: income.mjs and tiers.mjs allocate the leftover budget differently, '
-    + 'so the probe that MEASURES the income curve and the probe that READS it are funding '
-    + 'two different turrets. The two blocks between the sentinels must be identical.');
+const policyFiles = Object.keys(policySrc);
+let lineOfAny = '';
+if (policyFiles.length < 2) {
+  console.error(`policy: only ${policyFiles.length} script(s) carry the cheapest-first `
+    + `sentinels (${POLICY_OPEN.trim()}), and there are at least two probes that fund a `
+    + 'turret. The detection has drifted, not the exposure -- re-point this arm at whatever '
+    + 'now allocates the leftover budget.');
   process.exit(1);
+}
+{
+  const odd = policyFiles.filter((f) => policySrc[f] !== policySrc[policyFiles[0]]);
+  if (odd.length) {
+    console.error(`policy: ${odd.join(', ')} allocate the leftover budget differently from `
+      + `${policyFiles[0]}, so the probe that measures the money, the probe that reads it `
+      + 'and the probe that measures a boss are funding different turrets. The blocks '
+      + 'between the sentinels must be identical.');
+    process.exit(1);
+  }
+}
+{
+  /*
+   * AND STAGE 1 TOO, BY ENTRY RATHER THAN BY TEXT. The damage LINE is the
+   * priority order the leftover is left over FROM, so two probes agreeing on
+   * the allocator and disagreeing on the line still fund two turrets. Compared
+   * as a list of ids because the three copies carry different comments beside
+   * them -- which is what an md5 of the text reports as a difference and is
+   * not one.
+   */
+  const lineOf = (f) => {
+    const src = readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+    const a = src.indexOf('const LINE = [');
+    if (a < 0) return null;
+    const b = src.indexOf('];', a);
+    if (b < a) return null;
+    return (src.slice(a, b).match(/'[a-z_]+'/g) || []).join(' ');
+  };
+  const lines = {};
+  for (const f of policyFiles) lines[f] = lineOf(f);
+  const missing = policyFiles.filter((f) => !lines[f]);
+  if (missing.length) {
+    console.error(`policy: ${missing.join(', ')} allocate a leftover budget with no `
+      + '`const LINE = [...]` to have left it over from. Stage 1 is the priority order and '
+      + 'every probe that funds a turret owes one.');
+    process.exit(1);
+  }
+  lineOfAny = lines[policyFiles[0]];
+  const oddLine = policyFiles.filter((f) => lines[f] !== lines[policyFiles[0]]);
+  if (oddLine.length) {
+    console.error(`policy: ${oddLine.join(', ')} buy a different damage LINE from `
+      + `${policyFiles[0]} -- ${lines[oddLine[0]]} against ${lines[policyFiles[0]]}. Stage 1 `
+      + 'is the priority order and the probes share it.');
+    process.exit(1);
+  }
 }
 {
   /*
@@ -2337,8 +2408,10 @@ if (policySrc['scripts/income.mjs'] !== policySrc['scripts/tiers.mjs']) {
       + 'the fake buy door and the price table.');
     process.exit(1);
   }
-  console.log(`policy: the leftover-budget allocator is byte-identical in both probes and `
-    + `DRIVEN over ${grid.length} purses -- at every one it buys every level the purse can `
+  console.log(`policy: the same damage LINE (${policyFiles.length} probes, `
+    + `${lineOfAny.split(' ').length} entries) and the same leftover-budget allocator in `
+    + `${policyFiles.join(', ')}, `
+    + `and DRIVEN over ${grid.length} purses -- at every one it buys every level the purse can `
     + `reach (${grid[grid.length - 1].got.length} at 40, ${grid[1].got.length} at 1) and a `
     + `bigger purse buys a superset of a smaller one (the old declaration-order loop bought `
     + `4 levels at a purse of 4 and 2 at 6)`);

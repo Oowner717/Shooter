@@ -90,6 +90,48 @@ if (wrongTree) process.exit(1);
 // A fight that has not ended in this many game-seconds is not a fight, it is
 // a wall -- report it as one rather than hanging.
 const CAP = Number(flag('cap', 900));
+
+/*
+ * WHAT TURRET THE SLOT IS MET WITH, which is phase 7b's own phrase and was
+ * unmeasurable until build 374 landed a curve to read it off.
+ *
+ * Unfunded (the default) this probe measures the FLOOR -- assists only,
+ * nothing bought -- and every recorded length target is written against that.
+ * `--spend BYTES` funds the turret through the same two-stage policy
+ * `income.mjs` and `tiers.mjs` use, so the three probes fund one turret and
+ * not three. The figure is supplied on the command line rather than read out
+ * of `tiers.mjs`'s EARNED, deliberately: this probe imports nothing from
+ * `../src/` (build 347) so that it stays aimable at any served build, and a
+ * local import of the curve would take that away. The conditions then travel
+ * in the invocation, which is where a reader can see them.
+ *
+ * `--grant` owns the NEW FORM remainder so CORE is buyable. A run standing on
+ * rung 35 or 42 has answered five or six gates and can certainly own it, and
+ * `currency: 'remainder'` means no amount of `--spend` reaches it -- build
+ * 363's finding, which is why the flag exists rather than being implied.
+ */
+/*
+ * THE DAMAGE LINE, stage 1 of the shared funding policy: a priority order,
+ * bought in order and stopped at the first entry the purse cannot reach --
+ * not skipped past, because the order IS the priority. The same 14 entries
+ * live in `income.mjs` and `tiers.mjs`; `check-build.mjs` holds all three to
+ * the same list (by ENTRY, so the comments beside them may differ) and to the
+ * same leftover-budget allocator, because a probe that measures a boss
+ * against a different turret from the one that measured the money is two
+ * models wearing one name.
+ */
+const LINE = [
+  'hollowpoint', 'rate',
+  'hollowpoint', 'hollowpoint',
+  'hollowpoint', 'hollowpoint',
+  'overstuffed',
+  'overstuffed', 'overstuffed', 'overstuffed',
+  'salvo',
+  'casing', 'casing', 'casing',
+];
+
+const SPEND = flag('spend', null);
+const GRANT = argv.includes('--grant');
 /*
  * ---- THE SLOT: THE FIELD THE ANOMALY IS ACTUALLY MET ON -----------------
  *
@@ -165,12 +207,11 @@ async function fight(page) {
     const w = g.world;
     g.debugTeachAll();
     /*
-     * Assists only, and nothing bought.
-     *
-     * This is the floor the length targets are written against: whatever the
-     * fight measures here, somebody with upgrades does faster. Measuring a
-     * kitted-out turret would flatter every boss and tell us nothing about
-     * the player who opens the way the first time they can afford it.
+     * Assists on, purse empty. Unfunded that is the FLOOR every recorded
+     * length target is written against -- whatever the fight measures here,
+     * somebody with upgrades does faster -- and with `--spend` the funding
+     * happens further down, after the era is set, because the era decides the
+     * field the turret is bought to fight on.
      */
     w.autoAim = true;
     w.autoFire = true;
@@ -201,11 +242,12 @@ async function fight(page) {
     window.__fight = rec;
   });
 
-  const slot = await page.evaluate(async ({ n, want }) => {
+  const slot = await page.evaluate(async ({ n, want, spend, grant, line }) => {
     const { anomalyEra } = await import('../src/boss.js');
     const { CFG } = await import('../src/config.js');
     const { entryLine } = await import('../src/portal.js');
     const { CAPS_CPS } = await import('../src/tutorial.js');
+    const { NODES, priceOf, levelsOf } = await import('../src/tree.js');
     const T = CFG.waves.tier;
     const g = window.__sim;
     const w = g.world;
@@ -217,6 +259,44 @@ async function fight(page) {
      * arrive onto the field it is going to be fought on.
      */
     if (w.era !== era) { w.era = era === 1 ? 2 : 1; g.setEra(era); }
+    const bought = [];
+    if (spend > 0) {
+      /*
+       * The NEW FORM remainder, written into the LEDGER and not just onto the
+       * flag: `owned()` counts `world.ledger` and reads nothing else, which is
+       * build 266's note and the reason a probe that sets `world.newForm`
+       * alone still cannot buy CORE.
+       */
+      if (grant) {
+        w.newForm = 'done';
+        if (!w.ledger.includes('recast')) w.ledger.push('recast');
+      }
+      g.debugGiveBytes(spend);
+      for (const id of line) {
+        const got = g.buy(id);
+        if (got === 'poor') break;
+        if (got === 'ok') bought.push(id);
+      }
+      /* ---- cheapest-first: ONE allocator, byte-identical in both probes ---- */
+      for (;;) {
+        const have = (id) => w.ledger.filter((x) => x === id).length;
+        const cands = [];
+        for (const n of NODES) {
+          if (!n.id || n.repeat || n.dormant || n.currency) continue;
+          const h = have(n.id);
+          if (h >= levelsOf(n)) continue;
+          cands.push({ id: n.id, p: priceOf(n, h) });
+        }
+        cands.sort((a, b) => a.p - b.p);
+        let got = false;
+        for (const c of cands) {
+          if (c.p > w.bytes) break;
+          if (g.buy(c.id) === 'ok') { bought.push(c.id); got = true; break; }
+        }
+        if (!got) break;
+      }
+      /* ---- end cheapest-first ---- */
+    }
     if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
     const opened = g.openBoss(n);
     const core = w.boss && w.boss.core;
@@ -231,8 +311,15 @@ async function fight(page) {
       coreHp: core ? Math.round(core.maxHp) : null,
       hard: w.boss ? +(w.boss.hard || 0).toFixed(3) : null,
       capsCps: CAPS_CPS,
+      spend, grant,
+      buys: bought.length,
+      core: w.ledger.filter((x) => x === 'core').length,
+      damage: +w.up.damage.toFixed(3),
+      rate: +w.up.rate.toFixed(3),
+      left: Math.round(w.bytes),
     };
-  }, { n: N, want: ERA === null ? null : Number(ERA) });
+  }, { n: N, want: ERA === null ? null : Number(ERA),
+    spend: SPEND === null ? 0 : Number(SPEND), grant: GRANT, line: LINE });
   if (!slot.opened) throw new Error(`anomaly ${N} did not open`);
   // Above the hash branch, so the hash report says which field it read too.
   lastSlot = slot;
@@ -493,7 +580,26 @@ function slotLines(sl) {
     + `, era ${sl.era}${forced ? ` (FORCED -- derived ${sl.derived})` : ' (derived)'}`];
   out.push(`  field          power ${sl.power}, column ${sl.column}, width ${sl.width}`);
   out.push(`  core           ${sl.coreHp}hp, hard ${sl.hard}`);
+  /*
+   * The turret line, because a length measured against a funded turret and
+   * one measured against the floor are different readings and the heading is
+   * where a reader finds out which. `core` is printed even at 0 for build
+   * 363's reason: CORE is `currency: 'remainder'`, so a 0 beside a spend past
+   * its 5.32 MB says "remainder, not money" rather than nothing.
+   */
+  out.push(sl.spend > 0
+    ? `  turret         ${fmtB(sl.spend)} spent${sl.grant ? ' +NEW FORM' : ''}`
+      + ` -> ${sl.buys} level(s), core ${sl.core}, damage x${sl.damage},`
+      + ` rate x${sl.rate}, ${fmtB(sl.left)} left`
+    : '  turret         THE FLOOR -- assists only, nothing bought');
   return out;
+}
+
+/** Bytes, base-10 by CFG.bytes's ruling, for the heading only. */
+function fmtB(n) {
+  const u = [[1e9, 'GB'], [1e6, 'MB'], [1e3, 'kB']];
+  for (const [d, t] of u) if (n >= d) return `${(n / d).toFixed(n / d < 10 ? 2 : 1)} ${t}`;
+  return `${n} B`;
 }
 
 const num = (x) => (Math.round(x * 10) / 10).toFixed(1);
@@ -502,7 +608,8 @@ const med = (xs) => {
   return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
 };
 
-console.log(`\nANOMALY ${N} — ${RUNS} run${RUNS > 1 ? 's' : ''}, assists only, nothing bought\n`);
+console.log(`\nANOMALY ${N} — ${RUNS} run${RUNS > 1 ? 's' : ''}, assists only, `
+  + `${SPEND === null ? 'nothing bought' : `funded with ${fmtB(Number(SPEND))}`}\n`);
 for (const ln of slotLines(lastSlot)) console.log(ln);
 console.log('');
 
