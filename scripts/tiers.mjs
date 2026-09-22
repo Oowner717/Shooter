@@ -291,39 +291,67 @@ const TREE_TOTAL = NODES
  * alternate: rung 49 reads 687, 380, 462, 380 and rung 42 reads 276, 205,
  * 240, 197.
  *
- * What is landed is PASS 5 -- the last pass of the longest sequence, one
- * self-consistent curve, exact rather than a per-rung median across passes
- * that would reconcile against nothing. What it is NOT is a fixed point, and
- * two things say how far off it might be. The alternating pairs bracket a
- * damped estimate about 10-25% above it (rung 49 ~420 MB against 380, rung
- * 42 ~218 against 197, rung 28 ~20.3 against 15.9). And rung 1 is the noise
- * control, because its funding is 0.00 B in all five passes by construction:
- * on an identical input its rate reads 3.12 to 3.59 kB/s and its DWELL 12.7
- * to 18.5 seconds, a spread of x1.46 -- comparable to the step the iteration
- * is still taking, which is why five passes at one run a rung cannot
- * separate the two.
+ * Build 371 landed PASS 5 of that sequence, and it is superseded: those eight
+ * were measured at ONE run a rung and, as build 373 then found, against a
+ * turret the shared purchase policy under-built by about a fifth of its
+ * levels, with rungs 28 and up funded inside a hole where the damage
+ * multiplier HALVED. The paragraphs above are kept because the mechanism they
+ * describe -- a decreasing map, and why damping is the answer to it -- is what
+ * this curve was measured with.
  *
- * So the next pass on this table is `--runs 3`, which is three times the
- * hours, and the shape to reach for is DAMPED iteration -- seed pass N+1
- * with the mean of passes N-1 and N -- because a decreasing map is what
- * damping exists for. Until then these eight are the best measured curve
- * there has been (the first on the economy builds 365 and 366 left, and the
- * first with an anchor at the ceiling), and they are a reading rather than a
- * settled number.
+ * ---- WHAT IS LANDED, BUILD 374 ------------------------------------------
  *
- * AND THEY ARE NOW STALE ON A SECOND COUNT, WHICH IS THE POLICY AND NOT THE
- * ECONOMY. Build 373 found the stage-2 allocator both probes share to be a
- * NON-MONOTONE function of the purse -- measured over 183 purses, 46 dips in
- * level count and 2 in the damage multiplier, worst factor exactly 2 -- so
- * every one of these eight was measured against a turret under-built by
- * about a fifth of its levels (15.8 MB bought 64 where it now buys 77), and
- * build 373's own three damped `--runs 3` passes were VOIDED by it: rungs 28
- * and up were funded at 22.3 and 25.2 MB, inside a hole where the damage
- * multiplier halves. They are left in place because a measured curve beats
- * an asserted one even stale, which is build 366's ruling about the economy
- * pin; the re-take is owed on the fixed policy.
+ * THREE DAMPED PASSES AT THREE RUNS A RUNG ON THE FIXED POLICY, and the last
+ * one verbatim. Twenty scored waves a rung, w=0.5, every roll loose, chained
+ * `--from` pass to pass in one container, seeded from build 371's curve so
+ * the chain is auditable from the repo. The measured curves:
+ *
+ *   rung   371 (1 run)      pass 1      pass 2      pass 3  (landed)
+ *      7        617 kB      587 kB      520 kB      551 kB
+ *     14       1.31 MB     2.68 MB     2.16 MB     2.34 MB
+ *     21       4.21 MB     9.76 MB     6.41 MB     7.20 MB
+ *     28       15.9 MB     21.4 MB     15.6 MB     17.1 MB
+ *     35       66.8 MB     61.6 MB     68.7 MB     46.6 MB
+ *     42        197 MB      170 MB      190 MB      125 MB
+ *     49        380 MB      353 MB      327 MB      272 MB
+ *
+ * IT SETTLED, MEASURED AGAINST THE PROBE'S OWN FREE CONTROL RATHER THAN A
+ * THRESHOLD. Settling went 21.7% -> 4.8% -> 7.7% on the mean (66.0 -> 8.1 ->
+ * 16.7 at worst): a shrink of 4.5x on the first step and then a plateau,
+ * which is the iterate dropping under the noise rather than convergence
+ * error. The floor is rung 1, whose funding is 0.00 B in every pass by
+ * construction, so its pooled row is a repeated measurement of one input: its
+ * rate reads 3.41 / 3.08 / 3.41 kB/s but its DWELL 16.0 / 13.5 / 13.9 s, so
+ * the rate x dwell product that feeds the integral reads 55 / 42 / 47, a
+ * spread of x1.31. A settling figure is half a measured gap, so a fully
+ * settled rung 7 -- whose integral is rung 1's contribution alone -- would
+ * still read about 12%, and passes 2 and 3 read 4.8% and 7.7%.
+ * The channel is visible in the row: rung 1's verdict mix moved 17 climbs to
+ * 19 between passes, and the dwell moved with it.
+ *
+ * WHAT THE DEEP ANCHORS ARE WORTH, AND THE ONE OPEN QUESTION ANSWERED. Rungs
+ * 35 to 49 fell 25-35% in pass 3, which looks like divergence -- an increasing
+ * map with slope above 1, which no positive damping weight converges on. It is
+ * NOT: per-rung contributions across the three passes read 124/134/137 at rung
+ * 7, 1478/1895/1925 at 28, 18120/15867/15760 at 42 -- and 13302/18372/7970 at
+ * rung 35, a spread of x2.30 and not monotone. Rung 35's own window is the
+ * largest contribution below the top and `integrate` interpolates it across
+ * rungs 29-34, so one low draw there drags the anchors at 35, 42 and 49 with
+ * it. The deep end is noise-dominated by that one window; rungs 42 and 49's
+ * own windows barely move (x1.15, and rung 42's rate reads 217/205/197).
+ * So these anchors carry about x1.5 at the deep end and x1.1 to x1.8 below
+ * it, per-rung spreads are in the note above, and **the one thing that would
+ * tighten them is more runs at rung 35** rather than more passes.
+ *
+ * PASS 3 IS LANDED VERBATIM, not a per-rung median across the three. It is
+ * what `--iters 3` in one invocation would have handed over, so the chunking
+ * cannot have changed the answer; a hand-assembled curve is not something the
+ * probe ever produced and could not be reproduced by re-running it. Its rung
+ * 35 is the low draw of the three, which is exactly why the spreads above are
+ * recorded beside it.
  */
-const EARNED = [[1, 0], [7, 617033], [14, 1312335], [21, 4210247], [28, 15863661], [35, 66839173], [42, 196810828], [49, 379908991]];
+// measured: window 20 scored wave(s) a rung, 3 run(s) a rung, 3 damped pass(es) at w=0.5 RESUMED on build 371's curve, all four rolls loose, CORE not owned, build 373 rev 02b5255, this container
+const EARNED = [[1, 0], [7, 550690], [14, 2341417], [21, 7195205], [28, 17069765], [35, 46551271], [42, 124516892], [49, 271530688]];
 /*
  * Past the last anchor, the growth of the last measured pair carries on.
  *

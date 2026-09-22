@@ -1708,7 +1708,7 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * three times the hours, and that is a build of its own.
  */
 const INCOME_PIN = 'd305b7b056b2';
-const INCOME_AT = 366;
+const INCOME_AT = 374;
 const TIER_CFG = CFG.waves.tier;
 const incomeTerms = {
   'energy.perMass': CFG.energy.perMass,

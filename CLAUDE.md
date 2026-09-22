@@ -12880,3 +12880,96 @@ came from before believing the other one covers it.
   `thrown 0-27, speed 9-12 of 720, back null` and fails on three conjuncts at
   once. **A clamp is an assertion about the tail, so measure the tail it is
   hiding.**
+
+- **BUILD 374 LANDS THE INCOME CURVE, MEASURED ON THE FIXED POLICY: THREE
+  DAMPED PASSES AT THREE RUNS A RUNG, AND THE LAST ONE VERBATIM.** Twenty
+  scored waves a rung, w=0.5, every roll loose, chained `--from` pass to pass
+  in one container and seeded from the curve `tiers.mjs` already held so the
+  chain is auditable from the repo. `INCOME_AT` moves 366 -> 374 and
+  `INCOME_PIN` does not move, because the economy did not.
+
+  | rung | 371 (1 run) | pass 1 | pass 2 | pass 3 (landed) |
+  |---|---|---|---|---|
+  | 7 | 617 kB | 587 kB | 520 kB | **551 kB** |
+  | 14 | 1.31 MB | 2.68 MB | 2.16 MB | **2.34 MB** |
+  | 21 | 4.21 MB | 9.76 MB | 6.41 MB | **7.20 MB** |
+  | 28 | 15.9 MB | 21.4 MB | 15.6 MB | **17.1 MB** |
+  | 35 | 66.8 MB | 61.6 MB | 68.7 MB | **46.6 MB** |
+  | 42 | 197 MB | 170 MB | 190 MB | **125 MB** |
+  | 49 | 380 MB | 353 MB | 327 MB | **272 MB** |
+
+- **THE FIX IS VISIBLE IN THE MEASUREMENT AND NOT ONLY IN THE SWEEP.** At the
+  identical seed, build 373's void pass bought **0, 10, 21, 32, 63, 73, 107,
+  107** levels up the rungs and this one buys **0, 19, 26, 51, 75, 99, 107,
+  107** -- more at every rung and monotone for the first time. The sweep said
+  15.8 MB goes 64 -> 77 and `tiers.mjs` at tier 28 said the same; the curve's
+  own funding column is the third independent sighting.
+- **IT SETTLED AGAINST THE PROBE'S OWN FREE CONTROL RATHER THAN A THRESHOLD,
+  WHICH IS WHAT MAKES "SETTLED" A MEASUREMENT.** Settling ran **21.7% -> 4.8%
+  -> 7.7%** on the mean (66.0 -> 8.1 -> 16.7 at worst): a 4.5x shrink on the
+  first step and then a plateau, which build 373 established as the iterate
+  dropping under the noise rather than convergence error. The floor is rung 1,
+  funded with 0.00 B in every pass by construction, so its pooled row is a
+  repeated measurement of ONE input -- rate **3.41 / 3.08 / 3.41 kB/s** but
+  dwell **16.0 / 13.5 / 13.9 s**, so the rate x dwell product that feeds the
+  integral reads **55 / 42 / 47, a spread of x1.31**. A settling figure is
+  half a measured gap, so a fully settled rung 7 -- whose integral is rung 1's
+  contribution alone -- would still read about 12%, and passes 2 and 3 read
+  4.8% and 7.7%. The channel is in the row: rung 1's verdict mix moved 17
+  climbs to 19 between passes and the dwell moved with it.
+- **THE DEEP END LOOKED LIKE DIVERGENCE AND THE ARITHMETIC FOR THAT IS WORTH
+  KEEPING, BECAUSE NO DAMPING WEIGHT ANSWERS IT.** Rungs 35 to 49 fell 25-35%
+  in pass 3, and read as successive applications the rung-49 pairs give a
+  slope of 1.86 then 2.9 -- an INCREASING map with slope above 1, for which
+  the damped iterate is `g' = 1 + w(m - 1) > 1` for every positive w. Damping
+  is the answer to a DECREASING map (`g' = 1 - w(1 + k)`, which is what builds
+  371 and 372 measured and derived w from); against slope above 1 there is no
+  weight at all, and the shape to reach for would be a secant or a bisection
+  on `x - f(x)`.
+- **...AND IT IS NOT DIVERGENCE, WHICH THE PER-RUNG CONTRIBUTIONS SETTLED FOR
+  FREE.** `earned` is an ACCUMULATION, so a slope read off it is a slope of a
+  sum. The contributions the sum is made of, across the three passes:
+  124/134/137 at rung 7 (x1.11), 1478/1895/1925 at 28 (x1.30),
+  18120/15867/15760 at 42 (x1.15), 37433/24611/28752 at 49 (x1.52) -- and
+  **13302/18372/7970 at rung 35, x2.30 and not monotone**. Rung 35's own
+  window is the largest contribution below the top and `integrate`
+  interpolates it across rungs 29-34, so one low draw there drags the anchors
+  at 35, 42 AND 49 together and three rungs appear to move as one. Rungs 42
+  and 49's own windows barely moved. **Before believing a slope read off an
+  accumulated quantity, read the terms it accumulates** -- three points of a
+  sum can fake any slope, and here the fake was a factor of three in the
+  diagnosis.
+- **WHAT THE ANCHORS ARE WORTH, SAID OUT LOUD: about x1.5 at the deep end and
+  x1.1 to x1.8 below it**, and the one thing that tightens them is **more runs
+  at rung 35** rather than more passes -- its x2.30 dominates everything above
+  it, and the sequence is already settled, so another pass buys another draw
+  of the same window. Pass 3 is landed VERBATIM rather than a per-rung median
+  across the three: it is what `--iters 3` in one invocation would have handed
+  over, so the chunking cannot have changed the answer, and a hand-assembled
+  curve is not something the probe ever produced nor could be reproduced by
+  re-running it. Its rung 35 happens to be the low draw of the three, which is
+  exactly why the spreads are recorded beside it.
+- **AND THE TABLE'S COLUMNS CONTAIN SPACES, SO FIELD-INDEXED PARSING READS THE
+  WRONG COLUMN IN SILENCE -- four times in one session, by me.** `funded` is
+  `0.00 B` and the verdict mix is `0/17/ 3`, two cells of two tokens each, so
+  `$18` is the dwell on some rows and a rule name or a `paid/wave` entry on
+  others: one attempt reported every dwell as `0`, another printed a trait set
+  where a contribution belonged, and a third read the GPU process's CPU for
+  the renderer's. Split the header on two-or-more spaces and index the cells
+  by NAME. **A fixed-width readout is not whitespace-delimited data**, and the
+  failure is a plausible-looking number rather than an error.
+- **THE HASH IS NOT OWED AND WAS NOT RUN.** This build changes
+  `scripts/tiers.mjs` (the curve and its conditions), `scripts/check-build.mjs`
+  (`INCOME_AT`) and the BUILD literal; no executable `src/` line moves. What
+  had something to say is the three-pass table, the control, the contributions
+  and the suite.
+- **What this cost and the shape that made it affordable: about 6.6 hours of
+  wall clock, ZERO agents and no tokens while it ran.** One background node
+  process per pass, `--iters 1` a time so a container reprovision costs one
+  pass rather than the sequence, each pass's array recorded in the transcript
+  and the next seed computed by the same blend the probe uses -- cross-checked
+  against the settling percentages it prints, which matched to the decimal on
+  all three. Parallelising across rungs was considered and refused: within a
+  pass each rung is funded independently, but `integrate` accumulates UPWARD,
+  so a split run would need `integrate`'s arithmetic re-done by hand, and the
+  deep rungs dominate the clock anyway.
