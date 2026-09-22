@@ -232,6 +232,37 @@ export function offField(e) {
   e.dead = true;
 }
 
+/**
+ * How much harder a bought gun makes an anomaly: a multiplier on the health
+ * of its core and its structure, and on the patience clock that bounds a
+ * stage.
+ *
+ * ONE owner, because the arithmetic has three properties that are
+ * load-bearing and none of them is visible at a call site. Exported so
+ * check-build can assert them over the whole range rather than sample them.
+ *
+ * `CFG.boss.temper` is a KNEE and not a ceiling from build 376. BELOW it the
+ * boss answers the gun one for one, which is the identity -- so ORDINAL's
+ * slot is exactly where build 375 measured it (`gunScale` 2.778 there,
+ * under the knee, funding making that fight 3.5% LONGER, which is the
+ * compensation working). ABOVE it the boss answers `soften` of the gun's
+ * excess, measured in the log: the health-proportional part of the fight is
+ * `(temper / g) ** (1 - soften)` of its stock length, so `1 - soften` is
+ * the share of a deep gun's advantage the player keeps.
+ *
+ * It can never exceed `g`, so a tempered fight is never LONGER than the
+ * stock fight it is derived from -- which is the fear the ceiling was
+ * written for, kept as arithmetic rather than as a clamp. And `gunScale`
+ * returns exactly 1 for a stock gun, which is under any sane knee, so
+ * nothing here can move a stock reading or the canonical hash.
+ */
+export function bossHard(world) {
+  const g = gunScale(world);
+  const knee = CFG.boss.temper;
+  if (g <= knee) return g;
+  return knee * (g / knee) ** CFG.boss.soften;
+}
+
 export class Boss {
   constructor(world, n) {
     this.n = n; // which of the seven. See anomaly.js.
@@ -239,10 +270,9 @@ export class Boss {
      * How much harder this one is than it is authored, decided ONCE here and
      * never re-read: a fight whose health moved while you were in it because
      * you bought something, or because auto-aim was off for a frame, is not a
-     * fight anybody can read. Capped, because the point is a fight of the
-     * length it was tuned to and not a fight four times that. See gunScale.
+     * fight anybody can read. See bossHard below for the shape of it.
      */
-    this.hard = Math.min(gunScale(world), CFG.boss.temper);
+    this.hard = bossHard(world);
     this.t = 0;
     this.stage = 1;
     this.stageT = 0;

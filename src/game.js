@@ -3605,7 +3605,12 @@ export class Game {
      * hurt it -- so the allowance moves with the same multiplier its health
      * did, or the fix for "the late fights are too short" would withdraw them
      * instead. Identity at stock, where `hard` is 1 and this is the 90s it
-     * has always been. Measured at temper 3.4, TERMINUS's last stage runs
+     * has always been. `hard` reaches 16.363 at the deep slots from build 376
+     * and this allowance with it, which is generous and deliberately so: the
+     * longest stage measured anywhere, over 45 fights at build 375 and every
+     * setting swept at 376, is 95.4s against a `patience` of 150. The clock is
+     * not inside any fight the game currently produces.
+     * Measured at temper 3.4, TERMINUS's last stage ran
      * 77.8s of the 90 -- a 14% margin against a fight that varies by more
      * than that run to run, which is a net that would have started catching
      * fights it was never meant to catch.
@@ -5139,7 +5144,7 @@ export class Game {
    * it from the same gate table the ladder uses.
    *
    * The TIER is deliberately NOT set. A boss's difficulty is `gunScale` --
-   * what the gun does, capped at `CFG.boss.temper` -- and not the rung, so
+   * what the gun does, put through `CFG.boss.temper`'s knee -- and not the rung, so
    * moving the tier would change nothing about the fight while permanently
    * raising `peak` and unlocking every rung below it. The rung is shown on
    * the row instead, because it is worth knowing and not worth doing.

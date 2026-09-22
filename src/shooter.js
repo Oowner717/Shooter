@@ -527,13 +527,18 @@ function sliverOn(world, e, x, y, p, dirx, diry, sp) {
  * it was until build 229 took it to 5 at 1.32 and build 302 to 8 at 1.26.
  * Measured here: the node alone is x6.353, and with SALVO at 8 and FEED at
  * 0.9 this function returns 8.823 for a fully bought gun against
- * `CFG.boss.temper` 4.2 -- so the ceiling binds at a little over half of one
- * node's ladder and every deeper purchase is invisible to a boss. With CORE
- * owned (dormant until NEW FORM, x3.32 on top) the product is about 29, or
- * seven times the clamp. The consequence for anyone tuning boss scaling is
- * that `temper` and not this product is the live quantity above that point,
- * and a change to the damage line moves the RUNG at which the clamp starts
- * binding rather than the difficulty of a boss met after it.
+ * `CFG.boss.temper` 4.2 -- and with CORE owned (dormant until NEW FORM,
+ * x3.32 on top) this returns 29.307, measured at build 375 at the funding a
+ * run actually has by every gate rung above the era gate.
+ *
+ * `temper` was a CEILING until build 375, so every purchase past 4.2 was
+ * invisible to a boss and the deep fights collapsed -- PARITY over in 38.3
+ * seconds against a stock 183.4. It is a KNEE from 376 and `CFG.boss.soften`
+ * decides how much of the excess an anomaly answers, so this product is live
+ * again above it. What it CANNOT buy back is anything this function does not
+ * measure: `bossHard` is bounded by this return, and build 376 measured the
+ * gun's real effect on PARITY at seven times what this reports, which is why
+ * that one fight stays short at any setting.
  *
  * SIGHT was the fourth term and went in build 215, taking a 1.25^3 with it.
  * PILE replaces it on the TURRET branch and is NOT counted here on purpose:

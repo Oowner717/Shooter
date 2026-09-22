@@ -3907,6 +3907,108 @@ console.log(`ORDINAL: ${panels} segments in ${CFG.ordinal.rings.length} closed f
 // Everything the browser is served, in a fixed order, hashed. config.js's own
 // REV line is blanked before hashing or the value could never be stable — it
 // would be an input to itself.
+/*
+ * ---- the boss's difficulty curve, over its whole range --------------------
+ *
+ * `bossHard` has four properties that decide what the tree is worth against
+ * an anomaly, and not one of them is visible at the call site -- `this.hard =
+ * bossHard(world)` reads the same however the curve is shaped. Build 375
+ * measured what the old CEILING cost (the clamp discarding a factor of 6.98
+ * at every slot above the era gate, and PARITY over in 38.3 seconds against a
+ * stock 183.4), so the curve is now the live quantity and a static sweep is
+ * the cheapest thing that can watch it.
+ *
+ * Driven rather than shape-pinned, because the expression has already been
+ * written two ways -- a `Math.min` and a knee -- that look equally plausible
+ * in a diff, and because the properties are about the whole range rather than
+ * about any line of it. Build 349's split: a structural claim over a function
+ * is a check-build question and a measured fight is a probe's.
+ */
+{
+  const { bossHard } = await import(new URL('../src/boss.js', import.meta.url));
+  const { gunScale } = await import(new URL('../src/shooter.js', import.meta.url));
+  const knee = CFG.boss.temper;
+  const soften = CFG.boss.soften;
+  const world = (g) => ({ up: { damage: g, salvo: 0, rate: 1 } });
+  const at = (g) => bossHard(world(g));
+
+  const bad = [];
+  if (!(knee > 1)) bad.push(`temper is ${knee}; a knee at or under 1 scales a STOCK gun`);
+  if (!(soften >= 0 && soften <= 1)) {
+    bad.push(`soften is ${soften}, outside [0, 1]; above 1 an anomaly out-scales the `
+      + 'gun and a bought fight is LONGER than the stock one, which is the fear the '
+      + 'ceiling was written for');
+  }
+  // gunScale has to be the identity over the sweep, or the sweep is of something else.
+  const gs = [1, knee, knee * 3].filter((g) => Math.abs(gunScale(world(g)) - g) > 1e-9);
+  if (gs.length) bad.push(`gunScale is not the identity on the probe world at ${gs.join(', ')}`);
+
+  /*
+   * A stock gun is EXACTLY 1 and so is its multiplier, which is what keeps
+   * every stock reading and the canonical hash untouched by any shape this
+   * curve takes. `===` and not a tolerance: build 241's rule, and `temper(e)`
+   * early-returns on exactly this number.
+   */
+  if (at(1) !== 1) bad.push(`a stock gun gives hard ${at(1)}, not exactly 1`);
+
+  /*
+   * IDENTITY BELOW THE KNEE. This is what holds ORDINAL's slot: build 375
+   * measured `gunScale` 2.778 there against a knee of 4.2, funding making
+   * that fight 3.5% LONGER, which is the compensation working and the one row
+   * a change to this curve must not move.
+   */
+  for (let g = 1; g <= knee; g += knee / 64) {
+    if (at(g) !== g) { bad.push(`hard ${at(g)} at gun ${g.toFixed(3)}, under the knee ${knee}, is not the identity`); break; }
+  }
+
+  /*
+   * NEVER MORE THAN THE GUN, MONOTONE IN IT, AND SHORTER WITH IT. The first
+   * says a tempered fight is never longer than the stock fight it is derived
+   * from; the second that a bigger gun is never a weaker boss; the third that
+   * buying more always shortens a boss fight, which is the player-facing
+   * promise and the thing a non-monotone curve would break in silence.
+   */
+  let prev = null;
+  for (let g = 1; g <= knee * 16; g *= 1.05) {
+    const h = at(g);
+    if (h > g + 1e-9) { bad.push(`hard ${h.toFixed(3)} exceeds gun ${g.toFixed(3)}: that fight is LONGER than stock`); break; }
+    if (prev && !(h > prev.h - 1e-12)) { bad.push(`hard falls from ${prev.h.toFixed(3)} to ${h.toFixed(3)} as the gun rises ${prev.g.toFixed(3)} -> ${g.toFixed(3)}`); break; }
+    if (prev && h / g > prev.h / prev.g + 1e-9) { bad.push(`the fight's health share RISES ${(prev.h / prev.g).toFixed(4)} -> ${(h / g).toFixed(4)} as the gun goes ${prev.g.toFixed(3)} -> ${g.toFixed(3)}: buying more lengthened it`); break; }
+    prev = { g, h };
+  }
+
+  /*
+   * BOTH ENDS OF THE DIAL ARE THE TWO GAMES IT SITS BETWEEN, and reaching
+   * them is what makes `soften` a dial rather than a rewrite: 0 is build
+   * 375's ceiling to the bit and 1 is full compensation, where an anomaly
+   * scales exactly with the turret and the tree is worth nothing against one.
+   * Restored, because later arms read the live value.
+   */
+  const was = CFG.boss.soften;
+  CFG.boss.soften = 0;
+  const ceil = [1, knee * 0.5, knee, knee * 2, knee * 7]
+    .filter((g) => at(g) !== Math.min(g, knee));
+  CFG.boss.soften = 1;
+  const full = [1, knee * 0.5, knee, knee * 2, knee * 7]
+    .filter((g) => Math.abs(at(g) - g) > 1e-9);
+  CFG.boss.soften = was;
+  if (ceil.length) bad.push(`soften 0 is not Math.min(gun, ${knee}) at gun ${ceil.map((g) => g.toFixed(2)).join(', ')}`);
+  if (full.length) bad.push(`soften 1 is not full compensation at gun ${full.map((g) => g.toFixed(2)).join(', ')}`);
+
+  if (bad.length) {
+    console.error('boss difficulty curve:');
+    for (const b of bad) console.error(`  ${b}`);
+    console.error('  bossHard is in src/boss.js; CFG.boss.temper is the knee and');
+    console.error('  CFG.boss.soften the share of the gun past it the boss answers.');
+    process.exit(1);
+  }
+  const deep = knee * 7;
+  console.log(`boss curve:    knee ${knee}, soften ${soften} -- identity to ${knee}, `
+    + `then hard ${at(deep).toFixed(2)} at gun ${deep.toFixed(2)} `
+    + `(${(100 * at(deep) / deep).toFixed(0)}% answered, so the health part of that `
+    + `fight is ${(100 * at(deep) / deep).toFixed(0)}% of its stock length)`);
+}
+
 const REV_LINE = /export const REV = '[^']*';/;
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const files = [...src.map((f) => `src/${f}`).sort(), 'styles.css', 'index.html', 'sw.js'];

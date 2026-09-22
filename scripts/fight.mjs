@@ -133,6 +133,14 @@ const LINE = [
 const SPEND = flag('spend', null);
 const GRANT = argv.includes('--grant');
 /*
+ * `--soften K` overrides CFG.boss.soften for this run, so the knee can be
+ * swept without four edits to a served file. Written in the slot evaluate
+ * BEFORE openBoss, because `Boss.hard` is decided once in the constructor and
+ * never re-read -- and PRINTED in the slot block, or a sweep is a column of
+ * numbers with no record of which dial produced each one.
+ */
+const SOFTEN = flag('soften', null);
+/*
  * ---- THE SLOT: THE FIELD THE ANOMALY IS ACTUALLY MET ON -----------------
  *
  * `--era N` overrides; the default is DERIVED from `anomalyEra(n)`, which is
@@ -242,12 +250,13 @@ async function fight(page) {
     window.__fight = rec;
   });
 
-  const slot = await page.evaluate(async ({ n, want, spend, grant, line }) => {
+  const slot = await page.evaluate(async ({ n, want, spend, grant, line, soften }) => {
     const { anomalyEra } = await import('../src/boss.js');
     const { CFG } = await import('../src/config.js');
     const { entryLine } = await import('../src/portal.js');
     const { CAPS_CPS } = await import('../src/tutorial.js');
     const { NODES, priceOf, levelsOf } = await import('../src/tree.js');
+    const { gunScale } = await import('../src/shooter.js');
     const T = CFG.waves.tier;
     const g = window.__sim;
     const w = g.world;
@@ -297,6 +306,7 @@ async function fight(page) {
       }
       /* ---- end cheapest-first ---- */
     }
+    if (soften !== null) CFG.boss.soften = soften;
     if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
     const opened = g.openBoss(n);
     const core = w.boss && w.boss.core;
@@ -310,8 +320,16 @@ async function fight(page) {
       width: Math.round(w.width),
       coreHp: core ? Math.round(core.maxHp) : null,
       hard: w.boss ? +(w.boss.hard || 0).toFixed(3) : null,
+      /*
+       * The RAW product, beside the clamped one. `hard` alone cannot say
+       * whether a ceiling bound or by how much -- and that gap is the whole
+       * quantity anyone tuning boss scaling is working in, so printing the
+       * clamp without its input is build 329's broadphase cell again.
+       */
+      gun: +gunScale(w).toFixed(3),
       capsCps: CAPS_CPS,
       spend, grant,
+      soften: +CFG.boss.soften.toFixed(3), knee: CFG.boss.temper,
       buys: bought.length,
       core: w.ledger.filter((x) => x === 'core').length,
       damage: +w.up.damage.toFixed(3),
@@ -319,7 +337,8 @@ async function fight(page) {
       left: Math.round(w.bytes),
     };
   }, { n: N, want: ERA === null ? null : Number(ERA),
-    spend: SPEND === null ? 0 : Number(SPEND), grant: GRANT, line: LINE });
+    spend: SPEND === null ? 0 : Number(SPEND), grant: GRANT, line: LINE,
+    soften: SOFTEN === null ? null : Number(SOFTEN) });
   if (!slot.opened) throw new Error(`anomaly ${N} did not open`);
   // Above the hash branch, so the hash report says which field it read too.
   lastSlot = slot;
@@ -579,7 +598,10 @@ function slotLines(sl) {
   const out = [`  slot           rung ${sl.rung === null ? '(ungated)' : sl.rung}`
     + `, era ${sl.era}${forced ? ` (FORCED -- derived ${sl.derived})` : ' (derived)'}`];
   out.push(`  field          power ${sl.power}, column ${sl.column}, width ${sl.width}`);
-  out.push(`  core           ${sl.coreHp}hp, hard ${sl.hard}`);
+  out.push(`  core           ${sl.coreHp}hp, hard ${sl.hard}`
+    + `  (gun ${sl.gun}${sl.gun > sl.hard ? `, clamped -${(100 - 100 * sl.hard / sl.gun).toFixed(0)}%` : ', uncapped'})`);
+  out.push(`  knee           temper ${sl.knee}, soften ${sl.soften}`
+    + `${sl.gun > sl.knee ? `  -- ${(100 - 100 * sl.hard / sl.gun).toFixed(0)}% of the gun unanswered` : '  -- under the knee, identity'}`);
   /*
    * The turret line, because a length measured against a funded turret and
    * one measured against the floor are different readings and the heading is

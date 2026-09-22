@@ -15411,10 +15411,12 @@ if (MINE_LINE) {
   const r = await page.evaluate(async () => {
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
     const { gunScale } = await import('../src/shooter.js');
+    const { bossHard } = await import('../src/boss.js');
     const { freshUpgrades } = await import('../src/upgrades.js');
     const g = window.__sim;
     const w = g.world;
-    const out = { cap: CFG.boss.temper, patience: CFG.boss.patience };
+    const out = { cap: CFG.boss.temper, soften: CFG.boss.soften,
+      patience: CFG.boss.patience };
 
     /** Open one anomaly and read what it was built out of. */
     const open = (n, buy) => {
@@ -15532,6 +15534,15 @@ if (MINE_LINE) {
     // ---- ...and a bought one is tempered, everywhere it is made ----------
     const bought = open(1, true);
     out.boughtHard = bought ? +bought.hard.toFixed(3) : null;
+    /*
+     * The DOOR's own answer, beside the one the boss took. `hard` is assigned
+     * once in a constructor and there are five `clear` overrides in this
+     * codebase, so a boss computing its own difficulty some other way is the
+     * runtime risk a static sweep of `bossHard` cannot see -- and it would be
+     * invisible, because nothing on the screen says what a panel is worth.
+     */
+    out.doorHard = bought ? +bossHard(w).toFixed(6) : null;
+    out.doorGun = bought ? +gunScale(w).toFixed(6) : null;
     out.coreRatio = bought && stock ? +(bought.core / O.hp).toFixed(3) : null;
     out.pieceRatio = bought && bought.pieces
       ? +((bought.hp / bought.pieces) / T.hp).toFixed(3) : null;
@@ -15551,6 +15562,33 @@ if (MINE_LINE) {
       if (p) { p.dead = true; b.revive(w, p, 1); revived = p.maxHp; }
     }
     out.revived = revived ? +(revived / T.hp).toFixed(3) : null;
+
+    /*
+     * ---- IDENTITY BELOW THE KNEE, through a real Boss ------------------
+     *
+     * This is the arm that holds ORDINAL's slot. Build 375 measured
+     * `gunScale` 2.778 at the funding a run actually has by rung 7 -- under
+     * the knee -- and funding making that fight 3.5% LONGER, which is the
+     * compensation working. So the curve owes that slot an EXACT identity,
+     * and `temper(e)` early-returns on `hard === 1` alone, which means a
+     * number a hair off the gun's own is a silently different fight.
+     *
+     * The gun is set by hand rather than by buying, because what is wanted is
+     * a `gunScale` at a chosen point under the knee and the tree does not
+     * offer one: with fresh upgrades `salvo` is 0 and `rate` is 1, so
+     * gunScale is `up.damage` exactly.
+     */
+    g.restart();
+    w.phase = 'staging';
+    w.autoAim = true; w.autoFire = true;
+    w.up = freshUpgrades();
+    w.up.damage = CFG.boss.temper * 0.7;
+    out.underGun = +gunScale(w).toFixed(6);
+    w.aperture = 1;
+    g.openBoss(1);
+    out.underHard = w.boss ? w.boss.hard : null;
+    out.underExact = w.boss ? w.boss.hard === gunScale(w) : null;
+
 
     // ---- and the withdrawal clock moves with it -------------------------
     /*
@@ -15666,23 +15704,55 @@ if (MINE_LINE) {
     + `own jitter and nothing else -- the multiply is an identity at 1)`);
 
   /*
-   * `hard` is the product, or the cap, whichever is smaller. It WAS the cap
-   * until build 215: SIGHT's removal took a 1.25^3 out of gunScale and the
-   * product fell from 5.30 to 4.69. The ceiling still binds -- 4.2 is under
- * 4.69, so `Math.min` returns the cap on every bought fight, and the cap is
- * what sets a bought anomaly's health. The 2.71 this used to say was
- * HOLLOWPOINT priced at 1.25 a level, which it has not been since 215. Asserted
-   * against the same min the boss takes, not against a literal, or this case
-   * would have to be edited every time the gun changes -- and the point of
-   * it is to notice when the gun changes.
+   * `hard` is the KNEE'S answer to the gun from build 376, where it was
+   * `Math.min(product, temper)` from 215 to 375. Restated here from the two
+   * constants rather than read back off `bossHard`, for the reason the
+   * `Math.min` it replaces was: what this arm is for is noticing when the GUN
+   * changes, and a literal would have to be edited every time it did.
+   *
+   * Two brackets, and neither is decoration. `> temper` says the old ceiling
+   * would have bound on this very fight, so the arm is measuring the knee and
+   * not a run that never reached it; `< gunScale` says the boss is not fully
+   * compensated, which is the other end of the dial and the game where the
+   * tree is worth nothing against an anomaly.
    */
-  const cap = Math.min(want, r.cap);
+  const cap = want <= r.cap ? want : r.cap * (want / r.cap) ** r.soften;
   check('...and one opened by a bought turret is worth the gun that opened it',
     Math.abs(r.boughtHard - cap) < 0.02
+    && r.doorHard > r.cap && r.doorHard < r.doorGun
     && Math.abs(r.coreRatio / cap - 1) < 0.12
     && Math.abs(r.pieceRatio / cap - 1) < 0.12,
-    `hard ${r.boughtHard} (the product is ${want.toFixed(2)}, the ceiling `
-    + `${r.cap}); core x${r.coreRatio} and structure x${r.pieceRatio} of authored`);
+    `hard ${r.boughtHard} against the curve's own ${cap.toFixed(3)} (gun `
+    + `${r.doorGun}, knee ${r.cap}, soften ${r.soften}, so the ceiling that `
+    + `stood until build 375 would have bound here at ${r.cap}); core `
+    + `x${r.coreRatio} and structure x${r.pieceRatio} of authored`);
+
+  /*
+   * ...and it took that number from the DOOR. `hard` is assigned once in a
+   * constructor and this codebase has five `clear` overrides, so a boss
+   * computing its own difficulty some other way is the runtime risk no static
+   * sweep of `bossHard` can see -- and it would be silent, because nothing on
+   * the screen says what a panel is worth.
+   */
+  check('...and it is the one function that decides that, not a second copy',
+    r.doorHard !== null && Math.abs(r.boughtHard - r.doorHard) < 0.002,
+    `the boss took ${r.boughtHard} and bossHard(world) returns ${r.doorHard}`);
+
+  /*
+   * ---- and BELOW the knee it is the identity, exactly --------------------
+   *
+   * The arm that holds ORDINAL's slot. Build 375 measured `gunScale` 2.778 at
+   * the funding a run actually has by rung 7 -- under the knee of 4.2 -- and
+   * funding making that fight 3.5% LONGER, which is the compensation working
+   * rather than failing. `temper(e)` early-returns on `hard === 1` alone, so
+   * a number a hair off the gun's own is a silently different fight; asserted
+   * by `===` for build 241's reason, since two decimal places cannot see a
+   * re-associated product.
+   */
+  check('...and under the knee it answers the gun exactly, which is the first slot',
+    r.underExact === true && r.underHard === r.underGun && r.underGun < r.cap,
+    `at gun ${r.underGun}, under the knee ${r.cap}, hard is ${r.underHard} `
+    + `(exact: ${r.underExact})`);
 
   check('...and a piece put back mid-fight comes back tempered too',
     r.revived !== null && Math.abs(r.revived / cap - 1) < 0.02,

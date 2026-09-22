@@ -532,6 +532,29 @@
           going fine — and build 279 found TESSERA withdrawing at 164s with its core untouched.
           Patience should be authored per slot alongside health, at about 2.2× the target.</p>
       </div>
+      <div class="note">
+        <b>Answered at builds 375 and 376, and both asks moved</b>
+        <p><b>The clocks are not needed.</b> <code>patience</code> bounds a STAGE and not a fight,
+          which is what makes two targets past 150s harmless: over 45 fights at 375 and every
+          setting swept at 376, the longest stage anywhere is <span class="num">95.4s</span>, and
+          <code>hard</code> multiplies the allowance too, so a tougher fight gets a proportionally
+          longer one. TESSERA at 164s was a stage timing out, not a fight.</p>
+        <p><b>Per-slot health cannot do what this section wants.</b> <code>hard</code> reaches a
+          boss only as a multiplier on its health, so authored health is a common factor on the
+          stock column and the funded one alike and cannot move the ratio between them. Restoring
+          PARITY&rsquo;s funded length would need about <span class="num">4.8&times;</span> its
+          health, which takes its stock fight from 183s to about 880s. What sets the ratio is
+          <code>CFG.boss.temper</code>, a ceiling at 4.2 against a measured
+          <code>gunScale</code> of <span class="num">29.307</span> &mdash; a factor of 6.98
+          discarded. Build 376 makes it a knee.</p>
+        <p><b>And one slot is out of reach of either dial.</b> The mechanism is bounded by
+          <code>gunScale</code> by construction, and that proxy understates what a bought turret
+          does to PARITY by about <span class="num">7&times;</span> (against 1.23&times; for DYNAMO
+          and 1.75&times; for TERMINUS). Measured at full compensation &mdash; the tree worth
+          nothing against a boss &mdash; PARITY is still a <span class="num">56.4s</span> fight,
+          because its stage ladder is suspended by two clocked set-pieces that answer no
+          multiplier and one of which heals a fixed share of the pool.</p>
+      </div>
     </section>
 
     <section>

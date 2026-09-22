@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '375';
+export const BUILD = '376';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '375';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '2ace25f';
+export const REV = '3a1c5bb';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4746,25 +4746,42 @@ export const CFG = {
      */
     outroWait: 3.2,
     /*
-     * The most a bought turret may make an anomaly worth, as a multiplier on
-     * the health of its core and its structure. See gunScale in shooter.js
-     * for the measurement this answers: seven fights, all of them a fifth of
-     * their tuned length once the tree is bought out.
+     * The KNEE, from build 376: the point at which an anomaly stops answering
+     * the gun one for one. Below it `bossHard` is the identity, so a run that
+     * has bought little meets the fight it always did. Above it the boss takes
+     * back `soften` of the gun's excess.
      *
-     * A ceiling rather than the raw product -- which reached 4.69 when this was
-     * written and is 8.823 now, measured at build 352 after HOLLOWPOINT went to
-     * 5 levels at 229 and 8 at 302, and about 29 with CORE owned. That is not a
-     * detail: at 4.69 the ceiling barely bound, and at 8.823 it binds at a
-     * little over half of one node's ladder, so `temper` and not the product is
-     * the live quantity for anyone tuning boss scaling above that rung -- and
-     * because the
-     * multiplier reaches only structure and cores -- minions come through
+     * It was a CEILING from build 215 to 375, and the reason it had to stop
+     * being one is that it stopped being a safety rail and became the whole
+     * mechanism. It reached 4.69 as a raw product when it was written -- so
+     * the clamp barely bound -- and build 375 measured the product at
+     * `gunScale` 29.307 at every slot above the era gate, with the clamp
+     * discarding a factor of 6.98 and PARITY, the penultimate fight, over in
+     * 38.3 seconds against a stock 183.4. See gunScale in shooter.js.
+     *
+     * The multiplier reaches only structure and cores -- minions come through
      * claim() and are deliberately left alone, since a longer fight already
-     * means more of them -- and because a boss's scripted beats do not
-     * stretch. Tuned against the bench rather than derived: see the note in
-     * regress.mjs.
+     * means more of them -- and a boss's scripted beats do not stretch, which
+     * is why a deep fight does not scale with `hard` alone. Tuned against
+     * measured fights rather than derived: see regress.mjs and the build-376
+     * table in CLAUDE.md.
      */
     temper: 4.2,
+    /*
+     * The share of the gun's advantage PAST the knee that the anomaly takes
+     * back, in the log -- so `1 - soften` is the share the player keeps, and
+     * the health-proportional part of a fight lands at
+     * `(temper / gunScale) ** (1 - soften)` of its stock length.
+     *
+     * Both ends are reachable and neither is the design, which is what makes
+     * this a dial rather than a rewrite: 0 is build 375's ceiling TO THE BIT
+     * (`temper * x ** 0` is `temper`), and 1 is full compensation, where a
+     * boss scales exactly with the turret and the tree is worth nothing
+     * against one. The value between them is a judgement about what the tree
+     * should be worth on a boss, and it is measured rather than argued -- see
+     * the build-376 sweep.
+     */
+    soften: 0.7,
     riseFor: 2.1, // seconds a REMAINDER takes to reach the turret
     // What one leaves behind. One each, and the only source there is.
     remainder: 1,

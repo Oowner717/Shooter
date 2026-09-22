@@ -12992,7 +12992,13 @@ came from before believing the other one covers it.
   | PARITY | 42 | 183.4s | **38.3s** | -79% | 4.2 | x21.101 |
   | TERMINUS | 49 | 335.3s | **74.0s** | -78% | 4.2 | x21.101 |
 
-  21.101 over 4.2 is **5.02 the boss cannot answer**, and the deep fights land
+  **THAT SENTENCE WAS WRONG AND BUILD 376 MEASURED THE RIGHT NUMBER.** `hard`
+  is `min(gunScale, temper)` and `gunScale` is `damage x (1 + 2/salvo) / rate`
+  -- not `up.damage`, which is the column above. The raw product at every slot
+  above the era gate is **29.307**, so the clamp discards a factor of **6.98**
+  and not 5.02. A ratio taken against the wrong one of two numbers in the same
+  table is the shape to watch for; `fight.mjs` prints both from 376.
+  The deep fights land
   at 21-26% of their floor length: PARITY, at rung 42, is a **38-second**
   fight. Build 352 had already measured `gunScale` at 8.823 fully bought
   against `temper` 4.2 and recorded that "the clamp binds at a little over
@@ -13092,3 +13098,166 @@ came from before believing the other one covers it.
   own build with a reading either side; authoring it inside one whose content
   is a boss measurement is build 304's mistake. What is fixed here is the
   INSTRUMENT, which was reading a gait through a portal.
+
+- **BUILD 376 MAKES `temper` A KNEE, AND THE FIRST THING THE ARITHMETIC SETTLED
+  IS THAT PHASE 7b'S OWN ASK COULD NOT HAVE DONE IT.** `docs/rebalance.html`
+  asks for boss health "authored per slot", and `hard` reaches an anomaly as a
+  multiplier on its HEALTH at four sites (`temper(e)`, `revive`, and ORDINAL's
+  two private copies) plus the patience clock at `game.js:3613` -- read, not
+  assumed. So authored health is a COMMON FACTOR on the stock column and the
+  funded one alike and cannot move the ratio between them: restoring PARITY's
+  funded length would need about 4.8x its health, which takes its stock fight
+  from 183s to about 880s. What sets the ratio is `hard` against the gun, and
+  nothing else. **A dial that multiplies both sides of a ratio is not a dial on
+  that ratio** -- one grep of the four sites was the whole of the derivation,
+  and it redirected the build before a line was written.
+- **THE SHAPE IS A KNEE RATHER THAN A HIGHER CEILING, AND THE REASON IS
+  MONOTONICITY.** `bossHard` is the identity for `gunScale <= temper` and
+  `temper * (g / temper) ** soften` above it, so `soften` is the share of the
+  gun's advantage past the knee that the boss takes back, in the log, and
+  `1 - soften` is the share the player keeps. Raising the CEILING instead
+  makes the reward non-monotone in a nasty way -- zero reward below the new cap
+  (full compensation means the fight equals its stock length) and then reward
+  growing again above it -- where the knee is monotone by construction: more
+  gun is always a tougher boss AND always a shorter fight. `check-build`
+  asserts both senses over the range rather than sampling them.
+  **`soften: 0` is build 375's ceiling TO THE BIT** (`temper * x ** 0` is
+  `temper`) and `soften: 1` is full compensation, where the tree is worth
+  nothing against an anomaly. Both ends are reachable and asserted, which is
+  what makes the constant a dial rather than a rewrite -- and the identity
+  below the knee is what holds ORDINAL's row by construction rather than by
+  tuning, which is the one row build 375's note says must not move.
+- **THE DECISION WAS MEASURED ACROSS FOUR SETTINGS, NOT PICKED.** Every slot
+  funded from build 374's income curve at its own gate rung, `--grant` where
+  `recast: 4` is satisfiable (derived from the gate table, so the three slots
+  above the era gate), three runs at the shipped value and two at each
+  alternative:
+
+  | slot | rung | floor | `soften` 0 | **0.7** | 0.85 | 1 (ceiling) |
+  |---|---|---|---|---|---|---|
+  | ORDINAL | 7 | 257.6 | 266.6 | **256.0** | 251.2 | identity |
+  | GNOMON | 14 | 261.2 | 199.9 | **209.8** | 209.5 | identity-ish |
+  | FRACTAL | 21 | 252.1 | 145.4 | **201.1** | 203.7 | -- |
+  | AMPLITUDE | 28 | 233.5 | 94.5 | **138.5** | 148.5 | -- |
+  | DYNAMO | 35 | 178.5 | 49.2 | **97.4** | 120.9 | 156.9 |
+  | PARITY | 42 | 183.7 | 38.3 | **45.0** | 47.5 | **56.4** |
+  | TERMINUS | 49 | 333.9 | 74.0 | **144.4** | 167.7 | 215.0 |
+
+  0.7 doubles the two health-bound deep fights (49 -> 97 and 74 -> 144) and
+  leaves a fully bought tree worth about 2x there. **0.85's extra cost falls
+  ENTIRELY on the deep slots** -- the four shallow ones move by under 7%
+  between the two settings -- so it buys flatness by taking away exactly the
+  reward the deep slots exist to give. That comparison is the argument, and it
+  is only visible because both columns were taken.
+- **THE FIGHT DECOMPOSES AND THE TOTAL IS THE WRONG INSTRUMENT: THE SCRIPTED
+  BEATS ARE A FLOOR NO MULTIPLIER REACHES.** `fight.mjs` has printed arrival
+  and death beside the fight for as long as it has existed and build 375 read
+  only the total. Fighting time is `fight - arrival - death`:
+
+  | slot | stock | `soften` 0 | 0.7 | beats |
+  |---|---|---|---|---|
+  | DYNAMO | 147.1s | **18.0s** | 66.0s | 31.4s |
+  | PARITY | 152.5s | **6.6s** | 15.6s | 31.2s |
+  | TERMINUS | 289.7s | **15.0s** | 97.5s | 44.2s |
+
+  So PARITY at 38.3s was **31.2 seconds of arrival and death** around 6.6
+  seconds of fighting, and a health multiplier can only ever act on the second
+  number. `CFG.boss.temper`'s own docstring has said "a boss's scripted beats
+  do not stretch" since it was written; that sentence is the whole finding and
+  nobody had subtracted it. **When a measured total barely moves under a large
+  change, subtract the part the change cannot reach before concluding the
+  change did nothing.**
+- **AND ONE SLOT IS OUT OF REACH OF THE MECHANISM ENTIRELY, WHICH IS MEASURED
+  AT ITS CEILING RATHER THAN ARGUED.** `bossHard` can never exceed `gunScale`
+  -- that is the property that stops a tempered fight being LONGER than its
+  stock one -- so the most any `soften` can give back is what the PROXY
+  measures. Measured real dps against the proxy: **DYNAMO 1.23x, TERMINUS
+  1.75x, PARITY 7.12x.** So at full compensation, with the tree worth nothing
+  against a boss, PARITY is still a **56.4-second** fight (DYNAMO 156.9,
+  TERMINUS 215.0) -- and the derivation from the measured pairs predicted
+  52.6 / 151.2 / 209.5, within 7%, which is the model agreeing with the
+  measurement rather than with itself.
+  **The cause is in `parity.js` and is read rather than inferred**: `update`
+  RETURNS out of the stage ladder for the whole of MERGE (a countdown) and the
+  whole of INVERSION (a scripted animation), and MERGE HEALS the pool by a
+  fixed share of `poolMax`. So stages 1-3 measured **3.6 / 0.0 / 5.3 seconds
+  at both `soften` 0.5 and 0.85 -- identical to the tenth across a five-fold
+  health change** -- and only stage 4 answers health at all (0.5s -> 7.1s).
+  Its fighting time scales as health^0.545 over four settings, so reaching its
+  stock length would want about **300x** its authored health. Recorded as the
+  next question rather than answered: a set-piece that heals is the dial, and
+  authoring one inside a build whose subject is the difficulty curve is build
+  304's mistake.
+- **THE PATIENCE HALF OF 7b HAS A NEGATIVE ANSWER AND ONE NUMBER DOES SEVEN'S
+  WORK.** The plan's note says "two of these targets are at or past it" and
+  `patience` bounds a STAGE, not a fight -- which is what makes that harmless.
+  Over 45 fights at build 375 and every setting swept here the longest stage
+  anywhere is **95.4s against a `patience` of 150**, and `hard` multiplies the
+  allowance too, so a tougher fight gets a proportionally longer one (2454s at
+  the deep slots from this build). TESSERA withdrawing at 164s with its core
+  untouched, which is the note's own evidence, was a stage timing out. The
+  clock is not inside any fight the game currently produces.
+- **A CLAMP WITHOUT ITS INPUT IS BUILD 329'S BROADPHASE CELL, AND THIS ONE HAD
+  BEEN PRINTED WITHOUT IT SINCE THE CLAMP EXISTED.** `fight.mjs` printed
+  `hard` and not `gunScale`, so no reading of it could say whether the ceiling
+  bound or by how much -- which is the entire quantity anyone tuning boss
+  scaling works in, and it is why build 375's own note divided by `up.damage`
+  and got 5.02 where the answer is 6.98. Both are printed now, with the
+  clamped percentage, plus a `knee` line naming `temper` and `soften` -- and
+  `--soften K` sweeps the dial without four edits to a served file, PRINTED in
+  the slot block, because a sweep is otherwise a column of numbers with no
+  record of which dial produced each one.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922`, all six
+  intermediate marks and all six body counts identical to build 375's, on a
+  build that rewires the expression deciding a boss's difficulty. `gunScale`
+  returns exactly 1 for a stock gun and 1 is under any sane knee, so the
+  identity is structural -- and the probe's own slot block now says so in
+  words (`hard 1 (gun 1, uncapped)` / `under the knee, identity`), which is
+  the claim readable without the hash. Build 329's rule is that an argument
+  from inspection is exactly what this repo does not accept.
+- **FOUR PROPERTIES, DRIVEN RATHER THAN SHAPE-PINNED, because the expression
+  has already been written two ways that look equally plausible in a diff.**
+  `check-build` builds a probe world (`up.damage` is `gunScale` exactly when
+  `salvo` is 0 and `rate` is 1, asserted) and sweeps: the identity below the
+  knee by `===`, never more than the gun, monotone in the gun, the fight's
+  health share never RISING with the gun, a stock gun giving exactly 1, and
+  both ends of the dial. Four revert proofs, each on its own conjunct with its
+  own message -- reverting to `Math.min` fails the `soften 1` arm, an exponent
+  past 1 fails never-exceeds, breaking the identity fails it AND the
+  buying-more-lengthened-it arm, and `soften: 1.5` fails the range check
+  naming the ceiling's own fear.
+  The runtime half is regress's, and it is a different claim: **the boss took
+  its number from the DOOR.** `hard` is assigned once in a constructor and
+  this codebase has five `clear` overrides, so a boss computing its own
+  difficulty some other way is the one thing a static sweep cannot see --
+  proved by leaving `bossHard` correct and pointing the constructor at the old
+  `Math.min`, which fails that arm alone.
+- **A DESTRUCTURE THAT DOES NOT NAME A FIELD YOU PASSED IS A `ReferenceError`
+  AT RUNTIME AND NOTHING EARLIER.** `page.evaluate(async ({ n, want, spend,
+  grant, line }) => ...)` with `soften` added to the CALL and not the
+  signature: `node --check` passes, the patch looks complete, and every run
+  in the sweep loop died with no output at all. Build 273's fault inverted --
+  that one destructured MORE names than the table supplied and got a dead
+  branch; this supplies more than the signature names and gets a throw. The
+  tell was a loop producing nothing rather than something wrong: **when every
+  iteration of a sweep is silent, run ONE and read the error.**
+- **AND A `g.restart()` PLACED ABOVE AN ARM THAT READS THE PREVIOUS BOSS WOULD
+  HAVE PASSED FOR THE WRONG REASON.** The new identity block went in at the
+  revive arm's anchor, and that arm reads `bought.boss` and finds a piece in
+  `w.enemies` -- so it would have revived a piece belonging to the NEW boss
+  using the OLD boss's multiplier, computed `type.hp * boughtHard`, and
+  asserted it correctly. A case measuring a body one boss handed it with
+  another boss's number, green. Caught by reading the diff rather than the
+  suite, because only seven arms run after this one and none of them wants a
+  wave -- **"nothing downstream needs it" is luck, not a reason**, which is
+  build 356's note about a director stub arriving on a restart.
+- **THE SLICED-OUT HARNESS PAID FOR ITSELF A FOURTH TIME.** Builds 349, 351
+  and 358's idiom: anchor on a check TITLE, walk back to the enclosing
+  `page.evaluate`, brace-match its body, run it in a real page and then run
+  the SHIPPED node-side tail -- every `const`, the expected value and every
+  predicate -- as one Function with `check` as a spy. So what is verified
+  cannot disagree with what ships, and all eight arms plus three revert proofs
+  were settled in about a minute each against thirteen minutes of suite. One
+  rider learned here: slice the whole TAIL rather than the predicates, or the
+  `const cap` the arms divide by is not in scope and the harness reports a
+  `ReferenceError` for code that is correct.
