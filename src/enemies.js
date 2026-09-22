@@ -3097,8 +3097,32 @@ export class Enemy {
      * dispatch arm so `check-build`'s vocabulary guard covers it. It sits
      * BELOW `drive`, so the route branch still runs and `lurch` is a
      * modifier in the same sense `paired` and `cartwheel` are.
+     *
+     * ...AND `!this.staged` FROM BUILD 380, which is the one thing it did not
+     * share with them. It is the last statement in `drive` and the portal's
+     * brake is fourteen lines above it, so a burst in the throat is applied
+     * AFTER the clamp and nothing re-clamps until the next frame -- measured
+     * on HEAD, 16 releases of 16 broke the brake's own ceiling, for 8 to 46
+     * frames of a ~237-frame surface crossing and by up to **3.21x**, against
+     * a docstring saying "a staged body in it cannot be going faster than the
+     * ramp says". Above the surface the brake does not run at all, so moving
+     * the burst above the clamp would have bounded half of it; the hidden
+     * march is the portal's presentation and every other modifier is already
+     * excluded from it.
+     *
+     * What it costs is bounded and hidden: 3-5 bursts a release become 0, the
+     * throat takes 7.89s against 6.67, and the whole approach to the mount
+     * goes 24.06s -> 25.62s (+6.5%), all of it inside the portal. The LOOSE
+     * gait is untouched -- 9.4 bursts against 9.7 over the same approach --
+     * which is the control that says the word still means what it says.
+     *
+     * The hash did NOT move (`-954811922` either side, one container), and it
+     * could not: `lurcher` is the only type declaring this gait, ORDINAL and
+     * TALLY are `fixed` and declare none, DIGIT declares `march`, and a mote
+     * carries its parent's gait. Build 375 recorded that it "would move the
+     * ORDINAL hash" -- a guess, and the reading corrects it.
      */
-    if (this.type.gait === 'lurch') {
+    if (this.type.gait === 'lurch' && !this.staged) {
       this.lurchTimer -= dt;
       if (this.lurchTimer <= 0 && !this.frozen(world)) {
         this.lurchTimer = rand(1.1, 2.4);

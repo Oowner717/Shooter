@@ -805,6 +805,67 @@ console.log(`routes: ${ROUTES.length} march routes; ${pinned.length} types name 
   + `(${REPLACERS.join(' ')})`);
 
 /*
+ * ---- NOTHING STEERS ITSELF WHILE IT IS STILL IN THE THROAT (build 380) ---
+ *
+ * Every gait-keyed branch in `drive` is conjoined with `!this.staged`, and
+ * for eleven of the twelve that had been true since each was written. The
+ * twelfth was `lurch`, the LAST statement in the method, fourteen lines below
+ * the portal's own brake -- so a burst in the throat lands after the clamp
+ * and nothing re-clamps until the next frame. Measured on the build before
+ * this one, 16 releases of 16 broke the brake's own ramp ceiling, by up to
+ * 3.21x, against a docstring reading "a staged body in it cannot be going
+ * faster than the ramp says".
+ *
+ * A guard pinned to `lurch` would be a hand-kept list of one, so the SET is
+ * derived: every `this.type.gait === '...'` test inside `drive`, with the
+ * enclosing `if` condition read by paren-matching rather than by line, since
+ * two of them wrap. `drive`'s extent is taken to the next method signature at
+ * two-space indentation -- nothing inside the body sits at that indent -- and
+ * both ends throw rather than deriving an empty set, so this cannot go
+ * vacuous the way a shape-pinned guard does.
+ *
+ * `steer`'s `gait === 'drag'` is deliberately out of scope and is not a hole:
+ * it is a different method, and `windUp` only winds inside `hurl.range` 640
+ * of the machine, which a body still above the portal's rim is a whole field
+ * away from.
+ */
+const DRIVE_MIN = 8;
+const gFrom = routeSrc.indexOf('drive(world, dt) {');
+const gEnd = routeSrc.slice(gFrom).search(/\n  [a-zA-Z_$][\w$]*\(/);
+if (gFrom < 0 || gEnd < 0) throw new Error('check-build: cannot slice drive for the staged sweep');
+const driveAll = routeSrc.slice(gFrom, gFrom + gEnd);
+const stagedBad = [];
+const stagedSeen = [];
+for (const m of driveAll.matchAll(/this\.type\.gait === '([a-z]+)'/g)) {
+  const openAt = driveAll.lastIndexOf('if (', m.index);
+  if (openAt < 0) { stagedBad.push(`${m[1]} is not inside an if`); continue; }
+  let depth = 0;
+  let close = -1;
+  for (let i = openAt + 3; i < driveAll.length; i++) {
+    if (driveAll[i] === '(') depth++;
+    else if (driveAll[i] === ')' && --depth === 0) { close = i; break; }
+  }
+  if (close < 0) { stagedBad.push(`${m[1]}'s condition does not close`); continue; }
+  const cond = driveAll.slice(openAt, close + 1);
+  stagedSeen.push(m[1]);
+  if (!cond.includes('!this.staged')) {
+    stagedBad.push(`drive's '${m[1]}' branch fires for a body still marching in `
+      + '-- every other gait branch there carries !this.staged, and the portal brake '
+      + 'above it cannot hold a burst applied after it (build 380)');
+  }
+}
+if (stagedSeen.length < DRIVE_MIN) {
+  throw new Error(`check-build: found only ${stagedSeen.length} gait branches in drive `
+    + `[${stagedSeen.join(' ')}] -- the slice found nothing and this guard would be vacuous`);
+}
+if (stagedBad.length) {
+  for (const line of stagedBad) console.error(`staged: ${line}`);
+  process.exit(1);
+}
+console.log(`staged: all ${stagedSeen.length} gait branches in drive refuse a staged body `
+  + `(${stagedSeen.join(' ')})`);
+
+/*
  * ---- EVERY DIFFERENTIAL INSTRUMENT HAS TO SAY WHICH TREE IT READ --------
  *
  * Build 344 wrote this for `fight.mjs` alone and named the other four `--url`

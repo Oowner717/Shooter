@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '379';
+export const BUILD = '380';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '379';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8a37264';
+export const REV = 'aaa00ab';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -5055,6 +5055,13 @@ export const ENEMY_TYPES = [
      * behaviour could get out of step; `drive` reads the gait now and the
      * field is gone. Behaviourally identical, and the ORDINAL hash is what
      * says so rather than this sentence.
+     *
+     * From build 380 the burst is excluded from the STAGED march, which is
+     * the one thing it did not share with `paired` and `cartwheel`: the
+     * portal's brake runs fourteen lines above it in `drive`, so a burst in
+     * the throat landed after the clamp and broke the ramp's own ceiling on
+     * every release. What a player sees is unchanged from the rim down; the
+     * hidden march is 7.89s against 6.67 and the whole approach +6.5%.
      */
     gait: 'lurch',
     shape: 'hex',

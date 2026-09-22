@@ -61,7 +61,25 @@ const CHROME = process.env.CHROME_PATH || '/opt/pw-browsers/chromium-1194/chrome
 const results = [];
 const ok = (name, detail = '') => results.push({ pass: true, name, detail });
 const bad = (name, detail) => results.push({ pass: false, name, detail });
-const check = (name, cond, detail = '') => (cond ? ok(name, detail) : bad(name, detail));
+/*
+ * `TRACE=1` writes each case's title to stderr as it is reached, and it is
+ * OFF by default because the human report is a list you scan for the word
+ * FAIL and a line per case ahead of it would bury exactly that.
+ *
+ * It exists because build 355 corrected a note of build 319's: this runner
+ * does NOT print as it goes -- `ok` and `bad` only push to `results`, and one
+ * loop at the foot of the file prints every line -- so a run that hangs
+ * produces NOTHING and there is no way to say where. Build 380's first run
+ * stalled at 44 minutes with an empty output file and the renderer down to 2%
+ * of a core; the second, traced, exited cleanly at 784 cases, so the stall was
+ * a transient. Without this the only available answer would have been to
+ * re-run blind and hope. stderr to a file is synchronous in node, so the
+ * trace really is live where the report is not.
+ */
+const check = (name, cond, detail = '') => {
+  if (process.env.TRACE) process.stderr.write(`TRACE ${results.length} ${name}\n`);
+  return cond ? ok(name, detail) : bad(name, detail);
+};
 
 const browser = await chromium.launch({ executablePath: CHROME });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
@@ -22940,7 +22958,8 @@ if (MINE_LINE) {
   const r = await page.evaluate(async () => {
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
     const { release, spawnDrift } = await import('../src/enemies.js');
-    const { drawInstantiate } = await import('../src/portal.js');
+    const { drawInstantiate, portalDepth } = await import('../src/portal.js');
+    const { smoothstep } = await import('../src/util.js');
     const { background } = await import('../src/background.js');
     const g = window.__sim;
     const w = g.world;
@@ -22966,32 +22985,59 @@ if (MINE_LINE) {
       const [e] = release(w, TYPE_BY_ID.lurcher, w.width / 2, top - 200);
       e.vx = 0; e.vy = 0;
       /*
-       * THE LURCH IS PINNED OFF, because it is the one gait modifier with no
-       * `!this.staged` guard and it lands inside the window this arm reads.
+       * THE LURCH IS NOT PINNED OFF ANY MORE, which is build 380's own
+       * assertion rather than a tidy-up.
        *
-       * `lurch` sits at the bottom of `drive` and adds `rand(40, 90)` to the
-       * velocity on a `rand(1.1, 2.4)` clock; every other modifier there
-       * (`paired`, `cartwheel`, and each of the replacers) carries
-       * `!this.staged` and this one does not, so a body in the portal's
-       * throat bursts. `atRim` is the LAST staged frame -- build 301's fix,
-       * which is right -- so whether that frame lands in a burst is a coin
-       * toss: measured across four suite dumps the braked crossing read 0.74,
-       * 0.77, 0.96 and then **2.27** times cruise against a ceiling of 1.2,
-       * and the failing run's 95.4 minus its cruise of 42.1 is 53.3, square in
-       * the middle of the burst's own range. The control read 2.26x on the
-       * same run, so the arm reported a separation of 1.00x -- the brake
-       * looking absent when what was absent was a guard on the witness.
-       * Pinned in `march` and not in one arm, because the CONTROL's fast
-       * crossing is the entry march multiplier (build 298 measured it at 2.6x
-       * cruise) and owes nothing to the burst either.
+       * Build 375 pinned `e.lurchTimer = 1e9` here because `lurch` was the
+       * one gait modifier in `drive` with no `!this.staged` guard: it is the
+       * method's last statement, fourteen lines below the brake, so a burst
+       * in the throat is applied AFTER the clamp and nothing re-clamps until
+       * the next frame. `atRim` is the LAST staged frame -- build 301's fix,
+       * which is right -- so whether that frame landed in a burst was a coin
+       * toss, and across four dumps the braked crossing read 0.74, 0.77, 0.96
+       * and then **2.27** times cruise against a ceiling of 1.2, with the
+       * control at 2.26 on the same run: the brake looking absent when what
+       * was absent was a guard on the witness.
+       *
+       * The guard is in the game now, so the pin would be a belt whose
+       * justification has gone -- the shape build 377 spent a build on. What
+       * replaces it is `overFrames`/`overMax` below, which reads the brake's
+       * own claim directly instead of removing the one thing that breaks it,
+       * and `looseBursts`, which is the control that says the gait still
+       * fires once the body is out.
        */
-      e.lurchTimer = 1e9;
       let hiddenMax = 0;
       let atRim = null;
       let bornAt = -1;
-      for (let i = 0; i < 60 * 15 && bornAt < 0; i++) {
+      /*
+       * "A staged body in the surface cannot be going faster than the ramp
+       * says" is the brake's own docstring, and until build 380 it was false
+       * for one gait on every release: 16 of 16, for 8 to 46 frames of a
+       * ~237-frame crossing, by up to 3.21x. The ceiling is recomputed here
+       * from `CFG.entrySpeed` and the body's own depth rather than carried as
+       * a constant, so it follows the ramp; `portalDepth` is 0 with no portal
+       * and the ceiling is then the flat `entrySpeed`, which is why this arm
+       * holds for the control too.
+       */
+      let overFrames = 0;
+      let overMax = 1;
+      let stagedBursts = 0;
+      let looseBursts = 0;
+      let bornWas = false;
+      let bornForAt = 0;
+      let lurchT = e.lurchTimer;
+      for (let i = 0; i < 60 * 19 && (bornAt < 0 || i < bornAt + 240); i++) {
+        const was = e.staged;
         g.update(1 / 60);
+        if (e.lurchTimer > lurchT) { if (was) stagedBursts++; else looseBursts++; }
+        lurchT = e.lurchTimer;
         const v = Math.hypot(e.vx, e.vy);
+        if (e.staged) {
+          const d = portalDepth(w, e);
+          const ceil = e.cruise
+            * (d > 0 ? 1 + (CFG.entrySpeed - 1) * (1 - smoothstep(d)) : CFG.entrySpeed);
+          if (v / ceil > 1.002) { overFrames++; overMax = Math.max(overMax, v / ceil); }
+        }
         if (e.staged && e.y + e.r < top - 20) hiddenMax = Math.max(hiddenMax, v);
         /*
          * The crossing speed is the LAST BRAKED frame, not the first free
@@ -23006,10 +23052,19 @@ if (MINE_LINE) {
          * "comes out at its own cruise" means.
          */
         if (e.staged && e.y + e.r >= top) atRim = v;
-        if (!e.staged) bornAt = i;
+        /*
+         * `born` and `bornFor` are read ON THE FRAME OF BIRTH and not at the
+         * end of the loop, because build 380 runs this window 240 frames PAST
+         * the birth to collect `looseBursts` -- captured at the end, `bornFor`
+         * read 3.98s against a conjunct asking for under 1, which is the arm
+         * measuring how long the probe kept going rather than how fresh the
+         * mark is.
+         */
+        if (!e.staged && bornAt < 0) { bornAt = i; bornWas = e.born; bornForAt = e.bornFor; }
       }
       const res = { cruise: +e.cruise.toFixed(1), hiddenMax: +hiddenMax.toFixed(1), atRim: atRim === null ? null : +atRim.toFixed(1),
-        bornAt, born: e.born, bornFor: +e.bornFor.toFixed(2) };
+        bornAt, born: bornWas, bornFor: +bornForAt.toFixed(2),
+        overFrames, overMax: +overMax.toFixed(3), stagedBursts, looseBursts };
       e.dead = true;
       return res;
     };
@@ -23158,8 +23213,10 @@ if (MINE_LINE) {
     && r.ramp.born === true && r.ramp.bornFor < 1
     && r.loose.bornAt > 0 && r.loose.atRim !== null
     /*
-     * THE CONTROL'S FLOOR IS 1.30 AND WAS 1.5, because pinning the lurch
-     * above took the inflation out of THIS arm as well. With bursts the loose
+     * THE CONTROL'S FLOOR IS 1.30 AND WAS 1.5, because taking the lurch out
+     * of the throat took the inflation out of THIS arm as well -- build 375
+     * did it with a pin here and build 380 with the guard in the game, and
+     * the figures below are the same either way. With bursts the loose
      * crossing read 2.26x cruise; without them it reads 1.55 to 1.76 over
      * eight trials, so a floor of 1.5 had 3.3% of headroom on its own worst
      * draw -- a margin inside its distribution, which is the shape builds 319
@@ -23199,6 +23256,39 @@ if (MINE_LINE) {
     + `spat-out crossing, and the instrument reading it (a separation of `
     + `${((r.loose.atRim / r.loose.cruise) / (r.ramp.atRim / r.ramp.cruise)).toFixed(2)}x, `
     + `reported and not asserted); portal back ${r.portalBack}`);
+
+  /*
+   * ---- AND NOTHING STEERS ITSELF INSIDE THE THROAT (build 380) ----------
+   *
+   * The brake's own docstring says a staged body in the surface "cannot be
+   * going faster than the ramp says", and for one gait that was false on
+   * every release: `lurch` is `drive`'s last statement, fourteen lines below
+   * the clamp, so its burst is applied after it and nothing re-clamps until
+   * the next frame. Measured on the build before this one, 16 releases of 16
+   * broke the ceiling -- 8 to 46 frames of a ~237-frame crossing, worst
+   * 3.21x -- while the rim reading the arm above takes only catches it when
+   * a burst happens to land on the last staged frame, which is why it read
+   * as a flake rather than as a fault.
+   *
+   * `overFrames` is that claim read directly and is an ABSOLUTE: zero frames
+   * over the ramp's own ceiling, in the braked arm and the control alike.
+   * `looseBursts` is the liveness, and it is not optional -- without it a
+   * build that deleted the burst outright would pass every conjunct here.
+   * `check-build` holds the structural half (every gait branch in `drive`
+   * carries `!this.staged`, derived from the method's own source), which is
+   * what catches a twelfth modifier arriving unguarded; this holds the half
+   * a static sweep cannot see, that the guard is reached and the gait still
+   * fires once the body is out.
+   */
+  check('...and nothing bursts while it is still marching in',
+    r.ramp.stagedBursts === 0 && r.loose.stagedBursts === 0
+    && r.ramp.overFrames === 0 && r.loose.overFrames === 0
+    && r.ramp.looseBursts > 0 && r.loose.looseBursts > 0,
+    `through the surface: ${r.ramp.stagedBursts} lurches while staged and `
+    + `${r.ramp.overFrames} frames over the ramp's own ceiling (worst `
+    + `${r.ramp.overMax}x), then ${r.ramp.looseBursts} once loose, which is the `
+    + `control; with no surface: ${r.loose.stagedBursts} and ${r.loose.overFrames} `
+    + `(worst ${r.loose.overMax}x), then ${r.loose.looseBursts}`);
 
   check('...and it is marked on the BODY, the mark follows it, and goes when it goes',
     r.markOn && r.litAtBody > 200 && r.litAtNew > 200 && r.litAtOld < r.litAtBody * 0.1

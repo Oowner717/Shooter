@@ -13633,3 +13633,117 @@ came from before believing the other one covers it.
   changes `scripts/regress.mjs` and the BUILD literal and no executable `src/`
   line, so there is nothing for the ORDINAL probe to measure -- the same call
   builds 345-349, 360, 372, 374 and 378 made.
+
+- **BUILD 380 GIVES `lurch` THE `!this.staged` GUARD, AND THE FAULT IS NOT THE
+  FLAKE IT WAS RECORDED AS: THE BRAKE'S OWN CLAIM WAS FALSE ON EVERY
+  RELEASE.** Build 375 found it while running down a portal-brake arm that had
+  drawn 2.27x cruise against a ceiling of 1.2, pinned `lurchTimer` off in the
+  arm and recorded the fix as "recorded and not fixed... wants its own build
+  with a reading either side". This is that build, and the first thing
+  measuring it did was correct 375's account of the size.
+  `lurch` is `drive`'s LAST statement and the portal's brake is fourteen lines
+  above it, so a burst in the throat is applied AFTER the clamp and nothing
+  re-clamps until the next frame. Measured on HEAD, 16 releases at 390x844,
+  against the ramp's own ceiling (`e.cruise * (1 + (entrySpeed - 1) *
+  (1 - smoothstep(depth)))`, recomputed per frame rather than carried as a
+  constant): **16 of 16 broke it, for 8 to 46 frames of a ~237-frame surface
+  crossing, by up to 3.21x** -- against a docstring reading "the surface is
+  viscous: a staged body in it cannot be going faster than the ramp says".
+- **...AND MY FIRST INSTRUMENT COULD NOT REPRODUCE THE FAULT AT ALL, WHICH IS
+  THE LESSON.** It read the quantity the failing ARM reads -- the rim crossing
+  -- and drew **0 of 14 over 1.2x**, because `atRim` is the last staged frame
+  and a burst only corrupts it by landing on that one frame. So the reading
+  said "not reproducible" about a fault that is present on every single
+  release. The reading that sees it is the mechanism's OWN claim, which is
+  about every frame inside the surface and is deterministic in sign.
+  **When a fault is known from a flaky arm, measure what the mechanism
+  promises, not what the arm happened to sample** -- the arm's quantity is a
+  coincidence of the fault and will under-report it by however rare the
+  coincidence is.
+- **THE ARM'S NOISE WAS THE BURST, AND THE SPREAD SAYS SO.** Over the same 16
+  releases the rim ratio reads **0.682 to 0.977 on HEAD and 0.657 to 0.680
+  guarded** -- a spread of 0.295 collapsing to 0.023, thirteenfold, on the
+  quantity that had been failing.
+- **WHAT IT COSTS IS BOUNDED AND HIDDEN, AND THE LOOSE GAIT IS THE CONTROL.**
+  3-5 bursts a release become 0; the throat takes **7.89s against 6.67**; the
+  whole approach to the mount goes **24.06s -> 25.62s, +6.5%**, all of it
+  inside the portal where nothing can be seen or shot. The loose phase is
+  untouched -- 17.73s against 17.39 and **9.4 bursts against 9.7** over the
+  same approach -- which is what says the word still means what it says.
+- **AND THE OTHER CANDIDATE FIX BOUNDS HALF OF IT, which is why it is a guard
+  and not a reorder.** Moving the burst ABOVE the clamp would make a staged
+  burst braked -- but `portalDepth > 0` is only the SURFACE, and above it the
+  brake does not run at all, so a burst high in the throat would stay
+  unbounded. The hidden march is the portal's presentation (`drive`'s own
+  staged branch: "it simply comes down, drifting a little as it falls", with
+  the sway dying away so that "what pushes through the rim pushes straight"),
+  and every one of the eleven other gait branches is already excluded from it.
+- **THE HASH DID NOT MOVE AND BUILD 375'S NOTE SAYING IT WOULD WAS A GUESS.**
+  `-954811922` either side, one container, the served tree grepped for the
+  EXPRESSION either way (0 then 1) rather than for a string a docstring can
+  also contain. And it could not have moved, read off the roster rather than
+  assumed: `lurcher` is the ONLY type declaring this gait, ORDINAL and TALLY
+  are `fixed` and declare none, DIGIT declares `march`, and `shed` builds a
+  mote from its parent's type -- so nothing on that field can take the branch.
+  Build 343's own entry is the contrast and the reason the reading was owed
+  anyway: the wobble fix DID move it, through the salvage motes of two `fixed`
+  bodies, which is exactly the channel an argument from inspection misses.
+- **THE PIN CAME OUT RATHER THAN STAYING AS A BELT.** Build 375's
+  `e.lurchTimer = 1e9` in `march()` was the right call for a build whose
+  subject was a boss measurement; with the guard in the game it is a belt
+  whose justification has gone, which is what build 377 spent a build on. What
+  replaces it reads the brake's claim directly (`overFrames`, `overMax`)
+  instead of removing the one thing that breaks it -- and the control
+  reproduces 375's own figures with the guard instead of the pin: the loose
+  crossing reads **1.64x against a floor of 1.3** where 375 measured 1.55-1.76
+  pinned.
+- **THE LIVENESS CONJUNCT IS NOT OPTIONAL AND ITS REVERT PROOF SAYS SO.**
+  Without `looseBursts > 0` a build that deleted the burst outright passes
+  every other conjunct in the arm -- proved: `if (false && ...)` reads
+  `0 staged, 0 over, 0 loose` and fails on that clause alone, where removing
+  the GUARD reads `4 staged, 9 frames over at 2.784x`. Two reverts, two
+  different conjuncts.
+- **AND THE STRUCTURAL HALF IS DERIVED, BECAUSE A GUARD PINNED TO `lurch`
+  WOULD BE A HAND-KEPT LIST OF ONE.** `check-build` walks every
+  `this.type.gait === '...'` test inside `drive` -- the enclosing condition
+  read by PAREN-MATCHING rather than by line, since two of them wrap -- and
+  requires `!this.staged` in each. **12 branches** (hop paired cartwheel roll
+  dive creep straight spread serpent standoff flock lurch), so a thirteenth
+  modifier inherits the rule by existing. `drive`'s extent is taken to the
+  next method signature at two-space indentation, which nothing in the body
+  sits at, and both ends throw rather than deriving an empty set. Four revert
+  proofs, each with its own message: the `lurch` guard removed, **a DIFFERENT
+  branch's guard removed** (which is what says it is not `lurch`-specific),
+  the slice anchor broken, and the vacuity floor.
+- **`steer`'s `gait === 'drag'` IS OUT OF SCOPE AND IS NOT A HOLE.** It is a
+  different method, and `windUp` only winds inside `hurl.range` 640 of the
+  machine -- a body still above the portal's rim is a whole field away from
+  that, on either era. Said at the site rather than widened into, because a
+  sweep over the whole file also catches the constructor's
+  `this.rides = type.gait === 'ride'`, which is a capability derivation and
+  has nothing to do with staging.
+- **AND EXTENDING A PROBE'S WINDOW BROKE A SIBLING CONJUNCT IN THE SAME
+  CASE.** The arm now runs 240 frames PAST the birth to collect the loose
+  burst count, and `bornFor` was read at the END of the loop -- so it returned
+  **3.98s against a conjunct asking for under 1**, on a working build. It is
+  captured on the frame of birth now, which is what the claim was always
+  about. **A window lengthened for one reading is a window lengthened for
+  every reading taken off its final state**; the tell was a figure that
+  equalled the extension.
+- **AND THE SUITE HAS `TRACE=1` FROM BUILD 380, BECAUSE A RUN THAT HANGS
+  PRODUCES NOTHING AT ALL.** Build 355 corrected build 319's note about this:
+  the runner does NOT print as it goes -- `ok` and `bad` only push to
+  `results`, and one loop at the foot of the file prints every line -- so
+  thirteen minutes of work arrives in one block at the end or not at all.
+  This build's first run stalled at **44 minutes with a 19-byte output file
+  and the renderer down to 2 seconds of CPU a minute**, and there was no way
+  to say which of 784 cases it was in. `TRACE=1` writes each case's title to
+  stderr as it is reached (stderr to a file is synchronous in node, so it
+  really is live), it is OFF by default because a line per case would bury
+  the word FAIL, and the traced re-run exited cleanly at 784 -- so the stall
+  was a transient and the trace is what said so rather than a second blind
+  re-run. **Two liveness signals that are NOT the answer**: the node runner's
+  own CPU is near zero on a healthy run (build 348), and its elapsed time
+  says nothing on a loaded box (351). The renderer's CPU is the signal --
+  12:05 over the first 31 minutes and 2 seconds over the next 60 is a stall,
+  and one `ps -o time=` sample a minute apart settles it.
