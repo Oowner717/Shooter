@@ -866,6 +866,101 @@ console.log(`staged: all ${stagedSeen.length} gait branches in drive refuse a st
   + `(${stagedSeen.join(' ')})`);
 
 /*
+ * ---- THE FUSE'S CAUSES ARE LOOKED UP, NOT COMPARED ----------------------
+ *
+ * `Director.burnFrom` names which of the fuse's two signals is filling it, and
+ * until build 381 each of its two readers chose with a two-way ternary whose
+ * else arm was the CONTACT answer -- so a third cause, or the null the field
+ * holds while the fuse drains, was told it was gripped, in a diff where
+ * nothing looks wrong because there ARE two things. `BURN_BY_CAUSE` in
+ * tutorial.js is the table; this is what keeps it the only door.
+ *
+ * Three claims, and the causes are DERIVED from `burn`'s own assignment rather
+ * than restated here -- a written-out list of two is the shape that has
+ * already cost this repo `world.apertures` sized 8 against 9 anomalies:
+ *   - every cause the writer can produce has an entry, so a third one fails
+ *     the build instead of silently getting the contact answer;
+ *   - every entry has a writer, because an entry for a cause nothing writes is
+ *     `kind: 'works'`, which shipped dead for eighteen builds;
+ *   - no line COMPARES a cause, which is the ternary coming back under a new
+ *     name. Over the files that mention the field rather than all of `src/`:
+ *     'contact' and 'crowd' are ordinary words and a comparison against one
+ *     somewhere else is not this fault. Lines of CODE only -- the two readers
+ *     each quote the expression they replaced, which is build 344's trap.
+ */
+const tutSrc = readFileSync(new URL('../src/tutorial.js', import.meta.url), 'utf8');
+const burnCauses = new Set();
+for (const m of routeSrc.matchAll(/this\.burnFrom\s*=\s*([^;]+);/g)) {
+  for (const q of m[1].matchAll(/'([A-Za-z]+)'/g)) burnCauses.add(q[1]);
+}
+/*
+ * Brace-matched from the table's own opening rather than read to the next
+ * line-start `};`: a lazy regex matches the FIRST one after the export, which
+ * on a table reformatted to one line is some later object's, so the guard
+ * harvested that object's keys and reported both real causes as missing. It
+ * should fail for the thing it is about and survive a reformat.
+ */
+const burnAt = tutSrc.indexOf('export const BURN_BY_CAUSE = {');
+if (burnAt < 0) throw new Error('check-build: cannot find BURN_BY_CAUSE in src/tutorial.js');
+let burnDepth = 0;
+let burnEnd = -1;
+for (let i = tutSrc.indexOf('{', burnAt); i < tutSrc.length; i++) {
+  if (tutSrc[i] === '{') burnDepth++;
+  else if (tutSrc[i] === '}' && --burnDepth === 0) { burnEnd = i; break; }
+}
+if (burnEnd < 0) throw new Error('check-build: BURN_BY_CAUSE does not close');
+const burnBody = tutSrc.slice(tutSrc.indexOf('{', burnAt) + 1, burnEnd);
+const burnEntries = [...burnBody.matchAll(/(?:^|[{,])\s*([A-Za-z]+):\s*\{/g)].map((m) => m[1]);
+const burnBad = [];
+if (burnCauses.size < 2) {
+  burnBad.push(`\`burn\` writes ${burnCauses.size} named cause(s) [${[...burnCauses].join(' ')}] `
+    + '-- the assignment has moved and this guard would be vacuous');
+}
+if (burnEntries.length < 2) {
+  burnBad.push(`BURN_BY_CAUSE parses as ${burnEntries.length} entr(ies) `
+    + `[${burnEntries.join(' ')}] -- the table has moved and this guard would be vacuous`);
+}
+for (const c of burnCauses) {
+  if (!burnEntries.includes(c)) {
+    burnBad.push(`'${c}' is a cause \`burn\` can write and has no BURN_BY_CAUSE entry, so `
+      + 'its caption and its step-back reason are both whatever the fallback is rather '
+      + 'than anything about it (build 381)');
+  }
+}
+for (const c of burnEntries) {
+  if (!burnCauses.has(c)) {
+    burnBad.push(`BURN_BY_CAUSE has an entry for '${c}' and nothing writes it -- a table `
+      + 'making a promise the code is not keeping');
+  }
+}
+const burnFiles = src.filter((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')
+  .includes('burnFrom'));
+for (const f of burnFiles) {
+  const lines = readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8').split('\n');
+  lines.forEach((ln, i) => {
+    const t = ln.trim();
+    if (t.startsWith('*') || t.startsWith('//') || t.startsWith('/*')) return;
+    for (const c of burnCauses) {
+      if (new RegExp(`===?\\s*'${c}'`).test(ln)) {
+        burnBad.push(`src/${f}:${i + 1} compares a fuse cause ('${c}') instead of looking it `
+          + 'up in BURN_BY_CAUSE, so whatever its else arm is becomes the answer for every '
+          + 'cause that is not the one named');
+      }
+    }
+  });
+}
+if (!burnFiles.length) {
+  burnBad.push('no src file mentions burnFrom -- the field has been renamed and this guard '
+    + 'would be vacuous');
+}
+if (burnBad.length) {
+  for (const line of burnBad) console.error(`burn: ${line}`);
+  process.exit(1);
+}
+console.log(`burn: the fuse's ${burnCauses.size} causes (${[...burnCauses].join(' ')}) are each `
+  + `looked up in BURN_BY_CAUSE and none of ${burnFiles.length} file(s) compares one`);
+
+/*
  * ---- EVERY DIFFERENTIAL INSTRUMENT HAS TO SAY WHICH TREE IT READ --------
  *
  * Build 344 wrote this for `fight.mjs` alone and named the other four `--url`

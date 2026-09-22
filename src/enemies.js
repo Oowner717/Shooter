@@ -24,6 +24,7 @@ import { drawDummy, dummyHit } from './dummy.js';
 import { shielded, wallLine } from './yard.js';
 import { throughMouth, mouthSlots, entryLine, portalBirth, portalDepth, rimUnder } from './portal.js';
 import { ARSENAL } from './arsenal.js';
+import { BURN_BY_CAUSE } from './tutorial.js';
 
 /*
  * Every round and every mine, by the key each already books its damage under.
@@ -9170,6 +9171,17 @@ export class Director {
      * for both causes.
      */
     const cause = this.burnFrom;
+    // ...and what it is called, looked up rather than compared. See
+    // `BURN_BY_CAUSE` in tutorial.js: the line the caption says and the
+    // reason this alert posts are the two halves of one sentence and are
+    // authored together. The fallback is deliberately NEITHER answer --
+    // this was `cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED GAVE
+    // OUT'`, so an unnamed cause was posted as the feed giving out. It is
+    // unreachable through the door (`burn` writes two values and
+    // `check-build` derives that set from the assignment itself), and it is
+    // a neutral string rather than a throw because a throw here is inside
+    // the rAF loop, which build 288 records as a freeze rather than an error.
+    const named = BURN_BY_CAUSE[cause];
 
     /*
      * The field dissolves. Marked rather than destroyed: `destroy()` is what
@@ -9243,7 +9255,7 @@ export class Director {
       // Deliberately not the 'THE FIELD NEVER THINNED' `score()` posts on a
       // patience timeout: that one is a wave ending untidily and costs
       // nothing, this one is a rung.
-      reason: cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED GAVE OUT',
+      reason: named ? named.reason : 'THE FUSE RAN OUT',
       margin: 0,
     };
   }

@@ -234,6 +234,38 @@ export const ON_CROWD = (() => {
 })();
 
 /*
+ * ---- and the two of them as ONE TABLE, from build 381 -------------------
+ *
+ * `Director.burnFrom` is an extensible field and its readers were not. Build
+ * 293 added it under the rule that a signal with two causes needs a field
+ * saying which, and then chose the answer with a two-way ternary at each of
+ * the two sites that needs one: `game.js` had
+ * `burn === 'crowd' ? ON_CROWD : ON_GLITCH` and `enemies.js` had
+ * `cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED GAVE OUT'`. Both else
+ * arms are the CONTACT answer, so a third cause -- or the null the field
+ * holds while the fuse drains -- was told it was gripped. Nothing about that
+ * is visible in a diff: a two-way ternary reads as a choice between two
+ * things because there ARE two things.
+ *
+ * So the cause is LOOKED UP and never compared. A third one is one entry
+ * here, beside both the things it has to say, rather than an edit to a
+ * ternary in each of two files -- which is the `HERO_GAITS`/`HERO_COL` shape
+ * this repo has already paid for twice: two things that have to agree,
+ * authored apart. `check-build` derives the causes from `burn`'s own
+ * assignment and fails the build for one with no entry, for an entry with no
+ * writer, and for any line that compares a cause instead of looking it up.
+ *
+ * The REASON lives here rather than in `enemies.js` because it is the other
+ * half of one sentence: the caption says what is happening and the alert says
+ * what happened, and a cause whose two halves disagree is exactly what the
+ * table exists to make impossible to write.
+ */
+export const BURN_BY_CAUSE = {
+  contact: { line: ON_GLITCH, reason: 'THE FEED GAVE OUT' },
+  crowd: { line: ON_CROWD, reason: 'THE FIELD OVERRAN' },
+};
+
+/*
  * The wall across the field, which is the one rule in this game with nowhere to
  * be looked up.
  *

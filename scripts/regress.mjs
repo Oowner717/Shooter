@@ -8953,7 +8953,7 @@ if (!GUN_LINE) {
 {
   const r = await page.evaluate(async () => {
     const { forgetLines } = await import('../src/codex.js');
-    const { ON_GLITCH, ON_CROWD } = await import('../src/tutorial.js');
+    const { ON_GLITCH, ON_CROWD, BURN_BY_CAUSE } = await import('../src/tutorial.js');
     const g = window.__sim;
     const w = g.world;
     const heldLines = localStorage.getItem('sim7749-lines');
@@ -9093,14 +9093,91 @@ if (!GUN_LINE) {
     };
     const blown = { crowd: blow('crowd'), contact: blow('contact') };
 
+    /*
+     * ---- and one it has never heard of is told NEITHER thing -------------
+     * The whole of build 381. Both readers were two-way ternaries whose else
+     * arm is the CONTACT answer -- `burn === 'crowd' ? ON_CROWD : ON_GLITCH`
+     * and `cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED GAVE OUT'` --
+     * so a third cause, or the null the field holds while the fuse drains,
+     * was captioned "clear the turret" and posted as the feed giving out.
+     *
+     * PLANTED rather than driven, and the division is deliberate rather than
+     * a concession: `burn` can only ever write the two, which is the set
+     * `check-build` derives from that assignment and pins, so the door cannot
+     * produce a third and the only thing left for a case to measure is what
+     * the reader does with one. The static arm owns the coverage; this owns
+     * the fallback.
+     */
+    const planted = (() => {
+      const d = setup();
+      d.setTier(9);
+      d.burnFrom = 'zzz';
+      const out = d.glitchOut(w);
+      return out ? { reason: out.reason, cause: out.cause, moved: out.moved } : null;
+    })();
+
+    /*
+     * ...and so does the CAPTION, which is the other reader and the half
+     * build 336's note was most emphatic about: `sayOnce` refuses a line it
+     * has already said on this device, so a third cause handed the contact
+     * line said NOTHING at all on any device that had met contact, and spent
+     * the wrong sentence on a fresh one. An unnamed cause now says nothing
+     * whatever the device has seen, which is the honest answer -- and
+     * `check-build` makes an unnamed cause a build failure, so the silence is
+     * unreachable rather than tolerated.
+     *
+     * The WRITER is stood down for the window rather than the reader being
+     * called directly: `burn` recomputes the field from the rate every frame
+     * and can only ever produce the two, so a planted cause cannot survive
+     * it -- and that it cannot is exactly what the static guard pins.
+     * Everything else is the real path, `Game.update` -> `checkContact` ->
+     * `sayOnce`, and the named arm is what shows the reader can say a line at
+     * all before the unnamed one's silence is read as a mechanism.
+     */
+    const caption = (cause) => {
+      const d = setup();
+      d.burn = () => null;
+      const said = new Set();
+      for (let f = 0; f < 60 * 4; f++) {
+        d.burnFrom = cause;
+        g.update(1 / 60);
+        if (g.hud.hintTimer > 0) said.add(g.hud.el.hint.textContent.trim());
+      }
+      /*
+       * ...and PUT BACK, which cost a whole suite run to learn. `reset()`
+       * keeps the same Director object, so a stub on the INSTANCE outlives
+       * every `restart()` after it -- and with no `burn` there is no
+       * discharge, so build 296's rail-step case five hundred cases
+       * downstream found none of its three marks and threw on the first
+       * seek. CLAUDE.md states this rule in three places and the stub above
+       * broke it anyway. `delete` rather than a reassignment, and the
+       * restore is ASSERTED in the check below, because `d.burn = undefined`
+       * shadows the prototype's method and starves the suite exactly as a
+       * stub does (build 350's `putBack`).
+       */
+      delete d.burn;
+      // ...and the plant itself, which nothing else would have cleared: with
+      // the writer stood down the last value written is still on the field,
+      // and 'zzz' is a cause no reader can name. `douse()` clears it, which
+      // this case's own setup calls -- but a later case that does not would
+      // have inherited it.
+      d.burnFrom = null;
+      return [...said];
+    };
+    const captions = { named: caption('crowd'), unnamed: caption('zzz') };
+    const burnBack = typeof w.director.burn === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'burn');
+
     g.teaching = heldTeaching;
     if (heldLines === null) localStorage.removeItem('sim7749-lines');
     else localStorage.setItem('sim7749-lines', heldLines);
     g.restart();
     return {
-      crowd, contact, blown,
+      crowd, contact, blown, planted, captions, burnBack,
       crowdText: ON_CROWD.text.trim(), glitchText: ON_GLITCH.text.trim(),
       distinct: ON_CROWD.id !== ON_GLITCH.id,
+      table: Object.fromEntries(Object.entries(BURN_BY_CAUSE)
+        .map(([k, v]) => [k, { line: v.line.text.trim(), reason: v.reason }])),
     };
   });
 
@@ -9136,6 +9213,37 @@ if (!GUN_LINE) {
     && r.blown.crowd.moved === -1 && r.blown.contact.moved === -1,
     `a full field posts "${r.blown.crowd && r.blown.crowd.reason}" and a gripped `
     + `mount "${r.blown.contact && r.blown.contact.reason}", both a rung`);
+
+  /*
+   * ...and the table is tied to the BEHAVIOUR rather than to a literal: what
+   * `BURN_BY_CAUSE` holds for a cause has to be what a real discharge of that
+   * cause actually posts, and what the caption arms above actually said. A
+   * swapped table fails those two arms; this one says the pairing out loud so
+   * nobody has to infer it from them.
+   */
+  check('...and a cause it has never heard of is told neither of the two things',
+    r.planted && r.planted.cause === 'zzz' && r.planted.moved === -1
+    && r.planted.reason !== r.blown.crowd.reason
+    && r.planted.reason !== r.blown.contact.reason
+    && r.table.contact && r.table.crowd
+    && r.table.contact.line === r.glitchText && r.table.crowd.line === r.crowdText
+    && r.table.contact.reason === r.blown.contact.reason
+    && r.table.crowd.reason === r.blown.crowd.reason,
+    `a planted cause posts "${r.planted && r.planted.reason}" against the mount's `
+    + `"${r.blown.contact && r.blown.contact.reason}" and the field's `
+    + `"${r.blown.crowd && r.blown.crowd.reason}"; the table pairs `
+    + `${Object.keys(r.table).map((k) => `${k}->"${r.table[k].reason}"`).join(' ')}`);
+
+  check('...and the caption for one says nothing rather than the wrong sentence',
+    r.captions.named.includes(r.crowdText)
+    && !r.captions.unnamed.includes(r.crowdText)
+    && !r.captions.unnamed.includes(r.glitchText)
+    && r.burnBack,
+    `a planted 'crowd' put ${r.captions.named.length} line(s) up `
+    + `[${first({ said: r.captions.named })}] and a planted 'zzz' `
+    + `${r.captions.unnamed.length} `
+    + `[${first({ said: r.captions.unnamed }) || 'nothing'}]; `
+    + `the writer put back: ${r.burnBack}`);
 }
 
 // --- the boss engine holds seven, not one -----------------------------------
@@ -35307,6 +35415,19 @@ if (MINE_LINE) {
       w.spawnLock = 0;
       d.douse();
       d.wave = null;          // `burn` refuses a teach wave on its first line
+      /*
+       * ...and no TRIAL in flight, which neither `restart()` nor `setTier`
+       * clears: `glitchOut`'s FIRST branch is `if (this.probe)`, and a
+       * trial's discharge hands the run back to the rung it was armed FROM,
+       * so `moved` can be zero or positive -- and `markStep` only marks on
+       * `moved < 0`. With a leftover probe there is nothing to seek, and
+       * seeking a null threw INSIDE the evaluate rather than failing the
+       * case, which kills the runner with no case output at all (build 310).
+       * `Director.restore` sets a probe from a save, so a probe is reachable
+       * through this case's own `g.restart()`.
+       */
+      d.probe = null;
+      d.probeLock = 0;
       d.setTier(tier);
       d.hold = false;
       g.hud.syncRail(w);
@@ -35323,7 +35444,7 @@ if (MINE_LINE) {
       // Through `g.update`, because `Director.update` is only reached on the
       // non-boss side of that if/else and `onTier` is what marks the rail.
       g.update(1 / 60);
-      return { from, to: d.tier, verdict: d.lastVerdict };
+      return { from, to: d.tier, verdict: d.lastVerdict, moved: d.tier - from };
     };
 
     const read = (el) => {
@@ -35360,9 +35481,21 @@ if (MINE_LINE) {
      * MOVES between them and lands where the design says it lands.
      */
     const at = (entry, ms) => { entry.a.currentTime = ms; return read(entry.el); };
-    const lost = [at(lostA, 0), at(lostA, 190), at(lostA, lostA.ms)];
-    const landed = [at(landedA, 0), at(landedA, 300), at(landedA, landedA.ms)];
-    const knock = [at(knockA, 0), at(knockA, 240), at(knockA, knockA.ms)];
+    /*
+     * ...and a missing mark FAILS the case rather than throwing it. Seeking
+     * `null.a` is an uncaught TypeError inside `page.evaluate`, which takes
+     * the whole runner down with no case output at all and no way to say
+     * which of 785 cases it was in -- build 310's fault, and it cost a
+     * thirteen-minute run to find. The three marks are only absent when the
+     * step did not happen, so what a reader needs is the step, and that is
+     * what the first check's detail prints.
+     */
+    const seek = (entry, ms) => (entry ? at(entry, ms) : { border: '', style: '', bg: '',
+      ink: '', shadow: '', tf: 'none' });
+    const miss = ['railLost', 'railLanded', 'railKnock'].filter((n) => !byName(n));
+    const lost = [seek(lostA, 0), seek(lostA, 190), seek(lostA, lostA && lostA.ms)];
+    const landed = [seek(landedA, 0), seek(landedA, 300), seek(landedA, landedA && landedA.ms)];
+    const knock = [seek(knockA, 0), seek(knockA, 240), seek(knockA, knockA && knockA.ms)];
 
     const distinct = (rows, key) => new Set(rows.map((x) => x[key])).size;
     // The band travels: a non-zero translateX that ends at identity.
@@ -35390,7 +35523,7 @@ if (MINE_LINE) {
 
     g.restart();
     return {
-      step, floor, floorAnims, leftOver, stuck, onRightNodes,
+      step, floor, floorAnims, leftOver, stuck, onRightNodes, miss,
       names: live.map((x) => `${x.name}@${x.ms}`).sort(),
       lostMoves: distinct(lost, 'border') + distinct(lost, 'bg') - 1,
       lostEndsDashed: lost[2].style === 'dashed',
@@ -35403,8 +35536,9 @@ if (MINE_LINE) {
     r.step.verdict === 'glitch' && r.step.to === r.step.from - 1
     && r.onRightNodes
     && JSON.stringify(r.names) === JSON.stringify(['railKnock@500', 'railLanded@550', 'railLost@550']),
-    `rung ${r.step.from} -> ${r.step.to} (${r.step.verdict}); ${r.names.join(', ')}, `
-    + `each on the element it is about (${r.onRightNodes})`);
+    `rung ${r.step.from} -> ${r.step.to} (${r.step.verdict}, moved ${r.step.moved}); `
+    + `${r.names.join(', ') || 'no animations'}, each on the element it is about `
+    + `(${r.onRightNodes})${r.miss.length ? `; MISSING ${r.miss.join(' ')}` : ''}`);
 
   /*
    * ...and the marks DRAW something, which is the half a name check cannot

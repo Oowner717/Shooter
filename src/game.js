@@ -34,7 +34,7 @@ import { NODES, NODE_BY_ID, priceOf, UNDER, levelsOf } from './tree.js';
 
 /** The turret branch, for the fitting announcements and the completion one. */
 const TURRET_NODES = NODES.filter((n) => n.id && n.parent && n.parent.key === 'turret');
-import { SCRIPT, ON_CONTACT, ON_GLITCH, ON_CROWD, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, ON_DEPTH, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START } from './tutorial.js';
+import { SCRIPT, ON_CONTACT, ON_WALL, ON_LOTS, ON_WORKS, ON_CEILING, ON_DEPTH, STILL_HELD, CONTROL_LINES, FIRST_USE, ALL_KEYS, STARTING, GAP, START, BURN_BY_CAUSE } from './tutorial.js';
 import { freshLoadout, place, drop, carried, groupOf, freeSlot } from './loadout.js';
 import { drawSpecimen } from './enemies.js';
 import { registerCodexShape } from './menu.js';
@@ -3425,9 +3425,17 @@ export class Game {
      * arrives describes what is actually happening -- a run drowning with a
      * clear mount used to be told to clear the mount. Each cause is its own
      * id, so a device is taught both, once each, when it meets each.
+     *
+     * LOOKED UP and not compared, from build 381: this was
+     * `burn === 'crowd' ? ON_CROWD : ON_GLITCH`, whose else arm is the
+     * contact line, so a third cause would have been told to clear a mount
+     * nothing is standing on. A cause with no entry says nothing, which is
+     * the honest answer at runtime -- and `check-build` makes it a build
+     * failure, so the silence is unreachable rather than tolerated.
      */
     const burn = w.director && w.director.burnFrom;
-    if (burn && this.hintsAllowed) this.sayOnce([burn === 'crowd' ? ON_CROWD : ON_GLITCH]);
+    const named = burn && BURN_BY_CAUSE[burn];
+    if (named && this.hintsAllowed) this.sayOnce([named.line]);
     // ...and the wall, the first time anything is put down under it. Keyed off
     // the rule being CONSULTED rather than off arriving in era 2: a sentence
     // about where your things stop is worth reading when you have just put one

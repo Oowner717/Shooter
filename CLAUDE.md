@@ -13747,3 +13747,159 @@ came from before believing the other one covers it.
   says nothing on a loaded box (351). The renderer's CPU is the signal --
   12:05 over the first 31 minutes and 2 seconds over the next 60 is a stall,
   and one `ps -o time=` sample a minute apart settles it.
+
+- **BUILD 381 CLOSES BUILD 336'S RECORDED DEBT: THE FUSE'S CAUSE IS LOOKED UP
+  NOW, AND IT WAS BEING COMPARED IN TWO FILES WITH THE CONTACT ANSWER AS BOTH
+  ELSE ARMS.** `Director.burnFrom` names which of the glitch fuse's two signals
+  is filling it; build 293 added the field under the rule that a signal with
+  two causes needs one, and then chose the answer with a two-way ternary at
+  each of the two sites that needs one -- `game.js`'s
+  `burn === 'crowd' ? ON_CROWD : ON_GLITCH` and `enemies.js`'s
+  `cause === 'crowd' ? 'THE FIELD OVERRAN' : 'THE FEED GAVE OUT'`. So build
+  293 fixed the VALUE and left the SHAPE, and 336 recorded that its own
+  withdrawal note had asserted the opposite ("it exists precisely so a third
+  cause can be NAMED") -- true of the field, false of both readers.
+  `BURN_BY_CAUSE` in tutorial.js is the table: `{ cause: { line, reason } }`,
+  looked up and never compared.
+  **Measured either way, one planted cause, same frame, same rung:** it posts
+  **"THE FUSE RAN OUT" and says NOTHING**, against **"THE FEED GAVE OUT" and
+  "The ring is the simulation losing its grip. Clear the turret before it
+  closes"** with the ternaries restored -- a sentence about a mount with
+  nothing standing on it, which is verbatim the fault build 293 wrote the
+  field to fix, arriving through the reader instead of through the value.
+- **IT IS LATENT AND SAYS SO, WHICH IS THE HALF THAT DECIDES WHAT THE FIX IS.**
+  There is no third cause today, and the null the field holds while the fuse
+  drains cannot reach either reader: the caption is guarded on `burn` being
+  truthy, and **`glitchOut` has exactly ONE caller in `src/`** -- `burn`'s own
+  last line, where `rate > 0` and so `burnFrom` is non-null by construction --
+  with the fuse persisted nowhere (no `glitch` in save.js) and `burn` the only
+  one of the field's six writers that can make it non-zero -- the other five
+  all write 0 -- so it cannot arrive at 1 with no cause. Every other caller is
+  a probe. So this is build 329's and 361's ruling rather than a bug fix: the
+  mechanism is correct and the SILENCE was the fault, and the fix for a silent
+  correct thing is the rule, not a revert. **What made it worth a build is the
+  cost of the alternative**: a third cause was a two-site edit in two files
+  with the line and the reason authored apart, which is the
+  `HERO_GAITS`/`HERO_COL` shape this repo has already paid for twice.
+- **THE REASON MOVED OUT OF `enemies.js` BECAUSE IT IS THE OTHER HALF OF ONE
+  SENTENCE.** The caption says what is happening and the alert says what
+  happened, so a cause whose two halves disagree is exactly what the table
+  exists to make impossible to write -- and the two halves were in different
+  files with no relation between them. The runtime fallback is a neutral
+  string and NOT a throw: a throw there is inside the rAF loop, which build
+  288 records as a freeze rather than an error.
+- **A LAZY REGEX TO THE NEXT LINE-START BRACE READS SOME LATER OBJECT'S KEYS,
+  AND THE PROOF I EXPECTED TO BE A FORMALITY IS WHAT FOUND IT.** The guard's
+  first version took the table as `/export const BURN_BY_CAUSE = \{([\s\S]*?)
+  \n\};/` -- and `*?` matches the FIRST `\n};` after the export, which on the
+  real file is the table's own and on a table reformatted to ONE LINE is
+  whatever the next line-start `};` belongs to. Measured: reformatted, the
+  guard harvested that object's two-space keys and **reported both real causes
+  as missing**. Brace-matched from the table's own opening now, keys harvested
+  in a form that reads one-line or multi-line, and the reformat proof
+  **PASSES**. A guard should fail for the thing it is about and survive a
+  reformat -- and the reformat was not on my list of proofs until the
+  vacuity one went wrong.
+- **...AND THE RENAME PROOF FIRED AT MODULE LOAD, BEFORE MY OWN THROW, so the
+  throw is a belt behind the module graph's own brace.** Renaming the export
+  dies with `SyntaxError: The requested module './tutorial.js' does not
+  provide an export named 'BURN_BY_CAUSE'` at the first import -- which is a
+  perfectly good refusal and is not the guard's. The REACHABLE vacuity is the
+  table's own shape drifting, and the proof for it is the reformat above plus
+  emptying the table (`parses as 1 entr(ies) [crowd]`). **When a proof fires
+  for a reason other than your guard, find out which brace held** -- the arm
+  you wrote may be unreachable and the vacuity you meant to cover untested.
+- **NINE PROOFS, AND EVERY RUNTIME REVERT FAILS EXACTLY ONE ARM.** Static:
+  the `enemies.js` ternary re-inlined (named by file and line), the `game.js`
+  one, a third cause added to `burn`'s assignment ('held' has no entry), a
+  table entry nothing writes ('stall'), the export renamed (module load), the
+  table reformatted (passes -- the robustness proof), the derivation drifted
+  to identifiers (`writes 0 named cause(s)`), the table emptied. Runtime: the
+  `enemies.js` ternary back fails the discharge arm alone and the `game.js`
+  one the caption arm alone, three green either side -- which is the
+  attribution build 353 asked for after four proofs printed one message. Each
+  landing was `grep -c`'d before it was read (build 355) and each verdict read
+  as a MESSAGE rather than as `$?`, because `check-build` exits 1 on a stale
+  REV whatever the guard does (build 367).
+- **THE GUARD IS DERIVED FROM `burn`'S OWN ASSIGNMENT AND SCOPED TO THE FILES
+  THAT MENTION THE FIELD.** Three claims: every cause the writer can produce
+  has an entry, every entry has a writer (`kind: 'works'` shipped dead for
+  eighteen builds), and no line COMPARES a cause -- which is the ternary
+  coming back under a new name. Over the four files that mention `burnFrom`
+  rather than all of `src/`, because 'contact' and 'crowd' are ordinary words
+  and a comparison against one somewhere else is not this fault; and lines of
+  CODE only, because both new readers quote the expression they replaced,
+  which is build 344's trap and build 355's fix.
+- **THE CAPTION ARM STANDS THE WRITER DOWN RATHER THAN CALLING THE READER.**
+  `burn` recomputes the field from the rate every frame and can only ever
+  produce the two, so a planted cause cannot survive it -- and that it cannot
+  is exactly what the static guard pins, so the division is deliberate: the
+  static arm owns the coverage and the case owns the fallback. Everything else
+  is the real path, `Game.update` -> `checkContact` -> `sayOnce`. And the
+  NAMED arm is the liveness control, because a zero from an instrument never
+  shown to read a one means nothing: a planted 'crowd' puts **1** line up and
+  a planted 'zzz' **0**. And the stub is PUT BACK and the restore asserted --
+  see the note below, which is what that cost before it was.
+- **AND THE SUITE DIED RATHER THAN FAILED, IN A CASE THAT ALREADY HAD THE NULL
+  GUARD IT NEEDED A FEW LINES ABOVE THE PLACE IT THREW.** Build 296's
+  rail-step case finds its three animations by name, and `byName` returns
+  `null` for one that is absent -- which the author anticipated:
+  `onRightNodes` is `!!lostA && !!landedA && !!knockA && ...`. The SEEKS ran
+  unconditionally underneath it, and `at(entry, ms)` opens
+  `entry.a.currentTime = ms`, so an absent mark is an uncaught
+  `TypeError: Cannot read properties of null (reading 'a')` inside
+  `page.evaluate` -- which takes the whole runner down with no case output at
+  all, thirteen minutes in. Build 310's fault, and the tell for the class is
+  exactly that shape: **a conjunct that guards a null, followed by an
+  unguarded dereference of the same value.** Grep for `!!x &&` and then for
+  a bare `x.` below it.
+- **...AND `TRACE=1` ANSWERED "WHICH CASE" IN ONE LINE, ON THE BUILD AFTER IT
+  SHIPPED.** Build 380 added it because a stall produced a 19-byte output file
+  and no way to say which of 784 cases was in flight; this is a CRASH rather
+  than a stall and the trace named it immediately (`TRACE 703` and then a
+  stack), where the report block prints nothing at all on the way out. The
+  `--json` dumps then priced it for free: r379.json holds this case at index
+  701 passing with `rung 9 -> 8 (glitch); railKnock@500, railLanded@550,
+  railLost@550`, so the marks are normally all three. Two instruments, both
+  added for other reasons, and neither cost anything here.
+- **THE MARKS CAN LEGITIMATELY BE ABSENT, AND THE CHANNEL IS A TRIAL NOBODY
+  CLEARED.** `Hud.markStep` only marks on `moved < 0` -- the case's own
+  docstring says so, because at rung 1 there is no rung to hand back -- and
+  `glitchOut`'s FIRST branch is `if (this.probe)`, where a trial's discharge
+  hands the run back to the rung the trial was armed FROM, so `moved` can be
+  zero or positive. Neither `restart()` nor `setTier` clears `probe`, and
+  `Director.restore` SETS one from a save, so it is reachable through the
+  case's own `g.restart()`. Cleared in the setup now, with the reason -- which
+  is CLAUDE.md's own rule for the fourth or fifth time: **`restart()` is not a
+  reset of everything a case can leave behind, so set what the question
+  depends on.**
+- **AND THE CAUSE WAS MY OWN NEW ARM STUBBING THE DIRECTOR AND NOT PUTTING IT
+  BACK, WHICH IS THE FIFTH INSTANCE OF A RULE THIS FILE STATES IN THREE
+  PLACES.** The caption arm stands the WRITER down for its window --
+  `d.burn = () => null`, so a planted cause survives the frame -- and
+  `reset()` keeps the same Director object, so a stub on the INSTANCE
+  outlives every `restart()` after it. With no `burn` there is no discharge,
+  so the rail-step case five hundred cases downstream armed a fuse that never
+  blew, `onTier` was never called, `markStep` never ran, and the first seek
+  threw. `delete d.burn` now, with the restore ASSERTED rather than performed
+  (build 350's `putBack`): `d.burn = undefined` would shadow the prototype's
+  method and starve the suite exactly as a stub does. Revert-proved -- the
+  arm fails on `the writer put back: false` with its other four conjuncts
+  green.
+- **...AND "PASSES ALONE, FAILS IN THE SUITE" SENT ME THE WRONG WAY, BECAUSE
+  THE LEFTOVER WAS MY OWN AND IT REACHED FORWARD.** That signature is
+  recorded here half a dozen times and always as *upstream* state -- so the
+  isolation run, which passed 3 of 3 at rung 9 -> 8 with all three animations
+  and three classes, read as "some earlier case left something" and would
+  have cost a thirteen-minute run per hypothesis to chase. What found it was
+  **reading my own diff**: one `grep -n "d.burn ="` against one
+  `grep -n "delete d.burn"`, and the second returned nothing. **A case that
+  fails in the suite and passes alone may be failing on state its own
+  build left DOWNSTREAM of itself**, so grep your own new arms for a stub
+  before looking upstream -- the instruments to reach for are the ones that
+  cost seconds.
+  The rail case's fragility is separate and pre-existing and ships anyway,
+  because the guard is what makes the next occurrence readable rather than
+  fatal. **Verified in both directions**: clean, 3 of 3 pass; with `byName`
+  blinded, it FAILS reporting `rung 9 -> 8 (glitch, moved -1) ... MISSING
+  railLost railLanded railKnock` instead of throwing.

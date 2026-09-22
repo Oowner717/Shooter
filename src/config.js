@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '380';
+export const BUILD = '381';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '380';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'aaa00ab';
+export const REV = '587d3ff';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -6008,20 +6008,27 @@ export const ENEMY_TYPES = [
      *
      * The glitch fuse is the reachable payload that is not cosmetic: it is
      * visible, it is clamped, and `Director.burnFrom` (build 293) is the
-     * FIELD a third cause would be named by. **Its two readers are not**,
-     * and that matters to anyone building the re-spec below:
-     * `game.js:3352` is `burn === 'crowd' ? ON_CROWD : ON_GLITCH` and
-     * `enemies.js:8832` is `cause === 'crowd' ? 'THE FIELD OVERRAN' :
+     * FIELD a third cause is named by. **Its two readers were not**, which
+     * is what anyone building the re-spec below had to know about:
+     * `game.js` had `burn === 'crowd' ? ON_CROWD : ON_GLITCH` and
+     * `enemies.js` had `cause === 'crowd' ? 'THE FIELD OVERRAN' :
      * 'THE FEED GAVE OUT'` -- two-way ternaries whose else arm is the
-     * CONTACT answer, so a third cause is captioned "clear the turret" and
+     * CONTACT answer, so a third cause was captioned "clear the turret" and
      * posted as the feed giving out. Worse, `sayOnce` opens
      * `if (lineSeen(l.id)) continue` and `markLine` persists per device, so
      * a one-element array whose line has already been read says NOTHING,
-     * EVER -- a third cause is silent on any device that has met contact
-     * and spends the wrong line on a fresh one. Build 293 fixed the value
-     * and left the shape: a third cause is a TWO-SITE edit, and the form
-     * that cannot regress is one `{ contact, crowd, ... } ->
-     * { line, reason }` table rather than a third ternary.
+     * EVER -- a third cause was silent on any device that had met contact
+     * and spent the wrong line on a fresh one. Build 293 fixed the value and
+     * left the shape.
+     *
+     * **BUILD 381 IS THAT TABLE.** `BURN_BY_CAUSE` in tutorial.js is
+     * `{ cause: { line, reason } }`, looked up and never compared, with
+     * `check-build` deriving the causes from `burn`'s own assignment: a
+     * third cause is now ONE entry beside both the things it has to say, and
+     * one with no entry fails the build rather than inheriting the contact
+     * answer. Measured either way -- a planted cause posts "THE FUSE RAN
+     * OUT" and says nothing, against "THE FEED GAVE OUT" and "Clear the
+     * turret before it closes" with the ternaries restored.
      *
      * The fuse fails on arithmetic anyway, in both directions at once.
      *
