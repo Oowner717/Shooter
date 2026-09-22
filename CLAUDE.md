@@ -13168,7 +13168,18 @@ came from before believing the other one covers it.
   change, subtract the part the change cannot reach before concluding the
   change did nothing.**
 - **AND ONE SLOT IS OUT OF REACH OF THE MECHANISM ENTIRELY, WHICH IS MEASURED
-  AT ITS CEILING RATHER THAN ARGUED.** `bossHard` can never exceed `gunScale`
+  AT ITS CEILING RATHER THAN ARGUED.** **EVERY FIGURE IN THIS BULLET ABOUT
+  PARITY IS STRUCK AND THE CONCLUSION IS REFUTED -- see build 378.** It was
+  measured through the build-214 `temper` fault build 377 found, which left
+  that slot's shared pool at 5% on its opening frame; re-swept on the fixed
+  mechanism it reads 47.4 / 94.0 / 122.6 / **149.5s** across the dial against
+  a stock 182.9, so full compensation reaches 82% of stock rather than 31%,
+  the 7.12x proxy gap is **1.28x**, and no set-piece needs a dial. The
+  arithmetic in the first half -- that the mechanism is bounded by `gunScale`
+  and cannot stretch a scripted beat -- is the part that survives, and
+  DYNAMO's and TERMINUS's figures are unaffected (their bodies were pinned).
+  The paragraph is kept as written below because the WAY it went wrong is the
+  finding: `bossHard` can never exceed `gunScale`
   -- that is the property that stops a tempered fight being LONGER than its
   stock one -- so the most any `soften` can give back is what the PROXY
   measures. Measured real dps against the proxy: **DYNAMO 1.23x, TERMINUS
@@ -13386,3 +13397,135 @@ came from before believing the other one covers it.
   reported nothing, which reads exactly like a revert that did not land. Build
   346's rule needs the addition: check the revert landed, AND use absolute
   paths in a script that changes directory.
+
+- **BUILD 378 RE-TAKES THE ONE COLUMN BUILD 377 COULD NOT CARRY OVER, AND ALL
+  FOUR OF BUILD 376'S PARITY CLAIMS ARE REFUTED.** 377 fixed `Boss.temper` --
+  it had raised the health bar's denominator and never its health, a no-op on a
+  fresh body, masked for 162 builds by `arriveStep`'s pin, and PARITY's second
+  half is the one body that pin cannot reach -- and it re-checked the `soften`
+  dial at every slot, finding six of seven inside 4%. The seventh was PARITY,
+  whose whole column in 376's sweep had been measured through the fault. Funded
+  from build 374's curve at rung 42 with the NEW FORM remainder, three runs a
+  setting, plus a re-taken stock floor, all in one container:
+
+  | soften | 376 (through the fault) | 378 (fixed) | of stock |
+  |---|---|---|---|
+  | 0 (the old ceiling) | 38.3s | **47.4s** | 26% |
+  | 0.7 (shipped) | 45.0s | **94.0s** | 51% |
+  | 0.85 | 47.5s | **122.6s** | 67% |
+  | 1 (full compensation) | 56.4s | **149.5s** | 82% |
+  | stock | 183.4 / 183.7 | **182.9s** | -- |
+
+  - **"Out of reach of either dial, still a 56.4s fight at full
+    compensation"** -- it is **149.5s**, 82% of stock, and the dial spans a
+    factor of **3.15** at the slot 376 called out of reach of it.
+  - **"Real dps is 7.12x the `gunScale` proxy" (against 1.23x for DYNAMO and
+    1.75x for TERMINUS)** -- at `soften` 1, `hard` IS `gunScale`, so the
+    residual is the proxy's own error: the fighting window (fight minus the
+    31.2s of arrival and death) is **118.3s against a stock 151.7**, so the
+    ratio is **1.28x** and PARITY is the most ordinary of the three.
+  - **"Stages 1-3 identical to the tenth across a five-fold health change,
+    and only stage 4 answers health at all"** -- across a 6.55x health change
+    stage 1 goes **2.2 -> 36.6s (16.6x)** and stage 3 **3.4 -> 23.8s (7.0x)**.
+    Every stage answers health; at full compensation the four are 36.6 / 30.3
+    / 23.8 / 27.6 against a stock 37.9 / 44.2 / 32.3 / 37.1.
+  - **"Its fighting time scales as health^0.545, so reaching its stock length
+    would want about 300x its authored health"** -- health x6.55 against a
+    fighting window x7.3 is an exponent of **1.06**, which is what a health
+    bar under roughly constant dps has to give, and no extrapolation is
+    needed at all because full compensation already reaches 78% of the stock
+    window.
+- **AND THE WAY THAT HAPPENED IS THE FINDING: BUILD 376 READ THE MECHANISM OUT
+  OF THE SOURCE CORRECTLY AND ATTRIBUTED A SYMPTOM TO IT.** Its diagnosis --
+  "`update` RETURNS out of the stage ladder for the whole of MERGE and the
+  whole of INVERSION, and MERGE HEALS the pool by a fixed share of `poolMax`"
+  -- is true of the code today and was true then. The ladder really does
+  suspend for those two beats. What made them look like the whole fight is
+  that the other three stages had nothing left to do, because the pool arrived
+  at 5%: the set-pieces are **8.9 of a 64.2-second fighting window at the
+  shipped dial, 14%**. **A mechanism read correctly out of the source can
+  still be the wrong explanation for a measurement** -- reading it tells you
+  the mechanism exists, never that it is what you measured.
+- **...AND THE EVIDENCE WAS IN 376'S OWN OUTPUT: A STAGE OF 0.0 SECONDS IS A
+  STAGE THAT DID NOT HAPPEN, NOT A SMALL ONE.** It recorded "stages 1-3
+  measured 3.6 / 0.0 / 5.3 seconds" and read the row as health-independence.
+  Three of a four-stage fight reading 3.6, 0.0 and 5.3 against a fight of 45
+  seconds is a ladder that was already past its own gates, and nothing else
+  produces a literal zero. **When a stage, a window or a count reads exactly
+  zero, ask what did not happen before reading it as a quantity.**
+- **THE DIAL DOES NOT MOVE, AND THE FIX MADE ITS CALIBRATION BETTER WITHOUT
+  TOUCHING IT.** `soften: 0.7` puts PARITY at **51% of its stock length**
+  against DYNAMO's 57% and TERMINUS's 45%, so the three deep slots now agree
+  where one of them used to read 25%. 0.85 is refused for 376's own reason,
+  sharper on the re-taken numbers: its extra cost falls entirely on the deep
+  slots, so at PARITY it takes the reward for a fully bought tree from 2.0x
+  down to 1.5x -- which is exactly the reward those slots exist to give.
+- **AND THE STOCK FLOOR RE-TAKE VALIDATES 376'S FLOOR COLUMN, WHICH IS WORTH
+  A SENTENCE BECAUSE IT WAS THE OTHER THING AT RISK.** 377 also normalised
+  PARITY's two crescents onto the shared pool, because each rolled its own
+  `rand(0.92, 1.1)` against a pool-seeded `lastHp` and `if (lost > 0)`
+  discarded the favourable sign -- up to 16.4%, always adverse, and it applies
+  at `hard` 1 as well. Measured: **182.9s (174.5 / 182.9 / 187.7) against
+  376's 183.4 and 183.7**, so it moved the floor column by 0.4%. The fault was
+  concentrated in the FUNDED column, where `hard` > 1 and `temper` ran at all.
+- **AND THE FAULT CLASS IS A GUARD NOW, SWEPT OVER THE WHOLE ROSTER -- AND THE
+  PLANTED BREACH FOUND TWO INSTRUMENT FAULTS IN IT BEFORE IT COULD
+  DISCRIMINATE.** The claim is that every anomaly BEGINS ITS STAGE LADDER AT
+  STAGE 1, which is 377's PARITY conjunct generalised: a boss whose gates are
+  already past when its ladder starts reads as a boss whose ladder does not
+  answer health. It cannot be proved by reverting the build-214 fault -- that
+  reached one body of one slot -- so it is proved by planting a gate breach
+  (`stageCore` above 1), which fires it naming GNOMON, AMPLITUDE and TESSERA.
+  - **A FIXED WINDOW OF NINETY FRAMES IS INSIDE THE ARRIVAL AND MEASURES
+    NOTHING.** The first version stepped 1.5 seconds and read the stage; an
+    arrival is **14.4 seconds and TERMINUS's is 21.6** -- measured, the loop
+    walks 1296 frames at the worst slot, which is that constant to the frame
+    -- and `update` returns out of the arrival before the ladder is reached,
+    so the conjunct passed with the breach in place. **The plant is what found it**, which is the whole reason
+    a conjunct gets one -- a 90-frame window looked like a generous margin and
+    was a window in which the mechanism had not started.
+  - **AND THE FRAME `arriving` HITS 0 IS THE LAST FRAME THE LADDER HAS NOT
+    RUN**, so reading on it is one frame early and the breach passed again.
+    One more `g.update` and it fires. No margin is needed or wanted after
+    that: the frame the ladder starts IS the claim, and a fully bought turret
+    really does leave stage I in a few seconds (8.3s at PARITY), so any later
+    window would need one.
+  The arrival bound is derived off the boss's OWN clock (`arriving` is set to
+  its `C.arrive` when the hole opens) rather than a constant, so a slot with a
+  longer arrival is covered by existing, and a timeout pushes its own failure
+  rather than passing quietly.
+- **THE HASH IS NOT OWED AND WAS NOT RUN.** This build changes
+  `src/config.js`'s comments and the BUILD literal, `docs/rebalance.html`,
+  `scripts/regress.mjs` and this file; no executable `src/` line moves, so
+  there is nothing for the ORDINAL probe to measure -- the same call builds
+  345-349, 360, 372 and 374 made. What had something to say is the fifteen
+  fights above, the planted-breach proof and the suite.
+- **Cost: fifteen fights, about twenty minutes of wall clock, ZERO agents.**
+  One background shell running four `fight.mjs` invocations sequentially and
+  one more for the floor, each printing its own block, so a container
+  reprovision would have cost the remainder rather than the lot.
+- **AND THE ONE RED IS THE FLAKE THIS FILE HAS NAMED AS NEVER RUN DOWN SINCE
+  BUILD 226, PRICED FROM THE DUMPS RATHER THAN CHASED.** 782 of 783, 0
+  errors, and the failure is "the debris is thrown along lobes, in a different
+  pattern each time" -- which build 226 listed as "a randomised burst pattern
+  and has not been run down". CLAUDE.md's own rule is to note a known flake
+  and move on rather than re-run for it, so it is noted; what is new is that
+  build 320's dump makes the population free. Subtracted across twelve dumps,
+  builds 370 to 378, `lobeWorstPeak` reads **1.5, 1.8, 2.1, 2.3, 2.3, 2.5,
+  2.5, 2.6, 2.6, 2.9, 2.9, 3.0** against a bound of **1.8** -- so the
+  threshold sits INSIDE its own working distribution and two of twelve draws
+  are at or under it, which is builds 315, 319 and 351's fault on a fourth
+  case. Every other conjunct was healthy on the failing run (8/8 bare
+  directions, 8/8 distinct patterns).
+  **Two things the next session should not have to re-derive.** The bound was
+  set 17% below a MEASURED floor -- the case's own comment records 2.18 as the
+  minimum over 200 bursts, p5 2.55, median 3.27 -- and the suite does not
+  reproduce that floor, so the 200-burst probe was measuring a state the
+  suite's own field does not produce. And `lobeWorstPeak` is a MIN OVER EIGHT
+  draws of a 33-particle histogram in 12 bins, so its distribution is far
+  wider than the per-burst one: asserting it claims "every burst without
+  exception", which is a stronger claim than "the debris is thrown along
+  lobes" and is not what the effect promises. The fix is the MEAN of the eight
+  with the min reported, priced against a measured EVEN-RING control -- and
+  `fx.quality` is NOT the channel, checked: 0.45 produced both 2.3 and 1.5
+  and quality 1 produced both 1.8 and 2.9.

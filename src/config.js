@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '377';
+export const BUILD = '378';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '377';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'e6bcf1e';
+export const REV = 'f25f031';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4757,7 +4757,11 @@ export const CFG = {
      * the clamp barely bound -- and build 375 measured the product at
      * `gunScale` 29.307 at every slot above the era gate, with the clamp
      * discarding a factor of 6.98 and PARITY, the penultimate fight, over in
-     * 38.3 seconds against a stock 183.4. See gunScale in shooter.js.
+     * 47.4 seconds against a stock 182.9. See gunScale in shooter.js.
+     *
+     * (That pair was 38.3 against 183.4 until build 378, measured through
+     * the build-214 fault below; the ceiling really is a quarter of PARITY's
+     * stock length, and the figure was 20% low rather than wrong in kind.)
      *
      * The multiplier reaches only structure and cores -- minions come through
      * claim() and are deliberately left alone, since a longer fight already
@@ -4798,6 +4802,24 @@ export const CFG = {
      * architectural and worth knowing before anybody tunes this -- their
      * length is set by structure that `revive` re-forms, and `revive` has
      * been tempering correctly since 214.
+     *
+     * RE-SWEPT AT PARITY AT BUILD 378, because that slot's own column was
+     * the one thing 377 could not carry over: every figure in it had been
+     * taken through the fault. Funded from the measured curve at rung 42,
+     * three runs a setting, against a re-taken stock of 182.9s:
+     *
+     *   soften   0      0.7     0.85    1        (376, through the fault)
+     *   fight    47.4   94.0    122.6   149.5    38.3 / 45.0 / 47.5 / 56.4
+     *   of stock 26%    51%     67%     82%
+     *
+     * So the dial spans a factor of 3.15 at the slot 376 called out of reach
+     * of it, and 0.7 puts PARITY at 51% of its stock length against DYNAMO's
+     * 57% and TERMINUS's 45% -- the outlier is gone and the deep three agree,
+     * which is the calibration this value was chosen for. It does not move.
+     *
+     * 0.85 is refused for 376's own reason, now sharper: its extra cost falls
+     * entirely on the deep slots, so at PARITY it takes the reward for a
+     * fully bought tree from 2.0x down to 1.5x.
      */
     soften: 0.7,
     riseFor: 2.1, // seconds a REMAINDER takes to reach the turret

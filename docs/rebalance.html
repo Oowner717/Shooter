@@ -547,13 +547,23 @@
           <code>CFG.boss.temper</code>, a ceiling at 4.2 against a measured
           <code>gunScale</code> of <span class="num">29.307</span> &mdash; a factor of 6.98
           discarded. Build 376 makes it a knee.</p>
-        <p><b>And one slot is out of reach of either dial.</b> The mechanism is bounded by
-          <code>gunScale</code> by construction, and that proxy understates what a bought turret
-          does to PARITY by about <span class="num">7&times;</span> (against 1.23&times; for DYNAMO
-          and 1.75&times; for TERMINUS). Measured at full compensation &mdash; the tree worth
-          nothing against a boss &mdash; PARITY is still a <span class="num">56.4s</span> fight,
-          because its stage ladder is suspended by two clocked set-pieces that answer no
-          multiplier and one of which heals a fixed share of the pool.</p>
+        <p><b>That paragraph said one slot was out of reach of either dial, and it was a
+          bug.</b> Build 377 found <code>Boss.temper</code> raising the health bar&rsquo;s
+          denominator and never its health &mdash; a no-op on a fresh body, masked for 162 builds
+          by the arrival pin, and PARITY&rsquo;s second half is the one body that pin cannot
+          reach. So every funded PARITY fight began with its shared pool already at
+          <span class="num">5%</span>, past all three of its own stage gates. Re-swept on the
+          fixed mechanism, funded from the measured curve at rung 42, three runs a setting:
+          <span class="num">47.4s</span> at <code>soften</code> 0, <span class="num">94.0s</span>
+          at 0.7, <span class="num">122.6s</span> at 0.85 and <span class="num">149.5s</span> at
+          full compensation, against a stock <span class="num">182.9s</span>. The dial reaches
+          this slot like any other; the <span class="num">7&times;</span> proxy gap was the fault
+          and is <span class="num">1.28&times;</span>, in line with DYNAMO and TERMINUS; and no
+          set-piece needs a dial of its own.</p>
+        <p>What survives of it is the arithmetic that is true of every slot: the mechanism is
+          bounded by <code>gunScale</code> by construction, so full compensation restores a
+          fight&rsquo;s health-proportional part and not its scripted beats &mdash; 31.2 of
+          PARITY&rsquo;s seconds are an arrival and a death that answer no multiplier.</p>
       </div>
     </section>
 

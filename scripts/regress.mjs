@@ -15670,6 +15670,7 @@ if (MINE_LINE) {
      * body is born with is era-independent.
      */
     const bornBad = [];
+    const stageBad = [];
     let sweptBodies = 0;
     for (let n = 1; n <= ANOMALIES.length; n++) {
       g.restart();
@@ -15685,9 +15686,53 @@ if (MINE_LINE) {
         bornBad.push(`${n}:${bad.length}/${made.length}`
           + ` worst ${Math.min(...bad.map((e) => +(e.hp / e.maxHp).toFixed(3)))}`);
       }
+      /*
+       * ...and it BEGINS ITS STAGE LADDER AT STAGE 1, which is the
+       * generalisation of the PARITY conjunct below and the guard for the
+       * fault class build 376 misread rather than for the build-214 fault
+       * itself.
+       *
+       * A boss whose gates are already past when its ladder starts reads as
+       * a boss whose ladder does not answer health -- which is what 376
+       * concluded from PARITY's stages I, II and III measuring 3.6 / 0.0 /
+       * 5.3 seconds, and a stage of 0.0 seconds is a stage that did not
+       * happen rather than a small number.
+       *
+       * READ ON THE FIRST FRAME THE ARRIVAL IS OVER, and both halves of that
+       * are load-bearing. `enterStage` is reached from `update`, so the
+       * opening frame reads 1 whatever is wrong and only a STEPPED reading
+       * can discriminate -- and the ladder does not run during the arrival
+       * (14.4s at PARITY), so a fixed window of a second and a half is
+       * INSIDE it and measures nothing. The first version was ninety frames
+       * and passed with a planted gate breach in place; the plant is what
+       * found it, which is the whole reason a conjunct gets one.
+       *
+       * No margin either: the frame the ladder starts is exactly the claim,
+       * and a breached gate fires on it. A window after that would need one,
+       * because a fully bought turret really does leave stage I in a few
+       * seconds (measured 8.3s at PARITY, `soften` 0.7).
+       *
+       * Proved by planting a breach rather than by reverting the build-214
+       * fault, which reached one body of one slot and is 377's PARITY arm's.
+       */
+      // Bounded off the boss's OWN clock (`arriving` is set to its
+      // `C.arrive` when the hole opens), so a slot with a longer arrival is
+      // covered by existing rather than by a constant somebody measured.
+      const arrFor = Math.ceil((b2.arriving + 2) * 60);
+      let arrN = 0;
+      while (w.boss === b2 && b2.arriving > 0 && arrN < arrFor) { g.update(1 / 60); arrN++; }
+      // ONE more frame: `update` returns out of the arrival branch before it
+      // reaches the ladder, so the frame `arriving` hits 0 is the last frame
+      // the ladder has NOT run. Read a frame early and a planted breach
+      // passes -- measured, which is the second thing the plant found.
+      if (w.boss === b2 && b2.arriving <= 0) g.update(1 / 60);
+      if (w.boss !== b2 || b2.arriving > 0) stageBad.push(`${n}:no-arrival-end`);
+      else if (b2.stage !== 1) stageBad.push(`${n}:stage ${b2.stage}`);
+      out.arrFrames = Math.max(out.arrFrames || 0, arrN);
       g.withdrawBoss();
     }
     out.bornBad = bornBad;
+    out.stageBad = stageBad;
     out.sweptBodies = sweptBodies;
     out.slots = ANOMALIES.length;
 
@@ -15956,6 +16001,13 @@ if (MINE_LINE) {
     + `hp === maxHp; off: ${r.bornBad && r.bornBad.length
       ? r.bornBad.join(' ') : 'none'} (at the build-214 fault every body of `
     + `every slot was at 1/hard)`);
+
+  check('...and every anomaly begins its stage ladder at stage 1',
+    r.stageBad !== undefined && r.stageBad.length === 0 && r.slots >= 9,
+    `${r.slots} slots, every one on stage 1 on the first frame its ladder `
+    + `runs (worst arrival ${r.arrFrames} frames); off: ${r.stageBad
+      && r.stageBad.length ? r.stageBad.join(' ') : 'none'} (read inside the `
+    + `arrival instead, a planted gate breach passes)`);
 
   check('...and a boss whose health is one pool still has it when the fight starts',
     r.parPool !== null && r.parPool > 0.98

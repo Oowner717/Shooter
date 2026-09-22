@@ -532,13 +532,19 @@ function sliverOn(world, e, x, y, p, dirx, diry, sp) {
  * run actually has by every gate rung above the era gate.
  *
  * `temper` was a CEILING until build 375, so every purchase past 4.2 was
- * invisible to a boss and the deep fights collapsed -- PARITY over in 38.3
- * seconds against a stock 183.4. It is a KNEE from 376 and `CFG.boss.soften`
+ * invisible to a boss and the deep fights collapsed -- PARITY over in 47.4
+ * seconds against a stock 182.9. It is a KNEE from 376 and `CFG.boss.soften`
  * decides how much of the excess an anomaly answers, so this product is live
  * again above it. What it CANNOT buy back is anything this function does not
- * measure: `bossHard` is bounded by this return, and build 376 measured the
- * gun's real effect on PARITY at seven times what this reports, which is why
- * that one fight stays short at any setting.
+ * measure: `bossHard` is bounded by this return, so full compensation
+ * restores a fight's health-proportional part and not its scripted beats --
+ * 31.2 of PARITY's seconds are an arrival and a death.
+ *
+ * Build 376 read that gap at SEVEN TIMES for PARITY and wrote down that the
+ * slot therefore stays short at any setting; both halves were the build-214
+ * `temper` fault build 377 found, and build 378 measures the gap at 1.28x,
+ * in line with DYNAMO's 1.23x and TERMINUS's 1.75x. No slot is out of reach
+ * of the dial.
  *
  * SIGHT was the fourth term and went in build 215, taking a 1.25^3 with it.
  * PILE replaces it on the TURRET branch and is NOT counted here on purpose:
