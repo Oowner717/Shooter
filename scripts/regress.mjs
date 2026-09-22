@@ -15412,6 +15412,7 @@ if (MINE_LINE) {
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
     const { gunScale } = await import('../src/shooter.js');
     const { bossHard } = await import('../src/boss.js');
+    const { ANOMALIES } = await import('../src/anomaly.js');
     const { freshUpgrades } = await import('../src/upgrades.js');
     const g = window.__sim;
     const w = g.world;
@@ -15432,6 +15433,31 @@ if (MINE_LINE) {
        * the core, which is how the first version of this case came to divide
        * a 1900hp core by TALLY's 165 and report the structure at x53.
        */
+      /*
+       * ---- BORN: what `temper` itself produced, before a frame has run ----
+       *
+       * Read here and not after the arrival, because `arriveStep` PINS every
+       * body's health to its ceiling on every frame of it --
+       *
+       *     for (const p of this.parts()) p.hp = p.maxHp;
+       *     this.core.hp = this.core.maxHp;
+       *
+       * -- for the unrelated reason its own docstring gives ("a stray round
+       * landing on a boss that has not finished arriving is a fight that
+       * started before the player was looking"). That pin MASKED build 214's
+       * `temper` fault for 162 builds: every body was born at hp/maxHp =
+       * 1/hard and every one the pin reaches was repaired by the time
+       * anything could read it. Measured at the fault, all seven slots: born
+       * 0.142 at hard 7.06, after the arrival 1.000.
+       *
+       * So a reading taken after the arrival cannot see this at all, which is
+       * exactly what the first version of the arm below did.
+       */
+      const frac = (e) => (e && e.maxHp ? e.hp / e.maxHp : null);
+      const bornParts = w.boss ? w.boss.parts().filter(Boolean) : [];
+      const bornCore = w.boss ? frac(w.boss.core) : null;
+      const bornPiece = bornParts.length
+        ? Math.min(...bornParts.map(frac)) : null;
       for (let f = 0; f < 60 * 30 && w.boss && w.boss.sequencing(); f++) g.update(1 / 60);
       const b = w.boss;
       if (!b) return null;
@@ -15440,9 +15466,25 @@ if (MINE_LINE) {
       // structure multiplier of 53.
       const panels = w.enemies.filter((e) => !e.dead && e.counts === false
         && e.type.id === 'tally');
-      return { hard: b.hard, core: b.core ? b.core.maxHp : null,
+      /*
+       * BOTH fields, and that is the whole of build 377.
+       *
+       * This helper returned `maxHp` alone from build 214 to 376, so every
+       * arm below divided the BAR'S DENOMINATOR by the authored health --
+       * and `temper` was writing exactly that field and clamping `hp` to it,
+       * which is a no-op on a fresh body. So the one function whose subject
+       * is "the gun's multiplier, on the HEALTH of one of this boss's
+       * bodies" was measured on the one field it did touch, for 162 builds,
+       * with every arm green. Measured at the fault: core hp/authored 1.03
+       * against maxHp/authored 16.91.
+       */
+      const sum = (f) => panels.reduce((a, e) => a + f(e), 0);
+      return { hard: b.hard, bornCore, bornPiece,
+        coreMax: b.core ? b.core.maxHp : null,
+        coreHp: b.core ? b.core.hp : null,
         pieces: panels.length,
-        hp: panels.reduce((a, e) => a + e.maxHp, 0), boss: b, panels };
+        pieceMax: sum((e) => e.maxHp), pieceHp: sum((e) => e.hp),
+        boss: b, panels };
     };
 
     // ---- the measure itself: a PRODUCT, not a list of nodes --------------
@@ -15526,10 +15568,12 @@ if (MINE_LINE) {
      */
     const stock = open(1, false);
     out.stockHard = stock ? stock.hard : null;
-    out.stockCore = stock ? Math.round(stock.core) : null;
+    out.stockCore = stock ? Math.round(stock.coreHp) : null;
     const T = TYPE_BY_ID.tally;
     const O = TYPE_BY_ID.ordinal;
-    out.stockCoreBand = stock ? Math.abs(stock.core / O.hp - 1) : null;
+    out.stockCoreBand = stock ? Math.abs(stock.coreHp / O.hp - 1) : null;
+    // ...and a stock body's bar is full, which is the identity at hard === 1.
+    out.stockFull = stock ? stock.coreHp === stock.coreMax : null;
 
     // ---- ...and a bought one is tempered, everywhere it is made ----------
     const bought = open(1, true);
@@ -15543,9 +15587,29 @@ if (MINE_LINE) {
      */
     out.doorHard = bought ? +bossHard(w).toFixed(6) : null;
     out.doorGun = bought ? +gunScale(w).toFixed(6) : null;
-    out.coreRatio = bought && stock ? +(bought.core / O.hp).toFixed(3) : null;
+    out.coreBar = bought ? +(bought.coreMax / O.hp).toFixed(3) : null;
+    out.coreRatio = bought ? +(bought.coreHp / O.hp).toFixed(3) : null;
+    out.pieceBar = bought && bought.pieces
+      ? +((bought.pieceMax / bought.pieces) / T.hp).toFixed(3) : null;
     out.pieceRatio = bought && bought.pieces
-      ? +((bought.hp / bought.pieces) / T.hp).toFixed(3) : null;
+      ? +((bought.pieceHp / bought.pieces) / T.hp).toFixed(3) : null;
+    /*
+     * ...and the two fields AGREE at birth, which is what `temper` is for.
+     *
+     * The BORN figures, not the after-arrival ones: the pin repairs whatever
+     * it reaches, so an after reading is 1.000 on a build where `temper`
+     * touched nothing. Both are carried into the message, and their
+     * DISAGREEMENT at the fault is the whole of it -- born 0.142, after
+     * 1.000, on all seven slots.
+     */
+    out.bornCore = bought && bought.bornCore !== null
+      ? +bought.bornCore.toFixed(3) : null;
+    out.bornPiece = bought && bought.bornPiece !== null
+      ? +bought.bornPiece.toFixed(3) : null;
+    out.afterFull = bought
+      ? bought.coreHp === bought.coreMax
+        && bought.panels.every((e) => e.hp === e.maxHp)
+      : null;
 
     // ---- ...including a piece put BACK after it was taken apart ----------
     /*
@@ -15559,9 +15623,100 @@ if (MINE_LINE) {
     if (b) {
       const p = w.enemies.find((e) => !e.dead && e.counts === false
         && e.type.id === 'tally');
-      if (p) { p.dead = true; b.revive(w, p, 1); revived = p.maxHp; }
+      if (p) { p.dead = true; b.revive(w, p, 1); revived = p; }
     }
-    out.revived = revived ? +(revived / T.hp).toFixed(3) : null;
+    // `hpFrac` 1, so a revived panel is full: both fields, for the reason
+    // above -- this arm read `maxHp` alone too, and happened to be sound
+    // because `revive` writes both. It could not have told you which.
+    out.revived = revived ? +(revived.maxHp / T.hp).toFixed(3) : null;
+    out.revivedHp = revived ? +(revived.hp / T.hp).toFixed(3) : null;
+
+    /*
+     * ---- ...and the one boss the arrival pin cannot reach ---------------
+     *
+     * PARITY, whose whole health is ONE shared pool worth `core.maxHp`,
+     * drained by `syncPool` off what each half lost since the last frame
+     * against `lastHp`, which the constructor seeds at `[poolMax, poolMax]`.
+     *
+     * `Parity.parts()` returns the PANES and not the halves -- deliberately,
+     * and its own docstring says so ("Panes only -- they come in pairs") --
+     * so the pin's `for (const p of this.parts())` never touched either half,
+     * and `this.core.hp = this.core.maxHp` on the line below it repaired
+     * `halves[0]` only because `core` IS `halves[0]`. Measured at the fault:
+     * after the arrival the halves read [1, 0.142], and the FIRST run of
+     * `syncPool` then booked `lastHp[1] - halves[1].hp` as damage -- so the
+     * pool fell to 0.144 of itself on the first frame anything could be shot.
+     * Every stage gate is read off that pool (`mergeAt` 0.58, `loneAt` 0.30),
+     * so MERGE fired on that frame and stages I, II and III got 0.0 seconds
+     * each: the fight was 45.0s of countdowns against 90.8s of fighting.
+     *
+     * Era 1 on purpose. A boss's own health is era-independent (build 353
+     * measured two draws of DYNAMO's core at 3979 and 4190, which is the
+     * constructor's jitter and not a scaling) and so is this accounting, so
+     * the fifteen seconds of `setEra` and a re-laid field buy nothing here.
+     */
+    /*
+     * ---- ...and EVERY body of EVERY anomaly, which two slots cannot say ---
+     *
+     * `made()` is the boss's own answer to "everything I built" -- the list
+     * `hush` marks `spent` for its outro -- so this sweeps the structure
+     * rather than restating it, and a tenth boss is covered by existing. No
+     * stepping at all: `temper`'s output is what the constructor left, and
+     * one frame of `arriveStep` would pin most of it back (see `made`).
+     *
+     * Measured at the build-214 fault: 0 of 9 slots clean, every body at
+     * hp/maxHp = 1/hard. AXIOM and TESSERA have no gate rung, so
+     * `anomalyEra` answers 1 for them -- which is fine here, because what a
+     * body is born with is era-independent.
+     */
+    const bornBad = [];
+    let sweptBodies = 0;
+    for (let n = 1; n <= ANOMALIES.length; n++) {
+      g.restart();
+      w.phase = 'staging';
+      g.debugGiveBytes(400000000); g.debugBuyAll();
+      if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
+      if (!g.openBoss(n)) { bornBad.push(`${n}:refused`); continue; }
+      const b2 = w.boss;
+      const made = b2.made();
+      sweptBodies += made.length;
+      const bad = made.filter((e) => e.hp !== e.maxHp);
+      if (bad.length) {
+        bornBad.push(`${n}:${bad.length}/${made.length}`
+          + ` worst ${Math.min(...bad.map((e) => +(e.hp / e.maxHp).toFixed(3)))}`);
+      }
+      g.withdrawBoss();
+    }
+    out.bornBad = bornBad;
+    out.sweptBodies = sweptBodies;
+    out.slots = ANOMALIES.length;
+
+    const par = open(6, true);
+    out.poolMax = par && par.boss ? Math.round(par.boss.poolMax) : null;
+    out.parHalves = par && par.boss && par.boss.halves
+      ? par.boss.halves.map((h) => +(h.hp / h.maxHp).toFixed(3)) : null;
+    /*
+     * ...and each half's CEILING against the pool's, which is the conjunct
+     * that catches the seed.
+     *
+     * The pool reading below cannot carry that one on its own: the loss is
+     * `max(0, 1 - maxHp1/poolMax)` and the ratio spans 0.836 to 1.196, so a
+     * favourable draw reads a full pool on a build with the fault in it --
+     * about one run in two, which is a coin toss this repo refuses. This is
+     * exact on every draw.
+     */
+    out.parOfPool = par && par.boss && par.boss.halves
+      ? par.boss.halves.map((h) => +(h.maxHp / par.boss.poolMax).toFixed(3)) : null;
+    // ...and one frame on, which is the first `syncPool` and the first frame
+    // a round can land. Not zero gunfire, so a band and not an identity:
+    // measured 129,215 -> 129,203 over the first two SECONDS of it.
+    if (par && par.boss) {
+      g.update(1 / 60);
+      const pb = w.boss;
+      out.parPool = pb && pb.poolMax ? +(pb.pool / pb.poolMax).toFixed(3) : null;
+      out.parStage = pb ? pb.stage : null;
+      out.parMerged = pb ? !!pb.merged : null;
+    }
 
     /*
      * ---- IDENTITY BELOW THE KNEE, through a real Boss ------------------
@@ -15698,10 +15853,11 @@ if (MINE_LINE) {
    * make this number wrong.
    */
   check('an anomaly opened by a stock turret is the anomaly as authored',
-    r.stockHard === 1 && r.stockCoreBand < 0.11,
+    r.stockHard === 1 && r.stockCoreBand < 0.11 && r.stockFull === true,
     `hard ${r.stockHard}, core ${r.stockCore} against an authored 1900 `
     + `(${(r.stockCoreBand * 100).toFixed(1)}% off, which is the constructor's `
-    + `own jitter and nothing else -- the multiply is an identity at 1)`);
+    + `own jitter and nothing else -- the multiply is an identity at 1), `
+    + `full bar ${r.stockFull}`);
 
   /*
    * `hard` is the KNEE'S answer to the gun from build 376, where it was
@@ -15726,6 +15882,38 @@ if (MINE_LINE) {
     + `${r.doorGun}, knee ${r.cap}, soften ${r.soften}, so the ceiling that `
     + `stood until build 375 would have bound here at ${r.cap}); core `
     + `x${r.coreRatio} and structure x${r.pieceRatio} of authored`);
+
+  /*
+   * ---- ...and the multiplier is on the HEALTH, not only on the bar ------
+   *
+   * The arm this case did not have from build 214 to 376. `temper` read
+   *
+   *     e.maxHp = Math.round(e.maxHp * this.hard);
+   *     e.hp = Math.min(e.hp, e.maxHp);
+   *
+   * and a fresh body has `hp === maxHp`, so raising the ceiling makes that
+   * `min` return `hp` unchanged: the ONE door every boss body is built
+   * through never touched the health. Its three siblings -- `revive()` and
+   * ORDINAL's two private copies -- were written correctly in the SAME
+   * commit, which is what makes this a slip rather than a design.
+   *
+   * Two conjuncts because they fail differently and neither can see the
+   * other's failure. The RATIO says the health moved; the FULL BAR says the
+   * two fields agree, which is what `coreFrac` and every stage gate read.
+   * Measured at the fault: hp x1.03 of authored against maxHp x16.91, every
+   * one of the seven slots, and the arms above green throughout because they
+   * divided the ceiling.
+   */
+  check('...and that multiplier is on its HEALTH and not only on its bar',
+    r.bornCore === 1 && r.bornPiece === 1 && r.afterFull === true
+    && r.coreRatio !== null && Math.abs(r.coreRatio / r.coreBar - 1) < 0.02
+    && Math.abs(r.pieceRatio / r.pieceBar - 1) < 0.02,
+    `born on a full bar: core ${r.bornCore}, worst piece ${r.bornPiece} `
+    + `(at the build-214 fault both read 0.142 = 1/hard, on all seven slots, `
+    + `and the arrival pin put them back to 1.000 before anything could read `
+    + `them -- which is why an after-arrival reading cannot see this); after `
+    + `${r.afterFull}; core hp x${r.coreRatio} against a bar of x${r.coreBar}, `
+    + `structure hp x${r.pieceRatio} against x${r.pieceBar}`);
 
   /*
    * ...and it took that number from the DOOR. `hard` is assigned once in a
@@ -15754,10 +15942,40 @@ if (MINE_LINE) {
     `at gun ${r.underGun}, under the knee ${r.cap}, hard is ${r.underHard} `
     + `(exact: ${r.underExact})`);
 
+  /*
+   * The consequence, at the one place in the game the fault was visible. Two
+   * conjuncts, and neither can see the other's failure: the HALVES say the
+   * pin's blind spot is empty, and the POOL says the accounting that reads
+   * them did not book a phantom 86% on its first run. A third says the fight
+   * had not already skipped to its own set-pieces.
+   */
+  check('...and every body of every anomaly is born on a full bar',
+    r.bornBad !== undefined && r.bornBad.length === 0
+    && r.slots >= 9 && r.sweptBodies > 150,
+    `${r.sweptBodies} bodies across ${r.slots} slots, every one born with `
+    + `hp === maxHp; off: ${r.bornBad && r.bornBad.length
+      ? r.bornBad.join(' ') : 'none'} (at the build-214 fault every body of `
+    + `every slot was at 1/hard)`);
+
+  check('...and a boss whose health is one pool still has it when the fight starts',
+    r.parPool !== null && r.parPool > 0.98
+    && r.parHalves !== null && r.parHalves.every((f) => f === 1)
+    && r.parOfPool !== null && r.parOfPool.every((f) => f === 1)
+    && r.parStage === 1 && r.parMerged === false,
+    `both halves born full: ${JSON.stringify(r.parHalves)} (at the fault `
+    + `[1, 0.142] -- the pin reaches parts() and the core, and PARITY's `
+    + `parts() is panes only), and both agree with the pool: `
+    + `${JSON.stringify(r.parOfPool)} (at the fault [1, 0.933] -- its own `
+    + `rand(0.92, 1.1), read as a dent by the first syncPool); the pool is `
+    + `${r.parPool} of ${r.poolMax} on the first frame a round can land (at `
+    + `the fault 0.144), stage ${r.parStage}, merged ${r.parMerged}`);
+
   check('...and a piece put back mid-fight comes back tempered too',
-    r.revived !== null && Math.abs(r.revived / cap - 1) < 0.02,
-    `a revived panel is x${r.revived} of its authored health, against the `
-    + `x${cap.toFixed(2)} the rest of the boss is at`);
+    r.revived !== null && Math.abs(r.revived / cap - 1) < 0.02
+    && Math.abs(r.revivedHp / cap - 1) < 0.02,
+    `a revived panel is x${r.revived} of its authored health (bar) and `
+    + `x${r.revivedHp} (health), against the x${cap.toFixed(2)} the rest of `
+    + `the boss is at`);
 
   /*
    * The clock exists to stop an under-gunned run sitting in front of a gate

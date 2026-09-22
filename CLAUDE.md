@@ -13261,3 +13261,128 @@ came from before believing the other one covers it.
   rider learned here: slice the whole TAIL rather than the predicates, or the
   `const cap` the arms divide by is not in scope and the harness reports a
   `ReferenceError` for code that is correct.
+
+- **BUILD 377 FIXES A ONE-LINE FAULT BORN AT BUILD 214 THAT A BELT HAD BEEN
+  COVERING FOR 162 BUILDS: `Boss.temper` RAISED THE CEILING AND LEFT THE
+  HEALTH.** It read `e.maxHp = round(e.maxHp * hard); e.hp = min(e.hp,
+  e.maxHp);` -- and a fresh body has `hp === maxHp`, so raising the ceiling
+  makes that `min` return `hp` UNCHANGED. The one door every boss body is
+  built through never touched the health. Measured off the running game, every
+  core and every first part of all seven slots at hard 16.363: **`hp/type` is
+  0.93 to 1.08 and `maxHp/type` is 15.2 to 17.6.** The clamp reads as
+  defensive and is exactly backwards -- `hp` cannot exceed a ceiling that has
+  just gone up -- and its three siblings were written correctly in the SAME
+  diff (`revive()` and ORDINAL's two private copies, all three
+  `maxHp = round(type.hp * hard)` then `hp = round(maxHp * frac)`), which is
+  what makes it a slip rather than a design.
+- **WHAT HID IT IS `arriveStep`'S PIN, AND IT IS THE CLEAREST BELT-DOING-THE-
+  BRACE'S-JOB THIS FILE HAS RECORDED.** That method writes
+  `for (const p of this.parts()) p.hp = p.maxHp; this.core.hp =
+  this.core.maxHp;` on every frame of the arrival, for a reason of its own
+  ("a stray round landing on a boss that has not finished arriving is a fight
+  that started before the player was looking") -- so every body it REACHES was
+  repaired before anything could read one. Measured on the broken tree, all
+  seven slots: **born 0.142 = 1/hard, after the arrival 1.000.** Build 376's
+  own note says a belt and a brace look identical until you measure which one
+  is holding; here the belt had been holding for 162 builds and failed for
+  exactly one boss.
+- **PARITY IS THE ONE BODY THE PIN CANNOT REACH, AND THE SYMPTOM WAS A 94%
+  DISCONTINUITY ON THE OPENING FRAME.** `Parity.parts()` returns the PANES and
+  not the halves -- deliberately, and its docstring says so -- so the pin's
+  loop never touched either crescent, and the line below it repaired
+  `halves[0]` only because `core` IS `halves[0]`. Its whole health is one
+  shared pool drained by `syncPool` off `lastHp`, seeded `[poolMax, poolMax]`.
+  Measured: **after the arrival the halves read `[1, 0.142]`, and the first
+  run of `syncPool` booked `lastHp[1] - halves[1].hp` as damage -- the pool
+  fell 136,627 to 7,280 in ONE FRAME.** Every stage gate is read off that pool
+  (`mergeAt` 0.58, `loneAt` 0.30), so MERGE fired on that frame, STAGE 2 and 3
+  landed two frames apart, and **stages I, II and III got 0.0 seconds each**.
+  Fixed, the same fight is **95.4s against 45.0** with stages **8.6 / 27.1 /
+  12.6 / 15.6**, every gate firing where it was authored (MERGE at frac 0.536
+  against 0.58, INVERT at 0.298 against 0.30), and the fighting window
+  (fight minus arrival minus death) **64.2s against 13.8**.
+- **...AND THAT KILLS THE TASK THIS BUILD OPENED WITH.** Build 376 deferred "a
+  set-piece that heals is the dial" for PARITY, having measured stages 1-3 at
+  3.6 / 0.0 / 5.3 seconds and attributed them to MERGE and INVERSION being
+  health-independent countdowns. **That was the symptom.** The set-pieces are
+  8.9s of a 64.2s fighting window -- 14% -- and needed no dial at all. The
+  cause was one frame at the end of the arrival. **When three stages of a
+  four-stage fight read zero seconds, the bar is the suspect and not the
+  clocks.**
+- **A SECOND FAULT IN THE SAME ACCOUNTING, FOUND BY THE CASE WRITTEN FOR THE
+  FIRST: THE TWO CRESCENTS ROLL THEIR OWN HEALTH AND `lastHp` IS SEEDED FROM
+  THE POOL.** With `temper` fixed the pool still read **0.933** on the opening
+  frame. `Enemy` rolls `rand(0.92, 1.1)` per body, so `halves[1].maxHp` is its
+  own draw and not `core.maxHp` -- and the first `syncPool` reads the
+  difference as a dent. It is **always adverse**, because `if (lost > 0)`
+  discards the favourable sign and keeps the unfavourable one, and it spans 0
+  to 16.4% (the ratio runs 0.836 to 1.196). Both halves are normalised to
+  `poolMax` in the constructor now, which is the same write `syncPool` makes
+  every frame, applied at birth rather than one frame late. The pool then
+  reads **exactly 1**, and PARITY's fight 90.8s -> 95.4s.
+- **THE CASE READ `maxHp` ALONE FROM BUILD 214 TO 376, WHICH IS THE ONE FIELD
+  THE FAULT DID WRITE.** Its helper returned `{ core: b.core.maxHp, hp:
+  panels.reduce((a, e) => a + e.maxHp, 0) }`, so `coreRatio`, `pieceRatio`,
+  `stockCoreBand` and `revived` all divided the BAR'S DENOMINATOR by the
+  authored health -- and every one of them was green throughout. **Proved as a
+  clean green rather than as a red:** the pre-377 case run against the broken
+  tree passes **8 of 8**. That is the proxy rule this file already carries
+  from build 318's grip counter and 351's velocity reading, on a new
+  quantity -- and `maxHp` is the most plausible proxy for health there is.
+- **AND MY OWN FIRST REPLACEMENT ARM PASSED ON THE BROKEN TREE, BECAUSE IT
+  READ AFTER THE ARRIVAL.** It asserted `hp === maxHp` on the state `open()`
+  returns, which is post-arrival, where the pin has already repaired
+  everything: `core hp x7.125 against a bar of x7.125 ... full bar: true` on a
+  tree with the fault in it. The arm reads the BORN state now -- captured
+  before a frame has run, which is `temper`'s own output -- and carries the
+  after reading beside it, because the two DISAGREEING is the whole of the
+  fault. **A guard for a fault that something else repairs has to be read at a
+  moment before the repair**, and "after the thing has settled" is the
+  instinct that cannot see it.
+- **`Boss.made()` IS THE LIST OF EVERYTHING A BOSS BUILT, AND IT HAS ONE OWNER
+  BECAUSE A SECOND READER ARRIVED.** `hush` walked `[core, ...parts(),
+  ...parked]` plus `halves` inline; that expression is now a method, `hush`
+  calls it, and the case sweeps it over all `ANOMALIES.length` slots -- **197
+  bodies across 9, every one born with `hp === maxHp`** -- so the claim is
+  about the roster rather than about the two slots the case happens to open,
+  and a tenth boss with a body in a field of its own declares it in one place.
+  The halves' membership is load-bearing for `hush` and a BELT for the sweep,
+  and that was measured rather than assumed: with `temper` broken the sweep
+  fails on the PANES of every slot, so dropping the halves does not change its
+  verdict on today's roster. Recorded that way rather than claimed, because a
+  proof that does not discriminate is not a proof.
+- **THE DIAL DID NOT MOVE, AND RE-CHECKING IT WAS THE POINT.** Build 376's
+  `soften: 0.7` was calibrated against a mechanism whose multiplier only wrote
+  the bar, so the obvious fear was that the whole calibration was against a
+  fiction. Measured either side, three runs a slot, funded from build 374's
+  curve at each slot's own gate rung: **ORDINAL 256.0 -> 256.0, GNOMON 209.8
+  -> 215.4, FRACTAL 201.1 -> 201.1, AMPLITUDE 138.5 -> 138.2, DYNAMO 97.4 ->
+  100.9, TERMINUS 144.4 -> 148.9** -- six of seven inside 4%, under the
+  2.6-6.4% per-boss spread build 353 measured, so not distinguishable from
+  noise. **PARITY alone moved, and the fix therefore made the dial's own
+  calibration better without touching it**: the outlier that read 45s against
+  siblings at 97 and 144 now reads 95.4 against 100.9 and 148.9.
+- **...AND THE REASON THE OTHER SIX BARELY MOVED IS ARCHITECTURAL AND IS THE
+  THING TO KNOW BEFORE TUNING ANY OF THEM.** Their length is set by structure
+  that `revive` re-forms, and `revive` has been tempering correctly since 214;
+  the CORE's own health, which is what the fault divided by `hard`, is not
+  what gates those fights. ORDINAL's is the sharpest reading: its core goes
+  from its authored ~1,900 to **5,043** at hard 2.778 and **the fight is
+  256.0s either way.** So a per-slot health table -- phase 7b's own ask --
+  would reach those six through their re-formed structure and not through
+  their cores, which is worth knowing before that table is authored.
+- **NO NEW `check-build` ARM, DELIBERATELY.** What can go wrong here is a
+  runtime property of a constructed body, and the case now holds it over the
+  whole roster; a static arm would have to pin the SHAPE of `temper`'s two
+  lines, which is what build 370 refused in favour of driving the rule. The
+  four proofs are the argument: `temper` reverted fails the health arm AND the
+  nine-slot sweep; the halves' normalisation reverted fails the pool arm
+  alone; the pre-377 case passes 8 of 8 on the broken tree; and the
+  after-arrival version of the new arm passes on it too.
+- **AND A `run()` HELPER THAT `cd`s LEAVES THE SHELL WHERE IT PUT IT.** The
+  proof harness did `cd /home/user/Shooter/scripts` inside a function, so
+  every relative path after the first call resolved against `scripts/` -- a
+  `cp src/boss.js` failed with "No such file or directory" and two greps
+  reported nothing, which reads exactly like a revert that did not land. Build
+  346's rule needs the addition: check the revert landed, AND use absolute
+  paths in a script that changes directory.

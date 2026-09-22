@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '376';
+export const BUILD = '377';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '376';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '3a1c5bb';
+export const REV = 'e6bcf1e';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -4780,6 +4780,24 @@ export const CFG = {
      * against one. The value between them is a judgement about what the tree
      * should be worth on a boss, and it is measured rather than argued -- see
      * the build-376 sweep.
+     *
+     * RE-CHECKED at build 377 against a `temper` that reaches health at all,
+     * and DELIBERATELY NOT MOVED. 376's sweep was taken on a mechanism whose
+     * multiplier only ever wrote the bar's denominator, so the obvious fear
+     * was that the whole calibration was against a fiction. Measured either
+     * side, three runs a slot, funded from build 374's curve at each slot's
+     * own gate rung: ORDINAL 256.0 -> 256.0, GNOMON 209.8 -> 215.4, FRACTAL
+     * 201.1 -> 201.1, AMPLITUDE 138.5 -> 138.2, DYNAMO 97.4 -> 100.9,
+     * TERMINUS 144.4 -> 148.9 -- six of seven inside 4%, which is under the
+     * 2.6-6.4% per-boss spread build 353 measured. PARITY alone moved, 45.0
+     * -> 95.4s, because it was the one slot the arrival pin could not cover.
+     *
+     * So the fix made this dial's own calibration BETTER without touching it:
+     * the outlier that read 45s against siblings at 97 and 144 now reads 95.4
+     * against 100.9 and 148.9. The reason the other six barely moved is
+     * architectural and worth knowing before anybody tunes this -- their
+     * length is set by structure that `revive` re-forms, and `revive` has
+     * been tempering correctly since 214.
      */
     soften: 0.7,
     riseFor: 2.1, // seconds a REMAINDER takes to reach the turret

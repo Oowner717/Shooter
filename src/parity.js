@@ -136,6 +136,21 @@ export class Parity extends Boss {
     this.poolMax = this.core.maxHp;
     this.pool = this.poolMax;
     this.lastHp = [this.poolMax, this.poolMax];
+    /*
+     * ...and both halves normalised to it AT BIRTH, which is the same write
+     * `syncPool` makes on every frame -- applied here rather than one frame
+     * late.
+     *
+     * The two crescents are separate bodies and `Enemy` rolls
+     * `rand(0.92, 1.1)` on each, so `halves[1].maxHp` is its own draw and not
+     * `core.maxHp`. `lastHp` is seeded from the POOL for both, so the first
+     * `syncPool` read that draw as a dent: `lost = poolMax - halves[1].hp`,
+     * anywhere from 0 to 16.4% of the bar (the ratio spans 0.836 to 1.196),
+     * and ALWAYS adverse -- `if (lost > 0)` discards the favourable sign and
+     * keeps the unfavourable one. Measured 0.933 of the pool on the first
+     * frame a round could land, on a build with the rest of this right.
+     */
+    for (const h of this.halves) { h.maxHp = this.poolMax; h.hp = this.poolMax; }
 
     this.place(0);
     background.setFocus(this.x, this.y);

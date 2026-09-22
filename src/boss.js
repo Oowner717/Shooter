@@ -356,9 +356,7 @@ export class Boss {
    * assist a fresh set of targets halfway through their own outro.
    */
   hush(world) {
-    const all = [this.core, ...this.parts(), ...this.parked];
-    if (this.halves) all.push(...this.halves);
-    for (const p of all) if (p) p.spent = true;
+    for (const p of this.made()) p.spent = true;
     // ...and the field stops costing anything. A beam or a squeeze still on
     // the turret when the bar empties is the fight carrying on past its end.
     world.shock = 0;
@@ -384,6 +382,37 @@ export class Boss {
   }
 
   /**
+   * EVERYTHING this boss made, whether it is on the field or not.
+   *
+   * One owner, because two things need the same answer and the second one
+   * arrived at build 377. `hush` needs it to mark the whole thing `spent` for
+   * its own outro -- so a body left out of it is a target the assist keeps
+   * picking through a death sequence -- and `regress.mjs` sweeps it over all
+   * nine anomalies to assert every body is born on a full bar, which is the
+   * claim `temper` exists to make and could not make from two slots.
+   *
+   * `parts()` is not enough and PARITY is why: its `parts()` is the panes,
+   * deliberately ("Panes only -- they come in pairs"), and the two crescents
+   * that carry its entire health are neither panes nor, for one of them, the
+   * core. That is exactly the body `arriveStep`'s pin could not reach.
+   *
+   * The halves' membership is load-bearing for `hush` and a BELT for the
+   * sweep, and that was measured rather than assumed: with `temper` broken
+   * the sweep fails on the PANES of every slot, so dropping the halves from
+   * this list does not change its verdict on today's roster. It would on a
+   * roster where a body outside `parts()` is the only one that is wrong,
+   * which is what PARITY was.
+   *
+   * So a tenth boss with a body in a field of its own declares it HERE, once,
+   * and both readers follow.
+   */
+  made() {
+    const all = [this.core, ...this.parts(), ...this.parked];
+    if (this.halves) all.push(...this.halves);
+    return all.filter(Boolean);
+  }
+
+  /**
    * The gun's own multiplier, on the health of one of this boss's bodies.
    *
    * MULTIPLIES what the constructor produced; it does not recompute from
@@ -394,6 +423,30 @@ export class Boss {
    * identity on an already-rounded integer, which is what keeps the stock
    * fight, and the hash, untouched.
    *
+   * BOTH FIELDS, and that is build 377. This read
+   *
+   *     e.maxHp = Math.round(e.maxHp * this.hard);
+   *     e.hp = Math.min(e.hp, e.maxHp);
+   *
+   * from build 214 -- the commit that wrote the whole mechanism -- and a
+   * fresh body has `hp === maxHp`, so raising the ceiling makes that `min`
+   * return `hp` UNCHANGED. The one door every boss body is built through
+   * never touched the health: measured, every core and every part of all
+   * seven slots born at hp/maxHp = 1/hard. The clamp reads as defensive and
+   * was exactly backwards -- `hp` cannot exceed a ceiling that just went up.
+   *
+   * Its three siblings were written correctly in the SAME diff -- `revive()`
+   * below and ORDINAL's two private copies of it, all three `p.maxHp =
+   * round(type.hp * hard)` then `p.hp = round(maxHp * frac)` -- which is what
+   * makes this a slip rather than a design.
+   *
+   * What hid it for 162 builds is `arriveStep`'s pin, four hundred lines
+   * down: it writes `p.hp = p.maxHp` over `parts()` and the core on every
+   * frame of the arrival, for the unrelated reason its own docstring gives,
+   * and so repaired every body it reaches before anything could read one.
+   * Every arm of the case was green throughout, because the helper it reads
+   * through returned `maxHp` alone -- the one field this did write.
+   *
    * Also the door for the three places that put health BACK on a piece that
    * had gone -- revive(), and ORDINAL's two private copies of it -- which
    * write `type.hp` raw and would otherwise quietly un-temper a re-formed
@@ -402,7 +455,7 @@ export class Boss {
   temper(e) {
     if (this.hard === 1) return;
     e.maxHp = Math.round(e.maxHp * this.hard);
-    e.hp = Math.min(e.hp, e.maxHp);
+    e.hp = Math.round(e.hp * this.hard);
     return e;
   }
 
@@ -588,6 +641,19 @@ export class Boss {
    * Nothing can be hurt for any of it, and the health is pinned rather than
    * merely ignored -- a stray round landing on a boss that has not finished
    * arriving is a fight that started before the player was looking.
+   *
+   * That pin is a BELT and it spent builds 214 to 376 doing the brace's job.
+   * `temper` was raising the ceiling and leaving the health, so every body
+   * arrived at 1/hard of its own bar -- and the two lines below put every
+   * body they REACH back to full before the first frame anything could be
+   * shot, which is why six of the seven fights looked right. They reach
+   * `parts()` and the core. They do not reach PARITY's second crescent,
+   * because `Parity.parts()` is its panes and `core` is only `halves[0]`, and
+   * that is where it showed: 14% of a shared pool on the opening frame.
+   *
+   * With `temper` fixed these two lines repair nothing on any build, which is
+   * what a belt should be. They stay because what they are FOR is damage
+   * during the arrival, and that is still real.
    */
   arriveStep(world, raw, C, script, moods) {
     this.arriving -= raw;
