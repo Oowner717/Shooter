@@ -22562,6 +22562,27 @@ if (MINE_LINE) {
       const top = P ? P.top : line - 2 * CFG.portal.ry;
       const [e] = release(w, TYPE_BY_ID.lurcher, w.width / 2, top - 200);
       e.vx = 0; e.vy = 0;
+      /*
+       * THE LURCH IS PINNED OFF, because it is the one gait modifier with no
+       * `!this.staged` guard and it lands inside the window this arm reads.
+       *
+       * `lurch` sits at the bottom of `drive` and adds `rand(40, 90)` to the
+       * velocity on a `rand(1.1, 2.4)` clock; every other modifier there
+       * (`paired`, `cartwheel`, and each of the replacers) carries
+       * `!this.staged` and this one does not, so a body in the portal's
+       * throat bursts. `atRim` is the LAST staged frame -- build 301's fix,
+       * which is right -- so whether that frame lands in a burst is a coin
+       * toss: measured across four suite dumps the braked crossing read 0.74,
+       * 0.77, 0.96 and then **2.27** times cruise against a ceiling of 1.2,
+       * and the failing run's 95.4 minus its cruise of 42.1 is 53.3, square in
+       * the middle of the burst's own range. The control read 2.26x on the
+       * same run, so the arm reported a separation of 1.00x -- the brake
+       * looking absent when what was absent was a guard on the witness.
+       * Pinned in `march` and not in one arm, because the CONTROL's fast
+       * crossing is the entry march multiplier (build 298 measured it at 2.6x
+       * cruise) and owes nothing to the burst either.
+       */
+      e.lurchTimer = 1e9;
       let hiddenMax = 0;
       let atRim = null;
       let bornAt = -1;
@@ -22733,7 +22754,19 @@ if (MINE_LINE) {
     && r.ramp.hiddenMax >= r.ramp.atRim * 1.6 && r.ramp.atRim <= r.ramp.cruise * 1.2
     && r.ramp.born === true && r.ramp.bornFor < 1
     && r.loose.bornAt > 0 && r.loose.atRim !== null
-    && r.loose.atRim >= r.loose.cruise * 1.5
+    /*
+     * THE CONTROL'S FLOOR IS 1.30 AND WAS 1.5, because pinning the lurch
+     * above took the inflation out of THIS arm as well. With bursts the loose
+     * crossing read 2.26x cruise; without them it reads 1.55 to 1.76 over
+     * eight trials, so a floor of 1.5 had 3.3% of headroom on its own worst
+     * draw -- a margin inside its distribution, which is the shape builds 319
+     * and 351 keep having to fix. 1.30 sits in the GAP instead: the braked
+     * crossing measures 0.66 to 0.68 against its own ceiling of 1.20, so 1.30
+     * is 8% above what the claim allows a braked body and 16% below the worst
+     * a loose one was measured at. Measure the broken end, and put the bound
+     * between the two populations rather than beside one of them.
+     */
+    && r.loose.atRim >= r.loose.cruise * 1.3
     /*
      * ---- the RATIO-OF-RATIOS clause is gone (build 310) -----------------
      *

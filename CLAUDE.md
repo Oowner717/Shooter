@@ -12973,3 +12973,122 @@ came from before believing the other one covers it.
   pass each rung is funded independently, but `integrate` accumulates UPWARD,
   so a split run would need `integrate`'s arithmetic re-done by hand, and the
   deep rungs dominate the clock anyway.
+
+- **PHASE 7b-i IS MEASURED FROM BUILD 375, AND THE ANSWER IS ONE CONSTANT:
+  `CFG.boss.temper` CAPS THE BOSS'S COMPENSATION AT 4.2, WHICH IS ALREADY
+  REACHED AT RUNG 14, WHILE THE GUN GOES ON TO x21.101.** Every slot measured
+  floor against funded, three runs each, in one container, funded from build
+  374's curve at its own gate rung -- which is what `fight.mjs --spend` was
+  added for, phase 7b's own phrase being "the turret each slot actually
+  meets". All seven reconciled in all 45 runs (`remainder 1`).
+
+  | slot | rung | floor | funded | change | hard | damage |
+  |---|---|---|---|---|---|---|
+  | ORDINAL | 7 | 257.6s | 266.6s | **+3.5%** | 2.778 | x2 |
+  | GNOMON | 14 | 261.2s | 199.9s | -23% | **4.2** | x3.176 |
+  | FRACTAL | 21 | 252.1s | 145.4s | -42% | 4.2 | x5.042 |
+  | AMPLITUDE | 28 | 233.5s | 94.5s | -60% | 4.2 | x6.353 |
+  | DYNAMO | 35 | 191.4s | **49.2s** | -74% | 4.2 | x21.101 |
+  | PARITY | 42 | 183.4s | **38.3s** | -79% | 4.2 | x21.101 |
+  | TERMINUS | 49 | 335.3s | **74.0s** | -78% | 4.2 | x21.101 |
+
+  21.101 over 4.2 is **5.02 the boss cannot answer**, and the deep fights land
+  at 21-26% of their floor length: PARITY, at rung 42, is a **38-second**
+  fight. Build 352 had already measured `gunScale` at 8.823 fully bought
+  against `temper` 4.2 and recorded that "the clamp binds at a little over
+  half of ONE node's ladder"; this is that clamp measured in seconds of fight
+  rather than in a ratio, and the x21.101 is with CORE, which 352 did not have.
+- **ORDINAL IS THE ONE SLOT WHERE FUNDING MAKES THE FIGHT LONGER, AND THAT IS
+  THE COMPENSATION WORKING.** At rung 7 the run holds 550.7 kB, buys 16
+  levels for damage x2, and `hard` comes out 2.778 -- under the cap, so the
+  boss scales with the gun and slightly past it: the fight goes 257.6s ->
+  266.6s and its longest stage 67.1s -> 81.9s. So the mechanism is not broken,
+  it is CAPPED, and the cap is reached one slot later. Anything that changes
+  `temper` has to keep this row where it is.
+- **THE NEW FORM REMAINDER IS THE LARGEST SINGLE TERM AT THE TOP, AND IT IS
+  NOW PRICED.** TERMINUS funded with the same 271.5 MB reads **140.7s without
+  the grant and 74.0s with it** -- CORE's four levels at x1.35 take damage
+  x6.353 -> x21.101 and halve the fight, 107 levels to 111. Build 363 found
+  that no funded window either probe had ever taken owned CORE, because
+  `currency: 'remainder'` means no amount of bytes reaches it, and recorded
+  that "the model is short of the turret those slots actually meet". The
+  shortfall is a factor of 1.9 on the fight.
+  **Where the grant applies is DERIVED rather than chosen**: NEW FORM needs
+  `CFG.ordinal.recast` = 4 reconciled, and the gate table is 7/14/21/28/35/42
+  /49, so exactly the three slots above the era gate have four or more gates
+  below them. Slots 1-4 cannot own it at the rung they are met on and were
+  measured without it.
+- **AND ONE OF 7b'S TWO ASKS HAS A NEGATIVE ANSWER: THE SEVEN PATIENCE CLOCKS
+  ARE NOT NEEDED.** `CFG.boss.patience` is 150 and the longest STAGE anywhere
+  in the 45 runs is **95.4s** (TERMINUS at the floor, 64% of it); the worst
+  FUNDED stage is 81.9s, at ORDINAL, the slot where funding lengthens the
+  fight. Nothing else comes within half. Build 215 raised that clock 90 -> 150
+  because TERMINUS's last stage was reading "EXACTLY 90.0s every single time",
+  i.e. withdrawing -- and build 353 found that measurement had been taken on
+  the wrong field, so the raise was larger than it needed to be. That is why
+  it clears now, and it means phase 7b's clock half is answered by one number
+  rather than seven.
+- **WHAT 7b-ii HAS TO DECIDE, AND THE ONE ANSWER THAT LOOKS CHEAP AND IS
+  WRONG.** Raising `temper` toward 21 would let the boss scale with the gun
+  and close the collapse in one constant -- and it would delete the reward for
+  upgrading, because a boss that scales exactly with the turret is a boss the
+  tree cannot help you with. The measurement says the problem is not that the
+  cap exists but that the DAMAGE LINE outgrew it by 5x, and the plan's own ask
+  is per-slot health. Authoring that here is the mistake build 304 declined:
+  this build is the measurement.
+- **The floor column agrees with build 353's, across containers, which is
+  worth having.** That build measured the three era-2 slots at three runs
+  each: DYNAMO 188.1s against 191.4 here (1.8%), PARITY 181.1 against 183.4
+  (1.3%), TERMINUS 354.2 against 335.3 (5.3%, and TERMINUS is the loosest of
+  the three). A fight length is a physical measurement with a spread rather
+  than a bit-exact hash, so cross-container agreement inside those spreads is
+  real corroboration -- and it is the first time this repo has had two
+  independent readings of the same boss to compare.
+- **The instrument half shipped separately, on purpose.** `fight.mjs --spend`,
+  `--grant` and the derived policy guard went out as their own commit while
+  the 45 fights were still running, because bumping the BUILD literal makes
+  `askServer()` reload every probe page mid-fight (build 334) -- and
+  `scripts/*` are not served, so REV was unaffected and the commit was clean
+  without a bump. Two suite runs instead of one is what phasing cost, and the
+  alternative was an hour of measurement unprotected against a fourth
+  container reprovision.
+- **Cost: 45 fights, about an hour, ZERO agents.** One background shell
+  driving fifteen `fight.mjs` invocations sequentially, each printing its own
+  block, so a reprovision would have cost the remainder rather than the lot.
+- **AND THE SUITE TURNED UP A LATENT FAULT IN A WITNESS RATHER THAN IN WHAT IT
+  WITNESSES: `lurch` IS THE ONE GAIT MODIFIER IN `drive` WITH NO
+  `!this.staged` GUARD.** The portal-brake arm failed on a build whose only
+  content is a BUILD literal and a table of notes -- builds 319 and 351's
+  condition for fixing a margin properly -- reporting the braked crossing at
+  **2.27x the body's own cruise against a ceiling of 1.20**, with the control
+  at 2.26x, i.e. a separation of 1.00x and the brake looking absent.
+  It is not the brake. `lurch` sits at the BOTTOM of `drive` and adds
+  `rand(40, 90)` to the velocity on a `rand(1.1, 2.4)` clock, while `paired`,
+  `cartwheel` and every replacer branch above it carries `!this.staged` -- so a
+  LURCHER bursts inside the portal's throat. `atRim` is sampled on the LAST
+  STAGED FRAME, which is build 301's own fix and is right, so whether that
+  frame lands in a burst is a coin toss: across four suite dumps the braked
+  crossing read 0.74, 0.77, 0.96 and then 2.27, and the failing run's 95.4
+  minus its cruise of 42.1 is **53.3, square in the middle of the burst's own
+  range**. Pinned in `march` rather than in one arm, because the control's fast
+  crossing is the entry march multiplier (build 298 measured 2.6x cruise) and
+  owes nothing to bursts either. Eight trials after: braked **0.66 to 0.68x**
+  and `hiddenMax / atRim` **2.52 to 2.63** against its 1.60 floor.
+- **...AND THE FIX MADE A SIBLING CONJUNCT THIN, WHICH IS THE HALF THAT WOULD
+  HAVE COME BACK AS A FLAKE.** The bursts were inflating the CONTROL as well:
+  with them the loose crossing read 2.26x cruise, without them 1.55 to 1.76,
+  against a floor of **1.5 -- 3.3% of headroom on its own worst draw**. So
+  removing a confound moved a bound inside its own distribution, one arm along
+  from the one being fixed. It is 1.30 now, placed in the GAP between the two
+  populations: 8% above what the claim allows a braked body (ceiling 1.20) and
+  16% below the worst a loose one measured. **When a fix removes inflation,
+  re-price every bound that was resting on it.**
+- **The missing `!this.staged` on `lurch` is RECORDED AND NOT FIXED**, with the
+  reason. Whether a LURCHER should burst while it is still in the throat is a
+  behaviour question rather than a defect -- it predates build 338's re-key,
+  which was proved identical over the roster (`lurch: true` was on exactly one
+  type and `gait: 'lurch'` is on exactly that type), so this is how the game
+  has always run. Adding the guard would move the ORDINAL hash and wants its
+  own build with a reading either side; authoring it inside one whose content
+  is a boss measurement is build 304's mistake. What is fixed here is the
+  INSTRUMENT, which was reading a gait through a portal.
