@@ -480,10 +480,60 @@ export function hitBurst(x, y, nx, ny, color) {
   dot(x, y, 0, 0, color, 0.16, 13);
 }
 
+/*
+ * ---- WHAT A BURST COSTS, AND WHO IS ALLOWED TO THIN IT ------------------
+ *
+ * `explode` spends four POOLED emitters -- shards, sparks, embers and the
+ * white `dot` at the centre -- and every one of them returns null once
+ * `fx.budgetLeft` is gone. The two `ring`s, the `ripple` and the `shake` are
+ * not pooled and are not counted here: rings have their own unbounded pool,
+ * the ripple is bounded by a 12-deep shift and the shake saturates at 26.
+ *
+ * `share` divides the three COUNTS and nothing else. It exists for one
+ * caller: a boss's ARREST, which from build 385 detonates every piece of a
+ * frame on the frame the core dies. ORDINAL's forty panels are built at
+ * `ring.half / ring.per` -- twenty-four at r 25 and sixteen at r 23.5, so 48
+ * and 44 pooled particles each HERE, plus the four loose sparks the arrest
+ * throws beside every `explode` -- and ask **2,016** against a budget of
+ * 620, so the emitters granted the first twelve pieces a burst and the rest
+ * nothing. Because `arrest`
+ * walks its pieces in list order, and list order round a frame is
+ * geometrical, the twelve were CONTIGUOUS: the frame came apart on one side.
+ * Measured, quality 1 and the governor's 0.45 floor both cap coverage at
+ * about the same count (12 of 40 and 11 of 38), because the budget and the
+ * ask scale with quality together.
+ *
+ * `share === 1` is the exact identity and that is the property the other six
+ * callers rest on: each count floors at 3, 5 or 2, so `Math.max(1,
+ * Math.round(n * 1))` is `n` for every value any of them can take. The
+ * suite drives that rather than trusting it.
+ *
+ * `explodeCost` is the SAME arithmetic, exported, because the caller that
+ * has to fit forty bursts into one frame's budget needs to know what one
+ * costs -- and authored twice it would drift in the one direction nothing
+ * can see, a burst that comes out empty for the last pieces. Note the
+ * embers deliberately carry no `power` factor where the shards and sparks
+ * both do: that is `explode`'s own long-standing arithmetic, and a helper
+ * "tidied" into symmetry would change what every existing caller draws.
+ */
+const thin = (n, share) => Math.max(1, Math.round(n * clamp(share, 0, 1)));
+const shardsFor = (r, power, share) => thin(clamp((r * 0.4 * power * fx.quality) | 0, 3, 22), share);
+const sparksFor = (r, power, share) => thin(clamp((r * 0.7 * power * fx.quality) | 0, 5, 34), share);
+const embersFor = (r, share) => thin(clamp((r * 0.25 * fx.quality) | 0, 2, 12), share);
+
+/**
+ * How many POOLED particles `explode` will ask for at this radius, power and
+ * share. The `+ 1` is the centre dot: it is pooled and gated like the rest,
+ * so it belongs in the cost, and it is NOT divided by `share` -- one particle
+ * marking where the piece was is the last thing a thinned burst should lose.
+ */
+export function explodeCost(r, power = 1, share = 1) {
+  return shardsFor(r, power, share) + sparksFor(r, power, share) + embersFor(r, share) + 1;
+}
+
 /** An object dying: shards, embers, a shock ring and a ground ripple. */
-export function explode(x, y, r, color, glow, power = 1) {
-  const q = fx.quality;
-  const shards = clamp((r * 0.4 * power * q) | 0, 3, 22);
+export function explode(x, y, r, color, glow, power = 1, share = 1) {
+  const shards = shardsFor(r, power, share);
   for (let i = 0; i < shards; i++) {
     const a = rand(0, TAU);
     const s = rand(60, 260) * power;
@@ -493,13 +543,13 @@ export function explode(x, y, r, color, glow, power = 1) {
     const sr = Math.min(rand(r * 0.12, r * 0.3), rand(CFG.drop.min, CFG.drop.max * CFG.drop.burst));
     shard(x, y, Math.cos(a) * s, Math.sin(a) * s, color, rand(0.5, 1.15), sr, 3 + ((Math.random() * 3) | 0));
   }
-  const sparks = clamp((r * 0.7 * power * q) | 0, 5, 34);
+  const sparks = sparksFor(r, power, share);
   for (let i = 0; i < sparks; i++) {
     const a = rand(0, TAU);
     const s = rand(120, 520) * power;
     spark(x, y, Math.cos(a) * s, Math.sin(a) * s, glow, rand(0.18, 0.5), rand(1.5, 3.4));
   }
-  const embers = clamp((r * 0.25 * q) | 0, 2, 12);
+  const embers = embersFor(r, share);
   for (let i = 0; i < embers; i++) {
     ember(x, y, spread(70), spread(70) - 20, color, rand(0.7, 1.6), rand(1.4, 3));
   }

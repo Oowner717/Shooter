@@ -747,6 +747,27 @@ export class Parity extends Boss {
           if (!world.enemies.includes(q)) world.enemies.push(q);
         }
       }
+      /*
+       * ...and the arrest is allowed to take it again, which needs saying
+       * because `snapped` is a RUNNING TOTAL and this is the only ending in
+       * the game that puts its own population back.
+       *
+       * Build 385 made `die` snap the whole frame on the frame the core
+       * dies, so `snapped` arrives here at 14 -- and `arrest`'s loop is
+       * `while (this.snapped < want)` with `want = ceil(alive * k)` and
+       * `alive` rebuilt from the survivors, so 14 < ceil(14 * k) is false for
+       * every k up to 1 and the restored frame could never be taken. Measured
+       * across the three builds, live panes over the outro: build 384 went 14
+       * -> 13 -> 12 -> 9 -> 7 across the beat, and 385 and 386 sat at 14 of
+       * 14 for the whole of it and were swept at the end. So the set-piece
+       * put the frame back and the line below stopped being true.
+       *
+       * Zeroed HERE rather than in `arrest`, because the arrest cannot tell a
+       * restored population from a stalled count: the boss that restores is
+       * the one that knows. `die` is untouched -- the frame still detonates
+       * on the death frame, and this is the beat that takes it a second time.
+       */
+      this.snapped = 0;
       flash(0.4, '#e6d6ff');
       audio.chime(280);
     }

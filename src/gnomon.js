@@ -38,7 +38,7 @@
 import { CFG, TYPE_BY_ID } from './config.js';
 import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
 import { Enemy } from './enemies.js';
-import { explode, ring, ripple, spark, shake, flash } from './fx.js';
+import { ring, ripple, spark, shake, flash } from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { background } from './background.js';

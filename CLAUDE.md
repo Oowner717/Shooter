@@ -6689,8 +6689,15 @@ came from before believing the other one covers it.
   panels ask about 1,160 against `CFG.maxParticles` 620. Measured on the death
   frame: **620 particles of 620 at quality 1 and 279 of 279 at the governor's
   0.45 floor**, i.e. saturated either way, so roughly half the panels show only
-  their ring. Two things keep that acceptable and both were measured rather than
-  hoped for. `ring()` does not gate on `budgetLeft` and `fx.rings` is its own
+  their ring. **THE TWO FIGURES IN THAT SENTENCE ARE BOTH WRONG AND BUILD 386
+  MEASURED THEM: ORDINAL's forty panels are r 25 (twenty-four of them) and
+  r 23.5 (sixteen), which cost 52 and 48 with the arrest's sparks, so they ask
+  **2,016** rather than 1,160 -- 1.74x -- and the
+  count that got a burst was TWELVE of forty, not half.** The governor reading
+  below is wrong too, in the reassuring direction: the coverage is the same at
+  0.45 as at 1 (11 of 38 against 12 of 40), because the ask scales with quality
+  as well as the budget. Two things keep that acceptable and both were measured
+  rather than hoped for. `ring()` does not gate on `budgetLeft` and `fx.rings` is its own
   unbounded `Pool`, so **all 123 rings land** (40 arrest rings, 80 from the two
   each `explode` throws, 3 from the core) -- and the ring is the per-panel
   signal. And `explode` scales its own counts by `fx.quality` while the budget
@@ -6702,6 +6709,13 @@ came from before believing the other one covers it.
   rings, which reads as the blast being brightest where it started. Recorded
   rather than tuned: thinning each burst so all forty get shards is a second
   change with its own render, and the shipped picture delivers the request.
+  **THAT SECOND CHANGE IS BUILD 386, AND "ONE SIDE SPARKLY" UNDERSTATES WHAT
+  THE RENDER SHOWS.** `arrest` walks its pieces in `parts()` order and that
+  order is geometrical, so the twelve that got a burst are CONTIGUOUS: rendered
+  at 8 frames, twelve white bursts down the right and lower-right of the frame
+  and twenty-eight bare rings everywhere else. Measured where the pieces are
+  far enough apart to match particles to them, TERMINUS covered 11 of 32 at
+  quality 1 and 10 of 32 at the floor, GNOMON 11 of 22 and 10 of 22.
 - **THE DEATH GATE CANNOT BE REACHED BY KILLING THE CORE AND STEPPING ONE
   FRAME, AND THE PROBE THAT DID READ EXACTLY LIKE THE CHANGE NOT BEING
   THERE.** A dead core sends `coreFrac` hugely negative, so the trigger for
@@ -14389,3 +14403,385 @@ came from before believing the other one covers it.
   same call builds 345-349, 360, 372, 374, 378 and 382 made. The suite ran
   anyway, as the regression guard rather than the instrument, which is build
   360's own call on a change of this shape.
+
+- **BUILD 386 RESOLVES THE TWO THINGS BUILD 385 SHIPPED UNRESOLVED, AND THE
+  FIRST OF THEM TURNED UP A REGRESSION 385 ITSELF HAD CAUSED.** 385 recorded
+  two: the ORDINAL hash "cannot speak to the death frame at all, so the only
+  evidence the change does what was asked is the A/B and the render", and the
+  burst asymmetry "measured and left alone rather than tuned". Both are
+  closed, and closing the first meant building the instrument that could see
+  the death -- which is what then found PARITY.
+- **THE HASH'S BLINDNESS IS ITS SCENARIO AND ITS SAMPLING, AND FUNDING THE GUN
+  FIXES ONLY THE FIRST.** `fight.mjs --hash` runs a fixed number of frames of
+  an assists-only fight and an unfunded ORDINAL is still standing at 9,000 of
+  them, which the probe says in its own last line (`still standing, 0
+  remainder`). `--spend` ends the fight -- but the hash samples every 300
+  frames and the ARREST beat is `C.arrest` seconds, 42 frames for six of the
+  seven anomalies, so a sample lands inside the window the change is about
+  **about one time in seven**. A reading with a one-in-seven chance of seeing
+  the thing it is about cannot report its absence.
+  `--death` digests EVERY frame instead and splits at the sequence's own
+  beats: `pre` from the start of the fight to the frame the gate fires,
+  `arrest` while `boss.beat < C.arrest`, `after` to the end of `dying`. The
+  split is read off `beat` and the beat's length off the anomaly's own config
+  block (keyed by its core's id, falling back to the same 0.7 `dieStep` falls
+  back to), because written out it would be right for six of the seven and
+  wrong for TERMINUS's 1.6.
+- **IT MIXES THE WORLD AND NOT THE PICTURE, AND THAT IS WHAT LETS `after` HOLD
+  STILL.** Every part's position, health and marks, the core, the field
+  counts, `snapped`, `beat` and the time scale. Particles and rings are
+  REPORTED beside the digests rather than mixed into them: a particle's
+  position is rolled, so a digest over the picture moves whenever the PRNG
+  interleaving moves and the one window that has to be able to read
+  "identical" never could. `--death` refuses without `--seed` rather than
+  printing three numbers nobody can compare, and refuses a fight that did not
+  die rather than printing a `pre` digest over a fight that never reached the
+  gate. Both refusals exit 1; verified.
+- **THE READING, ALL THREE BUILDS IN ONE CONTAINER, ORDINAL AT RUNG 7 AND
+  AMPLITUDE AT 28, FUNDED FROM BUILD 374'S CURVE:**
+
+  | | ORDINAL 384 -> 385 | 385 -> 386 | AMPLITUDE 384 -> 385 | 385 -> 386 |
+  |---|---|---|---|---|
+  | `pre` (14,345 / 7,253 frames) | **identical** | **identical** | **identical** | **identical** |
+  | `arrest` (42 frames) | **moved** | identical | **moved** | identical |
+  | `after` (954 / 966 frames) | **moved** | identical | **moved** | identical |
+  | snapped on the gate frame | 0 -> 2 | 2 | 0 -> 13 | 13 |
+
+  So `pre` is the claim the hash was supposed to make and structurally could
+  not, now made at full frame resolution over the whole fight rather than at
+  one sample in 300: **neither change reached the 239 or the 121 seconds of
+  fight.** `arrest` and `after` moving for 384 -> 385 is the change localised
+  to the death and its outro. And 385 -> 386 is byte-identical in all three
+  windows on both bosses, including the reported peak particle count -- which
+  is the no-op claim measured rather than argued, because in both of those
+  real fights the ask fits and the share comes out exactly 1.
+  The digest is reproducible: two runs of one command, bit-identical.
+- **AND THE FIRST THING IT PRINTED KILLED THE PREMISE OF THE SECOND ITEM: A
+  FUNDED DEATH FINDS ALMOST NO FRAME STANDING.** `it found N of M part(s)
+  standing` -- because by the time the core dies the run has shot the frame
+  apart. All seven anomalies, funded at their own gate rungs; the four that
+  matter at three seeds each:
+
+  | slot | standing at the gate | of | its coverage ceiling |
+  |---|---|---|---|
+  | ORDINAL | 2, 1, 0 | 40 | 12 (q 1) / 11 (q 0.45) |
+  | GNOMON | 4, 3, 3 | 28 | 12 / 11 |
+  | FRACTAL | 0 | 14 | 18 / 15 |
+  | **AMPLITUDE** | **13, 14, 14** | **14** | **18 / 15** |
+  | DYNAMO | 0 | 3 | -- |
+  | PARITY | 0 | 14 | -- |
+  | TERMINUS | 0, 1, 3 | 44 | 10 / 9 |
+
+  The budget free at the gate was **512 to 555 of 620 in every one of them**,
+  and AMPLITUDE -- the one boss whose structure is not the path to its core,
+  so it dies with its frame intact -- fits with four pieces to spare at
+  quality 1 and one at the governor's floor (measured directly, 255 of 279,
+  13 of 13 covered). **So no measured real fight has a bare piece**, and the
+  bare-piece picture needs a FULL frame, which is the case's synthetic kill.
+- **THE COVERAGE CEILING IS ABOUT THE SAME AT EVERY QUALITY, WHICH IS THE
+  NON-OBVIOUS HALF.** One piece's ask, measured off an empty pool: r 16 asks
+  30 for its `explode` and 34 with the arrest's four sparks, r 24 46/50, r 25
+  48/52, r 30 57/61. Both the budget and the ask scale with `fx.quality`, so
+  `floor(budget / cost)` barely moves: **12 pieces at quality 1 and 11 at
+  0.45 for ORDINAL, 10 and 9 for TERMINUS.** Build 385's note read the floor
+  as the bad case; it is not, and neither reading was taken.
+- **SO THE FIX SHIPS ANYWAY, AND THE REASON IS THAT IT IS FREE WHERE IT DOES
+  NOT BITE.** `explode` grew a seventh argument, `share`, which divides its
+  three counts and nothing else, and `share === 1` is the exact identity --
+  each count floors at 3, 5 or 2, so `Math.max(1, Math.round(n * 1))` is `n`
+  for every value any of them can take. In every funded fight measured the
+  share comes out exactly 1, so this is the identity in all of them; what it
+  removes is AMPLITUDE's one-piece margin at the governor's floor, and the
+  full-frame case, which is reachable through the three bulk revives
+  (`Boss.reform`, GNOMON's `rebuild`, FRACTAL's `sprang`) even if no measured
+  fight produced it. That is build 329's and 361's ruling rather than a bug
+  fix: correct, identity everywhere reachable, and **the silence was the
+  fault** -- and it is LATENT rather than live, which build 361 demands be
+  said plainly.
+- **IT IS SELF-STARVATION AND NOT BUILD 350'S SHAPE, WHICH IS WHY THE ANSWER
+  IS DIFFERENT.** 350 refused to scale HAIL's share because nothing else
+  wanted the budget -- measured, the field left 120 of 279 at p1 and one frame
+  in 2,700 left less than the press asked for. Here the thing that wanted the
+  budget is **the rest of the same event**: forty pieces asking 2,016 against
+  620, granted in call order, so the first twelve take it all. A share is a
+  fault when something wanted the budget, and the other pieces are something.
+- **THE FLOORS ARE RESERVED RATHER THAN SHARED, AND A NAIVE `budget / ask`
+  DOES NOT FIT.** `explodeCost(r, power, 0)` is the smallest burst there is
+  (one shard, one spark, one ember and the centre dot) and no share makes it
+  smaller, so the share is the room ABOVE those floors over the ask above
+  them -- the largest factor that still fits. Measured at the governor's
+  floor, forty panels at a flat `budget / ask` deliver **320 against a budget
+  of 279**, because rounding and the floors add one or two particles a piece.
+  It returns 0 when even the floors do not fit, which is the honest give-up
+  rather than a safe-looking one: that needs a frame of about 55 pieces at
+  0.45 and the largest on the roster is 44, so nothing in the game reaches
+  it. Driven at the edges: empty pieces -> 1 (no division, so no NaN when the
+  pool is also spent), one piece -> 1, forty -> 0.2234 and 0.1039, a spent
+  pool -> 0, two hundred pieces -> 0. A negative `budgetLeft` -- reachable
+  because the governor lowers quality while particles bought at the richer
+  budget are still live -- takes the same `room <= 0` branch; it could not be
+  manufactured from outside, since the emitters refuse past the budget.
+- **`explodeCost` IS THE SAME ARITHMETIC AND ONE OWNER, AND THE TRAP IS THE
+  EMBERS.** The caller that has to fit forty bursts into one budget needs to
+  know what one costs, and authored twice the cost and the spend drift in the
+  one direction nothing can see -- a share computed against the wrong ask
+  overshoots and the last pieces are clipped again. **`embers` carries no
+  `power` factor where `shards` and `sparks` both do**, so a helper "tidied"
+  into symmetry agrees with itself and disagrees with what every existing
+  caller draws (at power 1.5 an ORDINAL panel's embers would go 6 to 9). The
+  suite DRIVES the helper against the emitter over 540 (quality, radius,
+  power, share) rows off an empty pool each time, and checks the unthinned
+  form against the pre-386 expression RESTATED in the case -- because a helper
+  checked against itself is not checked, and a restatement in a test is a test
+  rather than a second source of truth. Its own revert proofs: the embers line
+  given a power factor fires, and the centre dot dropped from the cost fires.
+- **THE DOT IS A FOURTH POOLED COUNT AND IS COUNTED WITHOUT BEING SCALED.**
+  `explode` spends four pooled emitters, not three: the white `dot` at the
+  centre is gated like the rest. It belongs in the cost, and it is the last
+  thing a thinned burst should lose -- one particle marking where the piece
+  was. Said at the site, because the plan's own two sentences disagreed about
+  it and the next reader would "fix" it in whichever direction they read
+  first.
+- **THE ARREST'S OWN FOUR SPARKS ARE IN THE ASK, AND OMITTING THEM OVERSHOOTS
+  BY EXACTLY THE AMOUNT THAT CLIPS AGAIN.** They live outside `explode` in
+  both copies of `arrest`, so a denominator built from `explodeCost` alone is
+  short by four a piece -- 8% at quality 1 and 17% at the floor. Priced that
+  way ORDINAL's share comes out 0.334 against a true 0.308 and the frame
+  spends 648 of 620. `ARREST_SPARKS` is one constant, exported for the suite
+  with the reason stated, because the arm that asserts nothing was clipped has
+  to price what the frame asked for.
+- **RENDERED, AND THE PICTURE IS THE JUDGEMENT.** Offscreen at 390x844 with
+  `timeScale` pinned, ORDINAL's full frame 8 frames after the death: build 385
+  is twelve white bursts down the right and lower-right with twenty-eight bare
+  magenta rings; build 386 is all forty lit, evenly, in both concentric
+  squares -- and it reads BRIGHTER on 495 particles than 385's 620, because
+  the light is spread over forty sites instead of twelve. At the governor's
+  floor (share 0.072, 224 particles) every one of the forty still reads, which
+  refutes the one design worry a reviewer raised about the change: five to
+  seven particles a piece plus the three rings is legible, because the ring
+  and the dot carry most of the read and the glow composites.
+- **AND IT GIVES THE BEAT AFTER IT ROOM, WHICH IS THE OTHER THING NOBODY HAD
+  MEASURED.** `updateFx` takes the SCALED dt and `die` slams `world.timeScale`
+  to `CFG.boss.endSlow` 0.12 for `slowFor` 3.6s, so whatever the arrest spends
+  occupies its slots about eight times longer than usual. Measured on the full
+  frame: build 385 sits at **620 of 620 with 0 free** through frames 0 and 20
+  and 11 free at frame 60, where 386 leaves **125 free** at 0 and 20 and 166
+  at 60 -- so the INFALL has somewhere to go. **The DETONATION is clipped
+  either way** (9 and 10 free when it fires, against an ask of about 99),
+  because the infall then fills the pool itself; that is pre-existing,
+  unchanged here, and recorded rather than fixed.
+- **AND THE INSTRUMENT THAT FOUND ALL OF THAT FOUND A REGRESSION BUILD 385 HAD
+  SHIPPED: PARITY'S ENDING PUT ITS FRAME BACK AND THEN NEVER TOOK IT.**
+  `Parity.dieExtra` is the only ending in the game that revives its own
+  population -- on the first frame of the ARREST beat it raises every dead
+  pane to 30% health, under a comment reading "it holds, whole, until the
+  arrest takes it". Build 385 made `die` snap the whole frame on the death
+  frame, which leaves `snapped` at the full count, and `arrest`'s loop is
+  `while (this.snapped < want)` -- so the restored frame could never be taken.
+  Traced across the three builds, live panes over the outro: **384 went 14 ->
+  13 -> 12 -> 9 -> 7 across the beat, and 385 and 386 sat at 14 of 14 for the
+  whole of it** and were swept when the boss was done. The set-piece put the
+  frame back and its own sentence stopped being true.
+  **Nothing in the suite could see it** -- no arm had ever counted PARITY's
+  panes through its outro -- and nothing about the fault is visible in build
+  385's diff, which is two `arrest(world, 1)` calls in another file.
+- **TWO THINGS HAD TO MOVE AND THEY DO DIFFERENT JOBS, WHICH ONLY THE MIDDLE
+  OF THE BEAT CAN TELL.** PARITY zeroes `snapped` where it restores, because
+  the arrest cannot tell a restored population from a stalled count and the
+  boss that restores is the one that knows. And `want` is a share of what the
+  sequence is working through (`snapped + all.length`) rather than of the
+  survivors -- against the survivors alone `want` shrinks as `snapped` grows,
+  the two meet in the middle, and the loop stops entering. **That is the stall
+  build 385 found and fixed only for the `k = 1` door**: `die` calls
+  `arrest(world, 1)` where `snapped` is 0 and `all` is the whole frame, so the
+  whole frame goes, and the staged path still could not finish. The `k = 1`
+  case is unchanged to the piece, so `die` is untouched.
+  Measured after: frame 0 all 14 explode, frame 1 the set-piece restores all
+  14 and resets the count, and the beat takes them to **0 by k = 0.67** with
+  nothing standing -- the authored ending, and strictly better than 384, which
+  stalled at 7 of 14.
+- **AND THE PROOF FOR THE RESET DID NOT FIRE UNTIL THE DENOMINATOR STOPPED
+  BEING PART OF THE FAULT.** With the reset removed the beat still FINISHES,
+  because `snapped + all.length` is then 28 -- the fourteen that died plus the
+  fourteen that came back -- and `ceil(28 * k)` passes 14 before the beat is
+  out. What it loses is the PACING: `want` does not exceed the 14 already
+  counted until k is past a half, so nothing moves for the first half of the
+  beat and the whole frame goes at the end of it. A mid-beat sample sees that
+  (7 of 14 standing with the reset, 14 of 14 without) -- but only against the
+  ROSTER count, because `pop` is derived from the counter and the counter is
+  what is under test: 14 of 28 clears any fraction. **A denominator that moves
+  with the fault cannot see it**, and that is the second time in this build a
+  proof had to be re-aimed before it could fire.
+- **FIVE INSTRUMENT FAULTS OF MY OWN, AND FOUR OF THEM READ AS RESULTS.**
+  - **A snapshot taken before the blow measured how far the pieces MOVED.**
+    The first coverage probe recorded the piece positions before killing the
+    core and read **6 of 40 covered, 34 bare, and 24 of 40 ringed** -- on a
+    build where every snapped piece demonstrably got three rings. A dead core
+    sends `coreFrac` hugely negative, so the trigger for whichever set-piece
+    the boss has not played fires and RETURNS above its own death gate:
+    ORDINAL goes into CONVERGENCE for 281 frames, which throws its segments
+    out and reels them into the core. The tell was arithmetic rather than
+    suspicion -- 109 rings is exactly 36 x 3 + the core's one, so the rings
+    were all there and the positions were not. Snapshot on the frame BEFORE
+    the gate.
+  - **...and after that ORDINAL's pieces sit 2 units apart, where no
+    positional metric can work at all.** Which is why the case's coverage
+    conjunct is exact arithmetic instead: on a boss whose part set does not
+    change inside `die`, `got === want` over the pieces the arrest actually
+    took IS coverage, proved without positions.
+  - **The recorded share read 1 for a frame thinned to 0.201.** `arrest` is
+    called again on every frame of the ARREST beat and those calls are no-ops
+    from build 385, so an unconditional `this.burstShared = share` reports the
+    LAST call's value. Recorded only when the call actually takes something.
+  - **A page screenshot of the field is a picture of the title screen.**
+    `g.restart()` puts the boot panel back up and `#boot` is a DOM overlay
+    over the canvas; an element screenshot is no better, because the canvas is
+    transparent wherever nothing is drawn and the panel reads through it.
+    Composite onto an opaque ground in an offscreen canvas and write the
+    dataURL, which is what every visual instrument in `scripts/` already does.
+  - **The exact snapped set is neither the before-set nor `boss.snapped`.**
+    It is their intersection: alive on the frame before AND dead on the gate
+    frame. The before-set includes whatever the arrival left dead, and
+    `snapped` counts pieces that were not in the before-set at all -- TERMINUS
+    unhides its inner ring inside `die` and snapped 44 against a before-set of
+    32, GNOMON 28 against 22. Pricing what the frame asked for over the wrong
+    set is how a "nothing was clipped" arm passes on a tree that clipped.
+- **AND `snapped + all.length` IS NOT INVARIANT FOR PARITY, WHICH IS WHY THE
+  CASE ASSERTS FINISHING RATHER THAN AN EXACT COUNT.** `pairPanes` takes a
+  broken pane's MIRROR TWIN with it, and that leaves `all` without going
+  through the counter, so the end count reads 12, 13 or 14 of 14 run to run.
+  What is invariant is that nothing is left standing and that the beat took
+  more than the one piece the restore frame already had. An exact conjunct
+  there would have been a flake with a plausible-looking number.
+- **SEVEN REVERT PROOFS, EACH FIRING ON ITS OWN CONJUNCT WITH ITS OWN
+  DETAIL.** Three of them share one arm, so the attribution is in the message
+  (build 353's rule): the share computed and NOT PASSED reads `asked 480, got
+  620, covered 13 of 38`; `burstShare` neutered to 1 reads `share 1, asked
+  1920 of 620, got 620, covered 12`; the sparks left out of the ask reads
+  `share 0.2827` with GNOMON saturating at 620. Then the embers given a power
+  factor and the dot dropped from the cost, both on the helper arm; and
+  PARITY's reset and the `want` expression, on the ending arm. **Two of them
+  independently reproduce the arithmetic**: the coverage figures 13 and 12 of
+  38 are the ~12 the per-piece cost predicts, from a positional metric that
+  knows nothing about it. Every landing was `grep -c`'d first, every verdict
+  read as a MESSAGE rather than as `$?`, and the tree restored from a `cp`
+  snapshot and diffed byte-identical afterwards.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922`, all six
+  intermediate marks and all six body counts identical to build 385's, served
+  BUILD confirmed as 386 in the probe's own heading. `explode` is on the hot
+  path of every body death in that fight -- every TALLY and DIGIT goes through
+  `Enemy.destroy` -> `explode`, and `shard()` rolls inside the emitter after
+  its budget gate -- so a change to its counts or to its argument list is
+  exactly what that instrument is for. An unchanged hash is what "a seventh
+  argument defaulting to the identity reached nothing" looks like measured,
+  which is the argument build 329 records this repo as not accepting from
+  inspection. Note it remains blind to the death frame, which is what
+  `--death` is for.
+- **AND TWO DEAD THINGS IN THE BLAST RADIUS, BOTH `git rm`.** `explode` was
+  imported and never called in `fractal.js` and `gnomon.js` -- two bindings
+  the bundle shipped, and touching `explode`'s signature is the moment they
+  read as live callers to anyone grepping the import list. And
+  `Ordinal.arrest` opened with `const C = O();` and used `C` zero times, a
+  maintained write with no reader in one of the two functions this build
+  edits: the `ttl` / `diveT` / `const q` shape, now six times. (`const q =
+  fx.quality` in `explode` became the sixth when the count helpers took over
+  its readers, and went in the same pass.)
+- **...AND THE NOTE ABOVE CLAIMED A REMOVAL THAT HAD NOT HAPPENED, THROUGH TWO
+  GREEN SUITE RUNS.** The two imports really did go; `Ordinal.arrest`'s
+  `const C = O();` was still the first statement of that function when the
+  paragraph saying it had gone was written, and stayed there through both
+  runs -- so "BOTH `git rm`" was one for two. It is out now, verified as
+  fourteen `const C = O()` in that file going to thirteen with the one in
+  `infall` two functions down still live and still used (`C.pull`), which is
+  why a blind sweep of that expression would have been wrong. **A note saying
+  a thing was removed is a claim about the tree and not about the intention**
+  -- builds 337 and 357 both record a removal pass deleting the config and the
+  prose and missing the code, and this is the same fault with the prose
+  running AHEAD of the code rather than behind it. What found it is the one
+  instrument that costs nothing: re-reading my own `git diff` before
+  committing, which is also what caught build 381's undeleted director stub
+  and build 356's. The tell was in the diff's own context lines -- a line I
+  had written a paragraph about appearing as unchanged CONTEXT rather than as
+  a deletion.
+  Fixed in the same pass: `fx.js`'s docstring said ORDINAL's panels cost "48
+  and 44 pooled particles each -- and ask **2,016**", which are two different
+  quantities a reader has to know to add the arrest's four loose sparks to
+  (24 x 48 + 16 x 44 is 1,856), where `boss.js`'s copy of the same figure
+  spells the 52 and 48 out. Both suite runs were before these two edits, so a
+  third was run rather than arguing about which strings a case can see, which
+  is build 356's ruling and the reason its own comment-only edit cost a run.
+- **WHAT THE READ-ONLY FAN-OUT WAS WORTH, PRICED HONESTLY.** Three lenses over
+  committed HEAD plus an adjudicator, launched before any of this was written
+  and while the measuring ran. It found, correctly and with the line numbers,
+  every one of: `boss.js` not importing `fx` at all (so `fx.budgetLeft` in
+  `arrest` would be a ReferenceError thrown from inside the rAF loop, which
+  build 288 records as reading to the player as a freeze); the embers line's
+  missing `power`; the dot being a fourth pooled count; the four loose sparks
+  having to be in the ask, with the 648-of-620 arithmetic; the floor-of-1
+  overshoot; build 385's 1,160 figure being 1.8x low; the existing case being
+  unable to fail for the change; `takeMinions` spending pooled particles four
+  lines before `arrest`; there being no per-frame pool reset; a negative
+  `budgetLeft`; the two dead imports; the dead `const C`; and **PARITY's
+  restore**, which is the regression above and which I would not have looked
+  for. The standing rule held in both directions: every mechanism was
+  re-measured here before being acted on, and one lens reported that the tree
+  had changed under it mid-read -- which is build 370's own lesson about
+  reviewing a tree you are editing, arriving from the agent's side.
+- **AND THE ADJUDICATOR CAUGHT A FIGURE OF MINE THAT I HAD ALREADY WRITTEN
+  INTO FOUR PLACES, WHICH IS THIS FILE'S OWN RULE ARRIVING ON MY OWN
+  CORRECTION.** Build 385's ask is not 2,080 either: ORDINAL's forty panels
+  are built at `ring.half / ring.per`, so **twenty-four at r 25 costing 52
+  each and sixteen at r 23.5 costing 48** -- **2,016**, verified here off
+  `CFG.ordinal.rings` and `explodeCost` rather than taken. The 2,080 came from
+  reading `r=24,25` off a probe that ROUNDS its radius census and then quoting
+  the rounded 24 as if it were a panel's radius; the same slip made one
+  sentence internally inconsistent, since r 24 costs 46 + 4 = **50** and not
+  the 52 beside it. **A rounded readout quoted as a value** is the shape, and
+  it is one step along from build 313's "round for the message, divide the
+  raw": round for the message, and do not then cite the message. The
+  corroborating detail is that build 385's own 1,160 came from the `tally`
+  TYPE's `r: 15` rather than from the constructed radius, so both figures
+  were the same kind of mistake at different radii.
+  Two more of its settlements, both verified: `detonate`'s radial spokes are
+  **30** in both copies (so its ask is 30 + 69 = 99, which is the figure used
+  above), and the carry-over `takeMinions` leaves in the pool is **0.5% to 9%
+  of the budget** rather than the 41% one lens supposed -- GNOMON's gate fires
+  one frame after the blow with the core's own 55-particle burst fully
+  resident, ORDINAL's 281 frames later with 3, and the garrison costs nothing
+  because `parked` minions are cleared with a bare flag and no `destroy`.
+- **AND THE SUITE CAUGHT THE ONE CONJUNCT I HAD ASSERTED AGAINST MY OWN
+  EVIDENCE.** The new arm's strongest form was `got === want` -- on a boss
+  whose part set is stable, the delivery equals the ask, which is coverage
+  proved without positions. It is not exact, and the suite read **342 against
+  333 at quality 0.7**: `die` runs `takeMinions` four lines before `arrest`
+  and a minion's `Enemy.destroy` explodes on the same frame, so the frame runs
+  a few particles over. **The evidence was already in this build's own
+  `--death` readings** (`+12` extra at the governor's floor) and in the note
+  above about `burstShare` reading the LIVE budget for exactly that reason,
+  and I asserted equality anyway. What is left is `got >= want` (nothing was
+  clipped) and `got < budget` (the pool was not exhausted) -- the second being
+  the one that sees a share COMPUTED and not PASSED, since a tree that asks in
+  full and lets the pool clip delivers the budget exactly and so satisfies the
+  first. A `wantFull` bound was tried as a third and dropped: it is strictly
+  weaker (41 particles of margin against 18) and it is a latent trap, because
+  on a frame whose ask FITS the share is 1, `wantFull - want` is 0, and the
+  bound degenerates into the exactness that is not available.
+  It also took a SECOND correction to price the ask over the right set. The
+  first version took "alive before AND dead after", which misses a piece that
+  was `hidden` before and snapped anyway -- GNOMON unhides six needle segments
+  inside `die`, 42 particles at quality 0.7 and **14% of the frame's ask**, so
+  the arm carried 14% of unpriced slack. Every part whose `dead` went false to
+  true, hidden or not, is the set, and it matches `bo.snapped` to the piece.
+- **THE SINGLE-FILE BUILD WAS CHECKED AND BOOTED, BECAUSE THE NEW IMPORT FORM
+  IS ONE `wrap()` HAS TO PARSE.** boss.js's import is two lines now
+  (`import { explode, explodeCost, fx, ... }` then `  from './fx.js';`), and
+  build 127's lesson is that a form `wrap()` has not been taught passes
+  through verbatim, a bare `import` in a classic script is a SyntaxError, and
+  the page then boots to its title screen and nothing else ever runs -- for
+  fifty-three builds. `node scripts/bundle.mjs` is clean (46 modules, "no
+  module statements left in either form", "no reassignable exports", the rev
+  stamp at byte 43 and 106 inside the 2KB window), and **both forms were
+  served over http and driven**: `window.__sim` exists, `g.start()` plus 120
+  frames advances `world.time` to 2.00s, and nothing 404s or throws.
+  `export const ARREST_SPARKS` and `export function explodeCost` both hit
+  taught rules and neither is a reassignable `export let`.

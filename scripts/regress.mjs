@@ -42792,6 +42792,112 @@ if (MINE_LINE) {
 }
 
 /*
+ * ---- `explodeCost` IS `explode`'S OWN ARITHMETIC, AND `share` 1 IS THE
+ *      IDENTITY (build 386) ------------------------------------------------
+ *
+ * `explode` grew a seventh argument so that a boss's ARREST can thin forty
+ * bursts into one frame's budget, and `explodeCost` is the same counts
+ * exported so the caller can price what it is about to ask for. Two things
+ * have to hold and neither is self-evident from the source.
+ *
+ * ONE OWNER. Authored twice, the cost and the spend drift in the one
+ * direction nothing can see -- a share computed against the wrong ask
+ * overshoots and the last pieces are clipped again, which is the fault the
+ * share exists to remove. So the helper is DRIVEN against the emitter here,
+ * over quality, radius, power and share, off an empty pool each time. The
+ * trap it guards is specific: `embers` carries no `power` factor where
+ * `shards` and `sparks` both do, so a helper "tidied" into symmetry agrees
+ * with itself and disagrees with what every existing caller draws -- at
+ * power 1.5 an ORDINAL panel's embers would go 6 to 9.
+ *
+ * THE IDENTITY. Six of the seven callers pass six arguments and must be
+ * untouched. `share === 1` is exact because each count floors at 3, 5 or 2,
+ * so `Math.max(1, Math.round(n * 1))` is `n` for every value they can take
+ * -- and that is checked against the pre-386 expression RESTATED here rather
+ * than against the helper, because a helper checked against itself is not
+ * checked. A restatement in a test is a test; it is a second source of truth
+ * only if something reads it.
+ *
+ * `fx.quality` is put back and the restore is asserted, because the backing
+ * store is sized inside `resize()` and a case that leaves the governor's
+ * factor on the floor charges every later case for it.
+ */
+{
+  const cst = await page.evaluate(async () => {
+    const { fx, explode, explodeCost } = await import('/src/fx.js');
+    const { CFG } = await import('/src/config.js');
+    const wasQ = fx.quality;
+    const wasShake = fx.shake;
+    const rows = [];
+    const one = (r, power, share, six) => {
+      fx.particles.clear();
+      if (six) explode(0, 0, r, '#ffffff', '#ffffff', power);
+      else explode(0, 0, r, '#ffffff', '#ffffff', power, share);
+      return fx.particles.active.length;
+    };
+    for (const q of [1, 0.7, 0.45]) {
+      fx.quality = q;
+      // Radii spanning the roster: a GNOMON needle segment at 11, an
+      // AMPLITUDE seg at 16, ORDINAL's panels at 24 and 25, TERMINUS's at 30,
+      // and a boss core at `coreR * 2`.
+      for (const r of [11, 16, 24, 25, 30, 76]) {
+        // Powers as they are actually passed: a drop, an ordinary body, a
+        // dropped boundary piece, an arrest, a core.
+        for (const power of [0.55, 1, 1.3, 1.5, 4]) {
+          for (const share of [1, 0.5, 0.2, 0.05, 0]) {
+            rows.push({ q, r, power, share,
+              got: one(r, power, share), want: explodeCost(r, power, share) });
+          }
+          // ...and the six-argument form every other caller uses.
+          rows.push({ q, r, power, share: 'six',
+            got: one(r, power, 1, true), want: explodeCost(r, power, 1) });
+        }
+      }
+    }
+    fx.particles.clear();
+    fx.rings.clear();
+    fx.ripples.length = 0;
+    fx.shake = wasShake;
+    fx.quality = wasQ;
+    return { rows, wasQ, back: fx.quality, cap: CFG.maxParticles };
+  });
+
+  // The pre-386 expression, restated independently -- three clamps and the
+  // centre dot. Note the embers line has no `power`.
+  const preShare = (r, power, q) => {
+    const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    return cl((r * 0.4 * power * q) | 0, 3, 22)
+      + cl((r * 0.7 * power * q) | 0, 5, 34)
+      + cl((r * 0.25 * q) | 0, 2, 12) + 1;
+  };
+  const bad = cst.rows.filter((x) => x.got !== x.want);
+  const full = cst.rows.filter((x) => x.share === 1 || x.share === 'six');
+  const drifted = full.filter((x) => x.got !== preShare(x.r, x.power, x.q));
+  const thinned = cst.rows.filter((x) => typeof x.share === 'number' && x.share < 1);
+  check('explodeCost is explode\'s own arithmetic, and a share of 1 is the identity',
+    cst.rows.length >= 300
+    // The helper and the emitter agree, at every quality, radius, power and
+    // share -- including 0, where every count is at its floor of one.
+    && bad.length === 0
+    // ...and the unthinned form is what it was before the argument existed,
+    // against an independent restatement rather than against the helper.
+    && drifted.length === 0
+    // Liveness: a share under 1 has to actually thin something, or the rows
+    // above agree because nothing was scaled.
+    && thinned.some((x) => x.got < preShare(x.r, x.power, x.q))
+    // ...and every thinned burst still has something in it. A piece that
+    // asks for nothing is not a thinned burst, it is a missing one.
+    && thinned.every((x) => x.got >= 4)
+    && cst.back === cst.wasQ
+    && true,
+    `${cst.rows.length} (quality, radius, power, share) rows: ${bad.length} where the`
+    + ` helper and the emitter disagree, ${drifted.length} of ${full.length} unthinned`
+    + ` rows off the pre-386 expression, thinnest ${Math.min(...thinned.map((x) => x.got))}`
+    + ` particle(s), floor-only cost ${cst.rows.filter((x) => x.share === 0)[0].got}`
+    + `; quality ${cst.wasQ} -> ${cst.back} restored`);
+}
+
+/*
  * A BOSS'S STRUCTURE GOES WITH ITS CORE, ON THE FRAME THE CORE DIES.
  *
  * `arrest(world, k)` snapped `ceil(alive * k)` pieces a frame across the
@@ -42822,7 +42928,8 @@ if (MINE_LINE) {
  */
 {
   const bs = await page.evaluate(async () => {
-    const { fx } = await import('/src/fx.js');
+    const { fx, explodeCost } = await import('/src/fx.js');
+    const { ARREST_SPARKS } = await import('/src/boss.js');
     const { CFG } = await import('/src/config.js');
     const g = window.__sim;
     const w = g.world;
@@ -42861,14 +42968,85 @@ if (MINE_LINE) {
        */
       let alive = 0;
       let waited = 0;
+      /*
+       * ...and the piece OBJECTS, not just the count, because the set the
+       * arrest actually took is the intersection of "alive on the frame
+       * before" and "dead on the gate frame" -- every part whose `dead` went
+       * false to true, `hidden` or not. Neither half alone is it: the
+       * before-set's ALIVE half misses a piece that was hidden before and
+       * snapped anyway, and the after-set alone counts whatever the arrival
+       * left dead. GNOMON unhides six needle segments inside `die` and
+       * TERMINUS its whole inner ring -- 28 against 22 and 44 against 32.
+       *
+       * Pricing it over the wrong set is not a rounding error: those six
+       * segments are 42 particles at quality 0.7, 14% of the frame's ask,
+       * and a "nothing was clipped" arm with 14% of slack in it cannot see a
+       * tree that clipped.
+       */
+      let before = [];
       for (; waited < 6000 && !(bo.dying > 0); waited++) {
-        alive = bo.parts().filter((p) => !p.dead && !p.hidden).length;
+        const ps = bo.parts();
+        alive = ps.filter((p) => !p.dead && !p.hidden).length;
+        before = ps.map((p) => ({ p, wasDead: p.dead }));
         fx.particles.clear();
         fx.rings.clear();
         g.update(1 / 60);
       }
       if (!(bo.dying > 0)) throw new Error('death gate never fired for ' + n);
       const parts = alive;
+      /*
+       * What the frame asked the pool for at the share the arrest used, and
+       * what it got. `explodeCost` is `explode`'s OWN arithmetic (the arm
+       * above drives that) and `ARREST_SPARKS` is `arrest`'s own constant, so
+       * this is not a second model of the spend -- and if the budget had
+       * clipped anything, `got` would be short of `want`.
+       */
+      const took = before.filter((o) => !o.wasDead && o.p.dead);
+      const share = bo.burstShared === undefined ? 1 : bo.burstShared;
+      let want = 0;
+      let wantFull = 0;
+      for (const o of took) {
+        want += explodeCost(o.p.r, 1.5, share) + Math.max(1, Math.round(ARREST_SPARKS * share));
+        wantFull += explodeCost(o.p.r, 1.5, 1) + ARREST_SPARKS;
+      }
+      /*
+       * ...and how many of those pieces a particle actually landed on, which
+       * is the only conjunct that can see a share COMPUTED and not PASSED --
+       * `got >= want` is satisfied by a tree that asks full and lets the pool
+       * clip, because the clipped total is larger than the thinned ask.
+       *
+       * Assigned to the NEAREST piece rather than within a radius, so a
+       * neighbour cannot steal one and there is no tolerance to choose. It is
+       * only sound where the pieces are further apart than one frame of the
+       * fastest thing `explode` throws -- a spark at `rand(120,520) * 1.5`,
+       * so 13 units -- and `minGap` is measured so the arm can say which
+       * bosses qualified. ORDINAL's do not: CONVERGENCE reels its panels into
+       * the core before the gate and they sit two units apart, where no
+       * positional metric can work at all.
+       */
+      const spots = took.map((o) => ({ x: o.p.x, y: o.p.y }));
+      let minGap = Infinity;
+      for (let i = 0; i < spots.length; i++) {
+        for (let j = i + 1; j < spots.length; j++) {
+          const d = Math.hypot(spots[i].x - spots[j].x, spots[i].y - spots[j].y);
+          if (d < minGap) minGap = d;
+        }
+      }
+      const hit = spots.map(() => 0);
+      for (const q of fx.particles.active) {
+        let bi = -1;
+        let bd = Infinity;
+        for (let i = 0; i < spots.length; i++) {
+          const d = Math.hypot(q.x - spots[i].x, q.y - spots[i].y);
+          if (d < bd) { bd = d; bi = i; }
+        }
+        if (bi >= 0 && bd <= 60) hit[bi]++;
+      }
+      const spend = { share: +share.toFixed(4), took: took.length, want, wantFull,
+        unhid: (bo.snapped | 0) - took.length, q: fx.quality,
+        budget: Math.round(CFG.maxParticles * fx.quality),
+        minGap: Number.isFinite(minGap) ? Math.round(minGap) : null,
+        covered: hit.filter((v) => v > 0).length };
       const onFrame = {
         snapped: bo.snapped, left: bo.parts().filter((p) => !p.dead && !p.hidden).length,
         rings: fx.rings.active.length, parts: fx.particles.active.length,
@@ -42881,7 +43059,7 @@ if (MINE_LINE) {
         g.update(1 / 60);
         after = Math.max(after, bo.snapped - onFrame.snapped);
       }
-      rows[name] = { n, parts, cored, waited, dying0, onFrame, after };
+      rows[name] = { n, parts, cored, waited, dying0, onFrame, after, spend };
     }
     return { rows, cap: CFG.maxParticles, wait: CFG.boss.outroWait };
   });
@@ -42905,7 +43083,16 @@ if (MINE_LINE) {
     // sequence that got shorter is the per-slot fight table in
     // `docs/rebalance.html`, every row of which is measured through it.
     && rs.every(([, r]) => r.dying0 > 0)
-    // Nothing comes off later: the beat is a no-op, not a shorter beat.
+    /*
+     * Nothing comes off later: the beat is a no-op, not a shorter beat.
+     *
+     * True of the eight endings that do not revive, which is what this case
+     * drives. PARITY is the ninth and asserts the OPPOSITE in its own case
+     * below -- its `dieExtra` restores the whole frame on the first frame of
+     * the beat and the beat then has to take it again -- so the two claims
+     * are about different bosses on purpose and neither should be "fixed"
+     * into the other.
+     */
     && rs.every(([, r]) => r.after === 0)
     && true,
     rs.map(([k, r]) => `${k}: ${r.onFrame.snapped}/${r.parts} snapped on the`
@@ -42914,20 +43101,251 @@ if (MINE_LINE) {
       + ` (${r.onFrame.rings} rings, ${r.onFrame.parts} particles)`).join('; ')
     + ` -- held pause ${bs.wait}s`);
 
-  // The BUDGET, recorded rather than asserted, because it is a consequence of
-  // the change and not a claim it makes. Forty pieces ask about 29 particles
-  // each against `CFG.maxParticles` 620, so the pool saturates and roughly
-  // half the pieces show only their ring -- and `explode` scales its counts by
-  // `fx.quality` while the budget scales by it too, so the COUNT of pieces
-  // that get a burst is about the same at the governor's floor as at 1.
-  // Every ring lands regardless: `fx.rings` is its own pool and `ring()` does
-  // not gate on `budgetLeft`. Asserted only that the rings are per piece,
-  // which is what makes the whole frame read as going at once.
+  /*
+   * The RINGS, which are the half of the picture no budget can take away:
+   * `fx.rings` is its own unbounded pool and `ring()` does not gate on
+   * `budgetLeft`, so a piece gets its three whatever else happens. Three
+   * each -- two from `explode` and one from `arrest` -- plus the core's own.
+   *
+   * The figures build 385 recorded here were wrong and are worth correcting
+   * rather than deleting: it said forty pieces ask "about 29 particles each"
+   * and that "roughly half the pieces show only their ring". ORDINAL's panels
+   * are built at `ring.half / ring.per`, so twenty-four are r 25 and sixteen
+   * r 23.5 -- 52 and 48 with the arrest's sparks, **2,016** against a budget
+   * of 620, and the count that got a burst was TWELVE of forty, not half.
+   * (2,080 was the first correction and was also wrong: it priced all forty
+   * at the ROUNDED r 24 a probe's census printed, and r 24 costs 50 rather
+   * than the 52 the same sentence quoted.) It also
+   * read the governor's floor as the bad case; the coverage is the same
+   * either way (12 of 40 at quality 1, 11 of 38 at 0.45), because the budget
+   * and the ask both scale with quality.
+   */
   check('...and every piece of it gets its own ring, budget or no budget',
     rs.every(([, r]) => r.onFrame.rings >= r.parts && r.onFrame.parts > 0),
     rs.map(([k, r]) => `${k}: ${r.onFrame.rings} rings for ${r.parts} pieces,`
       + ` ${r.onFrame.parts} particles of ${bs.cap}`).join('; ')
     + ' -- rings are not budget-gated, particles are');
+
+  /*
+   * ...AND EVERY PIECE GETS SHARDS, which is a different claim and the one
+   * the rings were standing in for.
+   *
+   * Build 385 left this as a recorded consequence. Rendered, it is not a
+   * detail: `arrest` walks its pieces in `parts()` order, that order is
+   * geometrical, and the emitters grant in call order and stop dead at
+   * `budgetLeft <= 0` -- so the twelve pieces that got a burst were
+   * CONTIGUOUS and ORDINAL's frame came apart on one side, twelve white
+   * bursts down the right of it and twenty-eight bare rings. Measured on
+   * TERMINUS, where the pieces are far enough apart to match particles to
+   * them by position, 11 of 32 covered at quality 1 and 10 of 32 at the
+   * governor's floor; on GNOMON 11 of 22 and 10 of 22.
+   *
+   * The assertion is `got >= want`, which is exact and needs no positions:
+   * `want` is what the pieces the arrest actually took asked for at the share
+   * it used, so a budget that clipped anything leaves `got` short. Extra is
+   * allowed and reported -- `die` also runs `takeMinions`, and a minion's
+   * `Enemy.destroy` explodes on the same frame, which is also why
+   * `burstShare` reads the LIVE `fx.budgetLeft` rather than the cap.
+   *
+   * `share` is reported and not bounded: whether a frame needs thinning is a
+   * property of how much of it was still standing, and in every funded fight
+   * measured (all seven anomalies, three seeds on four of them) the death
+   * found 0 to 14 pieces standing and the share came out exactly 1 -- the
+   * identity. A bound on it would be a bound on how shot-apart the frame
+   * happened to be.
+   */
+  check('...and its shards too: nothing the arrest asked for was clipped',
+    rs.length === 2
+    && rs.every(([, r]) => r.spend.took > 0 && r.spend.want > 0)
+    && rs.every(([, r]) => r.onFrame.parts >= r.spend.want)
+    // ...and the share really is a share: 0 < share <= 1, and the ask it was
+    // computed from fits the budget at it. A share of 0 is the honest
+    // give-up (not even the floors fit) and needs a frame of about 55 pieces
+    // at the governor's floor, against 44 for the largest on the roster.
+    && rs.every(([, r]) => r.spend.share > 0 && r.spend.share <= 1)
+    && rs.every(([, r]) => r.spend.want <= r.spend.budget)
+    /*
+     * ...AND THE POOL WAS NOT EXHAUSTED, which is the whole of what the share
+     * buys and one of the two conjuncts that see a share COMPUTED and not
+     * PASSED. `got >= want` above cannot: a tree that asks in full and lets
+     * the pool clip delivers the BUDGET, and a clipped total is larger than
+     * a thinned ask, so that tree satisfies it. What it cannot do is leave
+     * anything over.
+     */
+    && rs.every(([, r]) => r.onFrame.parts < r.spend.budget)
+    /*
+     * TWO THINGS ARE REPORTED AND NOT ASSERTED, both because they cannot
+     * discriminate here rather than because they are uninteresting.
+     *
+     * `wantFull` is what these same pieces would have asked at share 1, so
+     * `got <= want + (wantFull - want) * k` is the same claim as the line
+     * above from the other side -- and it is strictly weaker: at the
+     * fractions that clear the measured delivery it admits the budget for
+     * GNOMON, so `got < budget` is doing the work with more margin (41
+     * particles against 18). It is also a latent trap: on a frame whose ask
+     * FITS, `burstShare` returns 1, `wantFull - want` is 0, and the bound
+     * becomes `got <= want` -- exactness, which is not available (see below).
+     * So the figure is printed and the claim is left to the line above.
+     *
+     * An earlier version DID assert `got === want`, on the ground that a boss
+     * whose part set is stable spends exactly what it asked. The suite said
+     * otherwise at 342 against 333: `die` runs `takeMinions` four lines
+     * before `arrest` and a minion's `Enemy.destroy` explodes on the same
+     * frame -- measured, 0 particles over on a page of this block's own and
+     * 9 in the suite, where seven hundred cases upstream leave a field.
+     * Exactness is not available on a frame that has other spenders on it.
+     *
+     * And the positional coverage: the metric only works where the pieces are
+     * further apart than one frame of the fastest spark, and which bosses
+     * qualify is a draw -- measured across runs, ORDINAL's own gap read 2 on
+     * one and 33 on the next, because CONVERGENCE reels its panels in by
+     * however far the set-piece had got. A conjunct gated on that flakes.
+     */
+    && true,
+    rs.map(([k, r]) => `${k}: ${r.spend.took} piece(s) took, share`
+      + ` ${r.spend.share}, asked ${r.spend.want} of ${r.spend.budget}`
+      + ` (${r.spend.wantFull} unthinned, q ${r.spend.q}), got ${r.onFrame.parts},`
+      + ` covered ${r.spend.covered}`
+      + ` (gap ${r.spend.minGap}${r.spend.minGap > 26 ? '' : ', too close to tell'})`
+      + `${r.spend.unhid ? `, +${r.spend.unhid} unhid inside die` : ''}`).join('; '));
+}
+
+/*
+ * PARITY'S ENDING PUTS ITS FRAME BACK, AND THE ARREST HAS TO BE ABLE TO TAKE
+ * IT AGAIN.
+ *
+ * `Parity.dieExtra` is the only ending in the game that revives its own
+ * population: on the first frame of the ARREST beat it raises every dead pane
+ * to 30% health under a comment reading "it holds, whole, until the arrest
+ * takes it". Build 385 made `die` snap the whole frame on the frame the core
+ * dies, which left `snapped` at the full count -- and `arrest`'s loop is
+ * `while (this.snapped < want)`, so the restored frame could never be taken.
+ * Traced across three builds, live panes over the outro: 384 went 14 -> 13 ->
+ * 12 -> 9 -> 7 across the beat, and 385 sat at 14 of 14 for the whole of it
+ * and was swept at the end. The set-piece put the frame back and the sentence
+ * stopped being true.
+ *
+ * Two things had to move and this case holds both. PARITY zeroes `snapped`
+ * where it restores, because the arrest cannot tell a restored population
+ * from a stalled count and the boss that restores is the one that knows. And
+ * `want` is a share of what the sequence is working through (`snapped +
+ * all.length`) rather than of the survivors, because against the survivors
+ * alone `want` shrinks as `snapped` grows and the two meet in the middle --
+ * which is the stall build 385 fixed for the `k = 1` door and left standing
+ * on the staged one.
+ *
+ * Nothing here reads the field, so the era this is driven on does not enter
+ * the reading: the claim is about a boss's own structure and its own counter.
+ */
+{
+  const pa = await page.evaluate(async () => {
+    const { fx } = await import('/src/fx.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugTeachAll();
+    w.autoAim = false;
+    w.autoFire = false;
+    w.apertures[6] = 1;
+    if (!g.openBoss(6) || !w.boss) throw new Error('openBoss refused PARITY');
+    const bo = w.boss;
+    for (let i = 0; i < 3000 && bo.arriving > 0; i++) g.update(1 / 60);
+    const c = bo.core;
+    c.applyDamage(w, c.hp + 1e6, 0, -1, 0);
+    // Step until the gate, the way the block above does, clearing fx so the
+    // set-piece's own spend is not counted as the death's.
+    let waited = 0;
+    for (; waited < 6000 && !(bo.dying > 0); waited++) {
+      fx.particles.clear();
+      fx.rings.clear();
+      g.update(1 / 60);
+    }
+    if (!(bo.dying > 0)) throw new Error('PARITY death gate never fired');
+    const live = () => bo.parts().filter((q) => !q.dead && !q.hidden).length;
+    const total = bo.parts().length;
+    const gate = { live: live(), snapped: bo.snapped | 0 };
+    // One frame on: `dieStep` runs `dieExtra` and then `arrest`, so the
+    // restore and the first piece of the second pass are both in it.
+    g.update(1 / 60);
+    const next = { live: live(), snapped: bo.snapped | 0 };
+    /*
+     * ...to the MIDDLE of the beat, which is where the reset is legible. The
+     * two halves of this fix do different things and only this sample can
+     * tell them apart: `want` priced over `snapped + all.length` lets the
+     * beat FINISH either way, because without the reset that total is 28 --
+     * the fourteen that died plus the fourteen that came back -- and
+     * `ceil(28 * k)` still passes 14 before the beat is out. What it loses is
+     * the PACING: `want` does not exceed the 14 already counted until k is
+     * past a half, so nothing moves for the first half of the beat and the
+     * whole frame goes at the end of it. Measured, live panes at k = 0.5:
+     * 7 of 14 with the reset and 14 of 14 without.
+     */
+    let guard = 0;
+    for (; guard < 600 && (bo.beat || 0) < 0.35; guard++) g.update(1 / 60);
+    const mid = { live: live(), snapped: bo.snapped | 0, beat: +(bo.beat || 0).toFixed(2) };
+    // ...and out to the end of the beat. `CFG.parity` declares no `arrest`,
+    // so it takes `dieStep`'s own 0.7s -- read off `beat` rather than
+    // counted, because the clock is the sequence's and not this case's.
+    for (; guard < 600 && (bo.beat || 0) < 0.72; guard++) g.update(1 / 60);
+    const end = { live: live(), snapped: bo.snapped | 0, beat: +(bo.beat || 0).toFixed(2) };
+    /*
+     * The population the SEQUENCE is working through, read off the frame
+     * after the restore: what it has taken plus what is standing. It is not
+     * `parts().length` -- PARITY carries a `hidden` pane, which `arrest`
+     * filters out and `live()` does not count, so the roster says 14 and the
+     * arrest can only ever reach 13. Asserting against the roster reads as a
+     * stall on a build that finished.
+     */
+    return { total, waited, gate, next, mid, end, pop: next.live + next.snapped };
+  });
+
+  check('PARITY\'s ending puts its frame back, and the arrest takes it again',
+    // The death frame took the lot -- build 385's claim, on the one boss that
+    // then undoes it.
+    pa.gate.live === 0 && pa.gate.snapped === pa.total
+    /*
+     * ...the set-piece put the frame back. Not `=== total`: `dieStep` runs
+     * `dieExtra` and THEN `arrest` in the same frame, so the first piece of
+     * the second pass is already off by the time this is read -- `ceil(14 *
+     * (1/60) / 0.7)` is one. The claim is that the frame came back, so the
+     * bound is two rather than an exact count that a change to the beat's
+     * own length would move.
+     */
+    && pa.next.live >= pa.total - 2
+    // ...and the counter went with it, or the beat below cannot enter.
+    && pa.next.snapped < pa.pop
+    /*
+     * ...and the beat FINISHED it, which is the conjunct that catches `want`
+     * priced over the survivors -- that stalls at about half whatever the
+     * beat does (traced: 14 -> 13 -> 12 -> 9 -> 7 and stop).
+     *
+     * Not an exact `snapped === pop`: PARITY takes a broken pane's MIRROR
+     * TWIN with it (`pairPanes`), and that leaves `all` without going through
+     * the counter, so `snapped + all.length` is not invariant for this boss
+     * and the end count reads 12 or 13 of 14 run to run. What is invariant is
+     * that nothing is left standing and that the beat took more than the one
+     * piece the restore frame already had.
+     */
+    && pa.end.live === 0 && pa.end.snapped > pa.next.snapped
+    // ...over the WHOLE beat and not in a rush at the end of it, which is
+    // what the reset buys and the only conjunct that can see it.
+    /*
+     * ...against the ROSTER count and not `pop`, because `pop` is derived
+     * from the counter and the counter is what is under test: without the
+     * reset it reads 28 for a fourteen-pane frame, and 14 of 28 clears any
+     * fraction. A denominator that moves with the fault cannot see it.
+     */
+    && pa.mid.live > 0 && pa.mid.live <= pa.total * 0.75
+    // Liveness: PARITY has fourteen panes, so none of the above is a claim
+    // about an empty frame.
+    && pa.total >= 8
+    && true,
+    `${pa.total} panes (${pa.pop} the arrest can see): death frame left`
+    + ` ${pa.gate.live} (snapped ${pa.gate.snapped}),`
+    + ` the set-piece put ${pa.next.live} back and reset the count to ${pa.next.snapped},`
+    + ` ${pa.mid.live} left at ${pa.mid.beat}s and ${pa.end.live} by ${pa.end.beat}s`
+    + ` (snapped ${pa.end.snapped});`
+    + ` gate ${pa.waited}f after the blow`);
 }
 
 // --- report -----------------------------------------------------------------

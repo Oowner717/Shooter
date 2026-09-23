@@ -192,6 +192,44 @@ const SEED = flag('seed', null);
  * that something did, and that is the question a refactor has to answer.
  */
 const HASH = flag('hash', null);
+
+/*
+ * ---- `--death`: THE OUTRO, FRAME BY FRAME -------------------------------
+ *
+ * `--hash` is STRUCTURALLY BLIND to a boss's death and says so in its own
+ * last line: it runs a fixed number of frames of an assists-only fight, and
+ * an unfunded ORDINAL is still standing at 9,000 of them (`still standing, 0
+ * remainder`). So every change to the death sequence has had the same
+ * non-reading -- an unchanged hash taken on a run that never reached `die`.
+ *
+ * Funding the gun with `--spend` fixes the scenario and not the instrument.
+ * The hash samples every 300 frames; the ARREST beat is `C.arrest` seconds
+ * (0.7 for six of the seven anomalies, 1.6 for TERMINUS), which is 42 frames,
+ * so a sample lands inside the window the change is about roughly one time in
+ * seven. A reading that has a one-in-seven chance of seeing the thing it is
+ * about cannot report its absence.
+ *
+ * This mode digests EVERY frame instead, and splits the digest at the beats:
+ *
+ *   pre     every frame from the start of the fight to the frame the death
+ *           gate fires. A change to the outro must not move this AT ALL --
+ *           and unlike the hash's 1-in-300 sampling, `pre` is the whole
+ *           fight at full resolution, so it is a strictly stronger claim.
+ *   arrest  from the death frame while `boss.beat < C.arrest`.
+ *   after   from there to the end of `dying` -- the infall, the detonation
+ *           and the salvage walking home.
+ *
+ * It mixes the WORLD and not the picture: every part's position, health and
+ * marks, the core, the field counts, `snapped`, `beat` and the time scale.
+ * Particles and rings are REPORTED beside the digests rather than mixed into
+ * them, because their positions are rolled and a digest over them would move
+ * for the PRNG interleaving rather than for the behaviour -- which is the one
+ * thing that would make `after` unable to hold still.
+ *
+ * `--seed` is what makes any of it comparable, and this mode refuses without
+ * one rather than printing three numbers nobody can compare.
+ */
+const DEATH = argv.includes('--death');
 const STEP = 1 / 60;
 const CHUNK = 900; // steps per round trip: 15 game-seconds
 
@@ -360,6 +398,24 @@ async function fight(page) {
     return hashRun(page, Number(HASH));
   }
 
+  if (DEATH) {
+    /*
+     * A digest of three windows is three numbers, and three numbers are only
+     * a differential if the two runs they come from drew the same dice. The
+     * fight length varies by fifty seconds run to run unseeded -- garrison
+     * release, repair targets and burst angles are all rolled -- so an
+     * unseeded pair would disagree on `pre` for reasons that have nothing to
+     * do with the change. Refused rather than printed.
+     */
+    if (SEED === null) {
+      console.error('fight.mjs: --death needs --seed. The three digests are a '
+        + 'differential and an unseeded pair disagrees on the FIGHT, not on '
+        + 'the outro.');
+      process.exit(1);
+    }
+    return deathRun(page, Math.ceil(CAP / STEP), N);
+  }
+
   let done = false;
   let steps = 0;
   const maxSteps = Math.ceil(CAP / STEP);
@@ -457,6 +513,133 @@ async function fight(page) {
  * counts, the purse, and every body's position and health, sampled every few
  * frames so the hash is cheap without being blind between samples.
  */
+/**
+ * The fight, driven to its death and then digested frame by frame in three
+ * windows. Returns the digests, the beat lengths and what the picture spent.
+ */
+async function deathRun(page, maxFrames, n) {
+  await page.evaluate(async (num) => {
+    const g = window.__sim;
+    /*
+     * The ARREST beat's length, derived from the two places `dieStep` itself
+     * reads it -- the anomaly's own config block, keyed by its core's id,
+     * falling back to the same 0.7 that function falls back to. Written out
+     * here it would be right for six of the seven and wrong for TERMINUS,
+     * whose beat is 1.6, and it would go stale the first time one moved.
+     */
+    const { ANOMALIES } = await import('../src/anomaly.js');
+    const { CFG } = await import('../src/config.js');
+    const key = ANOMALIES[num - 1].types[0];
+    const C = CFG[key] || {};
+    /*
+     * `fx` is a module singleton and the game does not hand it out, so it is
+     * imported here and stashed rather than read off `window.__sim`. The
+     * page's module cache makes it the same object the emitters write to --
+     * a second import would be a second reading of the same registry entry,
+     * not a copy.
+     */
+    window.__fxRef = (await import('../src/fx.js')).fx;
+    /*
+     * FNV-1a over `Math.round(v * 64) | 0`, the same mix `hashRun` uses, so a
+     * figure from this mode and a figure from that one are at least in the
+     * same arithmetic. Three accumulators rather than one: a single number
+     * could only ever say "something in the outro moved".
+     */
+    window.__death = {
+      pre: 2166136261, arrest: 2166136261, after: 2166136261,
+      nPre: 0, nArrest: 0, nAfter: 0,
+      gateAt: null, parts0: null, snapped0: null,
+      peakParts: 0, peakRings: 0, partsAtGate: 0, ringsAtGate: 0,
+      blew: false, done: false, frames: 0,
+      arrestA: C.arrest !== undefined ? C.arrest : 0.7,
+      slot: key,
+      /*
+       * How much frame the death actually FOUND -- the alive count on the
+       * frame before the gate, carried forward every frame. It is the number
+       * the arrest's budget question turns on and it cannot be read on the
+       * gate frame itself, because `die` has already run by then: measured on
+       * a funded ORDINAL, two of forty panels were still standing when the
+       * core went, because the run had shot the rest off over 239 seconds.
+       */
+      prevAlive: null, aliveBefore: null, partsTotal: null,
+      partsBefore: 0, ringsBefore: 0, budgetAtGate: null, cap: CFG.maxParticles,
+    };
+  }, n);
+
+  let left = maxFrames;
+  let out = null;
+  while (left > 0) {
+    const chunk = Math.min(CHUNK, left);
+    // eslint-disable-next-line no-await-in-loop
+    out = await page.evaluate(({ n, step }) => {
+      const g = window.__sim;
+      const w = g.world;
+      const d = window.__death;
+      const fx = window.__fxRef;
+      for (let k = 0; k < n; k++) {
+        const boss = w.boss;
+        if (!boss) { d.done = true; return { done: true, frames: d.frames }; }
+        /*
+         * The gate frame is the FIRST frame `dying` is positive, and it is
+         * read BEFORE the step so the counts are the state `die` left rather
+         * than the state one frame of outro left. `parts0`/`snapped0` are
+         * the whole claim of build 385 as two numbers.
+         */
+        if (d.gateAt === null && boss.dying > 0) {
+          d.gateAt = d.frames;
+          d.parts0 = boss.parts().filter((p) => !p.dead && !p.hidden).length;
+          d.snapped0 = boss.snapped | 0;
+          d.partsAtGate = fx.particles.active.length;
+          d.ringsAtGate = fx.rings.active.length;
+          d.aliveBefore = d.prevAlive;
+          d.partsTotal = boss.parts().length;
+          d.budgetAtGate = Math.round(d.cap * fx.quality - d.partsBefore);
+        }
+        /*
+         * Which accumulator this frame goes into. `beat` is the death
+         * sequence's own raw clock, so the split is the game's rather than
+         * a frame count guessed from the config.
+         */
+        const phase = d.gateAt === null ? 'pre'
+          : (boss.beat || 0) < d.arrestA ? 'arrest' : 'after';
+        let h = d[phase];
+        const mix = (v) => {
+          h ^= Math.round((Number.isFinite(v) ? v : -1) * 64) | 0;
+          h = Math.imul(h, 16777619) | 0;
+        };
+        mix(w.enemies.length); mix(w.debris.length); mix(w.drops.length);
+        mix(w.timeScale); mix(boss.snapped | 0); mix(boss.beat || 0);
+        mix(boss.x); mix(boss.y); mix(boss.coreFrac);
+        const c = boss.core;
+        if (c) { mix(c.x); mix(c.y); mix(c.hp); mix(c.dead ? 1 : 0); }
+        for (const p of boss.parts()) {
+          mix(p.x); mix(p.y); mix(p.hp);
+          mix((p.dead ? 1 : 0) + (p.hidden ? 2 : 0) + (p.spent ? 4 : 0));
+        }
+        d[phase] = h;
+        d['n' + phase[0].toUpperCase() + phase.slice(1)] += 1;
+        if (fx.particles.active.length > d.peakParts) d.peakParts = fx.particles.active.length;
+        if (fx.rings.active.length > d.peakRings) d.peakRings = fx.rings.active.length;
+        if (boss.blew) d.blew = true;
+        if (d.gateAt === null) {
+          d.prevAlive = boss.parts().filter((q) => !q.dead && !q.hidden).length;
+          d.partsBefore = fx.particles.active.length;
+          d.ringsBefore = fx.rings.active.length;
+        }
+        g.update(step);
+        d.frames += 1;
+      }
+      return { done: false, frames: d.frames, dying: w.boss ? +(w.boss.dying || 0).toFixed(1) : null };
+    }, { n: chunk, step: STEP });
+    left -= chunk;
+    if (out.done) break;
+    if (process.env.FIGHT_TRACE) console.log(`   ${out.frames} frames, dying ${out.dying}`);
+  }
+
+  const d = await page.evaluate(() => window.__death);
+  return { death: d, deathOnly: true };
+}
+
 async function hashRun(page, frames) {
   const r = await page.evaluate(({ n, step }) => {
     const g = window.__sim;
@@ -583,6 +766,53 @@ if (HASH !== null) {
   for (const m of r.marks) console.log(`  ${m}`);
   console.log(`\n  hash  ${r.hash}`);
   console.log(`  ${r.alive ? 'still standing' : 'over'}, ${r.remainder} remainder\n`);
+  await browser.close();
+  process.exit(errors.length ? 1 : 0);
+}
+
+if (DEATH) {
+  const d0 = runs[0].death;
+  console.log(`\nANOMALY ${N} — the outro, frame by frame, seed ${SEED}\n`);
+  for (const ln of slotLines(lastSlot)) console.log(ln);
+  console.log('');
+  if (d0.gateAt === null) {
+    /*
+     * The one reading this mode cannot give. An unfunded fight does not end
+     * inside any cap worth waiting for -- which is the whole reason `--hash`
+     * has never seen a death -- so the refusal names the flag rather than
+     * printing a `pre` digest over a fight that never died and letting it
+     * read as a result.
+     */
+    console.log(`  NO DEATH in ${d0.frames} frames (${(d0.frames / 60).toFixed(0)}s).`);
+    console.log('  There is nothing to digest: fund the gun with --spend so the');
+    console.log('  fight ends, or raise --cap if it was going to.');
+    await browser.close();
+    process.exit(1);
+  }
+  const A = d0.arrestA;
+  console.log(`  gate           frame ${d0.gateAt} (${(d0.gateAt / 60).toFixed(1)}s)`);
+  console.log(`  it found       ${d0.aliveBefore} of ${d0.partsTotal} part(s) standing `
+    + `-- snapped ${d0.snapped0}, ${d0.parts0} left unsnapped`);
+  console.log(`  budget there   ${d0.budgetAtGate} free of ${d0.cap} `
+    + `(${d0.partsBefore} particle(s) already out)`);
+  console.log(`  arrest beat    ${A}s of ${d0.slot}'s own config`);
+  console.log('');
+  console.log(`  pre      ${String(d0.nPre).padStart(6)} frames   ${d0.pre}`);
+  console.log(`  arrest   ${String(d0.nArrest).padStart(6)} frames   ${d0.arrest}`);
+  console.log(`  after    ${String(d0.nAfter).padStart(6)} frames   ${d0.after}`);
+  console.log('');
+  /*
+   * Reported, never mixed: a particle's position is rolled, so a digest over
+   * the picture moves when the PRNG interleaving moves and `after` could
+   * never hold still. What these say is how much of the frame's budget the
+   * death spent and how many rings it laid -- and `ring()` does not gate on
+   * `fx.budgetLeft` while every pooled emitter does, so the two columns
+   * answer different questions.
+   */
+  console.log(`  picture        peak ${d0.peakParts} particle(s) of `
+    + `${d0.peakRings} ring(s); at the gate ${d0.partsAtGate}/${d0.ringsAtGate}`);
+  console.log(`  detonated      ${d0.blew ? 'yes' : 'NO -- the run stopped first'}`);
+  console.log(`  ${d0.done ? 'over' : 'still standing'}, ${d0.frames} frames driven\n`);
   await browser.close();
   process.exit(errors.length ? 1 : 0);
 }

@@ -34,7 +34,8 @@
 import { CFG, TYPE_BY_ID } from './config.js';
 import { clamp, rand, rgba, TAU, drawGlow } from './util.js';
 import { Enemy } from './enemies.js';
-import { explode, ring, ripple, spark, shake, haul, flash } from './fx.js';
+import { explode, explodeCost, fx, ring, ripple, spark, shake, haul, flash }
+  from './fx.js';
 import { audio } from './audio.js';
 import { shed } from './debris.js';
 import { background } from './background.js';
@@ -45,6 +46,23 @@ import { readFor } from './tutorial.js';
 const O = () => CFG.ordinal;
 /** The five numbers every boss's ending shares. See CFG.boss. */
 const B = () => CFG.boss;
+
+/*
+ * The loose sparks a snapping piece throws beside its `explode`, named
+ * because `burstShare` has to price them and the two copies of `arrest` have
+ * to spend them. Written out at both ends it was a four that only one of the
+ * three sites knew about, and the share is computed against the ask -- so a
+ * denominator short by four a piece overshoots the budget and clips the last
+ * pieces again, which is the fault the share exists to remove. Measured on
+ * ORDINAL at quality 1, pricing the `explode` alone gives a share of 0.334
+ * where the truth is 0.308, and the frame then spends 648 of 620.
+ *
+ * Exported for the suite, which is a real and stated reason: the arm that
+ * asserts nothing was clipped has to price what the frame asked for, and a
+ * four restated there is a fourth copy that can drift out of step with these
+ * three.
+ */
+export const ARREST_SPARKS = 4;
 
 /*
  * What it says on the way in, and what it says once it is over.
@@ -739,6 +757,15 @@ export class Boss {
     this.lineNext = null;
     world.bossLine = null;
     this.snapped = 0;
+    /*
+     * What `arrest` last had to thin a burst to. Declared here beside
+     * `snapped` rather than sprung into existence at the write site, and its
+     * only reader is the suite: a case that wants to assert nothing was
+     * clipped needs the share the arrest actually used, and recomputing it
+     * afterwards would be recomputing it against a pool the arrest has
+     * already spent. 1 means it fitted.
+     */
+    this.burstShared = 1;
     world.timeScale = B().endSlow;
     world.bossSlow = B().slowFor;
     // Everything it made goes with it, on the frame it dies. The outro reads
@@ -907,18 +934,123 @@ export class Boss {
     ctx.restore();
   }
 
+  /**
+   * How much of a burst each of these pieces can have, so that a frame going
+   * at once comes apart EVERYWHERE rather than on one side.
+   *
+   * Build 385 made `die` snap the whole frame on one frame. ORDINAL's forty
+   * panels are built at `ring.half / ring.per`, so twenty-four are r 25 (52
+   * each: 48 for the `explode` and 4 loose sparks) and sixteen are r 23.5
+   * (48) -- **2,016** against `CFG.maxParticles` 620, and every
+   * pooled emitter returns null once `fx.budgetLeft` is spent -- so the loop
+   * granted the first twelve pieces a full burst and the remaining
+   * twenty-four nothing but their three rings. The pieces are walked in
+   * `parts()` order and that order is geometrical, so the twelve were
+   * contiguous: measured on TERMINUS, ten of thirty-two segments, a
+   * 112-degree arc of a ring that was supposed to have gone all at once.
+   *
+   * This is SELF-starvation and not the shape build 350 refused to fix: the
+   * thing that wanted the budget was the rest of the same event. What made
+   * it worth doing anyway is that the answer is free wherever the ask fits
+   * -- `share` is exactly 1 then, and 1 is the identity -- so every fight
+   * this has been measured on is untouched (see the note below).
+   *
+   * The floors are RESERVED rather than shared, because they cannot be
+   * divided: `explodeCost(r, power, 0)` is the smallest burst there is (one
+   * shard, one spark, one ember and the centre dot) plus one loose spark,
+   * and no share makes it smaller. So the share is the room ABOVE those
+   * floors over the ask above those floors, which is the largest factor that
+   * still fits. Scaled naively it does not fit: measured at the governor's
+   * 0.45 floor, forty panels at a flat `budget / ask` deliver 320 against a
+   * budget of 279, because rounding and the floors add one or two particles
+   * a piece.
+   *
+   * What the guarantee costs is that it UNDER-spends, and that is a cost and
+   * not a fault: driven over five reachable qualities and four rosters the
+   * reserved form fits in 20 of 20 cells where a flat `budget / ask`
+   * overshoots in 18 of them (ORDINAL 648 of 620, GNOMON 624, TERMINUS 656,
+   * and 320 of 279 at the governor's floor), and at that floor ORDINAL's
+   * forty panels land on exactly 200 of 279 because every count is already
+   * at its floor -- 79 particles the frame cannot use.
+   *
+   * It returns 0 when even the floors do not fit, which is honest rather
+   * than safe: the emitters then clip the last pieces exactly as they do
+   * today. That needs a frame of more than about 55 pieces at the governor's
+   * floor and the largest structure on the roster is 44, so nothing in the
+   * game reaches it -- what this delivers is "every piece gets a shard", not
+   * "the budget is respected".
+   */
+  burstShare(pieces, power) {
+    let floorAsk = 0;
+    let fullAsk = 0;
+    for (const p of pieces) {
+      floorAsk += explodeCost(p.r, power, 0) + 1;
+      fullAsk += explodeCost(p.r, power, 1) + ARREST_SPARKS;
+    }
+    const budget = fx.budgetLeft;
+    if (fullAsk <= budget) return 1;
+    const room = budget - floorAsk;
+    if (room <= 0) return 0;
+    return clamp(room / (fullAsk - floorAsk), 0, 1);
+  }
+
   /** ARREST: pieces snapping off, one after another rather than all at once. */
   arrest(world, k) {
     const all = this.parts().filter((p) => !p.dead && !p.hidden);
-    const want = Math.ceil(all.length * clamp(k, 0, 1));
+    /*
+     * `want` is a share of the population this SEQUENCE is working through,
+     * which is what it has already taken plus what is still standing -- not
+     * a share of the survivors.
+     *
+     * Against `all.length` alone the two sides are incommensurate: `want`
+     * shrinks as the frame is taken while `this.snapped` grows, so they meet
+     * in the middle and the loop stops entering. That is the stall build 385
+     * found, and 385 fixed only the `k = 1` door: `die` calls
+     * `arrest(world, 1)` where `snapped` is 0 and `all` is the whole frame,
+     * so the whole frame goes. The STAGED path still could not finish --
+     * traced on PARITY, the one ending that restores its own population and
+     * therefore the only live user of it, the beat took 14 -> 13 -> 12 -> 9
+     * -> 7 and stopped at half. `snapped + all.length` is the same total on
+     * every frame of the beat, so `want` rises to it and the last piece comes
+     * off at k = 1.
+     *
+     * The `k = 1` case is unchanged to the piece: snapped 0 plus the whole
+     * frame is the whole frame.
+     */
+    const want = Math.ceil((this.snapped + all.length) * clamp(k, 0, 1));
+    /*
+     * The pieces THIS call will take, which is not `all` and not the first
+     * `want` of it: `snapped` is a running total across the calls while
+     * `all` is rebuilt from the survivors each time. Today only `die`'s
+     * `arrest(world, 1)` takes anything (snapped 0, k 1, so the slice is the
+     * whole frame), but `dieStep` still calls this with a partial `k` and a
+     * staged arrest would otherwise share against the wrong denominator.
+     * It has to be a SUM over the real slice rather than a count times an
+     * average, because the radii differ inside `all` in push order --
+     * GNOMON's first sixteen arcs cost 61 each and its last twelve needle
+     * segments 24.
+     */
+    const going = all.slice(0, Math.max(0, want - this.snapped));
+    const share = this.burstShare(going, 1.5);
+    /*
+     * ...recorded only when this call actually takes something. `dieStep`
+     * calls `arrest` again on every frame of the ARREST beat and those calls
+     * are no-ops from build 385 (the frame is already snapped), so an
+     * unconditional write reports the LAST call's share rather than the
+     * death frame's -- measured, a frame thinned to 0.268 read back as 1 two
+     * frames later, which is a reading of nothing wearing a measurement's
+     * clothes.
+     */
+    if (going.length) this.burstShared = share;
     while (this.snapped < want && all.length) {
       const p = all.shift();
       if (!p || p.dead) { this.snapped++; continue; }
       p.dead = true;
       this.snapped++;
-      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.5);
+      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.5, share);
       ring(p.x, p.y, 2, p.r * 5, 0.3, p.type.glow, 2);
-      for (let i = 0; i < 4; i++) {
+      const n = Math.max(1, Math.round(ARREST_SPARKS * share));
+      for (let i = 0; i < n; i++) {
         const a = rand(0, TAU);
         spark(p.x, p.y, Math.cos(a) * rand(90, 260), Math.sin(a) * rand(90, 260),
           p.type.color, rand(0.3, 0.7), 2);
@@ -1912,6 +2044,7 @@ export class Ordinal extends Boss {
     this.lineNext = null;
     world.bossLine = null;
     this.snapped = 0; // segments taken so far during ARREST
+    this.burstShared = 1; // ...and what it had to thin them to. See Boss.die.
     world.timeScale = B().endSlow;
     world.bossSlow = B().slowFor;
     // Everything the frames were holding is let go at once -- and everything
@@ -1933,18 +2066,45 @@ export class Ordinal extends Boss {
 
   /** ARREST: segments snapping off round the frame, one after another. */
   arrest(world, k) {
-    const C = O();
     const all = [];
     for (const ring2 of this.rings) for (const p of ring2.panels) if (!p.dead) all.push(p);
-    const want = Math.ceil(all.length * clamp(k, 0, 1));
+    /*
+     * `want` is a share of the population this SEQUENCE is working through,
+     * which is what it has already taken plus what is still standing -- not
+     * a share of the survivors.
+     *
+     * Against `all.length` alone the two sides are incommensurate: `want`
+     * shrinks as the frame is taken while `this.snapped` grows, so they meet
+     * in the middle and the loop stops entering. That is the stall build 385
+     * found, and 385 fixed only the `k = 1` door: `die` calls
+     * `arrest(world, 1)` where `snapped` is 0 and `all` is the whole frame,
+     * so the whole frame goes. The STAGED path still could not finish --
+     * traced on PARITY, the one ending that restores its own population and
+     * therefore the only live user of it, the beat took 14 -> 13 -> 12 -> 9
+     * -> 7 and stopped at half. `snapped + all.length` is the same total on
+     * every frame of the beat, so `want` rises to it and the last piece comes
+     * off at k = 1.
+     *
+     * The `k = 1` case is unchanged to the piece: snapped 0 plus the whole
+     * frame is the whole frame.
+     */
+    const want = Math.ceil((this.snapped + all.length) * clamp(k, 0, 1));
+    // The share is the base class's, inherited rather than copied: this is
+    // the one arrest in the game with a private body, and a second copy of
+    // that arithmetic is a second thing to keep in step. See `burstShare`,
+    // and see the base `arrest` for why the record is conditional.
+    const going = all.slice(0, Math.max(0, want - this.snapped));
+    const share = this.burstShare(going, 1.5);
+    if (going.length) this.burstShared = share;
     while (this.snapped < want && all.length) {
       const p = all.shift();
       if (!p || p.dead) { this.snapped++; continue; }
       p.dead = true;
       this.snapped++;
-      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.5);
+      explode(p.x, p.y, p.r, p.type.color, p.type.glow, 1.5, share);
       ring(p.x, p.y, 2, p.r * 5, 0.3, p.type.glow, 2);
-      for (let i = 0; i < 4; i++) {
+      const n = Math.max(1, Math.round(ARREST_SPARKS * share));
+      for (let i = 0; i < n; i++) {
         const a = rand(0, TAU);
         spark(p.x, p.y, Math.cos(a) * rand(90, 260), Math.sin(a) * rand(90, 260),
           p.type.color, rand(0.3, 0.7), 2);
