@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '382';
+export const BUILD = '383';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '382';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'dc3f073';
+export const REV = '533c914';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -1282,11 +1282,15 @@ export const CFG = {
    * release window plus slowest traverse plus the return tail makes the
    * remnant wave the LONGEST in band 5 at every rung and over the 120s cap
    * at all three sampled ones -- inference on top of measurements rather
-   * than a measurement, and labelled as such. Band 5 already misses that cap
-   * at four of seven rungs on the era-2 field (build 306), so this is a
-   * small marginal worsening of a documented plateau; the lever, if it is
-   * ever wanted, is `speed`, because the traverse is about half the modelled
-   * length. Recorded here so the next pacing pass has the number.
+   * than a measurement, and labelled as such. BOTH HALVES ARE STRUCK AT
+   * BUILD 382, which TIMED the band rather than modelling one body: this
+   * wave reads 11-25s, a median of 20s and fifth fastest of the sixteen,
+   * and the band -- believed to miss that cap at four of seven rungs on the
+   * era-2 field (build 306) -- misses it at none, 224 of 224 cells inside.
+   * A wave has fifty bodies in it, so one body's transit is an upper bound
+   * on one body and nothing else. The `speed` lever this paragraph reserved
+   * is not wanted; the model is kept as the record of how the figure was
+   * got, not as a number to act on.
    */
   remnant: {
     /*
@@ -6076,8 +6080,10 @@ export const ENEMY_TYPES = [
      * lever -- while still delivering 18 of them. Adding ballast re-prices
      * band 5 upward by 4-8%, which is build 328's fault by name: ANVIL's
      * wave took that band's mean up and turned REMNANT's arm red for a
-     * reason having nothing to do with REMNANT. Band 5 already misses the
-     * 120-second cap at four of seven rungs on the era-2 field.
+     * reason having nothing to do with REMNANT. Band 5 was believed to
+     * miss the 120-second cap at four of seven rungs on the era-2 field and
+     * misses it at none (build 382), so the re-pricing is still a real cost
+     * to every other wave in the band and no longer a cost against a cap.
      *
      * If it ever comes back it needs a re-spec and not a number: a payload
      * that is not the shader, and a bound that is not per body -- the TOW's

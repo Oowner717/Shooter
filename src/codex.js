@@ -618,12 +618,15 @@ export const CODEX = [
    *     and no anomaly can hold it.
    *   - AND THE WAVE CANNOT END WHILE ONE STANDS. `Director.standing` counts
    *     a kite like any hostile, so the tempo cost is real without anything
-   *     being thrown: measured, the wave is the longest in band 5 at rung 35
-   *     (116-128s against siblings at 55.7, 61.1 and 88.8) and straddles the
-   *     120-second cap -- the same shape REMNANT's wave has, and for the same
-   *     reason, the body's own transit. Recorded rather than tuned; band 5
-   *     already misses that cap at four of seven rungs on the era-2 field
-   *     (build 306).
+   *     being thrown. Both figures this note used to carry are STRUCK at
+   *     build 382, which TIMED all sixteen of band 5's waves at all seven of
+   *     its own rungs instead of modelling one body's transit: this wave
+   *     reads 26-72s rather than 116-128, and the band it was compared
+   *     against -- believed to miss the 120-second cap at four of seven
+   *     rungs (build 306) -- misses it at none, 224 of 224 cells inside. The
+   *     116-128 was taken against a 30-second march bound every deep-rung
+   *     cell reached, so part of what it timed was the walk in. The tempo
+   *     cost is still real; there is no plateau left for it to worsen.
    */
   {
     id: 'kite',

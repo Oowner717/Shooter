@@ -792,6 +792,21 @@ a wall above 20. Waves start missing the 120s cap at **tier 22** rather than
 16. The plateau is still there and is still intentional (see the section
 above it); what moved is where it starts to bite.
 
+**That cap figure is struck at build 383, and it is not superseded — it is not
+comparable.** It was taken with `tiers.mjs`'s heaviest-wave column, and four
+things under it have moved since: `perBand` was 2 rather than 7, so the five
+bands covered rungs 1–10 and a "tier 22" drew bands 4-5 at a multiplier nothing
+now reaches; build 300 gave the climb `popStep` and the `flow` table; build 301
+made a wave's counts a BUDGET, so the wave a rung sends is not the wave this row
+sent; and there was no second field at all — band 5's rungs became era-2
+territory at build 305, which build 306 measured as 2–3× longer to clear. What
+IS measured, by build 382 and at the rungs band 5 is actually drawn at: all
+sixteen of its ordinary waves at all seven of them, three runs a cell,
+**224 of 224 cells inside the cap** — worst 110s fully bought and 98s funded
+from the measured income curve. The entry stays because it names a real change
+and its reason, the way the ORDINAL hash keeps its own history; the number is
+history too.
+
 The ORDINAL hash did **not** move and was not re-baselined. Both slopes are
 `step ^ (tier - 1)`, which is exactly 1 at tier 1, and the fight probe runs at
 tier 1 — re-run and identical at `1796395127`. That is the hash agreeing with

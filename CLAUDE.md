@@ -276,7 +276,10 @@ and **`bountyStep` 1.10 -> 1.075**. Re-measured, worst body in the band: 4.0s
 at tier 9, 4.3s at 10, 6.2s at 14, 10.3s at 20, 25.6s at 32 -- which is plan
 B's 2-4s through about tier 10 and past 6s by about 14 -- and waves start
 missing the 120s cap at tier 22 rather than 16. The full derivation and both
-tables are in `docs/pacing.md` under build 229.
+tables are in `docs/pacing.md` under build 229 -- **where that cap figure is
+struck at build 383**, because four things under it have moved: `perBand` was
+2, there was no second field, and neither `popStep` nor the wave budget
+existed. Measured at 382, band 5 clears at all seven of its own rungs.
 
 **The hash did not move and did not need to.** Both slopes are
 `step ^ (tier - 1)`, exactly 1 at tier 1, and `fight.mjs` runs at tier 1 --
@@ -5597,10 +5600,11 @@ came from before believing the other one covers it.
   it. **BOTH HALVES OF THAT ARE STRUCK -- see build 382, which TIMED it:
   11-25s, a median of 20s and fifth fastest of the sixteen, and it misses the cap at
   no rung at all.** The model was an upper bound on ONE body's transit and the
-  wave has fifty in it. Band 5 already misses that cap at four of seven rungs
-  on the era-2 field
-  (build 306), so this is a small marginal worsening of a documented plateau
-  and the lever, if it is ever wanted, is `speed`. Authoring a balance answer
+  wave has fifty in it. **AND THE PREMISE IN THE SAME SENTENCE WENT WITH IT.**
+  Band 5 was believed to miss that cap at four of seven rungs on the era-2
+  field (build 306) and misses it at none, so there is no documented plateau
+  for this wave to have marginally worsened and the `speed` lever is not
+  wanted. Authoring a balance answer
   in the build that adds the body is the mistake build 304 deliberately did
   not make; the number is in `CFG.remnant` for the pacing pass.
 - **A SCOUT FAN-OUT SCORED TWO REAL BLOCKERS OUT OF FIVE LENSES AND MISSED
@@ -6037,8 +6041,9 @@ came from before believing the other one covers it.
   THIS PHASE.** `docs/objects.html` authors `speed: 18` and a counter of "the
   twenty-six seconds it takes to cross". The column a CLOSING body crosses is
   the portal's rim to the MOUNT -- 671 units at era 1 and 1202 at era 2 -- so
-  18 u/s is 37 and 67 seconds against a band-5 wave that already has a
-  120-second cap four of its seven rungs miss. The clock is the design, so the
+  18 u/s is 37 and 67 seconds against a 120-second cap -- which the band was
+  believed to miss at four of its seven rungs and misses at none, measured at
+  build 382; the two figures stand on their own. The clock is the design, so the
   speed is derived from it (1202 / 26 = 46.2), and `creep` joins `dive` in
   `OWN_SPEED` so a dawdling route cannot make an authored clock a spawn roll.
   Delivered **45.8 u/s, 27.5s at era 2 and 15.8s at era 1**. EMBER's speed
@@ -7205,9 +7210,10 @@ came from before believing the other one covers it.
   rung 35** against siblings at 55.7, 61.1 and 88.8 on the same rung. Same
   shape as REMNANT's wave and for the same reason -- the body's own transit,
   and `Director.standing` counts a kite until it dies, so the tempo cost is
-  real with nothing being thrown. Band 5 already misses that cap at four of
-  seven rungs on the era-2 field (build 306), so this is a marginal worsening
-  of a documented plateau: **recorded, not tuned**, which is build 304's rule.
+  real with nothing being thrown. Band 5 was believed to miss that cap at four
+  of seven rungs on the era-2 field (build 306), so this read as a marginal
+  worsening of a documented plateau: **recorded, not tuned**, which is build
+  304's rule -- and that premise is struck with the figures below it.
   **THE FIGURES ARE SUPERSEDED BY BUILD 382**, which swept all sixteen waves at
   all seven rungs with the march bound measured rather than guessed: this wave
   reads **26-72s** and the band fails the cap at no rung. The 116-128 was taken
@@ -7382,8 +7388,11 @@ came from before believing the other one covers it.
   +-10% lever -- while still delivering 18 of them. Adding ballast re-prices
   band 5 **upward by 4-8%**, which is build 328's fault by name (ANVIL's wave
   took that band's mean up and turned REMNANT's `|moved| < 0.05%` arm red for
-  a reason having nothing to do with REMNANT), on the band build 306 already
-  measured missing the 120s cap at four of seven rungs. Removing the wave
+  a reason having nothing to do with REMNANT), on the band build 306 measured
+  missing the 120s cap at four of seven rungs -- **struck at build 382, which
+  measured 224 of 224 cells inside it**, so the re-pricing is still a real cost
+  to every other wave in the band and no longer a cost against a cap. Removing
+  the wave
   entirely moves band 5 by **-0.05%**, which is the floor of the option space
   and worth knowing.
   If it ever comes back it needs a re-spec and not a number: a payload that
@@ -8532,9 +8541,13 @@ came from before believing the other one covers it.
   at all, and the same holds for BLOOM. **It is still a balance change and
   still not this build's**, because removing the lateral SHORTENS the path and
   therefore the crossing: NEEDLE's mean fell when its lateral went, and doing
-  that to band 5's heaviest body moves a clear time the 120s cap already
-  fails at four of seven rungs (build 306). What the next build needs is the
-  clear table either side, not another gait word.
+  that to band 5's heaviest body moves a clear time the 120s cap was believed
+  to fail at four of seven rungs (build 306). What the next build needs is the
+  clear table either side, not another gait word. **Both were taken and both
+  came back favourable**: build 356 shipped `straight` on BULWARK and BLOOM and
+  measured the five BULWARK waves at 73.9s -> 61.9s, and build 382 timed the
+  whole band at 224 of 224 cells inside the cap -- so the premise this
+  paragraph hesitated over was not there.
 - **AND A REFUTED ALARM OF MY OWN, WHICH IS THE MOST USEFUL THING IN THIS
   BUILD.** Chasing a fan-out claim that CHAFF spends 80% of its run WALKING,
   I measured a chaff released at the rim with the gun off: the hand-back
@@ -14031,3 +14044,97 @@ came from before believing the other one covers it.
   budget asks for and cannot see the class of fault build 333 found (a job
   taken off the list and one body of ninety-six released). That is a census
   question and wants `emit`, not this.
+
+- **BUILD 383 SWEEPS THE DEBT BUILD 382 CREATED, AND THE SHAPE IS SHARPER THAN
+  A STALE FIGURE: A STRIKE CORRECTS THE CLAUSE IT AIMS AT, AND THE PREMISE IN
+  THE SAME SENTENCE GOES ON READING AS MEASURED.** 382 struck three claims and
+  recorded the sweep discipline it had used ("a line-based grep undercounts a
+  wrapped phrase"). It swept neither `docs/` nor `src/`, and at **thirteen**
+  sites across five files -- six in CLAUDE.md, three in `docs/rebalance.html`,
+  one in `docs/pacing.md`, one in `src/codex.js` and two in `src/config.js` --
+  the clause BESIDE each strike still asserted band 5's cap plateau as
+  measured. Three of the thirteen are inside the very entries 382 edited (the
+  REMNANT and KITE ones, and `docs/rebalance.html`'s copy of REMNANT's), and
+  one of those is in the very SENTENCE: `docs/rebalance.html`'s REMNANT paragraph reads
+  "struck at build 382 ... the band fails the cap at no rung at all -- against
+  a band that already misses it at four of seven", which is a sentence
+  contradicting itself across one em-dash. **The strike is the easy half; the
+  premise it was resting on is the half nobody re-reads.**
+- **...AND KITE'S PARAGRAPH CARRIED BOTH HALVES THREE LINES APART, which is
+  build 355's rule one level on.** That rule is to check a docstring's
+  sentences against each other rather than only against the code; here the
+  standing premise and the strike that refutes it were in one bullet, in that
+  order, so a reader taking the first sentence stops before the correction.
+  Same for the KITE-bolt withdrawal, which used the cap as an ARGUMENT ("on the
+  band build 306 already measured missing the 120s cap") -- and there the
+  correction changes the argument's force rather than deleting it: re-pricing
+  band 5 upward is still a real cost to every other wave in the band and is no
+  longer a cost against a cap. **Ask what a struck premise was holding up, not
+  just whether it is still true.**
+- **AND `src/` WAS THE WORST OF THE FIVE FILES, BECAUSE THERE THE FALSIFIED
+  FIGURES THEMSELVES WERE STILL STANDING.** Everywhere else 382 had struck the
+  figure and left the premise; `src/codex.js`'s KITE docstring and
+  `src/config.js`'s `remnant` block had neither -- KITE's still read "the wave
+  is the longest in band 5 at rung 35 (116-128s ...) and straddles the
+  120-second cap" as a measurement, against a timed 26-72s. That is the comment
+  a reader touching the code meets FIRST, and it is the one a plan document's
+  reader never sees. **A sweep for a stale claim has to include the source
+  tree**, and the reason it is easy to miss is that the figure lives in a
+  docstring rather than in a value, so nothing derives it and no guard can see
+  it.
+- **THE INSTRUMENT NEEDS ENTITY NORMALISATION AS WELL AS WHITESPACE, which is
+  the other half of 382's own lesson.** `docs/rebalance.html` is one 47,000-
+  character line with `&mdash;`, `&times;` and `&nbsp;` inside its sentences,
+  so a phrase is invisible to a plain grep for two independent reasons. The
+  sweep collapses entities to ASCII and all whitespace to single spaces first.
+  And the premise was **worded three ways** -- "already misses that cap at four
+  of seven rungs", "already measured missing the 120s cap at four of seven",
+  "a 120-second cap four of its seven rungs miss" -- so grepping the sentence
+  finds a subset: grep the FIGURE (`four of seven`, `120s cap`) and read every
+  hit. 382's own count of five quoters was low for exactly this reason. One
+  false-positive shape to know: `CFG.energy`'s own docstring says "four of its
+  seven fields are not amounts at all", which matches the figure and has
+  nothing to do with the cap -- three hits in two files, so read each hit
+  rather than counting them. **And this entry's own site count was wrong on its
+  first draft**, written by hand as eight and then eleven against a real
+  thirteen, in the bullet whose subject is hand-written counts going stale.
+  Derive it from the SWEEP's hit list, and not from `git diff`'s hunk count,
+  which undercounts here for three separate reasons: two of the sites share one
+  47,000-character line in `docs/rebalance.html` and collapse into one hunk,
+  one is an addition beside a history entry rather than a replacement of it,
+  and one of `src/config.js`'s three hunks is the BUILD literal. Twelve hunks,
+  thirteen sites.
+- **AND `docs/pacing.md`'S BUILD-229 FIGURE IS NOT SUPERSEDED, IT IS NOT
+  COMPARABLE -- four named things under it have moved.** "Waves start missing
+  the 120s cap at tier 22 rather than 16" was taken with `tiers.mjs`'s
+  heaviest-wave column when `perBand` was 2 (so the five bands covered rungs
+  1-10 and a "tier 22" drew bands 4-5 at a multiplier nothing now reaches),
+  before build 300's `popStep` and `flow`, before 301 made a wave's counts a
+  BUDGET, and before there was a second field at all -- band 5's rungs became
+  era-2 territory at 305. So the entry stays and the number is history, the way
+  the ORDINAL hash keeps its own history: each entry names a real change and
+  its reason, and the figures in it are not comparable to anything you will
+  measure. CLAUDE.md's build-229 entry points at that note rather than
+  restating it.
+- **AND THE INSTRUMENT'S SUBJECT HAD MOVED UNDER BUILD 306 TOO, which is worth
+  a sentence at that site.** Its row is "the heaviest band-5 wave", and ANVIL
+  joined band 5 at build 328 -- so today's heaviest wave by threat is
+  `anvilx1 + motex3` at 49.77, which was not in the band when 306 measured it
+  and clears in 19-32s because one enormous body is not a crowd. A column keyed
+  on "the heaviest" silently re-points itself whenever the roster changes, so a
+  figure from it is about whichever wave was heaviest that day.
+- **What was NOT swept, deliberately: build 306's INCOME half.** "Income per
+  second falls to 0.27-0.77x of era 1" was not re-measured at 382 and is not
+  re-measured here, so it stands -- and both the CLAUDE.md strike and the
+  `docs/rebalance.html` note say so in as many words, because a note that
+  strikes one half of a two-part finding invites the next reader to treat the
+  other half as gone. `docs/objects.html`'s one cap sentence (build 356's own
+  A/B, "the one run in sixty that failed the 120-second cap was on `march`") is
+  true, is corroborated by 382 at seven times the coverage, and is left alone.
+- Verified by re-running the sweep to zero on all five phrasings, plus a
+  headless load of the edited doc page checking for a thrown error rather than
+  assuming one parses. The ORDINAL hash is NOT owed and was not run: no
+  executable `src/` line moves, so there is nothing for it to measure -- the
+  same call builds 345-349, 360, 372, 374, 378 and 382 made. The suite ran
+  anyway, as the regression guard rather than the instrument, which is build
+  360's own call on a change of this shape.
