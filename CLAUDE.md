@@ -3228,6 +3228,11 @@ came from before believing the other one covers it.
   the next phase has to beat: three of band 5's seven rungs do not clear their
   heaviest authored wave inside 120 seconds, and the run's income halves
   exactly where the tree's dearest bands begin.
+  **THE CAP HALF OF THAT IS RE-MEASURED AT BUILD 382 AND IS GONE**: all sixteen
+  of the band's ordinary waves clear at all seven of its rungs, fully bought
+  and funded alike, worst cell 110s of 120. Five later builds quoted this
+  sentence forward as a live premise; the income half was not re-measured
+  here.
 - **THE FIRST TWO OF THE TWENTY ARE IN FROM BUILD 307, AND BOTH OF THEM
   LEAVE.** Phase 6a: EMBER (band 1, `rise`) and HUSK (band 2, `tumble`), the
   two objects `docs/objects.html` says need no new rule. Every body in this
@@ -5589,7 +5594,11 @@ came from before believing the other one covers it.
   tail -- inference on top of measurements, labelled as such -- the era-2
   1481-unit column at 26 u/s is about 57 seconds, which puts the wave over the
   120s cap at all three sampled rungs where the band's next-longest is under
-  it. Band 5 already misses that cap at four of seven rungs on the era-2 field
+  it. **BOTH HALVES OF THAT ARE STRUCK -- see build 382, which TIMED it:
+  11-25s, a median of 20s and fifth fastest of the sixteen, and it misses the cap at
+  no rung at all.** The model was an upper bound on ONE body's transit and the
+  wave has fifty in it. Band 5 already misses that cap at four of seven rungs
+  on the era-2 field
   (build 306), so this is a small marginal worsening of a documented plateau
   and the lever, if it is ever wanted, is `speed`. Authoring a balance answer
   in the build that adds the body is the mistake build 304 deliberately did
@@ -7199,6 +7208,11 @@ came from before believing the other one covers it.
   real with nothing being thrown. Band 5 already misses that cap at four of
   seven rungs on the era-2 field (build 306), so this is a marginal worsening
   of a documented plateau: **recorded, not tuned**, which is build 304's rule.
+  **THE FIGURES ARE SUPERSEDED BY BUILD 382**, which swept all sixteen waves at
+  all seven rungs with the march bound measured rather than guessed: this wave
+  reads **26-72s** and the band fails the cap at no rung. The 116-128 was taken
+  against a 30-second march bound that every deep-rung cell reached, so part of
+  what it timed was the walk in.
 - **`applyDamage` TAKES POSITIONAL ARGUMENTS, AND AN OPTIONS OBJECT BECOMES
   THE IMPULSE.** `e.applyDamage(w, 1, 0, 0, { impulse: 3000, throwOff: true })`
   is legal JavaScript: the object lands in `impulse`, the velocity goes NaN,
@@ -13903,3 +13917,117 @@ came from before believing the other one covers it.
   fatal. **Verified in both directions**: clean, 3 of 3 pass; with `byName`
   blinded, it FAILS reporting `rung 9 -> 8 (glitch, moved -1) ... MISSING
   railLost railLanded railKnock` instead of throwing.
+
+- **BUILD 382 RE-TAKES BAND 5'S CLEAR TABLE, AND THE DOCUMENTED PLATEAU IS
+  CLOSED: 224 OF 224 CELLS CLEAR INSIDE THE 120-SECOND CAP.** Build 306
+  measured the heaviest band-5 wave failing that cap at **three of seven
+  rungs** on the era-2 field and recorded it as "the number the next phase has
+  to beat"; **FIVE** later builds quoted it forward as a live premise -- REMNANT
+  324, ANVIL 328, KITE 335, the KITE-bolt withdrawal 336 and BULWARK/BLOOM 356
+  -- counted by grep, which found only FOUR of the five, because CLAUDE.md is
+  hard-wrapped and KITE's copy of the phrase straddles two lines. **A
+  line-based grep undercounts a wrapped phrase, and in hard-wrapped prose that
+  is the normal case rather than the exception** -- worth knowing for every
+  "grep for who was quoting it" sweep this file asks for. And
+  build 356's own entry ends asking for exactly this -- *"what the next build
+  needs is the clear table either side, not another gait word"*. All sixteen of
+  band 5's ordinary waves, at all seven of its own rungs, three runs a cell,
+  era 2, in one container:
+
+  | | cells | over the cap | worst | >=80% of cap |
+  |---|---|---|---|---|
+  | fully bought (199.6 MB against a 133.1 MB tree) | 112 | **0** | **110s (92%)** | 2 |
+  | funded from the landed curve (21.3 -> 46.6 MB) | 112 | **0** | **98s (82%)** | 1 |
+
+  **AND THE BAND'S CLEAR TIME IS A BULWARK QUESTION AND ESSENTIALLY NOTHING
+  ELSE**, which is the finding the heaviest-wave column could never have
+  produced. Ranked by median clear, **the five slowest waves in the band are
+  exactly the five that carry a BULWARK** -- [35] 46s, [45] 53s, [34] 61s,
+  [28] 65s, [29] 67s -- against a sixth-slowest of 28s, so the separation is
+  an 18-second gap and needs no statistics. Per cell the five read **26-110s,
+  median 61s** and the other eleven **11-33s, median 21s**. Both cells at or
+  over 80% are the same wave, `bulwarkx2+heraldx1`, at rungs 34 and 35 (110s
+  over runs [97 110 116] and 101s over [108 86 101]). The band's HEAVIEST wave
+  by threat is `anvilx1+motex3` at 49.77, and it clears in **19-32s**, because
+  ANVIL is one enormous body rather than a crowd -- so threat and length have
+  come apart completely and the old column was measuring the wrong wave.
+- **`tiers.mjs`'S CLEAR COLUMN CANNOT ANSWER THIS ANY MORE, WHICH IS WHY THE
+  INSTRUMENT IS NEW.** It takes a band's heaviest authored wave at that band's
+  middle rung -- the right question while threat and length were the same
+  thing. `threatOf` is health over `threatPerHp` and nothing else, so it cannot
+  see that a KITE stands off at the edge of the assist's reach and will not
+  come and be shot, that a REMNANT holds its wave open for six seconds after it
+  dies, or that a VEIL stops the gun choosing what is behind it -- and each of
+  those was recorded as making its wave the longest in band 5 without making it
+  the heaviest. `scripts/clears.mjs` sweeps every wave at every rung instead.
+  It is 16 x 7 x 3 in about twelve minutes -- estimated rather than timed
+  cleanly, since both passes here ran in parallel and took thirteen -- so it is
+  affordable per build rather than per phase.
+- **TWO OF THOSE RECORDED CLAIMS ARE NOW FALSE, ONE BY A FACTOR OF SIX AND
+  ONE BY TWO.** REMNANT's wave was recorded as "the longest in band 5, over
+  the 120s cap at all three sampled rungs" (324) and measures **11-25s, a
+  median of 20s and FIFTH FASTEST of the sixteen** -- ranked rather than
+  eyeballed, because this file has paid for three superlatives in one
+  afternoon before. KITE's was "the longest in band 5 and
+  straddles the 120-second cap ... 116 to 128s at rung 35" (335) and measures
+  **26-72s, worst 72**. Both were modelled from a body's own transit rather
+  than timed (324's was explicitly "inference on top of measurements, labelled
+  as such"), and the transit is a small part of a wave that has fifty bodies in
+  it. **A wave's length modelled from its slowest body is an upper bound on one
+  body, not an estimate of the wave** -- and both were quoted forward as
+  measurements by later builds.
+- **THE INSTRUMENT'S OWN MARCH BOUND WAS REACHED BY EVERY DEEP-RUNG CELL, AND
+  MY WARNING FOR IT SAMPLED THE FLAG AT THE END OF THE WINDOW.** The wave
+  marches in with the gun cold so the clock measures killing rather than
+  walking, and the first version bounded that march at a flat 30s. Measured at
+  rung 35, **every one of the sixteen cells reached exactly 30.0s** -- the
+  bound -- so the clock started with bodies still staged and part of what it
+  timed was the walk. The warning could not see it because `marching` was read
+  AFTER the clear loop: a straggler comes loose during the very window it is
+  contaminating, so the flag is always false by the time it is read. That is
+  the end-of-window trap, in an hour-old probe, in the one field whose whole
+  job is to say the number is not comparable. Captured before the clock starts
+  now, and the bound is measured rather than guessed -- the true worst march at
+  rung 35 is **46.3s**, so 90s is 1.9x clear and the probe PRINTS the worst
+  march it saw against the bound either way.
+  **And the contamination was in the unfavourable direction, which is the part
+  that mattered**: `bulwarkx2+heraldx1` at rung 34 read 87s contaminated and
+  **110s** properly marched. A bound that truncates the march does not merely
+  add the walk to the clock -- it leaves bodies unchoosable (`autoTarget`
+  refuses `staged`) while the clock runs, and the two effects do not cancel.
+  Had the table been reported off the first run it would have said the band's
+  worst cell sat at 73% of the cap where it sits at 92%.
+- **A NEW PROBE IN `scripts/` INHERITS FOUR DERIVED GUARDS BY EXISTING, AND ONE
+  OF THEM CAUGHT A REAL GAP.** `check-build` put `clears.mjs` into the served-
+  tree set (7 probes), the purse-reading set (8), the aimable-constants set (3)
+  and the funding-policy set -- no list was edited for any of them. The policy
+  arm refused the build: the probe had the cheapest-first allocator between its
+  sentinels and **no `const LINE = [...]`**, so at a partial budget it was
+  buying cheapest levels anywhere instead of the damage line in priority order,
+  which is a different turret from the one `tiers.mjs` and `income.mjs` model.
+  Measured after fixing it: at both spends the two versions buy the same levels
+  (**109 at x6.35 bought, 96 at x6.35 funded**), because the damage line is
+  affordable at 21 MB either way -- so the funded column the guard made me
+  throw away was not in fact wrong. **A guard that refuses a structural gap is
+  worth having even when the gap happens to cost nothing today**, and saying
+  which of the two it was is the difference between a guard and a ritual.
+- **AND THE FUNDED COLUMN IS INSIDE THE BOUGHT COLUMN'S SPREAD, so the 87 MB of
+  tree past the damage line does not measurably shorten a band-5 wave.** Per
+  cell the two disagree in both directions (`[29]` at r33 is 76s bought against
+  98s funded and at r34 110s against 71s) while the three runs of one cell
+  swing 86-108s, so at three runs a cell they are not distinguishable. What
+  says it is the gun and not the noise is the buy column: **`dmg x6.35` at
+  every rung of both**, 92-96 levels funded against 109 bought. Consistent with
+  build 364's measurement that CORE -- the one node neither can buy, being
+  `currency: 'remainder'` -- is worth about a tenth at rung 42.
+- **WHAT THE PACING PASS NOW HAS, AND WHAT IT STILL DOES NOT.** It has the
+  table, and the table says there is no cap failure to fix: the lever every
+  deferred note pointed at (REMNANT's `speed`, KITE's transit) would be tuning
+  a plateau that is not there. What is genuinely marginal is one wave at two
+  rungs, and its body is a BULWARK -- which build 356 already re-gaited to
+  `straight` for path reasons and measured as -16% on the five BULWARK waves.
+  What the table does NOT cover, deliberately: it spawns through
+  `debugSpawnGroup` rather than `Director.emit`, so it delivers every body the
+  budget asks for and cannot see the class of fault build 333 found (a job
+  taken off the list and one body of ninety-six released). That is a census
+  question and wants `emit`, not this.
