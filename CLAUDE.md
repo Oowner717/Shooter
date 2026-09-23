@@ -6623,13 +6623,25 @@ came from before believing the other one covers it.
   background job reads as "finished suspiciously fast" rather than as an
   error. CLAUDE.md has said the last two probes need it since the suite was
   written; the suite needs it too.
-- **The ORDINAL hash is not owed and was not run.** Three CSS rules, one
-  measured reservation written from `syncApertures`, and one argument moved
-  through `fillCard`/`textOf` -- nothing on any body, payout or targeting
-  path, so there is nothing for the probe to measure and the reading would be
-  a formality (the same call builds 345-349, 360, 372, 374, 378, 382 and 383
-  made). What had something to say is the box measurements either side, the
-  four reverts and the suite.
+- **The ORDINAL hash was judged not owed, RUN ANYWAY ON REQUEST, AND DID NOT
+  MOVE.** Three CSS rules, one measured reservation written from
+  `syncApertures`, and one argument moved through `fillCard`/`textOf` --
+  nothing on any body, payout or targeting path, so the call was that there is
+  nothing for the probe to measure and the reading would be a formality (the
+  same call builds 345-349, 360, 372, 374, 378, 382 and 383 made). Taken on
+  the shipped tree it reads **`-954811922`**, all six intermediate marks and
+  all six body counts identical to build 383's, with the probe's own heading
+  confirming ANOMALY 1 and `build 384 rev e35cd28` -- so the call was right
+  and is now measured rather than argued, which is the one thing a formality
+  cannot be.
+  **And the formality reading has a use the judgement does not: it dates the
+  figure.** The current number had last been TAKEN at build 380 and carried
+  forward by inspection through 381-384; an unchanged reading on a build with
+  no gameplay reach is the cheapest possible confirmation that the carried
+  figure is still the live one, so the next build to move it cannot be
+  comparing against a number four builds stale. Roughly forty seconds, one
+  background server, zero agents. What ALSO had something to say is the box
+  measurements either side, the four reverts and the suite.
 
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
 
