@@ -60,6 +60,15 @@
   --rail-t: calc(var(--hud-t) + 56px);
   --rail-h: 0px;
   --boss-h: 0px;
+  /*
+   * ...and the same for the APERTURE banner, which sits in the same slot and
+   * is the other thing #alerts has to clear. `--boss-h` is a constant because
+   * the boss bar is one fixed row; this one is not -- the banner is one row
+   * per boss whose way in is held -- so Hud.syncApertures measures the filled
+   * bar and writes it here. Measured rather than authored for build 240's
+   * reason: a hand-picked height is right for one row and wrong for two.
+   */
+  --ap-h: 0px;
   --under-rail: calc(var(--rail-t) + var(--rail-h));
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
@@ -607,8 +616,14 @@ html, body {
   position: absolute;
   left: 0;
   right: 0;
-  /* ...and below the boss bar, when there is one. */
-  top: calc(var(--under-rail) + var(--boss-h));
+  /*
+   * ...and below the boss bar, when there is one -- and below the APERTURE
+   * banner, which is the other occupant of that slot. Both terms are in this
+   * calc rather than folded into `--under-rail`, because that property is
+   * computed on :root and inherits down already resolved: a fresh term
+   * defined lower would change nothing it had already substituted.
+   */
+  top: calc(var(--under-rail) + var(--boss-h) + var(--ap-h));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3608,13 +3623,31 @@ body.booting #quickBar {
   30% { transform: scale(1.13); }
   100% { transform: scale(1); }
 }
-#bytesChip.took {
-  animation: tookSalvage 0.26s ease-out;
-  border-color: rgba(159, 232, 255, 0.55);
-}
+/*
+ * On the FIGURE and not on the chip. The chip is a flex item in a row with a
+ * 5px gap either side of it, so it has no room to grow at all: measured at
+ * the keyframe's own peak, scaling the chip took it 111.6 -> 126.1 at 320 and
+ * 161.5 -> 182.5 at 390 and crossed the rail's right edge and the menu
+ * button's left edge by 2.2/2.3 and 5.5/5.5 points -- every time salvage
+ * banked, which is every frame of a PULSE. The digits are inside the chip's
+ * own 9px of horizontal padding, so the same beat costs no geometry.
+ */
+#bytesChip.took #bytesNum { animation: tookSalvage 0.26s ease-out; }
 @media (prefers-reduced-motion: reduce) {
-  #bytesChip.took { animation: none; }
+  #bytesChip.took #bytesNum { animation: none; }
 }
+/*
+ * It flashed the BORDER too, and that border never went back: `took` is added
+ * on every increase and nothing has ever removed it, so from the first mote
+ * collected the chip wore this colour for the rest of the run -- and this
+ * rule sits below `#bytesChip.canBuy` at equal specificity, so what it was
+ * permanently covering is the one standing fact the border carries, that
+ * there are rows within reach. A transient beat does not get to own a
+ * standing readout, and the beat is already the figure changing and the
+ * digits pulsing. Removed rather than made transient: relying on
+ * `animationend` to take the class off leaves it on for ever under
+ * prefers-reduced-motion, where the animation never runs.
+ */
 
 
 /* ============================================================

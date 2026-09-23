@@ -3061,6 +3061,20 @@ export class Hud {
         + '<span class="apGo">OPEN THE WAY</span>';
       ap.appendChild(b);
     }
+    /*
+     * What `#alerts` has to clear. The banner and the boss bar share one slot
+     * and never show together, but only the boss bar had a reservation
+     * (`--boss-h`) -- so every alert pill landed ON the banner: measured at
+     * 320, 390 and 414, the banner occupies y 76..112 and a pill sat at
+     * 79.6..96.4, which is the garbled line a player reads when a gate is
+     * held and anything is announced. Measured rather than authored because
+     * the banner is one row per boss held and two rows are 78 where one is
+     * 36; read AFTER the rows are in, for build 240's reason. Zero when
+     * hidden, since `getBoundingClientRect` on a `display: none` box is all
+     * zeros and would silently read as no reservation either way.
+     */
+    const h = held.length ? Math.round(ap.getBoundingClientRect().height + 6) : 0;
+    document.body.style.setProperty('--ap-h', `${h}px`);
   }
 
   /**

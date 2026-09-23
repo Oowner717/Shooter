@@ -42621,6 +42621,176 @@ if (MINE_LINE) {
     + ` rather than by calling the door; director put back ${fz.putBack}`);
 }
 
+/*
+ * ---- THE TOP OF THE SCREEN, AND THE CARD THAT HEADS A TIER --------------
+ *
+ * Three claims a screenshot found and no case could see, because all three
+ * are about a RENDERED BOX and the properties behind them were all correct.
+ *
+ * 1. `#apertureBar` and `#bossBar` share one slot at `--under-rail` and never
+ *    show together, and only the boss bar had a reservation (`--boss-h`) --
+ *    so with a gate held, every alert pill landed ON the banner. Measured
+ *    before the fix at 320, 390 and 414: the banner occupies y 76..112 and a
+ *    pill sat at 79.6..96.4, which is one line of text drawn over another.
+ *
+ * 2. `#bytesChip.took` scaled the CHIP, and a chip in a flex row with a 5px
+ *    gap either side has no room to grow. At the keyframe's own peak it went
+ *    111.6 -> 126.1 at 320 and 161.5 -> 182.5 at 390 and crossed the rail's
+ *    right edge and the menu button's left edge by 2.2/2.3 and 5.5/5.5
+ *    points -- on every frame salvage banked, which is every frame of a
+ *    PULSE. The flash is on the figure now, inside the chip's own padding.
+ *    And `took` also flashed the BORDER and was never removed, so it sat
+ *    below `#bytesChip.canBuy` at equal specificity and permanently covered
+ *    the one standing fact that border carries. Measured by revert: with the
+ *    rule restored the border reads the flash colour with `canBuy` both on
+ *    and off, so the green was dead rather than merely occasional.
+ *
+ * 3. `fillCard` took a NAME and `textOf` read the node's own line, so a card
+ *    headed OPEN SIEVE carried SIEVE's description and one headed DEEP ARRAY
+ *    quoted ARRAY's "+45%" for the level whose content is +45% AGAIN. All
+ *    three tier lines in upgrades.js had no reader at all. It takes the TIER
+ *    now, so the heading and the line come off one object.
+ *
+ * The viewport is put back, and `g.resize()` is called explicitly at each
+ * size: `setViewportSize` does not resize the game, and every quantity here
+ * is derived from the window.
+ */
+{
+  const held = page.viewportSize();
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    rows.push(await page.evaluate(async (vw) => {
+      const g = window.__sim;
+      g.restart();
+      g.resize();
+      const w = g.world;
+      const bx = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { l: +r.left.toFixed(1), r: +r.right.toFixed(1), t: +r.top.toFixed(1),
+          b: +r.bottom.toFixed(1), w: +r.width.toFixed(1) };
+      };
+      // --- 1. the banner and the alert column ---------------------------
+      w.apertures[1] = 1;
+      g.syncGate();
+      g.hud.syncApertures(w);
+      g.hud.alert('HELD AT THE GATE · ORDINAL', 'apGateCase', 4);
+      g.update(1 / 60);
+      const ban = bx('#apertureBar');
+      const pill = bx('.alert');
+      const apH = getComputedStyle(document.body).getPropertyValue('--ap-h').trim();
+      // --- 2. the purse chip's flash ------------------------------------
+      g.hud.setBytes(21.3e6, 1, 1.19);
+      g.hud.setBuys(31);
+      g.hud.fitBar();
+      const chip = document.getElementById('bytesChip');
+      const num = document.getElementById('bytesNum');
+      const restChip = bx('#bytesChip');
+      const restNum = bx('#bytesNum');
+      const rail = bx('#waveRail');
+      const menu = bx('#menuBtn');
+      // Seek the keyframe to its own peak rather than waiting on wall time:
+      // g.update advances no CSS animation clock at all.
+      const an = num.getAnimations().find((a) => (a.animationName || '') === 'tookSalvage');
+      let peakChip = null;
+      let peakNum = null;
+      if (an) {
+        an.currentTime = an.effect.getTiming().duration * 0.3;
+        peakChip = bx('#bytesChip');
+        peakNum = bx('#bytesNum');
+      }
+      // The border's own transition is 0.4s, so read it finished or the
+      // reading is of whatever it was leaving rather than where it lands.
+      const settle = () => chip.getAnimations({ subtree: true })
+        .forEach((a) => { try { a.finish(); } catch (e) { /* not running */ } });
+      settle();
+      const onBorder = getComputedStyle(chip).borderColor;
+      g.hud.setBuys(0);
+      settle();
+      const offBorder = getComputedStyle(chip).borderColor;
+      return {
+        vw, ban, pill, apH,
+        clears: !!(ban && pill) && pill.t >= ban.b,
+        restChip, peakChip, restNum, peakNum, rail, menu, hasAnim: !!an,
+        onBorder, offBorder,
+        gapRail: peakChip && rail ? +(peakChip.l - rail.r).toFixed(1) : null,
+        gapMenu: peakChip && menu ? +(menu.l - peakChip.r).toFixed(1) : null,
+      };
+    }, size.width));
+  }
+  await page.setViewportSize(held);
+
+  // --- 3. the card that heads a tier ---------------------------------------
+  const cards = await page.evaluate(async () => {
+    const g = window.__sim;
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const m = g.hud.menu;
+    const out = [];
+    for (const id of ['driftaim', 'aimrange']) {
+      const n = NODE_BY_ID.get(id);
+      if (!n || !n.tiers) { out.push({ id, missing: true }); continue; }
+      for (let have = 0; have < (n.levels || 1); have++) {
+        // Through fillCard and read back off the DOM, because the fault was
+        // the CARD disagreeing with itself and not what textOf returns.
+        const card = document.createElement('div');
+        card.innerHTML = '<div class="shopName"></div><div class="shopSpec"></div>'
+          + '<div class="shopStat"></div>';
+        const at = Math.min(have, Math.max((n.levels || 1) - 1, 0));
+        m.fillCard(card, n, (n.tiers && n.tiers[at]) || null);
+        out.push({
+          id, have,
+          name: card.querySelector('.shopName').textContent,
+          stat: card.querySelector('.shopStat').textContent,
+          tierName: n.tiers[at] ? n.tiers[at].name : null,
+          tierLine: n.tiers[at] ? n.tiers[at].line : null,
+          baseLine: n.line || '',
+        });
+      }
+    }
+    return out;
+  });
+
+  check('an alert pill clears the aperture banner instead of landing on it',
+    rows.length === 2 && rows.every((r) => r.ban && r.pill && r.clears
+      && r.ban.w > 0 && r.pill.w > 0 && parseFloat(r.apH) > 0),
+    rows.map((r) => `${r.vw}: banner ${r.ban ? `${r.ban.t}..${r.ban.b}` : 'MISSING'}`
+      + `, pill ${r.pill ? `${r.pill.t}..${r.pill.b}` : 'MISSING'}`
+      + `, --ap-h ${r.apH || '(unset)'}`).join('; ')
+    + ' -- both boxes non-empty, so the clearance is measured rather than'
+    + ' inherited from something being hidden');
+
+  check('the purse chip is the same box at the salvage flash as at rest',
+    rows.every((r) => r.hasAnim && r.peakChip && r.restChip
+      && Math.abs(r.peakChip.w - r.restChip.w) < 0.5
+      && r.gapRail > 0 && r.gapMenu > 0
+      // ...and the flash is still SEEN: the figure grows where the chip does
+      // not, or this arm passes on a build that deleted the beat outright.
+      && r.peakNum && r.restNum && r.peakNum.w > r.restNum.w * 1.05),
+    rows.map((r) => `${r.vw}: chip ${r.restChip && r.restChip.w} -> `
+      + `${r.peakChip ? r.peakChip.w : 'no anim'}, figure `
+      + `${r.restNum && r.restNum.w} -> ${r.peakNum ? r.peakNum.w : '--'}, `
+      + `gaps rail ${r.gapRail} menu ${r.gapMenu}`).join('; '));
+
+  check('...and the border says whether there is anything to buy, not whether salvage just landed',
+    rows.every((r) => r.onBorder !== r.offBorder),
+    rows.map((r) => `${r.vw}: canBuy ${r.onBorder} vs none ${r.offBorder}`).join('; ')
+    + ' -- `took` used to set this below `canBuy` at equal specificity and'
+    + ' was never removed, so the two read the same for the whole run');
+
+  check('a tier card carries its own line, not the line of the level below it',
+    cards.length >= 4 && cards.every((c) => !c.missing)
+      && cards.some((c) => c.tierName)
+      && cards.every((c) => (c.tierName ? c.name === c.tierName : true)
+        && (c.tierLine
+          ? c.stat.toLowerCase().startsWith(
+            c.tierLine.split('. ')[0].replace(/\.$/, '').toLowerCase().slice(0, 12))
+          : true)),
+    cards.map((c) => c.missing ? `${c.id} MISSING`
+      : `${c.id}@${c.have} "${c.name}" / "${c.stat}"`).join('; '));
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

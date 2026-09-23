@@ -1086,7 +1086,7 @@ export class Menu {
     if (!n.id) {
       c.disabled = true;
       c.classList.add('issued', 'own');
-      this.fillCard(c, n, n.name);
+      this.fillCard(c, n, null);
       c.querySelector('.shopPrice').textContent = 'ISSUED';
       return c;
     }
@@ -1145,7 +1145,7 @@ export class Menu {
 
     const at = Math.min(have, Math.max(max - 1, 0));
     const nm = card.querySelector('.shopName');
-    this.fillCard(card, n, n.tiers && n.tiers[at] ? n.tiers[at].name : n.name);
+    this.fillCard(card, n, (n.tiers && n.tiers[at]) || null);
 
     /*
      * REMAINDER keeps its diamond and its bare count -- it is seven tokens,
@@ -1200,7 +1200,7 @@ export class Menu {
    * So an arm splits: the numbers go on a spec line of their own and the card
    * says what it does.
    */
-  textOf(n) {
+  textOf(n, tier = null) {
     const say = (t) => (t ? t[0].toUpperCase() + t.slice(1) : '');
     if (n.kind === 'arm') {
       const a = ARM_BY_KEY.get(n.key);
@@ -1210,7 +1210,7 @@ export class Menu {
       // heading of the card and what is left starts mid-sentence.
       if (b) return { spec: '', stat: say((b.hint || '').replace(/^[A-Z ]+—\s*/, '')) };
     }
-    const line = (n.line || '').trim();
+    const line = ((tier && tier.line) || n.line || '').trim();
     if (!line) return { spec: '', stat: '' };
     const stop = line.indexOf('. ');
     const first = stop > 0 ? line.slice(0, stop) : line.replace(/\.$/, '');
@@ -1226,10 +1226,23 @@ export class Menu {
   }
 
   /** Name, numbers and effect. Shared, so an issued arm reads like a sold one. */
-  fillCard(card, n, name) {
+  /*
+   * The tier rather than its name, so the heading and the line under it come
+   * off ONE object. They did not: the name was made tier-aware and the line
+   * was not, so a card headed OPEN SIEVE carried SIEVE's own description --
+   * "hunt DRIFT and nothing else" over the level that stops you choosing --
+   * and a card headed DEEP ARRAY quoted ARRAY's "+45%" for a level whose
+   * whole content is +45% AGAIN. All three tier lines in upgrades.js
+   * (MUNITION . FERRITE, OPEN SIEVE, DEEP ARRAY) had no reader at all, which
+   * is a field written with content and never shown -- and the docstring
+   * above this branch in upgrades.js states the rule the code was breaking:
+   * a second level of SIEVE is not "SIEVE again".
+   */
+  fillCard(card, n, tier) {
+    const name = tier && tier.name ? tier.name : n.name;
     const nm = card.querySelector('.shopName');
     if (nm.textContent !== name) nm.textContent = name;
-    const { spec, stat } = this.textOf(n);
+    const { spec, stat } = this.textOf(n, tier);
     const sp = card.querySelector('.shopSpec');
     if (sp.textContent !== spec) sp.textContent = spec;
     sp.hidden = !spec;

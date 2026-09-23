@@ -6506,6 +6506,131 @@ came from before believing the other one covers it.
   no change at all here -- which is also why the suite is the only instrument
   that had anything to say.
 
+- **BUILD 384 IS THREE FAULTS A SCREENSHOT FOUND AND NO CASE COULD SEE, AND
+  ALL THREE HAVE THE SAME SHAPE: THE PROPERTY WAS CORRECT AND THE RENDERED
+  THING WAS WRONG.** Reported from a phone with three pictures. Each is a
+  box, a specificity race or a card disagreeing with itself, and the suite had
+  845 green cases over the lot.
+- **`#alerts` RESERVED FOR THE BOSS BAR AND NOT FOR THE APERTURE BANNER, SO
+  EVERY PILL LANDED ON THE BANNER.** The top furniture is three absolutely
+  positioned bands sharing one column and `#apertureBar` and `#bossBar` both
+  sit at `top: var(--under-rail)` under a comment saying "the two never show
+  at once" -- true, and `#alerts` is at `calc(var(--under-rail) +
+  var(--boss-h))`, where `--boss-h` is 0 outside a fight. Measured at 320,
+  390 and 414: the banner occupies **y 76..112 and a pill sat at
+  79.6..96.4**, so `APERTURE HELD` + `OPEN THE WAY` and
+  `HELD AT THE GATE · ORDINAL` were drawn on top of each other -- which is
+  exactly the garbled line in the report. `--ap-h` is the second
+  reservation, added to `#alerts`' own `calc` rather than folded into
+  `--under-rail`, because that property is computed on `:root` and inherits
+  down already resolved (the trap build 293's `--rail-h` paid for). Measured
+  after: the column starts at **118** at all three, 6px clear.
+  **It is MEASURED in `syncApertures` and not authored**, for build 240's
+  reason: the banner is one row per boss held, so one row is 36 and two are
+  78, and a constant would be right for one of them. That method already
+  rebuilds only when what is held changes, so the read is not per frame --
+  and it reads AFTER the rows are in, because a `getBoundingClientRect` on an
+  empty (or `display: none`) bar is short or zero and would silently read as
+  no reservation at all.
+- **A CHIP IN A FLEX ROW WITH A 5px GAP HAS NO ROOM TO SCALE, AND `took`
+  SCALED IT 1.13x ON EVERY FRAME SALVAGE BANKED.** `setBytes` adds `took` on
+  every increase -- which is every mote collected and every frame of a PULSE
+  -- and `#bytesChip.took` ran `tookSalvage`, whose keyframe is
+  `transform: scale(1.13)`. Measured by SEEKING the keyframe to its own peak
+  (`g.update` advances no CSS animation clock at all, build 296): the chip
+  went **111.6 -> 126.1 at 320 and 161.5 -> 182.5 at 390**, and crossed the
+  rail's right edge and the menu button's left edge by **2.2 / 2.3 and
+  5.5 / 5.5 points** -- both neighbours, both sizes, which is the report
+  verbatim ("expands a little bit too much and its borders crosses into its
+  neighbours"). The flash is on `#bytesNum` now: it is a flex item, so it is
+  blockified and the transform applies, and the digits grow **60.5 -> 68.4**
+  inside the chip's own 9px of horizontal padding. Same beat, no geometry.
+  Its clearances inside the chip are measured rather than assumed, because a
+  1.13x scale on a flex item grows in BOTH directions and its siblings do not
+  move: at the peak the digits stay **29-30pt inside the chip's own content
+  edge, 7.1pt clear of the `#bytesBuys` badge, and 1.1pt clear of the `em`**
+  that carries the depth dividend -- and at 320 the `em` is `display: none`
+  under the `max-width: 372px` rule, so there is no left neighbour at all.
+  The 1.1 is the tightest of them and is the figure to re-read against if
+  either the scale or that slot's tracking ever moves.
+- **...AND `took` ALSO FLASHED THE BORDER, WAS NEVER REMOVED, AND HAD BEEN
+  COVERING `canBuy` FOR THE WHOLE OF EVERY RUN.** `#bytesChip.took` sat at
+  line 3611 and `#bytesChip.canBuy` at 290 -- **equal specificity (1,1,0), so
+  source order decides** -- and the only `classList.remove('took')` in the
+  tree is the one immediately before the re-add that restarts the animation.
+  So from the first mote collected the chip wore the flash colour for the
+  rest of the run, and what it covered is the one standing fact that border
+  carries, which that rule's own docstring calls "the one figure that decides
+  whether opening it is worth the tap". Measured by revert: with the rule
+  restored the border reads **`rgba(159, 232, 255, 0.55)` with `canBuy` both
+  ON and OFF**, so the green was DEAD rather than occasionally lost.
+  **Removed rather than made transient, and the reason is the one arm a
+  listener cannot cover**: taking the class off on `animationend` leaves it on
+  for ever under `prefers-reduced-motion`, where the animation never runs and
+  therefore never ends.
+- **AND THE BORDER READS AS BROKEN FOR 0.4s BECAUSE IT IS A TRANSITION, which
+  cost two wrong readings before the case was written.** `#bytesChip` carries
+  `transition: opacity 0.4s, border-color 0.4s`, so a `getComputedStyle`
+  taken on the frame `canBuy` lands reads where the border is LEAVING rather
+  than where it goes -- I read `--line` twice and concluded `canBuy` was
+  still being overridden after the fix. `getAnimations({ subtree: true })
+  .forEach((a) => a.finish())` is the instrument (build 359's, used to finish
+  rather than to seek). The tell is that `box-shadow`, which has no
+  transition, read its final value on the same frame: **two properties of one
+  rule disagreeing is a clock, not a cascade.**
+- **A CARD HEADED `OPEN SIEVE` CARRIED SIEVE'S OWN DESCRIPTION, AND ALL THREE
+  TIER LINES IN THE TREE HAD NO READER AT ALL.** `fillCard(card, n, name)`
+  took a NAME computed from `n.tiers[at].name` and then called `textOf(n)`,
+  which reads `n.line` -- so the two halves of one card were derived from two
+  independent expressions and only one of them knew about tiers. Measured:
+  the level-2 card for `driftaim` read **"OPEN SIEVE" over "A third position
+  on AUTO AIM: hunt DRIFT and nothing else"** -- the description of the level
+  BELOW it, on the level whose whole content is that you stop choosing -- and
+  `aimrange`'s read **"DEEP ARRAY" over "+45% AUTO AIM RANGE"**, quoting
+  ARRAY's figure for a level whose own line says "+45% AGAIN, on top of
+  ARRAY". `fillCard` takes the TIER now and derives both from it, which is
+  the `HERO_GAITS`/`HERO_COL` rule: two things that have to agree, authored
+  apart. After: "OPEN SIEVE" / "A fourth position: grey and hostile
+  together" and "DEEP ARRAY" / "+45% AGAIN, ON TOP OF ARRAY".
+  **The text itself was accurate and that is why nothing could fail.** Read
+  against `Game.aimModes` (`['off','field']`, +`drift` at 1, +`all` at 2) the
+  counts are right -- a third position and a fourth -- and `consider`'s two
+  filters deliver exactly what each line claims. The fault was that the
+  player never saw either of them. One of the three (`gunammo`'s
+  `MUNITION · FERRITE`) is behind `CFG.gun.inPlay` and so unreachable today;
+  the other two are ordinary tree nodes.
+- **AND THE DOCSTRING ABOVE THE SIEVE NODE STATES THE RULE THE CODE WAS
+  BREAKING**, which is this repo's most expensive recurring shape: "a second
+  level of SIEVE is not 'SIEVE again', it is OPEN SIEVE and it hands over a
+  position the first one did not, and the offer..." -- the paragraph that
+  asked for the tier to be its own card, beside a `line` nothing read.
+- **FOUR REVERT PROOFS, EACH FIRING ON EXACTLY ONE ARM WITH THE OTHER THREE
+  GREEN**, which is the attribution build 353 asked for after four proofs
+  printed one message. Verified through the SLICED-OUT case rather than a
+  hand-written harness (builds 349, 351, 358), so what was proved cannot
+  disagree with what ships: the block is found by its own marker comment,
+  brace-matched, and run with `check` as a spy. Four proofs plus a baseline
+  and a restore in about a minute, against thirteen minutes of suite -- and
+  it was the harness that showed my FIRST two revert attempts proved nothing,
+  because both probes read `textOf` and `#bytesNum` directly and so were
+  scoped to the fixed shape. **A revert proof pointed at a helper cannot see
+  a fault in the caller**, and the tell was a revert that landed (`grep -c`
+  1) and changed no figure.
+- **AND `NODE_PATH` IS NOT OPTIONAL FOR `regress.mjs`, WHICH IS WORTH ONE
+  LINE BECAUSE THE FAILURE LOOKS LIKE A HANG.** Launched without it the run
+  dies in under a second with `Cannot find module 'playwright'` -- into a
+  redirect, so the output file holds nothing but the exit code and the
+  background job reads as "finished suspiciously fast" rather than as an
+  error. CLAUDE.md has said the last two probes need it since the suite was
+  written; the suite needs it too.
+- **The ORDINAL hash is not owed and was not run.** Three CSS rules, one
+  measured reservation written from `syncApertures`, and one argument moved
+  through `fillCard`/`textOf` -- nothing on any body, payout or targeting
+  path, so there is nothing for the probe to measure and the reading would be
+  a formality (the same call builds 345-349, 360, 372, 374, 378, 382 and 383
+  made). What had something to say is the box measurements either side, the
+  four reverts and the suite.
+
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
 
 - **LOOM IS IN FROM BUILD 332, AND ITS THREAD IS THE FIRST THING IN THIS GAME
