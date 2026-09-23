@@ -42791,6 +42791,145 @@ if (MINE_LINE) {
       : `${c.id}@${c.have} "${c.name}" / "${c.stat}"`).join('; '));
 }
 
+/*
+ * A BOSS'S STRUCTURE GOES WITH ITS CORE, ON THE FRAME THE CORE DIES.
+ *
+ * `arrest(world, k)` snapped `ceil(alive * k)` pieces a frame across the
+ * ARREST beat, so a forty-panel frame came apart over `CFG.boss.arrest`
+ * seconds AFTER the boss had already died -- and it never finished, which is
+ * the half nobody had measured. `this.snapped` is a running total while
+ * `all` is rebuilt from the SURVIVORS each call, so once `snapped` passes the
+ * remaining count the `while` stops entering: measured on build 384, ORDINAL
+ * snapped 0 of 40 on the death frame, then 9, 15, 19 -- and stalled at 19,
+ * with twenty-one panels never exploded at all. They were simply swept when
+ * the boss was done.
+ *
+ * Both `die` bodies call `arrest(world, 1)` now, where `snapped` is 0 and
+ * `all` is the whole frame, so the loop runs once and runs out. Two copies
+ * because there are two copies of the sequence: the base class's and
+ * ORDINAL's private one, which is exactly how ORDINAL kept its garrison
+ * flying through its own outro when the base class stopped letting the
+ * others (see `Ordinal.die`).
+ *
+ * The gate has to be REACHED, and that is the instrument's whole difficulty:
+ * killing ORDINAL's core at stage 1 sends `want` to 3 and throws it into
+ * CONVERGENCE, which returns out of the ladder ABOVE
+ * `if (this.core.dead) this.die(world)` for several seconds -- so the first
+ * version of this probe read `dying` 0 and `snapped` undefined and looked
+ * exactly like the change not being there. The boss is put on its last stage
+ * first, and `dying > 0` is asserted, because a case that navigates has to
+ * check that it arrived.
+ */
+{
+  const bs = await page.evaluate(async () => {
+    const { fx } = await import('/src/fx.js');
+    const { CFG } = await import('/src/config.js');
+    const g = window.__sim;
+    const w = g.world;
+    const rows = {};
+    // ORDINAL drives the PRIVATE copy of the sequence and GNOMON the base
+    // one, so both are covered; both are era-1 slots, so neither reading
+    // depends on the field.
+    for (const [name, n] of [['ordinal', 1], ['gnomon', 2]]) {
+      g.restart();
+      g.debugTeachAll();
+      w.autoAim = false;
+      w.autoFire = false;
+      if (n === 1) w.aperture = 1; else w.apertures[n] = 1;
+      if (!g.openBoss(n) || !w.boss) throw new Error('openBoss refused ' + n);
+      const bo = w.boss;
+      for (let i = 0; i < 3000 && bo.arriving > 0; i++) g.update(1 / 60);
+      g.update(1 / 60);
+      const c = bo.core;
+      c.applyDamage(w, c.hp + 1e6, 0, -1, 0);
+      const cored = c.dead;
+      /*
+       * ...and then STEP UNTIL THE GATE FIRES, rather than assuming the next
+       * frame is it. Every boss holds its ladder for a set-piece, and a dead
+       * core sends `frac` hugely negative, so the trigger for whichever one it
+       * has not played yet is true: ORDINAL goes into CONVERGENCE and GNOMON
+       * into MIDNIGHT, each of which RETURNS above its own
+       * `if (this.core.dead) this.die(...)` for seconds. A probe that read the
+       * frame after the blow measured the set-piece -- 3 rings and 55
+       * particles for GNOMON with `snapped` undefined, which is exactly what
+       * this change not being there would look like.
+       *
+       * `fx` is cleared on every frame of the wait, so what is counted on the
+       * gate frame is the death's own and not the set-piece's; and `alive` is
+       * the count the frame BEFORE it, because a held ladder can re-form
+       * structure while it waits (GNOMON's dial went 22 back to 28 here).
+       */
+      let alive = 0;
+      let waited = 0;
+      for (; waited < 6000 && !(bo.dying > 0); waited++) {
+        alive = bo.parts().filter((p) => !p.dead && !p.hidden).length;
+        fx.particles.clear();
+        fx.rings.clear();
+        g.update(1 / 60);
+      }
+      if (!(bo.dying > 0)) throw new Error('death gate never fired for ' + n);
+      const parts = alive;
+      const onFrame = {
+        snapped: bo.snapped, left: bo.parts().filter((p) => !p.dead && !p.hidden).length,
+        rings: fx.rings.active.length, parts: fx.particles.active.length,
+      };
+      // ...and nothing snaps LATER, which is the other half of "at the same
+      // time": the ARREST beat is a no-op by construction, not by timing.
+      const dying0 = +bo.dying.toFixed(2);
+      let after = 0;
+      for (let i = 0; i < 150; i++) {
+        g.update(1 / 60);
+        after = Math.max(after, bo.snapped - onFrame.snapped);
+      }
+      rows[name] = { n, parts, cored, waited, dying0, onFrame, after };
+    }
+    return { rows, cap: CFG.maxParticles, wait: CFG.boss.outroWait };
+  });
+
+  const rs = Object.entries(bs.rows);
+  check('a boss\'s structure explodes with its core, not over the beat after it',
+    rs.length === 2
+    // The claim: every piece, on the frame the core died.
+    // NOT `snapped === parts`: a held ladder can re-form structure on the very
+    // frame the gate fires, so the count arrest sees is not the count the
+    // frame before it -- measured, GNOMON's dial came back from 22 to 28 in
+    // that frame and snapped all 28. What is left standing is the claim.
+    && rs.every(([, r]) => r.cored && r.onFrame.left === 0)
+    // Liveness -- an empty frame satisfies the line above for nothing, and
+    // GNOMON's structure is two thirds of ORDINAL's.
+    && rs.every(([, r]) => r.onFrame.snapped >= 8)
+    // The gate was REACHED rather than the boss left standing, and the outro
+    // still has its full held pause in front of whatever that ending's own
+    // `endFor` is. The LENGTH is per-anomaly config, so it is recorded in the
+    // detail rather than compared against a constant here -- the guard for a
+    // sequence that got shorter is the per-slot fight table in
+    // `docs/rebalance.html`, every row of which is measured through it.
+    && rs.every(([, r]) => r.dying0 > 0)
+    // Nothing comes off later: the beat is a no-op, not a shorter beat.
+    && rs.every(([, r]) => r.after === 0)
+    && true,
+    rs.map(([k, r]) => `${k}: ${r.onFrame.snapped}/${r.parts} snapped on the`
+      + ` death frame, ${r.onFrame.left} left, ${r.after} after,`
+      + ` outro ${r.dying0}s, gate ${r.waited}f after the blow`
+      + ` (${r.onFrame.rings} rings, ${r.onFrame.parts} particles)`).join('; ')
+    + ` -- held pause ${bs.wait}s`);
+
+  // The BUDGET, recorded rather than asserted, because it is a consequence of
+  // the change and not a claim it makes. Forty pieces ask about 29 particles
+  // each against `CFG.maxParticles` 620, so the pool saturates and roughly
+  // half the pieces show only their ring -- and `explode` scales its counts by
+  // `fx.quality` while the budget scales by it too, so the COUNT of pieces
+  // that get a burst is about the same at the governor's floor as at 1.
+  // Every ring lands regardless: `fx.rings` is its own pool and `ring()` does
+  // not gate on `budgetLeft`. Asserted only that the rings are per piece,
+  // which is what makes the whole frame read as going at once.
+  check('...and every piece of it gets its own ring, budget or no budget',
+    rs.every(([, r]) => r.onFrame.rings >= r.parts && r.onFrame.parts > 0),
+    rs.map(([k, r]) => `${k}: ${r.onFrame.rings} rings for ${r.parts} pieces,`
+      + ` ${r.onFrame.parts} particles of ${bs.cap}`).join('; ')
+    + ' -- rings are not budget-gated, particles are');
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

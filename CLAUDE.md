@@ -6645,6 +6645,120 @@ came from before believing the other one covers it.
 
 - Develop on `claude/iphone-shooter-game-m6fccr`. No pull requests unless asked.
 
+- **BUILD 385 MAKES A BOSS'S STRUCTURE GO WITH ITS CORE, AND THE MEASUREMENT
+  FOUND A SECOND FAULT UNDERNEATH THE ONE THAT WAS REPORTED: THE FRAME NEVER
+  FINISHED COMING APART.** The request was that the parts explode on the frame
+  the core dies rather than over the beat after it. `arrest(world, k)` snapped
+  `ceil(alive * k)` pieces a frame across `CFG.boss.arrest`, so the staging was
+  real -- and `this.snapped` is a running TOTAL while `all` is rebuilt from the
+  SURVIVORS on every call, so once `snapped` passes the remaining count the
+  `while` stops entering. Measured on build 384, ORDINAL at its own death:
+  **0 of 40 snapped on the death frame, then 9, 15, 19 -- and stalled at 19**,
+  with twenty-one panels never exploded at all; they were simply swept when the
+  boss was done. GNOMON stalled at 14 of 28. So "the parts do not explode with
+  the boss" was the visible corner of "half the frame never explodes", and
+  nothing in the suite could see either: no arm had ever counted what came off.
+  Both `die` bodies call `arrest(world, 1)` now -- where `snapped` is 0 and
+  `all` is the whole frame, so the loop runs once and runs out.
+- **TWO `die` BODIES AND NINE GATES, WHICH IS THE OPPOSITE OF WHAT A GREP OF
+  THE GATES SUGGESTS.** `if (this.core.dead) this.die(...)` appears at nine
+  sites across eight files (GNOMON alone has three), and `die` itself is
+  defined in exactly TWO places -- the base class and ORDINAL's private copy,
+  both in `boss.js`. Every other boss overrides `dieExtra` and nothing else. So
+  the change is two sites in one file, and the one that would have been missed
+  is ORDINAL's, which is the same private-copy shape build 325 found in
+  `Ordinal.clear` and its own docstring names ("ORDINAL keeps its own copy of
+  this sequence, which is exactly how it kept its garrison flying through its
+  own outro when the base class stopped letting the others"). **Count the
+  DEFINITIONS, not the call sites.**
+- **THE ARREST BEAT IS LEFT EXACTLY WHERE IT IS AND BECOMES A NO-OP BY
+  CONSTRUCTION, WHICH IS WHY THE ENDING KEEPS ITS PACING.** Both copies of
+  `arrest` filter on `!p.dead`, so the A beat's `arrest(world, t / A)` and the
+  infall beat's `arrest(world, 1)` find nothing after a full snap -- measured,
+  `after` is 0 over the 150 frames following the death against 14 and 20 with
+  the change reverted. What that beat still carries is `dieExtra`, which is
+  whatever a particular ending does on the way down, and the beat before
+  INFALL. `dying` is untouched: 16.6s for ORDINAL and 16.8s for GNOMON either
+  side. That last figure is load-bearing rather than incidental -- **every
+  per-slot fight length in `docs/rebalance.html` is measured through this
+  sequence**, so a change that shortened it would have staled all seven rows of
+  builds 375, 376 and 378 in silence.
+- **THE PARTICLE BUDGET SATURATES AND THE RINGS DO NOT, WHICH IS WHAT MAKES THE
+  WHOLE FRAME READ AS GOING AT ONCE.** Each snap is an `explode` plus a `ring`
+  plus four sparks -- about 29 particles for a panel of that size -- so forty
+  panels ask about 1,160 against `CFG.maxParticles` 620. Measured on the death
+  frame: **620 particles of 620 at quality 1 and 279 of 279 at the governor's
+  0.45 floor**, i.e. saturated either way, so roughly half the panels show only
+  their ring. Two things keep that acceptable and both were measured rather than
+  hoped for. `ring()` does not gate on `budgetLeft` and `fx.rings` is its own
+  unbounded `Pool`, so **all 123 rings land** (40 arrest rings, 80 from the two
+  each `explode` throws, 3 from the core) -- and the ring is the per-panel
+  signal. And `explode` scales its own counts by `fx.quality` while the budget
+  scales by it too, so the COUNT of panels that get a burst is about the same at
+  the floor as at 1. **Rendered and looked at**, offscreen at 390x844 with
+  `timeScale` pinned: 0.13s after the death both frames are gone and forty rings
+  are expanding in the frames' own two concentric squares, with the bursts
+  concentrated on the panels that got budget -- one side sparkly, one side bare
+  rings, which reads as the blast being brightest where it started. Recorded
+  rather than tuned: thinning each burst so all forty get shards is a second
+  change with its own render, and the shipped picture delivers the request.
+- **THE DEATH GATE CANNOT BE REACHED BY KILLING THE CORE AND STEPPING ONE
+  FRAME, AND THE PROBE THAT DID READ EXACTLY LIKE THE CHANGE NOT BEING
+  THERE.** A dead core sends `coreFrac` hugely negative, so the trigger for
+  whichever SET-PIECE that boss has not played yet is true -- ORDINAL goes into
+  CONVERGENCE (`want` 3, and stage 2's branch returns for 281 frames) and
+  GNOMON into MIDNIGHT -- and each of those returns ABOVE its own
+  `if (this.core.dead) this.die(...)`. The first probe read `dying` 0 and
+  `snapped` **undefined**; the second put the boss on its last stage first,
+  which fixed ORDINAL and left GNOMON measuring MIDNIGHT (3 rings, 55
+  particles, `snapped` undefined again). What works is boss-agnostic and needs
+  no stage hack: **step until `dying > 0`**, bounded, clearing `fx` on every
+  frame of the wait so what is counted on the gate frame is the death's own,
+  and throw if it never fires. ORDINAL's gate is 281 frames after the blow and
+  GNOMON's is 1. **When a probe has to reach a gate through a state machine,
+  wait for the gate rather than counting frames to it** -- and assert it
+  arrived, because `snapped: undefined` is indistinguishable from a build with
+  the fix missing.
+- **...AND `parts` THE FRAME BEFORE THE GATE IS NOT THE COUNT `arrest` SEES,
+  because a held ladder RE-FORMS structure while it waits.** GNOMON's dial came
+  back from 22 pieces to 28 on the very frame the gate fired, and snapped all
+  28 -- so a conjunct asserting `snapped === parts` failed on a working build.
+  The claim is what is LEFT STANDING (`left === 0`), with `snapped` as the
+  liveness count. Same family as build 377's "read the BORN state": the moment
+  a count is taken decides what it is a count of.
+- **THE HASH DID NOT MOVE AND IS STRUCTURALLY BLIND TO THIS CHANGE, WHICH IS A
+  DIFFERENT STATEMENT FROM THE USUAL ONE.** `-954811922`, all six intermediate
+  marks and all six body counts identical to build 384's, taken in this
+  container with the served BUILD confirmed as 385 in the probe's own heading.
+  It was owed -- a change on the boss death path is exactly what that instrument
+  is for -- and what it establishes is that nothing in the 9,000 frames BEFORE
+  the death moved. It cannot speak to the death frame itself, and the probe says
+  why in its own last line: **`still standing, 0 remainder`** -- an assists-only
+  ORDINAL is at stage 3 with its core alive when the run ends, so `die` is never
+  called. The instruments that DO speak to it are the A/B above and the outro
+  length, both measured. A "did not move" reading whose subject the run never
+  reaches is worth taking and worth labelling; quoting it as proof the change is
+  inert would be the fault build 318 corrected.
+- **FOUR PROOFS, AND THE TWO THAT MATTER FIRE ON THE SAME TWO ARMS WITH
+  OPPOSITE DETAILS -- which is where the attribution lives when a case walks
+  more than one subject.** Both arms sweep both bosses, so removing either
+  `arrest` call reds both arms and the arm NAMES cannot tell them apart (build
+  353's "four proofs printing one message", arriving through a case that
+  iterates rather than through a broken restore). The detail strings can:
+  base-copy removed reads `gnomon: 0/22 snapped, 28 left, 14 after` with
+  ordinal untouched, and ORDINAL's-copy removed reads `ordinal: 0/39, 39 left,
+  20 after` with gnomon untouched. **And the reverts reproduce the STALL** --
+  14 of 28 and 20 of 39 snapped over the following 2.5 seconds -- so the proofs
+  are also the measurement of the fault. Each revert was `grep -c`'d before it
+  was read and restored from a `cp` snapshot, never `git checkout --` (build
+  353).
+- **AND THE SUITE RUN IS THE ONLY GUARD FOR THE THING THIS CHANGE COULD PLAUSIBLY
+  HAVE BROKEN.** `regress.mjs` walks all `ANOMALIES.length` anomalies through
+  their own deaths for the `spent`/`dissolved` marks (build 325) and asserts
+  nothing a boss made is still flying during its outro -- and those marks are
+  applied by `offField` at teardown, downstream of the arrest. A frame snapped
+  a beat early is exactly the shape that would leave one of them unmarked.
+
 - **LOOM IS IN FROM BUILD 332, AND ITS THREAD IS THE FIRST THING IN THIS GAME
   THAT STOPS A ROUND ANYWHERE BUT AT THE EDGES OF THE FIELD.** Phase 6q, band
   5, the seventeenth object to ship. A pair that walks apart stringing a

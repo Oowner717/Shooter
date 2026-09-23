@@ -746,6 +746,22 @@ export class Boss {
     // this boss threw should still be arriving while that happens.
     this.takeMinions(world);
     this.hush(world);
+    /*
+     * ...and the structure goes with it, in the same frame rather than over
+     * the ARREST beat. `arrest` took `k` from 0 to 1 across `C.arrest` (0.7s)
+     * and snapped `ceil(all * k)` pieces a frame, so the last piece of a
+     * forty-one-part frame came off two fifths of a second after the core
+     * did -- which reads as the boss dying and its frame following it. One
+     * call at k = 1 here and every piece detonates on the death frame.
+     *
+     * The ARREST beat in `dieStep` is left exactly where it is and becomes a
+     * no-op for the pieces by construction: both copies of `arrest` filter on
+     * `!p.dead`, so a second pass over a fully snapped frame finds nothing.
+     * What that beat still carries is `dieExtra`, which is whatever a
+     * particular ending does on the way down, and the beat before INFALL --
+     * so the rest of the sequence keeps its pacing.
+     */
+    this.arrest(world, 1);
     ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
     ripple(this.x, this.y, 2.4, 700);
     shake(20);
@@ -1904,6 +1920,10 @@ export class Ordinal extends Boss {
     // its own outro when the base class stopped letting the others.
     this.takeMinions(world);
     this.hush(world);
+    // ...and every segment of both frames with it, on the death frame rather
+    // than across the ARREST beat. See the same note in `Boss.die`; this is
+    // the private copy of the sequence, so it needs the call of its own.
+    this.arrest(world, 1);
     ring(this.x, this.y, 8, 240, 0.5, '#ffffff', 4);
     ripple(this.x, this.y, 2.4, 700);
     shake(20);
