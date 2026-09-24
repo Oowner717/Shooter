@@ -14785,3 +14785,91 @@ came from before believing the other one covers it.
   frames advances `world.time` to 2.00s, and nothing 404s or throws.
   `export const ARREST_SPARKS` and `export function explodeCost` both hit
   taught rules and neither is a reassignable `export let`.
+
+- **THE POST-386 DEBT SWEEP, AND IT IS A SURVEY RATHER THAN A BUILD: NO
+  EXECUTABLE LINE MOVES, SO NO BUILD BUMP, NO `--stamp` AND NO SUITE RUN.**
+  REV hashes `src/*`, `styles.css`, `index.html` and `sw.js` and not this file
+  (`check-build.mjs:4170`), so a notes-only commit is outside the one guard
+  that would otherwise be owed -- which is build 360's call and is worth
+  writing down, because build 383 bumped for a prose build and had to, having
+  edited `src/config.js` and `src/codex.js`. Ask which files the guard covers
+  before paying for it.
+- **EVERY USER-REPORTED ITEM IS SHIPPED AND BOTH AUDIT DOCUMENTS ARE DEAD, so
+  what is left is entirely debt the codebase recorded against itself.**
+  `audit-220-open.md` is fully adjudicated (3 real and fixed at 352, 8 already
+  fixed by a later build, 23 out of play behind `CFG.mines.inPlay`) and every
+  heading in `audit-266-open.md` now reads "Closed", its one "marginal case to
+  run down" being in the gun line. **Zero TODO/FIXME/XXX/HACK in the whole
+  tree.** All three pins current, `check-build` 0, suite 795/795.
+- **THE DAMAGE-BENCH STUB FAMILY IS BIGGER THAN ITS OWN NOTE, AND THE HONEST
+  COUNT IS PER `page.evaluate` BLOCK RATHER THAN PER STUB LINE.** The note at
+  the head of this file says eighteen cases leave the director stubbed.
+  Measured: **21 blocks stub `director.update` and never restore it, and 25 pin
+  `spawnLock` and never clear it**, of 100 blocks that touch either. Three
+  counting methods and only the third is right -- 92 stub LINES against 84
+  restores says nothing; "no restore before the next stub line" reads 45 and
+  **over-counts**, because a per-trial helper re-stubs on every call and the
+  case restores once at the end (line 20785 is orphaned by that test and its
+  block restores at 20923); segmenting by `page.evaluate` and asking whether
+  the stub is live at the BLOCK boundary is the question, because the boundary
+  is where the leak reaches the next case. Builds 243, 350, 356 and 381 each
+  paid a debugging session for this leak and the note's own remedy is a
+  workaround ("any new case downstream must clear them itself"). Mechanical,
+  one build, and it wants a `check-build` arm or it grows again.
+- **AND THE CASE COUNT CROSS-VALIDATES THE SLEEPING SET TO THE UNIT.** 850
+  `check(` call sites, **44 behind `MINE_LINE` and 11 behind `GUN_LINE`** --
+  and 850 - 55 = **795**, which is the suite's own reported count exactly. So
+  the two switched-off systems (`CFG.mines.inPlay` src/config.js:3044 false
+  since 289, `CFG.gun.inPlay` :9083) hold 55 cases that have never run, whose
+  thresholds have therefore never been sampled: the build that flips either
+  owes the figure dump as well as a suite run. A count that lands on a number
+  the instrument reports independently is a count worth trusting.
+- **THREE STALE CLAIMS IN ONE SENTENCE, IN THE SECTION A READER GOES TO
+  FIRST, AND THE PROBE CARRIES THE FALSE HALF AND ITS OWN REFUTATION 138 LINES
+  APART.** This file's own `income.mjs` description says the curve "is iterated
+  to a fixed point from BELOW, so the first pass owes nothing to the curve it
+  replaces" and "Thirteen minutes for three passes over eight rungs". Builds
+  371 and 372 measured the map as **DECREASING** -- the sequence alternates
+  (rung 42 read 276 / 205 / 240 / 197 MB), which is the entire reason `--damp`
+  exists -- and the timing predates build 368's wave-counted window, so a pass
+  is about fifteen minutes now and was 2.2 hours at `--runs 3`.
+  `scripts/income.mjs:53-54` asserts the same false claim as fact and refutes
+  it at `:192` ("The paragraph above says it climbs from below; measured at
+  build 371 it climbs once and then FALLS"), false one first and unannotated.
+  That is build 355's rule (check a docstring's sentences against each other)
+  and build 383's shape (the strike corrects the clause it aims at and the
+  premise beside it stands) in the one file whose subject is a curve nobody can
+  re-derive by eye. Two sites, one line each, and the cheapest live fix here.
+- **WHAT IS MEASUREMENT DEBT RATHER THAN CODE DEBT, and both are dependencies
+  on anything downstream of them.** Build 306's era-2 income half ("income per
+  second falls to 0.27-0.77x of era 1", CLAUDE.md:3214, recorded at :14391 as
+  unswept at 382 AND 383) was taken before 365 found the drop ratchet and 366
+  fixed it, so it describes an economy that has since changed in the
+  favourable direction -- and it is the last unmeasured input to an era-2
+  pacing decision. And the income curve's deep anchors are worth about x1.5 at
+  the deep end, do not own CORE (`currency: 'remainder'`, so no funding reaches
+  it), and build 374's own note says the one thing that tightens them is more
+  runs at rung 35, not more passes. Neither is fixable by reading.
+- **AND THE GAIT PLAN HAS THREE ROWS LEFT, EACH NEEDING A MECHANISM RATHER
+  THAN A WORD.** 4a (343) and 4b (356) shipped and five rows are REFUSED with
+  measured reasons, which is closed. Left: **MOTE -> `flock`** (needs a
+  per-release serial, because `flockOn` groups by `e.shoal` whose only writer
+  is `spawnSchool` and `undefined === undefined` would flock a serial-less MOTE
+  with every un-serialled body on the field), **HERALD -> `standoff`** (its own
+  `lob` block plus the before-and-after clear the plan itself asks for), and
+  **GLUT -> `forage`** (a new gait word and a new steering target). One build
+  each. Also still recorded and unrevisited: build 318's four SHRIKE faults
+  (CLAUDE.md:4451), of which the player-visible one is that on a viewport under
+  about 443 tall the hold band lands at or below the turret and the object
+  delivers nothing -- `sh` is floored at 420, so a short window reaches it.
+- **AND THE FAN-OUT WAS KILLED WITH TWO OF TEN LENSES IN FLIGHT, WHICH COST
+  NOTHING BECAUSE IT WAS NEVER THE INSTRUMENT.** Ten read-only lenses plus a
+  verify pass were launched over this file, the docs, `src/`, `scripts/` and
+  the log; the box has four CPUs, so the cap is `min(16, cpus - 2)` = **2** and
+  ten lenses run five deep -- build 308's recorded finding, met again. Every
+  figure above was measured here instead, by grep and by a twenty-line counter,
+  while the fan-out queued. The standing rule held in its strongest form yet: a
+  survey whose whole output is "which of these records is still true" is
+  answerable by reading the tree, and the tree is faster than a panel on a
+  four-CPU box. Reach for the panel when the question needs JUDGEMENT, not when
+  it needs a count.
