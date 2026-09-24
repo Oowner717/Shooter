@@ -6,7 +6,7 @@ import { swipeToDismiss } from './swipe.js';
 import { ARSENAL, specRows } from './arsenal.js';
 import { CONTROLS } from './narrative.js';
 import { pref, setPref } from './settings.js';
-import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID, kB, MB, fmtBytes } from './config.js';
+import { BUILD, REV, CFG, ENEMY_TYPES, TYPE_BY_ID, kB, MB, fmtBytes, fmtPurse } from './config.js';
 import { drawSpecimen, FORMATION_SHAPES, GROUP_MAX } from './enemies.js';
 
 import { CODEX, FIELD_ENTRIES, ANOMALY_ENTRIES, codex, markLine, forgetPlayer } from './codex.js';
@@ -1367,7 +1367,10 @@ export class Hud {
        * points, where a six-digit purse became a seven-character string.
        * Coming from raw BYTES it is ten characters down to seven.
        */
-      this.bytesText = fmtBytes(n);
+      // `fmtPurse` and not `fmtBytes`: the figure that is watched while it
+      // moves gets `CFG.bytes.purse` figures, and the door is shared with
+      // the tree's own bank so the two readouts cannot drift apart.
+      this.bytesText = fmtPurse(n);
       this.el.bytes.textContent = this.bytesText;
       if (up) {
         const chip = this.el.bytesChip;

@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '386';
+export const BUILD = '387';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '386';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '70e78be';
+export const REV = '350ee65';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -8737,7 +8737,30 @@ CFG.bytes = {
    * readout that prints a raw number, and the top of it costs nothing.
    */
   units: ['B', 'kB', 'MB', 'GB', 'TB', 'PB'],
-  sig: 3, // significant figures, never more
+  /*
+   * Significant figures, never more -- READ by `fmtBytes`, which hard-coded
+   * its own thresholds until build 387 and left this a field with a value
+   * nobody consulted. The dp ladder is derived from it now, so the two
+   * cannot disagree: at 3 the boundaries are the 9.995 and 99.95 that were
+   * written out, to the digit.
+   */
+  sig: 3,
+  /*
+   * ...and a LIVE PURSE gets one more, which is a different claim from the
+   * one above rather than an exception to it.
+   *
+   * Three is right for a LABEL -- a price, an alert, a rate -- which is read
+   * once and decided on. The purse is the one figure on the screen that is
+   * watched while it MOVES, and at three figures the last digit a player can
+   * see is worth a kilobyte at 1.00 MB: a mote landing changes nothing they
+   * can read. The fourth digit is what makes the readout live.
+   *
+   * It is one constant because the purse is shown in TWO places -- the bar
+   * chip and the tree's own bank -- and the same amount reading two ways in
+   * one game is the shape this repo keeps paying for. `fmtPurse` is the door;
+   * neither caller names the number.
+   */
+  purse: 4,
 };
 
 /**
@@ -8748,16 +8771,18 @@ CFG.bytes = {
  * `String(n)`, `Math.floor(n)` or `Math.round(n)` interpolated into a
  * template, in eleven places.
  *
- * Three significant figures and never more -- `948 B`, `1.00 kB`, `21.7 MB`,
- * `1.08 GB` -- because the figure is read at a glance and a fourth digit is a
- * digit nobody uses. Below a kilobyte there is no fractional byte, so it is a
- * plain integer: `948 B`, not `948.0 B`.
+ * `CFG.bytes.sig` significant figures and never more -- at the authored 3,
+ * `948 B`, `1.00 kB`, `21.7 MB`, `1.08 GB` -- because a LABEL is read once
+ * and decided on. Below a kilobyte there is no fractional byte, so it is a
+ * plain integer: `948 B`, not `948.0 B`. A live purse asks for one more and
+ * goes through `fmtPurse`; `sig` overrides per call for anything else.
  *
- * The widest string it can produce is seven characters (`1.08 GB`), against
- * the six of the widest raw figure it replaces. That one character is what
- * makes this a layout adjustment rather than a redesign -- see `Hud.fitBar`,
- * which has to be re-keyed because its digit-count signature gets SMALLER as
- * the string it stands for gets WIDER.
+ * The widest string it can produce is seven characters at 3 figures
+ * (`1.08 GB`) and eight at 4 (`999.9 MB`), against the six of the widest raw
+ * figure it replaces. That is what makes this a layout adjustment rather
+ * than a redesign -- see `Hud.fitBar`, whose purse term is the rendered
+ * string's LENGTH for exactly this reason: a digit-count signature gets
+ * SMALLER as the string it stands for gets WIDER.
  */
 /**
  * Which rung of the ladder an amount reads on. Exported for one caller: a
@@ -8774,16 +8799,17 @@ export function unitOf(n) {
   return i;
 }
 
-export function fmtBytes(n, at) {
+export function fmtBytes(n, at, sig) {
   const C = CFG.bytes;
+  const s = Number.isInteger(sig) && sig > 0 ? sig : C.sig;
   const v = Number.isFinite(n) ? n : 0;
   const sign = v < 0 ? '-' : '';
   let a = Math.abs(v);
   /*
    * Under one of the next unit, in the unit we are in -- unless a unit is
    * NAMED, in which case that one is used whatever the magnitude. A held unit
-   * can legitimately print more than three significant figures ("1050 kB"
-   * on the way down to "900 kB"), which is the cost of not flickering; it is
+   * can legitimately print more than `s` significant figures ("1050 kB" on
+   * the way down to "900 kB"), which is the cost of not flickering; it is
    * bounded because the only caller holds it for 260ms of a spend.
    */
   let i = 0;
@@ -8795,13 +8821,31 @@ export function fmtBytes(n, at) {
   const unit = C.units[i];
   if (i === 0) return `${sign}${Math.round(a)} ${unit}`;
   /*
-   * Three significant figures. `9.995` rounds to `10.0` and not to `9.99`,
-   * which is why the decimal count is taken AFTER the rounding rather than
-   * from the raw value -- the naive version prints "10.00 kB", four figures,
-   * on exactly the values that cross a decade.
+   * `s` significant figures. `9.995` at three rounds to `10.0` and not to
+   * `9.99`, which is why the decimal count is taken AFTER the rounding
+   * rather than from the raw value -- the naive version prints "10.00 kB",
+   * four figures, on exactly the values that cross a decade. So the two
+   * boundaries are where the carry happens and are DERIVED from `s`: at 3
+   * they are the 9.995 and 99.95 that used to be written out, at 4 they are
+   * 9.9995 and 99.995. Floored at 0, because `a` is under 1000 here and a
+   * one- or two-figure request would otherwise ask for negative decimals.
    */
-  const dp = a < 9.995 ? 2 : a < 99.95 ? 1 : 0;
+  const dp = Math.max(0, a < 10 - 0.5 * 10 ** (1 - s) ? s - 1
+    : a < 100 - 0.5 * 10 ** (2 - s) ? s - 2 : s - 3);
   return `${sign}${a.toFixed(dp)} ${unit}`;
+}
+
+/**
+ * The purse, as the player watches it move.
+ *
+ * `CFG.bytes.purse` figures rather than `CFG.bytes.sig`, and ONE door for it
+ * because the purse has two readouts -- `Hud.setBytes`'s chip and
+ * `Menu.rollBank`'s bank -- which must not be able to drift apart. `at` is
+ * passed straight through, so the roll can still hold its unit for the
+ * length of a spend.
+ */
+export function fmtPurse(n, at) {
+  return fmtBytes(n, at, CFG.bytes.purse);
 }
 
 /** ...and the same thing per second, which is what a throughput reads as. */

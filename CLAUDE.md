@@ -14873,3 +14873,218 @@ came from before believing the other one covers it.
   answerable by reading the tree, and the tree is faster than a panel on a
   four-CPU box. Reach for the panel when the question needs JUDGEMENT, not when
   it needs a count.
+
+- **BUILD 387 IS TWO REQUESTS, AND THE FIRST ONE'S CONSTANT HAD NO READER:
+  `CFG.bytes.sig` WAS 3 UNDER A COMMENT READING "significant figures, never
+  more" WHILE `fmtBytes` HARD-CODED ITS OWN 9.995 AND 99.95.** So the field a
+  reader would go to in order to change the purse's resolution was a value
+  nobody consulted -- `kind: 'works'` (eighteen builds), `large: true`
+  (fifteen types), the nine anomaly `cost` fields (fifty-six), CHAFF's four
+  copy fields, `ttl`, `diveT`, and now this. The dp ladder is derived from it,
+  and at 3 it reproduces both written-out boundaries **to the digit**
+  (`948 B`, `1.00 kB`, `21.7 MB`, `1.08 GB`, and `9.995 -> 10.0 kB`, which is
+  the carry case its own docstring is about).
+- **THE PURSE GETS `CFG.bytes.purse` = 4 AND EVERY LABEL KEEPS 3, WHICH IS A
+  DIFFERENT CLAIM RATHER THAN AN EXCEPTION.** Three is right for a figure
+  read once and decided on -- a price, an alert, a rate. The purse is the one
+  figure on the screen watched while it MOVES, and at three the last digit a
+  player can see is worth a kilobyte at 1.00 MB, so a mote landing changes
+  nothing readable. A global bump was the other option and is refused: it
+  would have widened fourteen other figures nobody asked about, including the
+  tree's price tags and the lot labels, where `yard.js`'s own docstring sizes
+  itself on `fmtBytes(2600000)` being "seven characters again".
+- **...AND IT IS ONE DOOR BECAUSE THE PURSE HAS TWO READOUTS.** `Hud.setBytes`
+  writes the bar chip and `Menu.rollBank` writes `#treeBank`, both off the
+  same `w.bytes` -- so a figure count written at each site is the
+  `HERO_GAITS`/`HERO_COL` shape, and the same amount reading two ways in one
+  game is what it produces. `fmtPurse` is the door and neither caller names
+  the number. The THIRD place the purse appears -- the title screen's resume
+  line, `14 OBJECTS · 21.7 MB · 3◆ REMAINDER` -- deliberately stays at three:
+  it is a summary of a file read once, which is a label by the rule above.
+  Recorded as a decision rather than left as an omission.
+- **A DIGIT COUNT IS NOT THE INVARIANT, AND THE ARM THAT ASSERTED ONE FAILED
+  ON A WORKING BUILD.** At MB(999.9) a label rounds up a decade to `1000 MB`
+  and gains a digit of its own, so both strings carry four and
+  `figs(chip) === figs(label) + 1` is false. What holds at every magnitude
+  above a kilobyte is the DECIMAL count, and it is asserted as
+  `purse - sig` off `CFG.bytes` rather than against the digit 4, so the
+  constant stays the owner.
+- **THE LAYOUT COST IS ONE CHARACTER AND IT IS MEASURED AT THE FLASH'S OWN
+  PEAK, WHICH IS WHERE BUILD 384 LEFT 1.1pt OF CLEARANCE.** Widest string 7
+  characters -> 8 (`999.9 MB`; at three figures the widest is `1000 MB`).
+  With the `took` animation SEEKED to its own midpoint -- a 1.13x scale on
+  `#bytesNum`, which is where 384 moved it so the chip's geometry does not
+  move -- the digits sit **6.42pt inside the chip at 320 and 7.42 at 390**,
+  the bar fits at both, and the `em` is `display: none` at 320 under the
+  `max-width: 372px` rule. **And the first version of that arm measured
+  against the chip's CONTENT box and read -1.58pt**, i.e. it called the
+  padding an overflow: the digits legitimately grow into the 9px of padding
+  and the claim is that they stay inside the chip.
+  `Hud.fitBar` needed nothing, and that is build 295 paying off rather than
+  luck: its purse term has been the rendered string's LENGTH since then,
+  under a docstring explaining that a digit-count key gets SMALLER as the
+  string it stands for gets WIDER.
+- **AND THE SECOND REQUEST WAS "the object must be ATTACHED, not just
+  nearby", WHICH IS THE REPO'S OWN WORD: `world.attackers` IS DOCUMENTED AS
+  "is something attached".** Four things read that set -- the intake tax, the
+  screen effect, the turret's breached accent, and the glitch fuse, which
+  `Game`'s own comment calls "a countdown to losing a rung" and which
+  `CFG.glitch.perFuse`'s calls the countdown outright. So this was never only
+  the countdown, and a body that cannot touch you must not be in it.
+- **`checkContact` TESTED THE COLLISION DISC, AND FOR TWO TYPES THE DISC IS A
+  FICTION THE DRAWING DOES NOT KEEP.** Measured off the shipped geometry, the
+  clear air between the two surfaces at the disc's own grab distance:
+  **`grabPad` = 2.00 units for every one of the 42 loose disc types**, and
+  **26.51 broadside for SPINDLE (r 30, a bar 96 x 11) and 48.02 for VEIL
+  (r 52, a membrane 104 x 12)**. And they cannot do better: `resolvePair`
+  holds a body at `e.r + s.r - slop` and neither term in that correction
+  contains a profile, so a broadside bar was lighting the fuse from a place
+  it can never reach. Revert-proved, three of three draws: a **VEIL grips at
+  45.59 to 46.08 units of clear air** and a broadside SPINDLE at 25.23 to
+  26.41. The grab is `e.hitCircleAt(s.x, s.y)` now -- which returns `this`
+  for everything that is not a bar, so the 42 disc types are the identity to
+  the bit and the ORDINAL hash is what says so rather than the paragraph.
+- **VEIL CAN NEVER ATTACH AND THAT IS THE RIGHT OUTCOME; SPINDLE STILL DOES,
+  WHICH IS WHAT SAYS THE CHANGE IS NOT A REFUSAL.** A membrane is `upright`,
+  so build 330 pins its `angle` and `av` every frame and it is permanently
+  broadside -- a level sheet hanging 44 units above the machine is not
+  attached to it. A SPINDLE cartwheels and grips **tip-first, measured at
+  64.9 to 80.1 units out with 0.57 to 1.88 of clear air** against the disc's
+  26.5, its tip ending inside the turret's own circle. Its wave still has
+  contact pressure either way: VEIL's is `veil x3 + lurcher x2` and a LURCHER
+  grips.
+- **THE RELEASE STAYS ON THE DISC, AND THE ASYMMETRY IS THE ANTI-CHATTER BAND
+  READ ONE STEP OUT -- PRICED, BECAUSE IT IS THE ONE THING THIS CHANGE MAKES
+  WORSE.** Build 315 left `checkContact` on the disc entirely and named this:
+  "a body whose half-extent varied with rotation would flip in and out of
+  `world.attackers` every 0.75s and each entry fires `audio.glitchOn()`". The
+  disc is rotation-invariant, so it is what holds a gripped bar. It does not
+  hold it perfectly: measured over four draws of a resting SPINDLE, **0 / 29
+  / 31 / 33 frames of 600 released in 0 / 6 / 1 / 1 re-attachments, against 0
+  in three of three with the disc grab.** The mechanism is the band -- a
+  bar's grab reach is its TIP (up to 76 units) and its release is its CENTRE
+  (62), so it can settle between the two and be let go and taken again. Worst
+  draw **0.6 re-attachments a second against the 1.33 build 315 refused a
+  capsule release for**, and the case bounds it rather than asserting zero
+  because zero is not what either build draws.
+- **FOUR INSTRUMENT FAULTS, ALL MINE, ALL FOUND IN FORTY SECONDS BY THE
+  SLICED-OUT HARNESS.** Builds 349, 351, 358 and 376's idiom, fifth use: cut
+  the case block out of `regress.mjs` by its own heading, brace-match it, and
+  run it in a real page with `check` as a spy, so what is verified cannot
+  disagree with what ships. Against thirteen minutes of suite per fault. One
+  rider learned here: a block with several `page.evaluate` calls inside a
+  viewport loop needs the whole BLOCK sliced and `page` passed in, not just
+  the predicates -- and the paren matcher has to know regex literals, which
+  build 359 already had to teach it.
+- **...AND THE SHARPEST OF THEM IS THAT A PIN WHICH MOVES WHERE THE BODY
+  SETTLES MOVES THE MEASUREMENT.** Pinning `CFG.cartwheel.spin` to 0 and
+  forcing `e.angle = PI/2` reads a body the game does not produce: forced
+  end-on the SPINDLE settles **77.5 units from the turret against the 56.8 a
+  cartwheeling one rests at** -- outside the disc release band -- so the probe
+  chattered for a reason that was the probe's, and the arm reported the
+  release shaking it off. The arm whose subject is the spin was the one I
+  pinned. It runs with the spin FREE now and the pin is kept only for the
+  broadside arm, where the claim is about an angle rather than a rest.
+- **AND `air >= 0` WAS THE WRONG BOUND BECAUSE A CARTWHEELING TIP CROSSES THE
+  SURFACE FASTER THAN A FRAME.** The grip lands on whichever frame the sweep
+  samples, so it legitimately reads a fraction PAST the surface (-0.12 on one
+  draw). The bound is `grabPad` either side and the claim is that it grips AT
+  the surface rather than at 26 units of clear air -- which is the quantity
+  that separates the two builds.
+- **A FABRICATED CONTROL FIGURE NEARLY SHIPPED IN A DOCSTRING, AND IT WAS
+  BACKWARDS.** I wrote "the disc GRAB reads 62 frames and 8 over the same
+  window, so the profile grab makes this strictly better" into the case from
+  nothing at all -- it reads **0 in three of three**, so the profile grab
+  makes it slightly worse. Caught only by going back to MEASURE a number I had
+  already written down as measured. That is build 383's shape from the inside:
+  a figure in prose is a claim about the tree, and one written to support a
+  decision you have already taken is the one nobody re-reads.
+- **AND A DETAIL STRING ASSERTED "never gripped" BESIDE ITS OWN
+  "(1 attackers)".** Fifth instance after builds 319, 323, 324 and 343 -- the
+  revert's FAIL line said the membrane never gripped while printing the
+  attacker that had. Derived now. **Writing it a fifth time immediately after
+  reading the note about the fourth is the durable half**: diagnosing a fault
+  does not inoculate you against writing it.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922`, all six
+  intermediate marks and all six body counts identical, build 386 served from
+  a worktree on :8097 and 387 live, with the served BUILD confirmed in each
+  probe heading. `checkContact` runs every frame of that fight and every body
+  on it -- ORDINAL, TALLY, DIGIT -- is a disc, so the change is the identity
+  by inspection, which is exactly the argument build 329 records this repo as
+  not accepting. An unchanged hash is what "a new geometry on the contact
+  path reached nothing already using it" looks like measured.
+- **AND THE SUITE TURNED UP TWO REDS, ONE OF THEM THIS CHANGE WORKING AS
+  DESIGNED AND CAUGHT BY A PROXY: THE VEIL GAIT ARM'S "ARRIVES AT THE
+  MACHINE" WAS `e1.attacking`, WHICH IS MEMBERSHIP OF THE VERY SET THIS BUILD
+  NARROWED.** 799 of 801, 0 errors. That arm read the flag for BOTH its break
+  condition and its verdict -- so a membrane, which can now never be in the
+  set, ran its whole derived window (`arrived false ... in 187.5s of a derived
+  187.5s window`) and reported the gait as failing to arrive.
+  **It does arrive, measured**: closest approach **77.6 against `e.r + s.r`
+  78** at era 1 and **91.9 against 92** at era 2 -- it is pressed against the
+  mount and held off by `resolvePair`'s own correction -- while its own
+  surface stays **33.2 units clear**, which is the whole of the change. So the
+  proxy stopped standing for the thing at exactly the moment the thing became
+  interesting. The arrival test is the pair solver's CONTACT DISTANCE now,
+  read live off `e.r + s.r` so it follows the era rather than being right at
+  one, and `attacking` is PRINTED beside it with the contact case named as
+  what owns that claim.
+  **A LURCHER reaches contact at 22.7s and a SPINDLE at 35.7s with `attacking`
+  one frame EARLIER in each case** -- the grab band is `grabPad` wider than
+  contact -- so the two tests agree for a disc and only a membrane separates
+  them. Which is the general rule: **a case that asserts a PROXY cannot see
+  the thing it is a proxy for moving**, and this file has recorded it about a
+  grip counter (318), a velocity reading (351) and `maxHp` standing for health
+  (377). What is new is the direction -- the proxy did not drift, the CODE
+  drew a distinction the proxy had never had to make.
+- **...AND THE THREE PROOFS ARE WHAT SEPARATE "MY CHANGE BROKE THE GAME" FROM
+  "MY CHANGE BROKE A PROXY", WHICH A SINGLE RED CANNOT.**
+  **A**, the `attacking` test restored on this build: FAILS, reproducing the
+  suite's red to the tenth (`187.2s of a derived 187.2s window`).
+  **B**, the geometric test with `checkContact`'s grab reverted to the disc:
+  **PASSES with `attacking` TRUE at the same closest approach of 91.9 against
+  92** -- so the new test agrees with the old one exactly where the old one
+  worked, which is what makes it a generalisation rather than a weakening,
+  and is build 359's rule that a proof reproducing the old GREEN is worth more
+  than one that merely turns the new case red.
+  **C**, the gait's own fold pinned at 1 so the sheet never converges: FAILS
+  on arrival, and diagnoses itself -- the sheet held its lane **perfectly
+  (`closed to 0`)** and came to rest level with the mount **335.3 units out to
+  the side** against the solver's 92. That is build 312's `tumble` finding,
+  live, caught by the arrival conjunct on a run where the LANE conjunct passes
+  more easily than ever -- which is what says the new test discriminates the
+  fault it exists for rather than being satisfied by any closing body.
+- **AND THE OTHER RED WAS MY OWN `putBack` ASSERTING SOMEBODY ELSE'S IDIOM AS
+  A LEAK.** Build 350's rule is to ASSERT the restore rather than perform it,
+  because `= undefined` shadows the prototype's method and starves the suite
+  exactly as a stub does. Mine folded a fifth term in -- `!wasUpd`, captured
+  at ENTRY -- which is a claim about UPSTREAM state, and the damage-bench
+  family upstream restores by **ASSIGNMENT** (`w.director.update = ranD`, the
+  prototype's own method read back and written to the instance). That is
+  behaviourally correct and leaves an own property, so the conjunct failed for
+  a perfectly good idiom. Dropped; the four terms I actually control stay.
+  **It was invisible standalone and only the suite could see it**: on a fresh
+  page `wasOwn` reads **false** and the old conjunct passed, in the suite it
+  reads **true**. Build 381's note is the mirror image (a case failing in the
+  suite on state its own build left DOWNSTREAM); this one fails on state
+  upstream left, legitimately, and the rule that covers both is narrower than
+  either: **assert what your own block did, and REPORT what it inherited.**
+- **...AND THE FAILING CONJUNCT WAS THE ONE WHOSE FIGURE THE MESSAGE DID NOT
+  CARRY, FOR THE SECOND TIME IN THIS FILE.** The FAIL line read `34 of 600
+  frames released ... in 1 re-attachment(s); the director and the spin put
+  back: false` -- every printed figure inside its bound, and one boolean
+  standing for five terms. Build 350 recorded exactly this ("a conjunct whose
+  figure the message does not carry cannot be diagnosed from its own FAIL
+  line") about `restored === 1`; the fix then was to print the figure and the
+  fix now is to print all five. It paid immediately: proof A's FAIL line reads
+  "closest approach 91.6 against the pair solver's own 92", so the next reader
+  of that red sees the body IS at the machine without writing a probe.
+- **AND THE BUNDLE WAS BOOTED BECAUSE `fmtPurse` IS A NEW `export function`.**
+  `node scripts/bundle.mjs` clean (46 modules, no module statements in either
+  form, no reassignable exports, the rev stamp at bytes 43 and 106 inside the
+  2KB window), and both forms served over http and driven: `window.__sim`
+  exists, the world advances, and the purse renders **948 B / 1.000 kB /
+  21.70 MB / 1.080 GB / 9.995 kB -- byte-identical to the modules, carry case
+  included**, so the extra figure reaches the form the phone installs. Build
+  127's rule: a form `wrap()` has not been taught passes through verbatim and
+  the page then boots to its title screen and nothing else ever runs.

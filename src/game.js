@@ -3327,6 +3327,18 @@ export class Game {
     if (w.phase === 'boot') return;
     const s = w.shooter;
     for (const e of [...w.attackers]) {
+      /*
+       * The release stays on the DISC while the grab is on the profile, and
+       * the asymmetry is the whole of the anti-chatter band read one step
+       * further out. A rotating bar's half-extent varies, so a capsule
+       * release would flip a resting SPINDLE out of this set about twice a
+       * revolution -- 1.33 times a second at `cartwheel.spin` -- and every
+       * re-entry fires `audio.glitchOn()` and a ring, which is exactly what
+       * the four units between `grabPad` and `releasePad` exist to stop and
+       * is the reason build 315 left `checkContact` on the disc entirely.
+       * So a body that has genuinely touched stays attached until the pair
+       * solver lets it out, which takes a shove.
+       */
       const off = e.r + s.r + CFG.shooter.releasePad;
       if (!e.dead && !e.fizzle && (e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= off * off) continue;
       e.attacking = false;
@@ -3355,8 +3367,31 @@ export class Game {
        */
       const landing = !!e.hurled && !e.harmless && !e.fizzle;
       if ((e.dead && !landing) || e.attacking || e.harmless || e.fizzle > 0) continue;
-      const rr = e.r + s.r + CFG.shooter.grabPad;
-      if ((e.x - s.x) ** 2 + (e.y - s.y) ** 2 <= rr * rr) {
+      /*
+       * ---- ATTACHED, not merely nearby -------------------------------
+       *
+       * The test is against the body's own PROFILE and not its collision
+       * disc. `hitCircleAt` returns the capsule circle nearest the turret
+       * for a bar body and `this` for everything else, so for the 42 disc
+       * types in the roster this is the identity to the bit -- the ORDINAL
+       * hash is what says so rather than this paragraph.
+       *
+       * What it changes is the two BAR types, where the disc is a fiction
+       * the drawing does not keep. Measured, clear air between the two
+       * surfaces at the disc's own grab distance: every disc type is
+       * `grabPad` = 2.00 units, and SPINDLE is 26.51 broadside and VEIL
+       * 48.02. `resolvePair` holds a body off at `e.r + s.r - slop` and
+       * neither term in that correction contains a profile, so a broadside
+       * bar CANNOT get closer than that -- it was lighting the fuse, taxing
+       * the intake and tinting the screen from a place it can never reach.
+       * A membrane hanging level 48 units above the machine is not attached
+       * to it. VEIL is `upright`, so its bar is pinned level and it is
+       * always broadside; SPINDLE cartwheels and still grips end-on, where
+       * its tip is 18 units inside the turret's own circle.
+       */
+      const c = e.hitCircleAt(s.x, s.y);
+      const rr = c.r + s.r + CFG.shooter.grabPad;
+      if ((c.x - s.x) ** 2 + (c.y - s.y) ** 2 <= rr * rr) {
         /*
          * A MASS that was thrown at you is not the same event as something
          * walking into you. It lands as a spike of corruption in its own

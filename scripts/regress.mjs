@@ -3287,7 +3287,7 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
   const r = await page.evaluate(async () => {
     const g = window.__sim;
     const w = g.world;
-    const { fmtBytes, kB, MB } = await import('../src/config.js');
+    const { fmtPurse, kB, MB } = await import('../src/config.js');
     const out = {};
     const chip = g.hud.el.bytesChip;
     const em = chip.querySelector('em');
@@ -3300,7 +3300,7 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
       shown.push([n, num.textContent]);
     }
     out.shown = shown;
-    out.formatted = shown.every(([n, t]) => t === fmtBytes(n));
+    out.formatted = shown.every(([n, t]) => t === fmtPurse(n));
     // ...and it is not the raw number any more, which is what a half-done
     // migration would leave behind.
     out.notRaw = shown.every(([n, t]) => t !== String(Math.floor(n)));
@@ -3343,7 +3343,7 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
  */
 {
   const r = await page.evaluate(async () => {
-    const { fmtBytes, unitOf, kB, MB } = await import('../src/config.js');
+    const { fmtPurse, unitOf, kB, MB } = await import('../src/config.js');
     const out = {};
     // A spend that crosses a decade: 1.05 MB down to 900 kB.
     const from = kB(1050);
@@ -3354,13 +3354,13 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     for (let k = 0; k <= 20; k++) {
       const p = k / 20;
       const e = 1 - (1 - p) * (1 - p);
-      const txt = fmtBytes(Math.round(from + (to - from) * e), at);
+      const txt = fmtPurse(Math.round(from + (to - from) * e), at);
       frames.push(txt);
       units.add(txt.split(' ')[1]);
     }
     out.units = [...units];
     out.oneUnit = units.size === 1;
-    out.lands = frames[frames.length - 1] === fmtBytes(to);
+    out.lands = frames[frames.length - 1] === fmtPurse(to);
     out.first = frames[0];
     out.last = frames[frames.length - 1];
     // The control: the same roll formatted per frame on its own magnitude,
@@ -3370,7 +3370,7 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     for (let k = 0; k <= 20; k++) {
       const p = k / 20;
       const e = 1 - (1 - p) * (1 - p);
-      loose.add(fmtBytes(Math.round(from + (to - from) * e)).split(' ')[1]);
+      loose.add(fmtPurse(Math.round(from + (to - from) * e)).split(' ')[1]);
     }
     out.looseUnits = [...loose];
 
@@ -3392,7 +3392,133 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     `formatted per frame the same roll shows [${r.looseUnits.join(', ')}]`);
 
   check("...and the tree's own figure is written the same way",
-    r.direct === '20.0 MB', `treeBank reads "${r.direct}"`);
+    r.direct === '20.00 MB', `treeBank reads "${r.direct}"`);
+}
+
+
+// --- the purse carries one more figure than a label, in both its readouts ---
+/*
+ * Three significant figures is right for a LABEL -- a price, an alert, a rate
+ * -- which is read once and decided on. The purse is the one figure on the
+ * screen watched while it MOVES, and at three the last digit a player can see
+ * is worth a kilobyte at 1.00 MB, so a mote landing changes nothing readable.
+ *
+ * Two things are asserted and they fail in different directions. The COUNT,
+ * against `fmtBytes` on the same amount, because a purse that stopped going
+ * through `fmtPurse` reads as an ordinary label and nothing else would say
+ * so -- and against `CFG.bytes` rather than against the digit 4, so the
+ * constant stays the owner. And that BOTH readouts agree: the chip and the
+ * tree's bank show the same `w.bytes`, and the same amount reading two ways
+ * in one game is the shape one door exists to make impossible.
+ *
+ * The BOX is measured too, because a figure one character wider is a layout
+ * change: `fitBar`'s purse term is the rendered string's LENGTH (so it
+ * re-keys correctly by construction) but the chip's own clearances are
+ * measured constants -- see build 384, which found the `took` flash crossing
+ * into both neighbours at 1.13x and left 1.1pt between the digits and the
+ * `em`. Measured at 320, where the suite does not run and where that `em` is
+ * `display: none` under the `max-width: 372px` rule.
+ */
+{
+  const was = page.viewportSize();
+  const r = {};
+  for (const vp of [{ width: 320, height: 568 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(vp);
+    r[vp.width] = await page.evaluate(async () => {
+      const { fmtBytes, fmtPurse, CFG, MB } = await import('../src/config.js');
+      const g = window.__sim;
+      g.resize();
+      const w = g.world;
+      const held = w.bytes;
+      const out = { sig: CFG.bytes.sig, purse: CFG.bytes.purse };
+
+      // ---- the count, at the magnitudes a run actually reaches ------------
+      /*
+       * DECIMALS and not digits. A digit count is not the invariant: at
+       * MB(999.9) a label rounds up a decade to "1000 MB" and gains a digit
+       * of its own, so both strings carry four. What is true at every
+       * magnitude above a kilobyte is that the purse's figure has exactly
+       * `purse - sig` more decimal places than a label's on the same amount.
+       */
+      const dps = (t) => ((t.split(' ')[0].split('.')[1]) || '').length;
+      const rows = [];
+      for (const n of [MB(1), MB(21.7), MB(999.9), MB(1080)]) {
+        g.hud.setBytes(n, 1, 1);
+        const chip = (document.getElementById('bytesNum').textContent || '').trim();
+        g.hud.menu.bankShown = undefined;
+        g.hud.menu.rollBank(Math.round(n));
+        const bank = (g.hud.menu.el.treeBank.textContent || '').trim();
+        rows.push({ n, chip, bank, label: fmtBytes(n), want: fmtPurse(n) });
+      }
+      out.rows = rows;
+      // The chip and the bank are the same figure, and it is the purse's.
+      out.agree = rows.every((x) => x.chip === x.bank && x.chip === x.want);
+      // ...and it really is one more than a label's, which is the claim. Off
+      // `CFG.bytes` rather than a literal, so the constant stays the owner.
+      out.moreThanLabel = rows.every((x) => dps(x.chip) === dps(x.label) + (out.purse - out.sig));
+      out.widest = Math.max(...rows.map((x) => x.chip.length));
+
+      // ---- the box, at the flash's own peak ------------------------------
+      g.hud.setBytes(MB(999.9), 1, 1);
+      const chipEl = g.hud.el.bytesChip;
+      const num = document.getElementById('bytesNum');
+      const em = chipEl.querySelector('em');
+      chipEl.classList.remove('took');
+      void chipEl.offsetWidth;
+      chipEl.classList.add('took');
+      for (const a of chipEl.getAnimations({ subtree: true })) {
+        const t = a.effect && a.effect.getComputedTiming();
+        if (t && Number.isFinite(t.activeDuration)) a.currentTime = t.activeDuration / 2;
+      }
+      /*
+       * Against the chip's own BORDER box, which is what the player sees --
+       * the flash is a 1.13x scale on this element and the chip's geometry
+       * does not move (build 384 put it here for exactly that reason), so
+       * the digits legitimately grow into the 9px of padding. The claim is
+       * that they stay inside the chip, not that they stay off its padding.
+       */
+      const nb = num.getBoundingClientRect();
+      const cb = chipEl.getBoundingClientRect();
+      out.insideL = +(nb.left - cb.left).toFixed(2);
+      out.insideR = +(cb.right - nb.right).toFixed(2);
+      const eb = em.getBoundingClientRect();
+      out.emShown = eb.width > 0;
+      out.toEm = out.emShown ? +(nb.left - eb.right).toFixed(2) : null;
+
+      // ...and the bar still fits, which is what the extra character risks.
+      const bar = g.hud.el.barChips;
+      out.barFits = bar.scrollWidth <= bar.clientWidth + 1;
+      out.barCls = bar.className;
+      const top = document.getElementById('topbar');
+      out.topFits = top ? top.scrollWidth <= top.clientWidth + 1 : null;
+
+      chipEl.classList.remove('took');
+      w.bytes = held;
+      g.hud.setBytes(w.bytes, 1, 1);
+      g.hud.menu.bankShown = undefined;
+      return out;
+    });
+  }
+  await page.setViewportSize(was);
+  await page.evaluate(() => window.__sim.resize());
+
+  const a = r[320];
+  const b = r[390];
+  check('the purse carries one more figure than a label, and both its readouts agree',
+    a.moreThanLabel && b.moreThanLabel && a.agree && b.agree
+    && a.purse === a.sig + 1,
+    `sig ${a.sig} -> purse ${a.purse}: `
+    + a.rows.map((x) => `label "${x.label}" chip "${x.chip}"`).join(', ')
+    + `; bank agrees ${a.agree && b.agree}`);
+
+  check('...and the wider figure still sits inside its chip and inside the bar',
+    a.insideL >= 0 && a.insideR >= 0 && b.insideL >= 0 && b.insideR >= 0
+    && (!a.emShown || a.toEm >= 0) && (!b.emShown || b.toEm >= 0)
+    && a.barFits && b.barFits && a.topFits !== false && b.topFits !== false,
+    `widest ${a.widest} chars; at 320 the digits sit ${a.insideL}/${a.insideR}pt inside the chip`
+    + ` (em ${a.emShown ? `${a.toEm}pt clear` : 'hidden'}, bar "${a.barCls}")`
+    + `, at 390 ${b.insideL}/${b.insideR}pt`
+    + ` (em ${b.emShown ? `${b.toEm}pt clear` : 'hidden'}, bar "${b.barCls}")`);
 }
 
 // --- ...and the price slot knows which currency it is printing --------------
@@ -5248,6 +5374,205 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     `said at ${r.saidAt}s of being held (window ${r.window}s); `
     + `said again in the two minutes after a PULSE: ${r.again} `
     + `(with ${r.stillHeld} still attached)`);
+}
+
+
+// --- a body has to be ATTACHED to hold the glitch timer, not merely nearby --
+/*
+ * `checkContact`'s grab test is against the body's own PROFILE and not its
+ * collision disc. `world.attackers` is documented as "is something attached",
+ * and four things read it -- the intake tax, the screen effect, the turret's
+ * breached accent, and the glitch fuse, which is the one involuntary way down
+ * a rung -- so a body that cannot touch you must not be in it.
+ *
+ * For the 42 disc types in the roster `hitCircleAt` returns `this`, so this is
+ * the identity to the bit and the ORDINAL hash is what says so. What it
+ * changes is the two BAR types, where the disc is a fiction the drawing does
+ * not keep: measured, the clear air between the two surfaces at the disc's own
+ * grab distance is `grabPad` = 2.00 units for every disc type and 26.51
+ * broadside for SPINDLE, 48.02 for VEIL. `resolvePair` holds a body off at
+ * `e.r + s.r - slop` and neither term in that correction contains a profile,
+ * so a broadside bar cannot get closer than that -- reverting this reads a
+ * VEIL gripping at 45.84 units of clear air.
+ *
+ * Four arms, and each fails for something a different edit would break. The
+ * DISC bodies are the no-op. The broadside bar is the claim. The end-on bar is
+ * what says the change is not "a bar never attaches" -- SPINDLE cartwheels and
+ * still grips tip-first, where its tip ends 18 units inside the turret's own
+ * circle. And the RELEASE is still on the disc, which is the anti-chatter band
+ * read one step out: a capsule release would flip a resting SPINDLE out of the
+ * set twice a revolution and fire `audio.glitchOn()` each time, which is why
+ * build 315 left `checkContact` on the disc entirely.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { CFG } = await import('../src/config.js');
+    const g = window.__sim;
+    const spin = CFG.cartwheel.spin;
+    const wasUpd = Object.prototype.hasOwnProperty.call(g.world.director, 'update');
+
+    /*
+     * One body walked in from above, healed every frame so it cannot destroy
+     * itself on the mount, with the field and both automations explicitly set
+     * -- `restart()` is not a reset of everything a case can leave behind.
+     * The spin is pinned to zero so "at this angle" means anything at all:
+     * the gait HOLDS `av` every substep, so writing `e.av = 0` once is
+     * overwritten inside the same update.
+     */
+    const walk = (id, angle) => {
+      g.restart();
+      const w = g.world;
+      const s = w.shooter;
+      w.director.update = () => {};
+      w.director.traits = [];
+      w.spawnLock = 1e9;
+      for (let k = 0; k < 8; k++) g.debugClearField();
+      w.attackers.clear();
+      w.autoAim = false;
+      w.autoFire = false;
+      const e = g.debugSpawn(id, s.x, s.y - 320);
+      if (!e) return { id, err: 'no spawn' };
+      let at = null, air = null, minAir = Infinity;
+      for (let f = 0; f < 2400; f++) {
+        e.hp = e.maxHp;
+        e.dead = false;
+        if (angle !== null) { e.angle = angle; e.av = 0; }
+        g.update(1 / 60);
+        const c = e.hitCircleAt(s.x, s.y);
+        const clear = Math.hypot(c.x - s.x, c.y - s.y) - c.r - s.r;
+        if (clear < minAir) minAir = clear;
+        if (e.attacking && at === null) { at = +Math.hypot(e.x - s.x, e.y - s.y).toFixed(1); air = +clear.toFixed(2); }
+        if (at !== null && f > 240) break;
+      }
+      return { id, gripped: at !== null, at, air, minAir: +minAir.toFixed(2), e, s, w };
+    };
+
+    // Broadside is pinned through the gait's own constant, because writing
+    // `e.av = 0` is overwritten inside the same update.
+    CFG.cartwheel.spin = 0;
+    const out = { discs: [], spin: +spin.toFixed(3) };
+    for (const id of ['mote', 'lurcher', 'bulwark']) {
+      const x = walk(id, null);
+      out.discs.push({ id: x.id, gripped: x.gripped, air: x.air });
+    }
+    // A membrane is `upright`, so its bar is pinned level and it is ALWAYS
+    // broadside: the angle is left alone here rather than forced, because the
+    // body's own rule is the thing under test.
+    const v = walk('veil', null);
+    out.veil = { gripped: v.gripped, minAir: v.minAir, attackers: v.w.attackers.size };
+    // Broadside is perpendicular to the line to the turret, which is vertical.
+    const sb = walk('spindle', 0);
+    out.broad = { gripped: sb.gripped, minAir: sb.minAir };
+    /*
+     * ...and the one that arrives tip-first is measured with its OWN SPIN
+     * RUNNING rather than at a pinned angle. Pinning it reads a body the game
+     * does not produce: forced end-on it settles 77.5 units from the turret
+     * against the 56.8 a cartwheeling one rests at, which is outside the disc
+     * release band and so chatters in the probe for a reason that is the
+     * probe's. The gait holds `av` every substep, which is why an angle can
+     * only be pinned through `CFG.cartwheel.spin` at all -- and here the spin
+     * is what the claim is about.
+     */
+    CFG.cartwheel.spin = spin;
+    const se = walk('spindle', null);
+    out.endOn = { gripped: se.gripped, at: se.at, air: se.air, minAir: se.minAir };
+
+    // ---- and the release is the DISC, so turning does not shake it off ----
+    if (se.gripped) {
+      const e = se.e;
+      const w = se.w;
+      let lost = 0;
+      let entries = 0;
+      let was = e.attacking;
+      const revs = (CFG.cartwheel.spin * 600) / (60 * 2 * Math.PI);
+      for (let f = 0; f < 600; f++) {
+        e.hp = e.maxHp;
+        e.dead = false;
+        g.update(1 / 60);
+        if (!e.attacking) lost++;
+        if (e.attacking && !was) entries++;
+        was = e.attacking;
+      }
+      out.rotated = { lost, entries, revs: +revs.toFixed(1), stillHeld: e.attacking, attackers: w.attackers.size };
+    }
+
+    CFG.cartwheel.spin = spin;
+    g.restart();
+    delete g.world.director.update;
+    g.world.spawnLock = 0;
+    out.grabPad = CFG.shooter.grabPad;
+    /*
+     * The restore is ASSERTED rather than performed, because `= undefined`
+     * shadows the prototype's method and starves the suite exactly as a stub
+     * does. What it deliberately does NOT assert is anything about the state
+     * this case INHERITED: the damage-bench family upstream restores by
+     * ASSIGNMENT (`w.director.update = ranD`, the prototype's own method read
+     * back and written to the instance), which leaves an own property that is
+     * behaviourally correct -- so a conjunct on `hasOwnProperty` at ENTRY
+     * fails for somebody else's perfectly good idiom, which is what the first
+     * version of this arm did. It is reported instead.
+     */
+    out.back = {
+      fn: typeof g.world.director.update === 'function',
+      own: Object.prototype.hasOwnProperty.call(g.world.director, 'update'),
+      lock: g.world.spawnLock === 0,
+      spin: CFG.cartwheel.spin === spin,
+      wasOwn: wasUpd,
+    };
+    out.putBack = out.back.fn && !out.back.own && out.back.lock && out.back.spin;
+    return out;
+  });
+
+  check('an ordinary body still attaches at the same clearance, which is the no-op',
+    r.discs.every((d) => d.gripped && d.air >= 0 && d.air <= 2) && r.discs.length === 3,
+    r.discs.map((d) => `${d.id} ${d.gripped ? `at ${d.air}` : 'NOT'}`).join(', ')
+    + ' units of clear air (grabPad is the bound)');
+
+  check('...and a level membrane forty units clear of the machine does not',
+    !r.veil.gripped && r.veil.attackers === 0 && r.veil.minAir > 20
+    && !r.broad.gripped && r.broad.minAir > 10,
+    `VEIL came no closer than ${r.veil.minAir} units of clear air and `
+    + `${r.veil.gripped ? 'GRIPPED' : 'did not grip'} (${r.veil.attackers} attackers); `
+    + `a broadside SPINDLE ${r.broad.minAir} and `
+    + `${r.broad.gripped ? 'GRIPPED' : 'did not grip'}`);
+
+  /*
+   * The bound is `grabPad` and NOT zero: a cartwheeling tip crosses the
+   * surface faster than a frame, so the sampled frame the grip lands on can
+   * legitimately read a fraction past it. What is asserted is that it grips
+   * AT the surface rather than at the disc's 26 units of clear air.
+   */
+  check('...while a bar that really does arrive tip-first attaches, so it is not a refusal',
+    r.endOn.gripped && r.endOn.air <= r.grabPad && r.endOn.air > -6,
+    `end-on SPINDLE grips at ${r.endOn.at} with ${r.endOn.air} units of clear air `
+    + `(the disc would have been 26.5), closest ${r.endOn.minAir}`);
+
+  /*
+   * The release is still the DISC, which is rotation-invariant and is what
+   * holds a gripped bar. It does not hold it perfectly and never did: a
+   * cartwheel sweeps the body's centre past the release band occasionally,
+   * so a resting SPINDLE lets go for a few frames a revolution.
+   *
+   * Measured over four draws of this window, 0 / 29 / 31 / 33 frames of 600
+   * in 0 / 6 / 1 / 1 re-attachments -- and the disc GRAB reads 0 in three of
+   * three, so the profile grab makes this slightly WORSE and that is the
+   * price of the arm above. The reason is the band: a bar's grab reach is
+   * its TIP (up to 76 units) while the release is its CENTRE (62), so it can
+   * settle between the two and be let go and taken again. The worst draw is
+   * 0.6 re-attachments a second against the 1.33 build 315 refused a capsule
+   * release for, and each one is an `audio.glitchOn()` and a ring. Bounded
+   * rather than asserted at zero because zero is not what it draws.
+   */
+  check("...and the release is still the disc, so turning barely shakes it off",
+    !!r.rotated && r.rotated.stillHeld && r.rotated.attackers === 1
+    && r.rotated.lost < 180 && r.rotated.entries <= 12 && r.putBack,
+    `${r.rotated ? r.rotated.lost : '-'} of 600 frames released over `
+    + `${r.rotated ? r.rotated.revs : '-'} revolutions in `
+    + `${r.rotated ? r.rotated.entries : '-'} re-attachment(s); `
+    + `put back -- update a function ${r.back.fn}, not an own property `
+    + `${!r.back.own}, spawnLock clear ${r.back.lock}, spin ${r.back.spin} `
+    + `(it was an own property on entry: ${r.back.wasOwn}, which is upstream's `
+    + 'restore-by-assignment and not a leak)');
 }
 
 // --- nine rounds, nine shapes in the air ------------------------------------
@@ -38736,6 +39061,29 @@ if (MINE_LINE) {
      */
     let cap = 6000;
     let usedFrames = 0;
+    /*
+     * ---- ARRIVING IS GEOMETRY, NOT MEMBERSHIP OF `world.attackers` -------
+     *
+     * Build 387. This read `e1.attacking` for both the break and the verdict,
+     * and that flag is written by `checkContact`'s grab -- which is against
+     * the body's own PROFILE from that build, so a membrane can never be in
+     * the set: it hangs level and its surface stays 33 units clear of the
+     * machine however hard it drives in. Measured, the sheet still ARRIVES --
+     * closest approach 77.6 against `e.r + s.r` 78, i.e. it is pressed
+     * against the mount and held off by `resolvePair`'s own correction -- so
+     * the old test read false for a body sitting on the machine and the loop
+     * then ran its whole derived window.
+     *
+     * The pair solver's contact distance is what "arrives at the machine"
+     * means for a body of any shape, and it is what stops this one. A LURCHER
+     * reaches it at 22.7s and a SPINDLE at 35.7s, with `attacking` one frame
+     * earlier in each case (the grab band is `grabPad` wider than contact) --
+     * so the two agree for a disc and only a membrane separates them.
+     * Whether a sheet may be in the attackers set at all is the contact
+     * case's claim, not this one's; it is printed here, never asserted.
+     */
+    let nearest = 1e9;
+    let atMount = false;
     for (let f = 0; f < cap; f++) {
       g.update(1 / 60);
       if (!e1) e1 = w.enemies.find((e) => e.type.id === 'veil' && !e.isDrop) || null;
@@ -38749,9 +39097,17 @@ if (MINE_LINE) {
       }
       if (x0 !== null) closest = Math.min(closest, Math.abs(e1.x - laneAt));
       usedFrames = f + 1;
-      if (e1.dead || e1.attacking) break;
+      if (!e1.staged) {
+        const dist = Math.hypot(e1.x - s.x, e1.y - s.y);
+        if (dist < nearest) nearest = dist;
+        if (dist <= e1.r + s.r) atMount = true;
+      }
+      if (e1.dead || atMount) break;
     }
-    const sheetEnd = { arrived: e1 ? !!e1.attacking : false, dead: e1 ? !!e1.dead : null,
+    const sheetEnd = { arrived: atMount, dead: e1 ? !!e1.dead : null,
+      attacking: e1 ? !!e1.attacking : null,
+      nearest: nearest === 1e9 ? null : +nearest.toFixed(1),
+      hold: e1 ? +(e1.r + s.r).toFixed(1) : null,
       y: e1 ? Math.round(e1.y) : null, frames: usedFrames, cap };
     // ...and a control from the same release, which takes a route instead
     clean();
@@ -38764,6 +39120,8 @@ if (MINE_LINE) {
     let cx0 = null;
     let cAcross = 0;
     let cLast = null;
+    let cAtMount = false;
+    let cNearest = 1e9;
     for (let f = 0; f < 7000; f++) {
       g.update(1 / 60);
       if (!c1) c1 = w.enemies.find((e) => e.type.id === 'lurcher' && !e.isDrop) || null;
@@ -38772,8 +39130,11 @@ if (MINE_LINE) {
         if (cx0 === null) cx0 = c1.x;
         if (cLast !== null) cAcross += Math.abs(c1.x - cLast);
         cLast = c1.x;
+        const cd = Math.hypot(c1.x - s.x, c1.y - s.y);
+        if (cd < cNearest) cNearest = cd;
+        if (cd <= c1.r + s.r) cAtMount = true;
       }
-      if (c1.dead || c1.attacking) break;
+      if (c1.dead || cAtMount) break;
     }
     out.gait = {
       lane: laneAt === null ? null : Math.round(laneAt),
@@ -38785,10 +39146,16 @@ if (MINE_LINE) {
       gap: x0 === null || laneAt === null ? null : Math.round(Math.abs(x0 - laneAt)),
       closest: Math.round(closest),
       arrived: sheetEnd.arrived,
+      nearest: sheetEnd.nearest,
+      hold: sheetEnd.hold,
+      attacking: sheetEnd.attacking,
       endY: sheetEnd.y,
       mount: Math.round(s.y),
       controlCrossed: Math.round(cAcross),
-      controlArrived: c1 ? !!c1.attacking : false,
+      controlArrived: cAtMount,
+      controlNearest: cNearest === 1e9 ? null : +cNearest.toFixed(1),
+      controlHold: c1 ? +(c1.r + s.r).toFixed(1) : null,
+      controlAttacking: c1 ? !!c1.attacking : null,
       secs: +(sheetEnd.frames / 60).toFixed(1),
       capSecs: +(sheetEnd.cap / 60).toFixed(1),
       controlDead: c1 ? !!c1.dead : null,
@@ -38869,8 +39236,12 @@ if (MINE_LINE) {
     `released at x ${G.startX}, lane ${G.lane} of [${G.lanes.join(' ')}], a gap of `
     + `${G.gap} closed to ${G.closest}; arrived ${G.arrived} (dead ${G.dead}) at y `
     + `${G.endY} in ${G.secs}s of a derived ${G.capSecs}s window, against a mount at `
-    + `${G.mount}, grouped ${G.grouped}. A LURCHER from `
-    + `the same release arrived ${G.controlArrived} (dead ${G.controlDead}) having `
+    + `${G.mount}, grouped ${G.grouped}. Closest approach ${G.nearest} against the `
+    + `pair solver's own ${G.hold}, and in the attackers set: ${G.attacking} -- a `
+    + 'membrane never is, which is the contact case\'s claim and not this one\'s. '
+    + `A LURCHER from the same release arrived ${G.controlArrived} at a closest `
+    + `${G.controlNearest} of its own ${G.controlHold} `
+    + `(attacking ${G.controlAttacking}, dead ${G.controlDead}) having `
     + `wandered ${G.controlCrossed} units of lateral on its route -- so arriving is `
     + 'not what this arm is about, holding a chosen column on the way is');
 }
