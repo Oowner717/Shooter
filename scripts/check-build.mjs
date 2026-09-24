@@ -996,6 +996,112 @@ console.log(`portal: the rift is world.width / 2 at every screen and era, and th
   + `the width at worst (${worstCell.vw} era ${worstCell.era}), against 25.7% before 388`);
 
 /*
+ * ---- A SCALED VALUE IS SCALED ONCE ---------------------------------------
+ *
+ * Build 389. `SCALED` rewrites each named leaf from `BASE` on every resize, so
+ * what a reader gets is ALREADY in the era's units -- and a read site that
+ * multiplies by `CFG.scale` again applies the factor twice. `CFG.portal.spill`
+ * did, from build 297 (both halves in one commit) to 389: authored 150, live
+ * 230.8 at era 2, and read as 355.
+ *
+ * It was unobservable, which is why nothing failed for 91 builds -- the one
+ * reachable state that reads it is era 1 play, where the factor is exactly 1.
+ * So the fix is the RULE and not the one line: swept here, exactly one of the
+ * 65 entries was doubly scaled, so "a SCALED path is never scaled again" is
+ * the convention the other 64 already keep and the next one inherits it by
+ * existing. Same shape as build 328's renamed `SCALED` path, which stopped
+ * being scaled at all and was invisible because every assertion about it was a
+ * floor the unscaled number still cleared.
+ *
+ * Two forms are detected, because the fault does not need the full path in
+ * one place: the DIRECT read (`CFG.a.b * k`, either order, `k` or `CFG.scale`)
+ * and the ALIASED one (a local bound straight to the parent object, then
+ * `X.leaf * k`). The alias count is printed rather than assumed, so an arm
+ * that has stopped finding any reads says so instead of passing for free --
+ * and it counts (path, alias) PAIRS rather than bind sites, because one
+ * `const C = CFG.portal` is checked once per SCALED leaf under `portal`, so
+ * the figure is the arm's coverage and not a census of the file.
+ * Comment lines are skipped -- a docstring quoting the expression it replaced
+ * is build 344's trap and build 355's fix.
+ *
+ * A THIRD form is not detected and is a measured gap rather than an oversight:
+ * `const { ry } = CFG.portal` followed by `ry * k` reads as a bare identifier
+ * and nothing here would see it. Swept over all 32 distinct SCALED parents at
+ * build 389 and there are ZERO such destructures in `src/`, so the form does
+ * not exist in this codebase -- if one is ever written, the detection owes it
+ * an arm, and the sweep that says whether it is worth one is one grep.
+ */
+const scaledBlock = cfgSrc.match(/const SCALED = \[([\s\S]*?)\n\];/);
+if (!scaledBlock) {
+  throw new Error('check-build: cannot find the SCALED block in config.js -- the '
+    + 'double-scale sweep would be vacuous');
+}
+const scaledPaths = [...scaledBlock[1].matchAll(/'([A-Za-z0-9_.]+)'/g)].map((m) => m[1]);
+if (scaledPaths.length < 40) {
+  throw new Error(`check-build: the SCALED block parsed as only ${scaledPaths.length} `
+    + 'path(s) -- the detection has drifted, not the exposure');
+}
+const SCALE_TOK = '(?:k|CFG\\.scale)\\b';
+const srcFiles = readdirSync(new URL('../src/', import.meta.url))
+  .filter((f) => f.endsWith('.js') && f !== 'config.js');
+const srcLines = new Map(srcFiles.map((f) => [f,
+  readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8').split('\n')]));
+const isComment = (ln) => {
+  const t = ln.trim();
+  return t.startsWith('*') || t.startsWith('//') || t.startsWith('/*');
+};
+const twiceBad = [];
+let aliasChecks = 0;
+for (const path of scaledPaths) {
+  const full = `CFG\\.${path.replace(/\./g, '\\.')}`;
+  const direct = [new RegExp(`${full}\\s*\\*\\s*${SCALE_TOK}`),
+    new RegExp(`${SCALE_TOK}\\s*\\*\\s*${full}`)];
+  const parts = path.split('.');
+  const leaf = parts.pop();
+  const objPath = `CFG.${parts.join('.')}`;
+  for (const [file, lines] of srcLines) {
+    // the direct form
+    lines.forEach((ln, i) => {
+      if (isComment(ln)) return;
+      if (direct.some((re) => re.test(ln))) {
+        twiceBad.push(`${file}:${i + 1} reads CFG.${path} -- which SCALED has already `
+          + `scaled -- and multiplies it by the scale again: ${ln.trim().slice(0, 90)}`);
+      }
+    });
+    // ...and the aliased one, for every local bound straight to the parent
+    const bind = new RegExp(`(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*`
+      + `${objPath.replace(/\./g, '\\.')}\\s*[;,)]`, 'g');
+    const body = lines.join('\n');
+    const seen = new Set();
+    for (const m of body.matchAll(bind)) {
+      if (seen.has(m[1])) continue;
+      seen.add(m[1]);
+      aliasChecks += 1;
+      const via = [new RegExp(`\\b${m[1]}\\.${leaf}\\s*\\*\\s*${SCALE_TOK}`),
+        new RegExp(`${SCALE_TOK}\\s*\\*\\s*\\b${m[1]}\\.${leaf}\\b`)];
+      lines.forEach((ln, i) => {
+        if (isComment(ln)) return;
+        if (via.some((re) => re.test(ln))) {
+          twiceBad.push(`${file}:${i + 1} reads CFG.${path} as ${m[1]}.${leaf} -- which `
+            + `SCALED has already scaled -- and multiplies it by the scale again: `
+            + `${ln.trim().slice(0, 80)}`);
+        }
+      });
+    }
+  }
+}
+if (twiceBad.length) {
+  for (const line of [...new Set(twiceBad)]) console.error(`scaled twice: ${line}`);
+  console.error('scaled twice: SCALED rewrites the leaf from BASE on every resize, so a read '
+    + 'site that scales it again applies the factor twice -- take the `* CFG.scale` off the '
+    + 'read, or take the path out of SCALED if it was meant to be a BASE figure');
+  process.exit(1);
+}
+console.log(`scaled twice: none of the ${scaledPaths.length} SCALED paths is scaled again at `
+  + `a read site (${srcFiles.length} modules swept, ${aliasChecks} (path, alias) pair(s) `
+  + 'checked) -- CFG.portal.spill was the one, from build 297 to 389');
+
+/*
  * ---- THE FUSE'S CAUSES ARE LOOKED UP, NOT COMPARED ----------------------
  *
  * `Director.burnFrom` names which of the fuse's two signals is filling it, and

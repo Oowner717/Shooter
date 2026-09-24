@@ -339,8 +339,20 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
    * open", which is the better sentence and the one the object is about.
    * Rendered and looked at before deciding. At era 2 it runs to the wall,
    * which is where the light of the enemy's side ends.
+   *
+   * `spill` IS SCALED ONCE, IN `SCALED`, AND IS READ RAW HERE. It was written
+   * with a `* k` from build 297 -- the same commit that put it in SCALED -- so
+   * it was scaled twice for 91 builds: read as 355 world units at era 2 where
+   * `SCALED` had already made the authored 150 into 230.8. The two literals
+   * beside it keep their `* k` because they
+   * are RAW: that is the distinction, and the sweep in `check-build` holds it
+   * for EVERY `SCALED` entry, not one of which is scaled again at its read
+   * site -- it prints the live count, so there is no number to write here. Unobservable, measured on all four reachable states: the else arm is
+   * only taken at era 1 play, where `k` is exactly 1 -- at era 2 play the yard
+   * is there and takes the other arm, and in either ASSAY room `syncPortal`
+   * returns `world.portal = null`, so nothing is drawn at all.
    */
-  const spillTo = world.yard ? world.yard.wallY + 40 * k : P.rim + CFG.portal.spill * k;
+  const spillTo = world.yard ? world.yard.wallY + 40 * k : P.rim + CFG.portal.spill;
   const spill = ctx.createLinearGradient(0, P.rim - P.ry * 0.4, 0, spillTo);
   spill.addColorStop(0, rgba(accent, 0.17 * live));
   spill.addColorStop(0.5, rgba(accent, 0.06 * live));

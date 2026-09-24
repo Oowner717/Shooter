@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '388';
+export const BUILD = '389';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '388';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '94d33ca';
+export const REV = '6c834cb';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -9185,8 +9185,19 @@ CFG.title = {
  * `mouth` is the fraction of `rx` births are spread across, and from 388 it is
  * ONE OF TWO bounds rather than the whole of it -- see `mouthHalf`, which also
  * keeps births out of the band `edgeEase` pushes a body away from. Both bind on
- * real phones and `check-build` holds that. `spill` is how far the light pools
- * down the field at era 1; at era 2 it runs to the wall.
+ * real phones and `check-build` holds that.
+ *
+ * `spill` is how far the light pools down the field from the rim at era 1; at
+ * era 2 it runs to the wall instead and this number is not read. It is a BASE
+ * figure and `SCALED` below is the ONE place it is multiplied -- `drawPortal`
+ * reads it raw. It carried a second `* k` at that read site from build 297 to
+ * 389, both halves authored in the same commit, so it was read as 355 world
+ * units where `SCALED` had already made the authored 150 into 230.8 -- and
+ * unobservable, because the only reachable state
+ * that reads it is era 1 play, where the factor is exactly 1. The rule that
+ * makes it a rule rather than one fix is `check-build`'s sweep: no SCALED path
+ * is scaled again at any read site, and every one of them satisfies it -- the
+ * guard counts them, so this sentence does not.
  */
 CFG.portal = {
   ry: 58, pad: 16, mouth: 0.82, spill: 150,

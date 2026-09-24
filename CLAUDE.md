@@ -15294,10 +15294,134 @@ came from before believing the other one covers it.
   different function -- `syncPortal`'s own first statement,
   `if (world.sandbox) { world.portal = null; return null; }`, against
   `drawPortal`'s `if (!P) return` -- so there is no portal to spill in the one
-  place the factor would bite. Left as it is, because the fix is one character
-  on a served file and this build's suite run is already spent; it would be
-  1.54x if a portal ever existed at era 2 with no yard.
+  place the factor would bite. **FIXED AT BUILD 389, where the whole chain was
+  MEASURED on all four reachable states rather than read** -- and the reading
+  agrees with the third read above, which is what a chain checked one more time
+  is worth. Left as it was here because the fix is one character on a served
+  file and this build's suite run was already spent; it would be 1.54x if a
+  portal ever existed at era 2 with no yard.
   **A chain that is unobservable for a reason you did not name is a chain you
   have not checked**, which is build 361's rule about a reachability argument
   arriving on my own prose -- and the half I had is the half that reads as
   sufficient.
+
+- **BUILD 389 CLOSES BUILD 388'S ONE RECORDED ITEM, AND THE SWEEP IS THE
+  DELIVERABLE RATHER THAN THE LINE: EXACTLY ONE OF THE 65 `SCALED` PATHS WAS
+  BEING SCALED A SECOND TIME AT ITS READ SITE.** `SCALED` rewrites each named
+  leaf from `BASE` on every resize, so what a reader gets is already in the
+  era's units -- and `drawPortal` read `CFG.portal.spill * k` where
+  `k = CFG.scale`. Both halves arrived in ONE commit, `edadbb7` "Build 297: the
+  portal" (dated with `git log -S` on each half separately), so it has been
+  doubly scaled from the day the portal existed: **authored 150, live 230.8 at
+  era 2, read as 355.** Neither half is a later addition -- it was written that
+  way once, which is why no removal-pass sweep would have found it.
+- **IT IS UNOBSERVABLE, AND THIS TIME THAT WAS MEASURED RATHER THAN READ.**
+  Build 388's own note flagged its first draft of this chain as under-read (it
+  claimed the branch was "era-1-only, because `world.yard` is null unless era
+  2", which is false in the direction that matters -- the era-2 ASSAY has a
+  null yard too). All four reachable states, off the running game at 390x844:
+
+  | state | `CFG.scale` | yard | portal | else arm | shipped | fixed |
+  |---|---|---|---|---|---|---|
+  | era 1, play | 1 | null | yes | **taken** | 410 | **410** |
+  | era 2, play | 1.5385 | **present** | yes | no | 755 | 630.8 |
+  | ASSAY era 2 | 1.5385 | null | **null** | no | -- | -- |
+  | ASSAY era 1 | 1 | null | **null** | no | -- | -- |
+
+  So the one state that reads it has a factor of exactly 1 and the value is
+  identical either way; at era 2 play the yard takes the other arm, and in
+  either room `syncPortal`'s first line writes `world.portal = null` against
+  `drawPortal`'s `if (!P) return`. Build 329's and 361's ruling: correct,
+  identity everywhere reachable, and **the silence was the fault**, so the fix
+  is a pin and not a revert.
+- **WHICH HALF TO FIX IS DECIDED BY THE SWEEP, NOT BY TASTE.** Two honest
+  fixes: drop the `* k`, or take the path out of `SCALED` and let the read site
+  do the scaling. The sweep settles it -- **65 entries and not one of the other
+  64 is scaled again at its read site**, so reading a SCALED value raw IS the
+  convention, and the two literals beside this one (`40 * k`, `60 * k`) keep
+  their factor because they are RAW. That distinction is the whole of it.
+  **And the guard admits the other fix, which is what says it is about the
+  DOUBLE and not about the `* k`**: restoring the multiply with the path taken
+  out of `SCALED` passes, reporting 64 paths.
+- **THE FAULT HAS TWO FORMS AND THE SECOND ONE'S COUNT IS PRINTED.** The direct
+  read (`CFG.a.b * k`, either order, `k` or `CFG.scale`) and the ALIASED one --
+  a local bound straight to the parent object, then `X.leaf * k`, which is how
+  most of this codebase reads config. The alias arm made **52 checks across 45
+  modules**, and that figure is in the readout rather than assumed, so an arm
+  that has stopped finding any reads says so instead of passing for free
+  (build 294's rule: a vacuity denominator has to count what was MEASURED).
+  Comment lines are skipped, because a docstring quoting the expression it
+  replaced is build 344's trap and build 355's fix -- proved by planting the
+  expression in a comment, which passes.
+- **...AND THE FIRST LABEL ON THAT COUNTER SAID "52 BINDS", WHICH IS NOT WHAT
+  IT COUNTS.** One `const C = CFG.portal` is checked once per SCALED leaf under
+  `portal`, so the loop visits a bind site as many times as its parent has
+  entries and 52 is (path, alias) PAIRS -- the arm's coverage, which is the
+  useful figure, under a label claiming a census of the file. Sixth instance of
+  "a detail string is a declaration" after builds 319, 323, 324, 343 and 387,
+  and the first where the declaration was a variable NAME rather than a
+  message: `aliasBinds` is what made the label read that way, and renaming it
+  `aliasChecks` is most of the fix.
+- **A THIRD FORM IS NOT DETECTED AND IS A MEASURED GAP RATHER THAN AN
+  OVERSIGHT.** `const { ry } = CFG.portal` followed by `ry * k` reads as a bare
+  identifier and nothing in the sweep would see it. Swept over all **32
+  distinct SCALED parents: ZERO such destructures in `src/`**, so the form does
+  not exist in this codebase -- which is the difference between a gap named
+  with a number beside it and a hole. Detection for a form nothing uses is the
+  `kind: 'works'` shape, and the sweep that says whether it is ever worth one
+  is one grep.
+- **AND BOTH NEW DOCSTRINGS WROTE THE COUNT OUT BESIDE A GUARD THAT DERIVES
+  IT.** "the sweep holds it for all 65 SCALED entries" and "all 65 satisfy it"
+  -- a figure in prose, two lines from an arm that prints the live one, in the
+  build whose whole subject is a derived sweep. Build 329's rule, and the one
+  thing that makes it worth a line here rather than a silent fix: the count is
+  the ONE number in those paragraphs that cannot be wrong for a reason a reader
+  would notice, because adding a SCALED entry is an ordinary edit that moves it
+  and fails nothing. Both say "every entry" now and name the guard as the thing
+  that counts.
+- **AND THE FIRST, LOOSE VERSION OF THAT SWEEP REPORTED 33 CANDIDATES OF WHICH
+  32 WERE ITS OWN.** Matching a SCALED path by its LEAF finds
+  `abilities.js`'s `const rr = this.r * k` for every one of the twenty-odd
+  entries ending in `.r`, plus `H.speed * k` for `drop.speed` and
+  `r.width * k` -- a route's width -- for `wire.width`. None of them is a CFG
+  read at all. Tightened to the full path and to aliases bound *directly* to
+  the parent object, it reads 1 and 0. **A sweep keyed on a leaf name is a
+  sweep over every object in the tree that happens to have that field**, and
+  the tell was a hit count in the same order as the number of paths.
+- **FIVE PROOFS, EACH ON ITS OWN CONJUNCT WITH ITS OWN MESSAGE.** The `* k`
+  restored fires naming `portal.js:354`; the `* k` restored with the path out
+  of `SCALED` **passes** (the discrimination above); an aliased double on a
+  DIFFERENT path (`C.ry * CFG.scale`, where `const C = CFG.portal` is already
+  bound in `syncPortal`) fires the alias arm naming `portal.ry as C.ry`, which
+  is what says the guard is not `spill`-specific; the `SCALED` block
+  reformatted so the detection misses it throws "cannot find the SCALED
+  block"; and the list truncated throws "parsed as only 3 path(s) -- the
+  detection has drifted, not the exposure". Every verdict read as a MESSAGE
+  rather than as `$?`, because `check-build` exits 1 on a stale REV whatever
+  the guard does (build 367).
+- **...AND A RESTORE THAT IS TWO PATCHES LEAVES THE TREE IN NEITHER STATE.**
+  Proof C's output carried TWO hits -- the planted alias and the spill line --
+  because the restore before it copied the snapshot back without re-applying
+  this build's own one-line fix, so the tree was at 388 for that run. Harmless
+  here (the extra hit is a true positive about a real 388 state) and it reads
+  exactly like a guard firing twice for one plant. When a build's fix is a
+  patch ON TOP of a snapshot, the restore is `cp` **plus** every patch, and the
+  baseline has to be re-read after it -- which is build 346's rule about
+  reading the baseline, one step further out.
+- **`enterSandbox` REFUSED FOUR TIMES BEFORE THE PROBE COULD MEASURE THE ROOM,
+  AND THE GATE IS NOT THE LEDGER.** Build 266's rule is that anything needing
+  NEW FORM owned writes `recast` into the LEDGER, because `owned()` reads
+  `world.ledger` and nothing else. `Game.enterSandbox` does not: its refusals
+  are `!w.up.sandbox` -- the DERIVED upgrade table, which pushing an id into
+  the ledger does not rebuild -- and `w.phase !== 'staging'`. So the probe
+  pushed `sandbox` and `recast` into the ledger and got `false` three times
+  running, which reads exactly like the room being shut. **Which table to write
+  depends on which one the gate reads**, and the two are a `ledger.push` and a
+  `w.up.<id> = 1` apart; grep the gate before funding it.
+- **THE HASH IS NOT OWED AND WAS NOT RUN, AND THE REASON IS STRUCTURAL RATHER
+  THAN A SHRUG.** The change is one expression inside `drawPortal`, and
+  `fight.mjs` **never paints** -- verified by grep, no `.draw(` anywhere in it
+  -- so there is no path by which the probe could execute the line. The one
+  suite case that does import `drawPortal` runs at era 1, where the factor is
+  exactly 1 and the expression is the identity. What had something to say is
+  the four-state table above, the five proofs, the suite and the bundle boot.
