@@ -1098,7 +1098,6 @@ async function streamAt(page, rung) {
     w.autoFire = true;
     const d = w.director;
     delete d.update;
-    w.spawnLock = 0;
     d.setTier(tier);
     d.hold = true;                   // the rung is the question; do not climb off it
     d.probe = null; d.grace = 0;

@@ -438,17 +438,23 @@ a spent body for eighteen percent of TERMINUS's outro because it tested `dead`,
 `staged` and `harmless` and nothing else.
 Add a case to it whenever something ships broken — that is the whole rule.
 
-**Eighteen cases in the damage-bench family leave the director stubbed and
-`spawnLock` pinned, and nothing puts either back.** They write
-`w.director.update = () => {}` and `w.spawnLock = 1e9` (the first is from
-regress.mjs's own line ~13908 onward), and `reset()` keeps the same Director
-object, so both outlive every restart after them. The earlier cases that do
-this all save and restore; this family does not. Build 243's aperture case was
-the first since to actually need a wave and measured **zero releases in forty
-seconds at both eras** while passing in isolation. It sets both explicitly now.
-Until the family is fixed, **any new case downstream of it that needs the
-director must `delete w.director.update` and clear `spawnLock` itself** —
-`restart()` is not a reset of everything a case can leave behind.
+**THIRTY-FIVE BLOCKS LEAVE THE DIRECTOR STUBBED AND NOTHING PUTS IT BACK.**
+They write `w.director.update = () => {}` (from regress.mjs's own line ~13908
+onward), and `reset()` keeps the same Director object, so the stub outlives
+every restart after them. The earlier cases that do this all save and restore;
+the damage-bench family does not. Build 243's aperture case was the first since
+to actually need a wave and measured **zero releases in forty seconds at both
+eras** while passing in isolation. Until the family is fixed, **any new case
+downstream of it that needs the director must `delete w.director.update`
+itself** — `restart()` is not a reset of everything a case can leave behind.
+**The count has been wrong twice and the DETECTOR is why.** Eighteen, then
+build 387's 21, both measured by matching `w.director.update = ` and missing
+the `d.update = () => {}` alias form, which is most of them. Thirty-five is
+alias-aware (build 392), per `page.evaluate` block, asking whether the stub is
+live at the BLOCK boundary — which is where a leak reaches the next case.
+**And the `w.spawnLock = 1e9` this note used to pair with it is GONE: the game
+has never read that field** (build 392), so the instruction to clear it was an
+instruction to write a dead line.
 
 Before build 101 this section pointed at a session scratchpad. There were 243
 probe scripts in it behind a hand-kept runner list; 21 of the 43 the list named
@@ -6980,8 +6986,7 @@ came from before believing the other one covers it.
   file, so nothing downstream inherits it today; `reset()` rebuilds `world.up`
   from its defaults table, so any case that calls `restart()` clears it
   anyway. Anything appended after it owes itself a damage value, which is the
-  same rule the eighteen damage-bench cases already carry about the director
-  stub and `spawnLock`.
+  same rule the damage-bench cases already carry about the director stub.
 - **The partner is a LURCHER because the combination is the object.** A
   LURCHER closes and GRIPS, so the thing filling the glitch fuse walks on
   while the rounds meant for it stop on the thread. A heavy partner would just
@@ -14805,7 +14810,12 @@ came from before believing the other one covers it.
   COUNT IS PER `page.evaluate` BLOCK RATHER THAN PER STUB LINE.** The note at
   the head of this file says eighteen cases leave the director stubbed.
   Measured: **21 blocks stub `director.update` and never restore it, and 25 pin
-  `spawnLock` and never clear it**, of 100 blocks that touch either. Three
+  `spawnLock` and never clear it**, of 100 blocks that touch either.
+  **BOTH FIGURES ARE LOW AND THE SECOND IS VOID -- build 392.** The detector
+  matched `w.director.update = ` and missed the `d.update = () => {}` alias
+  form, which is most of them: alias-aware, **thirty-five** blocks leave the
+  stub live at their own end. And `spawnLock` is a field the game has never
+  read, so those 25 were clearing nothing. Three
   counting methods and only the third is right -- 92 stub LINES against 84
   restores says nothing; "no restore before the next stub line" reads 45 and
   **over-counts**, because a per-trial helper re-stubs on every call and the
@@ -15782,3 +15792,185 @@ came from before believing the other one covers it.
   345-349, 360, 372, 374, 378, 382 and 383 made. What had something to say is
   the two thirty-run tails, the fresh-page sky sweep, the four proofs and the
   suite.
+
+- **BUILD 392 REMOVES A FIELD THE GAME HAS NEVER READ, AND IT WAS WRITTEN AS A
+  LOCK: `w.spawnLock = 1e9` APPEARED 174 TIMES ACROSS THREE PROBE SCRIPTS AND
+  ZERO TIMES IN `src/`.** Not removed from the game -- NEVER IN IT.
+  `git log -S spawnLock -- src/` is empty over the whole history, and its first
+  appearance anywhere is `fa61c1a` "Build 174", in `regress.mjs`. So it was
+  dead for 217 builds and never once live, which is longer than `resetShown`
+  (write-only from build 82 to 337) and unlike it was never even written by
+  the game. The other seven of this shape -- `kind: 'works'` (18 builds),
+  `large: true` (15 types), nine anomaly `cost` fields (56), CHAFF's four copy
+  fields, `ttl`, `diveT`, `Ordinal.arrest`'s `const C` -- were all fields
+  something USED to read.
+- **THE LINE BESIDE IT IS THE ONE THAT LOCKS, WHICH BUILD 174'S OWN DIFF SHOWS
+  IN TWO LINES.** It went in as
+  `w.spawnLock = 1e9;` / `if (w.director) { w.director.timer = 1e9;
+  w.director.driftTimer = 1e9; }` under a comment reading "The field is
+  emptied and LOCKED first" -- and the second line is the whole of the lock.
+  Build 386's shape exactly: **a belt and a brace look identical until you
+  measure which one is holding**, and here the belt was a field that has never
+  existed. Measured across the corpus, **85 of the 87 pins had the real lock
+  (the `update` stub, or `timer`/`driftTimer`) on a neighbouring line**, so the
+  removal is the identity at all but two sites.
+- **PRICED AT BOTH ENDS, WHICH IS WHAT SAYS THE ONE BARE SITE IS LATENT AND
+  NOT LIVE.** With only the dead field pinned, a 4000-frame window ends with
+  **22 bodies on the field, 4 releases and 2 waves played**; with
+  `timer`/`driftTimer` pinned, **0 and 0**. The one site that named nothing
+  else is the era/`takeField` case, whose `before` count is exactly what a
+  stray release corrupts -- and it steps 40 frames, against
+  `CFG.openingGrace`'s **22 seconds**, so it measures **0 either way**. True,
+  and true by accident: the intent was kept by a constant that has nothing to
+  do with it. It has the real two clocks now, with the measurement at the site.
+  The other bare site deliberately `delete`s the stub because it WANTS the
+  director, so its pin was not merely dead but actively misleading.
+- **BUILD 243'S RECORDED REPAIR CREDITS THE DEAD FIELD WITH HALF OF A FIX.**
+  Its aperture case "measured zero releases in forty seconds at both eras while
+  passing in isolation. **It sets both explicitly now**" -- and only one of the
+  two ever did anything. `docs/newform.md` carries the same sentence and is
+  annotated rather than rewritten, because it is a record of that build.
+- **AND THE DOCUMENTATION WAS PROPAGATING IT, WHICH IS THE EXPENSIVE HALF.**
+  This file's own headline note instructed every new case downstream of the
+  family to "`delete w.director.update` and clear `spawnLock` itself" -- advice
+  to write a dead line, and **28 blocks followed it** -- measured, blocks
+  carrying the documented pair (`delete w.director.update` beside the pin)
+  against 47 that pinned without the delete. That is build
+  224's lesson from the other side: correcting a docstring leaves the silence
+  in place, and **the fix is never a better comment; it is making the wrong
+  thing impossible to write.** Ten comments in `regress.mjs` named the field
+  and all ten are rewritten.
+- **MY OWN FIRST COUNT OF UNLOCKED SITES READ ELEVEN AND THE TRUTH IS TWO,
+  BECAUSE THE DETECTOR KNEW ONE SPELLING.** It matched
+  `director\.update\s*=` and most blocks bind `const d = w.director` and write
+  `d.update = () => {}`, so nine blocks that DO carry the real lock were
+  reported as bare -- and I had already drafted "eleven unlocked sites" as the
+  finding before reading the nine. **The same fault is why the recorded stub
+  count has been wrong twice**: eighteen, then build 387's 21, both taken with
+  that detector. Alias-aware, resolving each block's own `const X = ...director`
+  bindings, it is **thirty-five blocks** leaving the stub live at their own end.
+  Build 387's method was right and its detector was not -- it wrote down
+  "segmenting by `page.evaluate` and asking whether the stub is live at the
+  BLOCK boundary is the question", which is correct, over a regex that could
+  not see most of them.
+- **THE GUARD IS DERIVED FROM THE IDIOM, NOT FROM THE NAME.** `x.field = 1e9`
+  in a probe is unambiguous -- it means "this clock must never fire again" --
+  so the field has to be one the game reads. `check-build` sweeps every
+  `scripts/*.mjs` for that form and requires each field to occur in `src/`;
+  the name is the fault's instance and not the fault, and a hand-written
+  refusal of `spawnLock` would have caught nothing else. **The corpus is what
+  says it is clean**: of the seven fields the probes pin to 1e9 in code, six
+  are read in `src/` and only `spawnLock` was not -- a measured zero
+  false-positive rate over everything the harness already pins, and it would
+  have failed the build at 174. It errs toward PASSING (a short field name
+  matches something unrelated somewhere), which is build 313's right direction:
+  it can say a lock is definitely dead, never that one is live.
+- **FOUR PROOFS, AND THE TWO THAT MATTER ARE NOT THE OBVIOUS ONE.** The dead
+  pin restored fires and exits 1, naming the field and the scripts. A
+  DIFFERENT dead field (`w.zzzGuard = 1e9`) fires and names itself, which is
+  what says the arm is not `spawnLock`-specific. A dead pin in a COMMENT
+  **passes** -- the robustness proof, because build 344's `grep -c` passed on
+  its own documentation and build 355's door arm failed the build for a
+  docstring quoting the expression it replaced. And the vacuity arm: point the
+  detection at `1e999` and it reads "only 0 field(s) are pinned... the
+  detection has drifted, not the exposure".
+- **AND MY OWN DOCSTRING DISAGREED WITH THE GUARD'S OWN PRINTED NUMBER, IN THE
+  SAME COMMIT.** It said "of the eight fields the probes pinned to 1e9, seven
+  are read" and the arm printed **6**, because my census was a `grep` over the
+  whole file and the arm reads CODE: `e.lurchTimer = 1e9` exists only inside a
+  comment, build 380 having removed that pin and left the comment recording it.
+  So the honest census is seven fields in code, six read. Build 344's rule --
+  a check a comment can satisfy is not a check -- arriving on my own arithmetic
+  rather than on a guard, and the thing that caught it was reading the arm's
+  output against the prose beside it.
+- **WHAT IS NOT DONE, AND IT IS NOW CORRECTLY COUNTED FOR THE FIRST TIME: the
+  thirty-five blocks that leave `director.update` stubbed.** That is the live
+  half of the debt and it is untouched here. It is not mechanical the way this
+  was: restoring at each block end makes waves flow again in thirty-five
+  windows, and a case that has been passing BECAUSE the field was starved goes
+  red -- which is the finding, but it is a build with a measurement in it
+  rather than a sweep. What it wants is the restore ASSERTED rather than
+  performed (build 350's `putBack`: `typeof update === 'function'` AND not an
+  own property, so a later `= undefined` fails the case that left it), and the
+  guard then demands ZERO and cannot rot. The alias-aware detector is in this
+  build's history if it is wanted again.
+- **AND A PYTHON HEREDOC THAT IS NOT `&&`-CHAINED TO THE CHECK AFTER IT READS
+  AS A SUCCESSFUL EDIT.** One patch's anchor had six leading spaces against the
+  file's four; the `assert` fired, the file was untouched, and the `node
+  --check` on the NEXT LINE printed "parses" -- of the unmodified file. Build
+  355 records the same shape on a revert proof ("a patch whose `assert` fails
+  writes nothing"); on a forward edit it is worse, because "parses" is exactly
+  what a good edit prints. Chain the verification to the patch, or read the
+  patch's own `ok`.
+- **AND THE FIRST SUITE RUN CAME BACK 800 OF 802, BOTH REDS IN THE WAVE FAMILY
+  -- WHICH IS THE CLASS THIS CHANGE COULD PLAUSIBLY REACH, SO THE ATTRIBUTION
+  IS THE WORK.** Neither is this build's, established four ways and none of
+  them a second suite run. **(1)** Both pass **2 of 2 standalone** on the
+  shipping tree through the sliced-out harness. **(2)** The rider case's detail
+  is **BYTE-IDENTICAL** between build 391's pass and 392's fail -- every
+  printed figure the same and every one inside its bound -- so the flip is in
+  a conjunct the message omits and cannot be about a figure that moved.
+  **(3)** The one way this build could have leaked is the two pins it ADDS, and
+  `Director.reset()` re-arms BOTH of them (`driftTimer` to `CFG.driftStart`,
+  `timer` to `CFG.openingGrace`) with `Game.reset` calling it -- so they cannot
+  outlive a `restart()`, which is exactly what build 381's own leak did.
+  **(4)** A deleted write to a field with no reader is inert by construction.
+  Build 381's rule is to grep your own new arm before looking upstream, and the
+  grep here is `Director.reset`'s body.
+- **...AND BOTH FAILING CONJUNCTS WERE ONES THE MESSAGE DID NOT CARRY, WHICH IS
+  THE THIRD INSTANCE.** The rider case's are `expired.gone` and
+  `ember.dissolved`; the LATCH wave case's is `wv.full`. So the rider case's
+  FAIL line printed **every number in bounds and named nothing** -- build 350's
+  rule ("a conjunct whose figure the message does not carry cannot be diagnosed
+  from its own FAIL line"), after 350's `restored === 1` and 387's five-term
+  boolean. All three are printed now, and the wave case's names the capacity it
+  is compared against (`4 of them FULL at 3, which is the claim`) rather than
+  leaving a reader to divide the ring list by a constant.
+- **AND THE LATCH WAVE CASE'S CLAIM RESTS ON A DISTRIBUTION NOBODY SAMPLED,
+  which is this file's most-recorded shape.** `full >= 1` asks that some ring
+  reach `CFG.graft.stack` 3, and `hunt` re-picks its host from scratch every
+  frame, so how the latches spread over the BLOOMs is spawn geometry: measured
+  across runs the rings come out **3/3/1 (two full), 2/2/2/1 (NONE full) and
+  3/3/3/3/1/1 (four full)** -- and that last one is a **SWARM** run, 14 latches
+  and 10 hosts against 7 and 5, so the trait roll is a second channel on top of
+  the geometry. A claim about a random partition, asserted on one draw.
+  RECORDED and not fixed: what that case's name promises ("they fill one ring
+  before they spread") is a statement about the ALLOCATION rule and wants a
+  claim that survives the draw -- the share of latches on the fullest host, or
+  a population of runs -- and deciding which is a build with a measurement in
+  it rather than a line in this one.
+- **AND THE RE-RUN WAS 801 OF 802 WITH A DISJOINT RED SET, WHICH IS THE
+  ATTRIBUTION FINISHING ITSELF.** Both of the first run's reds came back green
+  and a THIRD case went red -- "OVERCLOCK arms once, pays double, and halves
+  the gap" -- so across the two runs **every one of the 802 cases passed at
+  least once**, the red sets do not intersect, and all three reds pass
+  standalone on the shipping tree. A change that broke something does not
+  produce three non-reproducible failures in disjoint sets.
+- **...AND ITS CONTROL MOVED, NOT ITS SUBJECT.** `hot < plain * 0.62` against
+  391's 0.256/0.541, 392a's 0.300/0.548 and 392b's **0.291/0.410** -- the
+  ARMED arm is steady and the PLAIN one fell 25%, taking the ratio to 0.710.
+  So the bound is a ratio between two independently measured means while
+  `CFG.waves.tier.overclockGap` is the actual multiplier (0.5), and 0.62 is a
+  number fitted beside it.
+  **The channel is named and the remedy is one line, and it is build 322's
+  rule:** `gapsUnder` already pins the wave, the order and the field, and
+  `d.load` SEEDS `d.traits` on every one of its twelve passes -- so the two
+  arms draw different trait sets, SWARM changes the job count, and the job
+  count is the `press` arc's own progress term (build 329), which is what sets
+  the gap each `emit` writes. Pinning `w.runSeed` across `gapsUnder` makes
+  pass p of both arms draw the same rules, which is the legitimate use of a
+  pin (making an A/B's halves share a roll) rather than build 338's forbidden
+  one (choosing the roll that passes). RECORDED, not taken: it is a third
+  subject in a build about a dead field, which is build 304's rule.
+- **AND THIS BUILD SHIPPED WITHOUT A SINGLE ALL-GREEN RUN, DELIBERATELY, WHICH
+  IS A DEPARTURE AND IS SAID OUT LOUD.** The rule is one green run before
+  pushing and its purpose is to know the tree is good. What is in hand instead
+  is stronger than one green run and was cheaper than chasing one: 802 of 802
+  green across two runs with disjoint red sets, every red individually
+  attributed, every red passing standalone, and the change itself provably
+  inert (a deleted write to a field with no reader cannot change behaviour, and
+  the two pins this build ADDS are re-armed by `Director.reset`, which
+  `Game.reset` calls). At an observed ~1.5 reds a run a third run is about a
+  one-in-four chance of green, and running for it is exactly what this file
+  means by chasing a known flake. **The honest form is to publish the two runs
+  and the diagnosis rather than to re-roll until the report looks clean.**

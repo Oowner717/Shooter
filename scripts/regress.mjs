@@ -2617,7 +2617,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
       g.debugClearField();
       g.restart();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
       w.up = freshUpgrades();
       w.effects.length = 0;
@@ -2716,7 +2715,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     out.forked = reachOf('fork', 1);
 
     bare();
-    w.spawnLock = 0;
     w.up = freshUpgrades();
     g.restart();
     return out;
@@ -2967,7 +2965,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const cadence = (flag, name) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.director.update = () => {};
       g.debugTeachAll();
       w.phase = 'staging';
@@ -4807,7 +4804,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const { fx, impactFx, deathFx } = await import('../src/fx.js');
     g.debugTeachAll();
     g.debugClearField();
-    w.spawnLock = 1e9;
     if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
 
     const census = () => {
@@ -4925,7 +4921,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const { glitch } = await import('../src/glitch.js');
     g.debugTeachAll();
     g.debugClearField();
-    w.spawnLock = 1e9;
     if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
     g.hud.clearHint(); g.hud.clearAlerts(); g.hud.unrecede();
     glitch.level = 0; glitch.burst = 0;
@@ -5071,7 +5066,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     g.debugTeachAll();
     g.debugClearField();
     w.debug.noCooldown = true;
-    w.spawnLock = 1e9;
     if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
     g.hud.clearHint(); g.hud.clearAlerts(); g.hud.unrecede();
     glitch.level = 0; glitch.burst = 0;
@@ -5322,7 +5316,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
      * perfectly correct reasons and fails the check for none.
      */
     g.debugClearField();
-    w.spawnLock = 1e9;
     if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
     for (const a of [...w.attackers]) a.dead = true;
     w.attackers.clear();
@@ -5425,7 +5418,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
       const s = w.shooter;
       w.director.update = () => {};
       w.director.traits = [];
-      w.spawnLock = 1e9;
       for (let k = 0; k < 8; k++) g.debugClearField();
       w.attackers.clear();
       w.autoAim = false;
@@ -5499,7 +5491,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     CFG.cartwheel.spin = spin;
     g.restart();
     delete g.world.director.update;
-    g.world.spawnLock = 0;
     out.grabPad = CFG.shooter.grabPad;
     /*
      * The restore is ASSERTED rather than performed, because `= undefined`
@@ -5515,11 +5506,10 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     out.back = {
       fn: typeof g.world.director.update === 'function',
       own: Object.prototype.hasOwnProperty.call(g.world.director, 'update'),
-      lock: g.world.spawnLock === 0,
       spin: CFG.cartwheel.spin === spin,
       wasOwn: wasUpd,
     };
-    out.putBack = out.back.fn && !out.back.own && out.back.lock && out.back.spin;
+    out.putBack = out.back.fn && !out.back.own && out.back.spin;
     return out;
   });
 
@@ -5570,7 +5560,7 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     + `${r.rotated ? r.rotated.revs : '-'} revolutions in `
     + `${r.rotated ? r.rotated.entries : '-'} re-attachment(s); `
     + `put back -- update a function ${r.back.fn}, not an own property `
-    + `${!r.back.own}, spawnLock clear ${r.back.lock}, spin ${r.back.spin} `
+    + `${!r.back.own}, spin ${r.back.spin} `
     + `(it was an own property on entry: ${r.back.wasOwn}, which is upstream's `
     + 'restore-by-assignment and not a leak)');
 }
@@ -9297,7 +9287,6 @@ if (!GUN_LINE) {
       // The damage-bench family leaves both of these behind and `restart()` is
       // not a reset of everything a case can leave; see CLAUDE.md.
       delete w.director.update;
-      w.spawnLock = 0;
       const d = w.director;
       d.douse();
       d.wave = null;
@@ -12673,7 +12662,6 @@ if (!GUN_LINE) {
     const real = WAVES.findIndex((x) => !x.teach && x.of && x.of.length);
     const teachIdx = WAVES.findIndex((x) => x.teach);
     delete w.director.update;
-    w.spawnLock = 1e9;
     /*
      * `Director.wave` is a GETTER off `order[at]`, so a wave is selected by
      * setting those two -- which is how every other case in this suite does
@@ -12758,7 +12746,6 @@ if (!GUN_LINE) {
       g.debugClearField();
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.autoAim = false; w.autoFire = false;
       w.reconciled = T.gates.map((_, i) => i + 1);
       w.newForm = 'done';
@@ -12848,7 +12835,6 @@ if (!GUN_LINE) {
     g.debugClearField();
     w.reconciled.length = 0;
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -14059,7 +14045,6 @@ if (!GUN_LINE) {
       g.restart();
       g.debugTeachAll();
       g.debugClearField();
-      w.spawnLock = 1e9;
       d.driftTimer = 1e9;
       d.order = [real]; d.at = 0;
       d.resting = true; d.timer = 1e9;
@@ -14458,7 +14443,6 @@ if (!GUN_LINE) {
     out.tau = Math.PI * 2;
 
     g.debugClearField();
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -14700,7 +14684,6 @@ if (!GUN_LINE) {
     g.restart();
     g.debugTeachAll();
     g.debugClearField();
-    w.spawnLock = 1e9;
     if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; w.director.resting = true; }
     const pin = () => {
       const e = g.debugSpawn('lurcher', 300, 300);
@@ -15173,7 +15156,6 @@ if (!GUN_LINE) {
       if (buy) { g.debugGiveBytes(500000000); g.debugBuyAll(); }
       w.projectiles.length = 0; w.effects.length = 0; w.mines.length = 0;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       // Nothing else may spend the pool while the press is being counted.
       w.autoFire = false;
       w.autoAim = false;
@@ -15237,7 +15219,6 @@ if (!GUN_LINE) {
      * own property of `undefined` shadows it.
      */
     delete w.director.update;
-    w.spawnLock = 0;
     w.autoFire = true;
     w.autoAim = true;
     g.restart();
@@ -16586,7 +16567,6 @@ if (MINE_LINE) {
       g.debugClearField();
       w.effects.length = 0;
       w.projectiles.length = 0;
-      w.spawnLock = 1e9;
       if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
       w.up = freshUpgrades();
       w.pileT = 0;
@@ -16720,7 +16700,6 @@ if (MINE_LINE) {
 
     bare();
     w.up = freshUpgrades();
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -17074,7 +17053,6 @@ if (MINE_LINE) {
         g.debugClearField();
         g.restart();
         w.phase = 'staging';
-        w.spawnLock = 1e9;
         if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
         w.up = freshUpgrades();
         for (let i = 0; i < levels; i++) def.apply(w.up, w);
@@ -17143,7 +17121,6 @@ if (MINE_LINE) {
       out.two = fanRadii(2);
 
       g.debugClearField();
-      w.spawnLock = 0;
       w.up = freshUpgrades();
       g.restart();
       return out;
@@ -17198,7 +17175,6 @@ if (MINE_LINE) {
       g.debugClearField();
       g.restart();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
       w.up = freshUpgrades();
       if (buy) { const d2 = BY_ID.get('shockfront'); for (let i = 0; i < 2; i++) d2.apply(w.up, w); }
@@ -17294,7 +17270,6 @@ if (MINE_LINE) {
       g.debugClearField();
       g.restart();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.up = freshUpgrades();
       if (w.director) { w.director.setTier(tier); w.director.timer = 1e9; w.director.driftTimer = 1e9; }
       const host = g.debugSpawn('bulwark', s.x, s.y - 120);
@@ -17316,7 +17291,6 @@ if (MINE_LINE) {
     out.want = CFG.waves.tier.bountyStep ** 19;
 
     g.debugClearField();
-    w.spawnLock = 0;
     w.up = freshUpgrades();
     w.autoFire = false;
     g.restart();
@@ -17420,7 +17394,6 @@ if (MINE_LINE) {
       g.debugClearField();
       g.restart();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
       w.up = freshUpgrades();
       for (let i = 0; i < levels; i++) def.apply(w.up, w);
@@ -17469,7 +17442,6 @@ if (MINE_LINE) {
     g.debugClearField();
     g.restart();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     w.up = freshUpgrades();
     def.apply(w.up, w); def.apply(w.up, w);
     w.projectiles.length = 0;
@@ -17487,7 +17459,6 @@ if (MINE_LINE) {
     out.loneePeak = peak;
 
     g.debugClearField();
-    w.spawnLock = 0;
     w.up = freshUpgrades();
     w.round = 'standard';
     g.restart();
@@ -17565,7 +17536,6 @@ if (MINE_LINE) {
     g.restart();
     g.debugTeachAll();
     g.debugClearField();
-    w.spawnLock = 1e9;
     if (w.director) { w.director.timer = 1e9; w.director.driftTimer = 1e9; }
 
     const fires = (free) => {
@@ -17602,7 +17572,6 @@ if (MINE_LINE) {
     const off = fires(false);
     const on = fires(true);
 
-    w.spawnLock = 0;
     g.restart();
     return { off, on };
   });
@@ -17642,7 +17611,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
 
@@ -17682,7 +17650,6 @@ if (MINE_LINE) {
     const forms = new Set(w.projectiles.map((p) => p.form));
 
     w.director.update = ran;
-    w.spawnLock = 0;
     g.restart();
     return {
       cooldown, standingLevels,
@@ -17749,7 +17716,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
     const run = (n) => { for (let i = 0; i < n; i++) g.update(1 / 60); };
@@ -17834,7 +17800,6 @@ if (MINE_LINE) {
       wallFree: wallSpeed(false), wallHeld: wallSpeed(true),
     };
     w.director.update = ran;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -17885,7 +17850,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
     const s = w.shooter;
@@ -17942,7 +17906,6 @@ if (MINE_LINE) {
     const fooled = closes(true);
 
     w.director.update = ran;
-    w.spawnLock = 0;
     g.restart();
     return { cuts, arcs, free, fooled, unused: [mote, drops].length };
   });
@@ -17996,7 +17959,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       const ran = w.director.update;
       w.director.update = () => {};
       w.autoFire = false;
@@ -18115,7 +18077,6 @@ if (MINE_LINE) {
         };
       }
       w.director.update = ran;
-      w.spawnLock = 0;
       g.restart();
       return out;
     });
@@ -18171,7 +18132,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
     g.debugGiveBytes(500000000);
@@ -18214,7 +18174,6 @@ if (MINE_LINE) {
       salvo, afterOne, afterTwo, laid, cap: CFG.mines.cap,
     };
     w.director.update = ran;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -18344,7 +18303,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       if (bought) { g.debugGiveBytes(500000000); g.debugBuyAll(); }
       g.toggleRound('arc');
@@ -18427,7 +18385,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       const ran = w.director.update;
       w.director.update = () => {};
 
@@ -18469,7 +18426,6 @@ if (MINE_LINE) {
       }
       w.up.mineFizzle = false;
       w.director.update = ran;
-      w.spawnLock = 0;
       g.restart();
       return out;
     });
@@ -18511,7 +18467,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
     g.toggleRound('tithe');
@@ -18542,7 +18497,6 @@ if (MINE_LINE) {
     const low = at(1);
     const high = at(18);
     w.director.update = ran;
-    w.spawnLock = 0;
     g.restart();
     return { low, high, want: T.bounty };
   });
@@ -18588,7 +18542,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       if (bought) { g.debugGiveBytes(500000000); g.debugBuyAll(); }
     };
@@ -18657,7 +18610,6 @@ if (MINE_LINE) {
       plain: voidOn(false), armoured: voidOn(true),
       base: { spore: CFG.rounds.spore.patch.dps, thorn: CFG.thorn.patch.dps },
     };
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -18706,7 +18658,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     const ran = w.director.update;
     w.director.update = () => {};
     g.debugGiveBytes(400000000);
@@ -18756,7 +18707,6 @@ if (MINE_LINE) {
     e.applyDamage = real;
 
     w.director.update = ran;
-    w.spawnLock = 0;
     const levels = bought.length;
     g.restart();
     return { hits, fired, levels, r: e.r };
@@ -18805,7 +18755,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       const d = w.director;
       d.update = () => {};
       // `setTier` is the machinery's setter and unlocks as it goes; `reach`
@@ -18841,7 +18790,6 @@ if (MINE_LINE) {
     };
     const low = at(1);
     const high = at(14);
-    w.spawnLock = 0;
     g.restart();
     return { low, high, parent: parent && parent.id, child: parent && parent.splits.type };
   });
@@ -18900,7 +18848,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       w.autoAim = false;
       w.autoFire = false;
@@ -18977,7 +18924,6 @@ if (MINE_LINE) {
       casing60: casing(1 / 60), casing120: casing(1 / 120),
       casingOwned: w.up.casing,
     };
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -19111,7 +19057,6 @@ if (MINE_LINE) {
         if (w[list]) w[list].length = 0;
       }
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       if (buy) {
         g.debugGiveBytes(400000000);
@@ -19175,7 +19120,6 @@ if (MINE_LINE) {
     g.debugTeachAll();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     w.director.update = () => {};
     const wi = w.abilities.slots.findIndex((x) => x.def.id === 'ward');
     w.abilities.clearCooldowns();
@@ -19276,7 +19220,6 @@ if (MINE_LINE) {
         g.debugTeachAll();
         g.debugClearField();
         w.phase = 'staging';
-        w.spawnLock = 1e9;
         w.director.update = () => {};
         w.abilities.clearCooldowns();
       };
@@ -19489,7 +19432,6 @@ if (MINE_LINE) {
         g.debugTeachAll();
         g.debugClearField();
         w.phase = 'staging';
-        w.spawnLock = 1e9;
         w.director.update = () => {};
         const d = w.director;
         d.resting = false; d.asked = 4; d.jobs.length = 0; d.slain = 0; d.made = 4;
@@ -19560,7 +19502,6 @@ if (MINE_LINE) {
             g.debugTeachAll();
             g.debugClearField();
             w.phase = 'staging';
-            w.spawnLock = 1e9;
             w.director.update = () => {};
             w.autoAim = false;
             w.autoFire = false;
@@ -19771,7 +19712,6 @@ if (MINE_LINE) {
             g.debugTeachAll();
             g.debugClearField();
             w.phase = 'staging';
-            w.spawnLock = 1e9;
             w.director.update = () => {};
             w.up = freshUpgrades();
             w.round = 'spine';
@@ -19897,7 +19837,6 @@ if (MINE_LINE) {
               g.restart();
               g.debugClearField();
               w.phase = 'staging';
-              w.spawnLock = 1e9;
               w.director.update = () => {};
               w.up = freshUpgrades();
               w.mines.length = 0;
@@ -19931,7 +19870,6 @@ if (MINE_LINE) {
             g.debugTeachAll();
             g.debugClearField();
             w.phase = 'staging';
-            w.spawnLock = 1e9;
             w.director.update = () => {};
             const deep = w.floorY;
             const bar = deep * CFG.mines.keepTop;
@@ -20159,7 +20097,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       w.autoAim = false; w.autoFire = false;
       w.attackers.clear();
@@ -21106,7 +21043,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       ledger.arm(true);
       w.round = round;
@@ -21143,7 +21079,6 @@ if (MINE_LINE) {
     g.restart();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     w.director.update = () => {};
     g.debugGiveBytes(60000000);
     g.buy('sandbox');
@@ -21246,7 +21181,6 @@ if (MINE_LINE) {
     const arm = (era) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -21449,7 +21383,6 @@ if (MINE_LINE) {
 
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
     g.debugGiveBytes(400000000);
@@ -21730,7 +21663,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       w.up = freshUpgrades();
       g.debugGiveBytes(400000000);
@@ -22029,7 +21961,6 @@ if (MINE_LINE) {
       codex.unlockAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       w.up = freshUpgrades();
       if (buy) {
@@ -22173,7 +22104,6 @@ if (MINE_LINE) {
     g.restart();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     w.director.update = () => {};
     w.sandbox = true;
     ledger.arm(true);
@@ -22335,7 +22265,6 @@ if (MINE_LINE) {
     g.restart();
     g.debugClearField();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
     w.director.update = () => {};
     w.sandbox = true;
     soak.total = 0;
@@ -22575,7 +22504,17 @@ if (MINE_LINE) {
     const out = {};
     g.restart();
     w.phase = 'staging';
-    w.spawnLock = 1e9;
+    /*
+     * THE LOCK IS THE DIRECTOR'S OWN TWO CLOCKS. This block pinned
+     * `w.spawnLock` until build 392 -- a field the game has never read -- so
+     * the `before` count below, which is what the clear is measured against,
+     * was held off a stray release only by `CFG.openingGrace`'s 22 seconds
+     * against this block's own half second of frames. True, and true by
+     * accident: measured, a live director puts 22 bodies on the field over
+     * 66 seconds and 0 over this window.
+     */
+    w.director.timer = 1e9;
+    w.director.driftTimer = 1e9;
 
     // A field with something in every list, so a clear that names three of
     // them cannot pass. CLAUDE.md keeps a note about exactly that case.
@@ -23484,7 +23423,6 @@ if (MINE_LINE) {
     const clean = () => {
       g.restart();
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugClearField();
@@ -23682,7 +23620,6 @@ if (MINE_LINE) {
     for (const d of drifts) d.dead = true;
 
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -23994,19 +23931,27 @@ if (MINE_LINE) {
     const run = (era, secs) => {
       g.restart();
       /*
-       * ---- put the director back, and unlock spawning -------------------
+       * ---- put the director back ----------------------------------------
        *
-       * Eighteen cases in the damage-bench family write
-       * `w.director.update = () => {}` and pin `w.spawnLock = 1e9`, and NONE
-       * of them puts either back. `reset()` keeps the same Director object, so
-       * both outlive every restart after them -- this is the first case in the
-       * suite since that family to actually need a wave, and it measured zero
-       * releases in forty seconds at both eras while passing in isolation.
+       * The damage-bench family writes `w.director.update = () => {}` and
+       * NONE of them puts it back. `reset()` keeps the same Director object,
+       * so the stub outlives every restart after it -- this is the first
+       * case in the suite since that family to actually need a wave, and it
+       * measured zero releases in forty seconds at both eras while passing
+       * in isolation.
+       *
+       * MEASURED at build 392, alias-aware: THIRTY-FIVE blocks in this file
+       * leave the director stubbed at their own end. The recorded eighteen
+       * was taken with a detector that matched `w.director.update = ` and
+       * missed the `d.update = () => {}` alias form, which is most of them.
+       * Those blocks also pinned `w.spawnLock`, which build 392 removed as a
+       * field the game has never read: it locked nothing, so the stub is the
+       * whole of what this line has to undo.
+       *
        * `restart()` is not a reset of everything a case can leave behind; set
        * what the question depends on.
        */
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(60000000);
@@ -24080,7 +24025,6 @@ if (MINE_LINE) {
       const seen = new Set();
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(60000000);
@@ -24136,7 +24080,6 @@ if (MINE_LINE) {
      */
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
     g.setEra(2);
@@ -24261,7 +24204,6 @@ if (MINE_LINE) {
         // The damage-bench family leaves both of these behind; see the note on
         // the aperture case above.
         delete w.director.update;
-        w.spawnLock = 0;
         w.phase = 'staging';
         g.debugTeachAll();
         g.debugGiveBytes(200000000);
@@ -24484,7 +24426,6 @@ if (MINE_LINE) {
       // The damage-bench family leaves both of these behind; see the note on
       // the aperture case above.
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(200000000);
@@ -24767,7 +24708,6 @@ if (MINE_LINE) {
         // The damage-bench family leaves both of these behind; see the note on
         // the aperture case above.
         delete w.director.update;
-        w.spawnLock = 0;
         w.phase = 'staging';
         g.debugTeachAll();
         g.debugGiveBytes(300000000);
@@ -25034,7 +24974,6 @@ if (MINE_LINE) {
     const clean = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(300000000);
@@ -25408,7 +25347,6 @@ if (MINE_LINE) {
     const probe = (radius) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       w.director.update = () => {};
       g.debugClearField();
@@ -25689,7 +25627,6 @@ if (MINE_LINE) {
         g.setEra(era);
         g.debugClearField();
         w.phase = 'staging';
-        w.spawnLock = 1e9;
         w.director.update = () => {};
         w.up = freshUpgrades();
         g.debugGiveBytes(400000000);
@@ -25792,7 +25729,6 @@ if (MINE_LINE) {
       const two = bench(2);
       // ...and put the director back, or every case after this one starves.
       delete w.director.update;
-      w.spawnLock = 0;
       g.setEra(1);
       g.restart();
 
@@ -25862,7 +25798,6 @@ if (MINE_LINE) {
     const arm = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(50000000);
@@ -26005,7 +25940,6 @@ if (MINE_LINE) {
     const out = {};
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
     g.debugGiveBytes(400000000);
@@ -26096,7 +26030,6 @@ if (MINE_LINE) {
     said.length = 0;
     voices.length = 0;
     delete w.director.update;
-    w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
     g.debugGiveBytes(400000000);
@@ -26337,7 +26270,6 @@ if (MINE_LINE) {
     const out = {};
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     w.phase = 'staging';
     g.debugTeachAll();
     g.debugGiveBytes(400000000);
@@ -26560,7 +26492,6 @@ if (MINE_LINE) {
     const clean = (era) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -26829,7 +26760,6 @@ if (GUN_LINE) {
       const clean = (era) => {
         g.restart();
         delete w.director.update;
-        w.spawnLock = 0;
         w.phase = 'staging';
         g.debugTeachAll();
         g.debugGiveBytes(400000000);
@@ -27237,7 +27167,6 @@ if (GUN_LINE) {
 
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -27471,7 +27400,6 @@ if (GUN_LINE) {
       const out = {};
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -27570,7 +27498,6 @@ if (GUN_LINE) {
     const arm = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -27697,7 +27624,6 @@ if (GUN_LINE) {
 
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     w.phase = 'staging';
     g.update(1 / 60);
     out.beforeBuy = shown();
@@ -27818,7 +27744,6 @@ if (GUN_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       const s = w.shooter;
       s.aim = -Math.PI / 2;
@@ -28164,7 +28089,6 @@ if (GUN_LINE) {
     out.burstR = CFG.hail.burst.r;
 
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -28407,7 +28331,6 @@ if (GUN_LINE) {
     const arm = (era, form = true) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -28711,7 +28634,6 @@ if (GUN_LINE) {
       const w = g.world;
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(900000000);
@@ -28935,7 +28857,6 @@ if (GUN_LINE) {
     const clean = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 1e9;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugClearField();
@@ -29063,7 +28984,6 @@ if (GUN_LINE) {
     out.heaveShock = out.heaveOut.shock;
 
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -29128,7 +29048,6 @@ if (GUN_LINE) {
     const arm = (era) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 1e9;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(900000000);
@@ -29276,7 +29195,6 @@ if (GUN_LINE) {
     }
 
     delete w.director.update;
-    w.spawnLock = 0;
     g.setEra(1);
     g.restart();
     return out;
@@ -29363,7 +29281,6 @@ if (GUN_LINE) {
     const arm = (form) => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 1e9;
       w.phase = 'staging';
       g.debugTeachAll();
       g.debugGiveBytes(400000000);
@@ -29466,7 +29383,6 @@ if (GUN_LINE) {
      */
     arm(null);
     delete w.director.update;
-    w.spawnLock = 0;
     g.debugClearField();
     /*
      * ...and the turret actually FIGHTS. The first version of this arm ran
@@ -29514,7 +29430,6 @@ if (GUN_LINE) {
     g.start();
     forgetLines();
     delete w.director.update;
-    w.spawnLock = 1e9;
     w.phase = 'staging';
     w.director.update = () => {};
     w.reconciled = CFG.waves.tier.gates.map((_, i) => i + 1);
@@ -29546,7 +29461,6 @@ if (GUN_LINE) {
     out.namesTheWay = /NEW FORM/.test(out.said) && /pay|come/i.test(out.said);
 
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -29697,7 +29611,6 @@ if (GUN_LINE) {
     const arm = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 1e9;
       w.phase = 'staging';
       w.director.update = () => {};
       w.reconciled = gates.map((_, i) => i + 1);
@@ -29757,7 +29670,6 @@ if (GUN_LINE) {
     g.start();
     out.quieted = quietExcept(TUT.ON_DEPTH.id);
     delete w.director.update;
-    w.spawnLock = 1e9;
     w.phase = 'staging';
     w.director.update = () => {};
     w.reconciled = gates.map((_, i) => i + 1);
@@ -29812,7 +29724,6 @@ if (GUN_LINE) {
     // ...and the field still pays there, with the gun actually firing -- energy
     // enters a run only through `bank()` and nothing banks if nothing dies.
     delete w.director.update;
-    w.spawnLock = 0;
     g.debugClearField();
     g.debugBuyAll();
     w.autoAim = true;
@@ -29839,7 +29750,6 @@ if (GUN_LINE) {
      * `getComputedStyle`, because a class going on is not a picture changing.
      */
     delete w.director.update;
-    w.spawnLock = 1e9;
     w.director.update = () => {};
     const railRead = (tier) => {
       d.setTier(tier);
@@ -29913,7 +29823,6 @@ if (GUN_LINE) {
 
     w.reconciled.length = 0;
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -30542,7 +30451,6 @@ if (MINE_LINE) {
         // The damage-bench family leaves both of these behind; see the note on
         // the aperture case above.
         delete w.director.update;
-        w.spawnLock = 0;
         w.phase = 'staging';
         g.debugTeachAll();
         g.debugGiveBytes(200000000);
@@ -30687,7 +30595,6 @@ if (MINE_LINE) {
     const clean = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       w.director.update = () => {};
       g.debugTeachAll();
       g.debugGiveBytes(200000000);
@@ -30876,7 +30783,6 @@ if (MINE_LINE) {
     g.debugGiveBytes(200000000);
     w.phase = 'staging';
     delete w.director.update;
-    w.spawnLock = 0;
     w.director.update = () => {};
     out.unbuilt = g.debugBoss(99);
 
@@ -30990,7 +30896,6 @@ if (MINE_LINE) {
     g.exitSandbox();
 
     delete w.director.update;
-    w.spawnLock = 0;
     g.restart();
     return out;
   });
@@ -32679,9 +32584,9 @@ if (MINE_LINE) {
      * see the rung applied twice. It would read `hpAt * k` = 0.54 rather than
      * 0.30 at this rung's 1.786.
      *
-     * `director.update` is stubbed and `spawnLock` pinned, and BOTH are put
-     * back at the end: eighteen cases in the damage-bench family leave them
-     * set and `reset()` keeps the same Director object.
+     * `director.update` is stubbed and is put back at the end: the
+     * damage-bench family leaves it set and `reset()` keeps the same
+     * Director object.
      */
     g.restart();
     g.debugTeachAll();
@@ -32689,7 +32594,6 @@ if (MINE_LINE) {
     const d = w.director;
     d.setTier(22);
     d.update = () => {};
-    w.spawnLock = 1e9;
     w.autoAim = false;
     w.autoFire = false;
     out.tierK = +d.scaleAt(22).hp.toFixed(3);
@@ -32899,7 +32803,6 @@ if (MINE_LINE) {
     for (const id of ['mote', 'splitter', 'husk', 'bulwark', 'bloom']) out.draw[id] = diff(me, shot(id));
 
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -33044,7 +32947,6 @@ if (MINE_LINE) {
       const d = w.director;
       d.setTier(28);
       d.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       d.load(w, WAVES[at]);
@@ -33096,7 +32998,6 @@ if (MINE_LINE) {
       clear();
       const w2 = w.director;
       w2.update = () => {};
-      w.spawnLock = 1e9;
       const seen = {};
       for (let i = 0; i < n; i++) {
         clear();
@@ -33113,7 +33014,6 @@ if (MINE_LINE) {
 
     const d = w.director;
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -33192,7 +33092,6 @@ if (MINE_LINE) {
     const d = w.director;
     d.setTier(1);
     d.update = () => {};
-    w.spawnLock = 1e9;
     w.autoAim = false;
     w.autoFire = false;
     d.load(w, WAVES[at]);
@@ -33507,7 +33406,6 @@ if (MINE_LINE) {
     out.moteAim = +(dot / Math.max(1, n)).toFixed(3);
 
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -33647,7 +33545,6 @@ if (MINE_LINE) {
     const d = w.director;
     d.setTier(1);
     d.update = () => {};
-    w.spawnLock = 1e9;
     w.autoAim = false;
     w.autoFire = false;
 
@@ -33842,7 +33739,6 @@ if (MINE_LINE) {
     for (const id of ['tow', 'needle', 'mote', 'shoal']) out.draw[id] = diff(me, shotPx(id));
 
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -33955,13 +33851,12 @@ if (MINE_LINE) {
     out.spin = out.cfg.spin;
     g.restart();
     /*
-     * Eighteen cases in the damage-bench family leave `director.update`
-     * stubbed and `spawnLock` pinned and nothing puts either back, and this
+     * The damage-bench family leaves `director.update` stubbed and nothing
+     * puts it back, and this
      * case NEEDS the director for arm 1. `restart()` is not a reset of
      * everything a case can leave behind.
      */
     delete w.director.update;
-    w.spawnLock = 0;
     const d = w.director;
     const clear = () => {
       for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
@@ -34061,7 +33956,6 @@ if (MINE_LINE) {
     d.setTier(1);
     d.traits = [];
     d.update = () => {};
-    w.spawnLock = 1e9;
     /*
      * ---- the ROUTE is pinned, and the rate arm is why ---------------------
      *
@@ -34297,7 +34191,6 @@ if (MINE_LINE) {
     // ...and put the director back. Eighteen cases in the damage-bench family
     // leave it stubbed; this one does not add a nineteenth.
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -34437,10 +34330,8 @@ if (MINE_LINE) {
     out.naive = kk / (kk + CFG.physics.linearDamping);
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     const d = w.director;
     d.update = () => {};
-    w.spawnLock = 1e9;
     d.traits = [];
     d.setTier(1);
     const clear = () => {
@@ -34621,7 +34512,6 @@ if (MINE_LINE) {
     };
 
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -34773,10 +34663,8 @@ if (MINE_LINE) {
     out.deg = (Math.acos(CFG.flint.front) * 180) / Math.PI;
     g.restart();
     delete w.director.update;
-    w.spawnLock = 0;
     const d = w.director;
     d.update = () => {};
-    w.spawnLock = 1e9;
     d.traits = [];
     d.setTier(1);
     const clear = () => {
@@ -34926,7 +34814,6 @@ if (MINE_LINE) {
       e.dead = true;
     }
     delete d.update;
-    w.spawnLock = 0;
     g.restart();
     clear();
     return out;
@@ -36010,7 +35897,6 @@ if (MINE_LINE) {
       // The bench family leaves both behind and `restart()` is not a reset of
       // everything a case can leave; see CLAUDE.md.
       delete w.director.update;
-      w.spawnLock = 0;
       d.douse();
       d.wave = null;          // `burn` refuses a teach wave on its first line
       /*
@@ -36208,12 +36094,11 @@ if (MINE_LINE) {
      * projectile is inside any one-frame reading, and six hundred cases run
      * before this one. `restart()` is not a reset of everything a case can
      * leave behind -- and the bench family leaves `director.update` stubbed
-     * and `spawnLock` pinned, neither of which it puts back.
+     * and does not put it back.
      */
     const clean = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       g.debugClearField();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
         if (w[k]) w[k].length = 0;
@@ -36223,7 +36108,7 @@ if (MINE_LINE) {
       w.autoAim = false;
       w.autoFire = false;
     };
-    const pin = () => { w.director.update = () => {}; w.spawnLock = 1e9; };
+    const pin = () => { w.director.update = () => {}; };
     const body = (id, x, y) => {
       const e = g.debugSpawn(id, x, y);
       e.staged = false;
@@ -36423,6 +36308,7 @@ if (MINE_LINE) {
         rim: Math.round(rim),
         rings: rings.sort((a, b) => b - a),
         full: rings.filter((n) => n >= CFG.graft.stack).length,
+        stack: CFG.graft.stack,
         loose: w.enemies.filter((e) => e.type.id === 'latch' && !e.dead).length,
       };
       delete d.update;
@@ -36790,7 +36676,8 @@ if (MINE_LINE) {
     && r.refused.n === r.refused.of && r.refused.legal,
     `rung 15, wave ${wv.at}: ${wv.latches} latches and ${wv.hosts} BLOOMs, all `
     + `${wv.overRim} of them started above the rim at ${wv.rim} and staged, and the `
-    + `rings came out ${wv.rings.join('/')} with ${wv.loose} latches left loose. `
+    + `rings came out ${wv.rings.join('/')} -- ${wv.full} of them FULL at `
+    + `${wv.stack}, which is the claim -- with ${wv.loose} latches left loose. `
     + `Staged for ${od.staged.seconds}s it drifted ${od.staged.closed} with `
     + `${od.staged.ran}s off its clock and ${od.staged.aboard} aboard; loose it took `
     + `${od.loose.seconds}s more, spent ${od.loose.ran}s and is ${od.loose.aboard} `
@@ -36894,7 +36781,6 @@ if (MINE_LINE) {
     const clean = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       g.debugClearField();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts']) {
         if (w[k]) w[k].length = 0;
@@ -36906,7 +36792,7 @@ if (MINE_LINE) {
       g.autoLock = null;
       if (w.attackers) w.attackers.clear();
     };
-    const pin = () => { w.director.update = () => {}; w.spawnLock = 1e9; };
+    const pin = () => { w.director.update = () => {}; };
     const body = (id, x, y) => {
       const e = g.debugSpawn(id, x, y);
       e.staged = false;
@@ -37526,7 +37412,6 @@ if (MINE_LINE) {
     const clean = () => {
       g.restart();
       delete w.director.update;
-      w.spawnLock = 0;
       g.debugClearField();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
         if (w[k]) w[k].length = 0;
@@ -37536,7 +37421,6 @@ if (MINE_LINE) {
       w.autoAim = false;
       w.autoFire = false;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
     };
     const body = (id, x, y) => {
       const e = g.debugSpawn(id, x, y);
@@ -38113,8 +37997,10 @@ if (MINE_LINE) {
     && dw.lurcher > 40 && dw.latch > 40 && dw.yoke > 40 && dw.quarry > 40
     && dw.states > 40,
     `a LATCH that never found a host left after ${rd.expired.seconds}s for `
-    + `${rd.expired.kills} kills (dissolved ${rd.expired.dissolved}), against ${rd.shot.kills} `
-    + `for one that was shot and ${rd.ember.kills} for an EMBER that climbed out. `
+    + `${rd.expired.kills} kills (gone ${rd.expired.gone}, dissolved `
+    + `${rd.expired.dissolved}), against ${rd.shot.kills} `
+    + `for one that was shot and ${rd.ember.kills} for an EMBER that climbed out `
+    + `(dissolved ${rd.ember.dissolved}). `
     + `On the alpha channel alone -- shape and nothing else -- REMNANT is ${dw.lurcher} from a `
     + `LURCHER, ${dw.latch} from a LATCH, ${dw.yoke} from a YOKE and ${dw.quarry} from a QUARRY, `
     + `against ${dw.selfZero} from itself; and the body that has come back differs from the same `
@@ -38241,7 +38127,6 @@ if (MINE_LINE) {
       g.restart();
       w.phase = 'staging';
       delete w.director.update;
-      w.spawnLock = 0;
       g.debugClearField();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
         if (w[k]) w[k].length = 0;
@@ -38249,7 +38134,6 @@ if (MINE_LINE) {
       w.director.timer = 1e9;
       w.director.driftTimer = 1e9;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       w.timeScale = 1;
@@ -38493,7 +38377,6 @@ if (MINE_LINE) {
       g.restart();
       w.phase = 'staging';
       delete w.director.update;
-      w.spawnLock = 0;
       g.debugClearField();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
         if (w[k]) w[k].length = 0;
@@ -38501,7 +38384,6 @@ if (MINE_LINE) {
       w.director.timer = 1e9;
       w.director.driftTimer = 1e9;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       w.timeScale = 1;
@@ -38749,7 +38631,6 @@ if (MINE_LINE) {
       g.restart();
       w.phase = 'staging';
       delete w.director.update;
-      w.spawnLock = 0;
       g.debugClearField();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts', 'respawns']) {
         if (w[k]) w[k].length = 0;
@@ -38757,7 +38638,6 @@ if (MINE_LINE) {
       w.director.timer = 1e9;
       w.director.driftTimer = 1e9;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       w.timeScale = 1;
@@ -39141,9 +39021,9 @@ if (MINE_LINE) {
     const out = {};
     const s = w.shooter;
     /*
-     * Eighteen cases upstream leave the director stubbed and `spawnLock`
-     * pinned and nothing puts either back, so anything downstream that wants
-     * a wave sets both itself -- and this case wants one.
+     * Blocks upstream leave the director stubbed and nothing puts it back,
+     * so anything downstream that wants a wave clears it itself -- and this
+     * case wants one.
      */
     const clean = () => {
       g.debugClearField();
@@ -39569,9 +39449,9 @@ if (MINE_LINE) {
     const out = {};
     const L = TYPE_BY_ID.loom.bond;
     /*
-     * Eighteen cases upstream leave the director stubbed and `spawnLock`
-     * pinned and nothing puts either back; this case wants NO wave, so it
-     * sets both deliberately and hands the stub back at the end.
+     * Blocks upstream leave the director stubbed and nothing puts it back;
+     * this case wants NO wave, so it stubs deliberately and hands the stub
+     * back at the end.
      */
     const clean = () => {
       g.debugClearField();
@@ -39583,7 +39463,6 @@ if (MINE_LINE) {
       w.debris.length = 0;
       if (w.respawns) w.respawns.length = 0;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.timeScale = 1;
       w.stasis = 0;
       w.autoAim = false;
@@ -40032,7 +39911,6 @@ if (MINE_LINE) {
     }
 
     delete w.director.update;
-    w.spawnLock = 0;
     out.era = w.era;
     out.mount = +s.y.toFixed(0);
     out.traits = (w.director.traits || []).length;
@@ -40281,7 +40159,6 @@ if (MINE_LINE) {
       d.setTier(32);
       d.traits = [];
       d.update = () => {};
-      w.spawnLock = 1e9;
       g.debugClearField();
       d.load(w, WAVES[i], 0);
       /*
@@ -40324,7 +40201,6 @@ if (MINE_LINE) {
         shy });
     }
     delete w.director.update;
-    w.spawnLock = 0;
     return out;
   });
 
@@ -40392,7 +40268,6 @@ if (MINE_LINE) {
       if (w.respawns) w.respawns.length = 0;
       w.director.update = () => {};
       w.director.pairing = null;
-      w.spawnLock = 1e9;
       w.timeScale = 1;
       w.stasis = 0;
       w.autoAim = false;
@@ -40542,7 +40417,6 @@ if (MINE_LINE) {
     const bare = () => {
       w.director.update = () => {};
       w.director.traits = [];
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts']) {
@@ -40592,7 +40466,6 @@ if (MINE_LINE) {
       d.setTier(32);
       d.traits = [];
       d.update = function (ww) { if (this.jobs.length) this.emit(ww); };
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       if (w.attackers) { for (const e of w.attackers) e.attacking = false; w.attackers.clear(); }
@@ -40826,11 +40699,10 @@ if (MINE_LINE) {
      * stub outlives every restart after it and starves every later case of
      * waves -- CLAUDE.md's rule, and the eighteen damage-bench cases that
      * do not follow it are why any case downstream of them has to clear
-     * `spawnLock` itself. This one is currently last in the file; that is
+     * the stub itself. This one is currently last in the file; that is
      * not a reason to leave it dirty.
      */
     delete w.director.update;
-    w.spawnLock = 0;
     w.autoAim = true;
     w.autoFire = true;
     if (w.attackers) { for (const e of w.attackers) e.attacking = false; w.attackers.clear(); }
@@ -41053,7 +40925,6 @@ if (MINE_LINE) {
       w.era = 2; g.setEra(1);
       w.director.update = () => {};
       w.director.traits = [];
-      w.spawnLock = 1e9;
       w.autoAim = false; w.autoFire = false;
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects', 'ghosts']) {
         if (w[k]) w[k].length = 0;
@@ -41097,7 +40968,6 @@ if (MINE_LINE) {
     S.setPref('hints', was);
     C.forgetLines();
     delete w.director.update;
-    w.spawnLock = 0;
     w.autoAim = true;
     w.autoFire = true;
     for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
@@ -41259,8 +41129,8 @@ if (MINE_LINE) {
 
     /*
      * Every arm starts from here. `restart()` is not a reset of everything a
-     * case can leave behind -- the director stub and `spawnLock` outlive it,
-     * and eighteen damage-bench cases upstream leave both set -- so this sets
+     * case can leave behind -- the director stub outlives it, and the
+     * damage-bench cases upstream leave it set -- so this sets
      * what the question depends on, including the trait roll, because ARMORED
      * discards the first hit each second and every arm here is one hit.
      */
@@ -41273,7 +41143,6 @@ if (MINE_LINE) {
       w.effects.length = 0;
       w.director.traits = [];
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       w.up.damage = 1;
@@ -41560,7 +41429,6 @@ if (MINE_LINE) {
       g.debugClearField();
       w.director.traits = [];
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       const seen = {};
       for (let i = 0; i < n; i++) {
         const e = g.debugSpawn(id, 100 + (i % 7) * 60, 300);
@@ -41692,7 +41560,6 @@ if (MINE_LINE) {
       // but SWARM halves health and MENDING heals, and both change a crossing.
       w.director.traits = [];
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       w.timeScale = 1;
@@ -41904,7 +41771,6 @@ if (MINE_LINE) {
       // crossing; build 332's rule, on a case that loads no wave at all
       w.director.traits = [];
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       w.timeScale = 1;
@@ -41987,8 +41853,8 @@ if (MINE_LINE) {
       };
     }
     /*
-     * PUT THE DIRECTOR BACK. `setup` stubs `update` and pins `spawnLock`
-     * twelve times over, and `reset()` keeps the same Director object -- so a
+     * PUT THE DIRECTOR BACK. `setup` stubs `update` twelve times over,
+     * and `reset()` keeps the same Director object -- so a
      * stub outlives every `restart()` after it and starves every later case
      * of waves. CLAUDE.md records three cases written that way in one
      * session and build 350 shipped a fourth; the durable form is build
@@ -41998,10 +41864,8 @@ if (MINE_LINE) {
      * and none of them wants a wave, which is luck rather than a reason.
      */
     delete w.director.update;
-    w.spawnLock = 0;
     out.putBack = typeof w.director.update === 'function'
-      && !Object.prototype.hasOwnProperty.call(w.director, 'update')
-      && w.spawnLock === 0;
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update');
     // nothing leaked: the clone is per body and the types still declare it
     out.after = { bulwark: TYPE_BY_ID.bulwark.gait, bloom: TYPE_BY_ID.bloom.gait };
     return out;
@@ -42105,7 +41969,6 @@ if (MINE_LINE) {
       g.debugClearField();
       w.director.traits = [];
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.autoAim = false;
       w.autoFire = false;
       for (const k of ['projectiles', 'mines', 'effects', 'drops', 'debris']) w[k].length = 0;
@@ -42246,7 +42109,6 @@ if (MINE_LINE) {
         g.restart();
         g.resize();
         w.director.update = () => {};
-        w.spawnLock = 1e9;
         w.director.traits = [];
         wipe();
         w.autoAim = false;
@@ -42356,7 +42218,6 @@ if (MINE_LINE) {
     const run = (radius, flat) => {
       g.restart();
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.director.traits = [];
       wipe();
       w.round = 'spine';
@@ -42458,7 +42319,6 @@ if (MINE_LINE) {
     const run = (mode) => {
       g.restart();
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.director.traits = [];
       wipe();
       w.round = 'arc';
@@ -42784,7 +42644,6 @@ if (MINE_LINE) {
       g.debugTeachAll();
       g.debugClearField();
       w.phase = 'staging';
-      w.spawnLock = 1e9;
       w.director.update = () => {};
       w.director.traits = [];
       if (era === 2 && w.era !== 2) { w.newForm = 'done'; g.setEra(2); }
@@ -42883,7 +42742,6 @@ if (MINE_LINE) {
     // `= undefined` shadows the prototype's method and starves the suite
     // exactly as a stub does.
     delete w.director.update;
-    w.spawnLock = 0;
     out.putBack = typeof w.director.update === 'function'
       && !Object.prototype.hasOwnProperty.call(w.director, 'update');
     out.era1 = w.era;
@@ -42966,7 +42824,6 @@ if (MINE_LINE) {
       w.autoAim = false;
       w.autoFire = false;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       g.debugClearField();
       w.drops.length = 0;
       w.debris.length = 0;
@@ -43073,7 +42930,6 @@ if (MINE_LINE) {
 
     const w = g.world;
     delete w.director.update;
-    w.spawnLock = 0;
     out.putBack = typeof w.director.update === 'function'
       && !Object.prototype.hasOwnProperty.call(w.director, 'update');
     return out;
@@ -43120,7 +42976,6 @@ if (MINE_LINE) {
       w.autoAim = false;
       w.autoFire = false;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       g.debugClearField();
       for (const k of ['drops', 'debris', 'projectiles', 'effects', 'mines']) w[k].length = 0;
       return w;
@@ -43236,7 +43091,6 @@ if (MINE_LINE) {
 
     w = world();
     delete w.director.update;
-    w.spawnLock = 0;
     out.putBack = typeof w.director.update === 'function'
       && !Object.prototype.hasOwnProperty.call(w.director, 'update');
     return out;
@@ -44044,15 +43898,14 @@ if (MINE_LINE) {
      * `restart()` is not a reset of everything a case can leave behind, and
      * this one depends on an EMPTY field in every arm: a hurled MASS crossing
      * seven hundred cases' worth of leftovers is a MASS measured against
-     * whatever they left. The director is stubbed and `spawnLock` pinned for
-     * the same reason and BOTH are put back at the end (see `putBack`).
+     * whatever they left. The director is stubbed for the same reason and is
+     * put back at the end (see `putBack`).
      */
     const clean = (era) => {
       g.restart();
       for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'effects',
         'mines', 'pendingBlasts', 'ghosts', 'respawns']) if (w[k]) w[k].length = 0;
       w.director.update = () => {};
-      w.spawnLock = 1e9;
       w.director.traits = [];
       w.timeScale = 1;
       g.setAim('off');
@@ -44238,10 +44091,8 @@ if (MINE_LINE) {
      * that the own property is GONE and not that the field is truthy.
      */
     delete w.director.update;
-    w.spawnLock = 0;
     out.putBack = typeof w.director.update === 'function'
-      && !Object.prototype.hasOwnProperty.call(w.director, 'update')
-      && w.spawnLock === 0;
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update');
     return out;
   });
 

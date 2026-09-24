@@ -254,7 +254,6 @@ const cell = (tier, of, spend, waveCap, band) => page.evaluate(async ({
       // health while doubling the count -- so a stale set is a different
       // wave wearing this one's name.
       w.director.traits = [];
-      w.spawnLock = 1e9;
       w.bytes = spend;
 
       const bought = [];

@@ -923,6 +923,18 @@ family to need a wave, and it measured **zero releases in forty seconds at
 both eras** while passing in isolation. It sets both explicitly. Fixing the
 eighteen is a separate pass and is recorded in CLAUDE.md.
 
+**Half of that repair did nothing, and the count was low -- build 392.**
+`w.spawnLock` is a field the game has never read: born in `regress.mjs` at
+build 174, written 174 times across three probe scripts, and with zero
+occurrences in `src/` over the whole history (`git log -S spawnLock -- src/`
+is empty), so only the `director.update` half of "it sets both explicitly"
+ever locked anything. It is removed. And **eighteen** was measured with a
+detector that matched `w.director.update = ` and missed the
+`d.update = () => {}` alias form, which is most of them: the alias-aware
+count is **thirty-five** blocks leaving the director stubbed at their own
+end. That stub is still the live debt; only the dead belt beside it has
+gone.
+
 ## 17. P4c, as built (build 244) — P4 complete
 
 **The wall is three placement clamps and a drawn line. It is in `physics.js`

@@ -2809,6 +2809,66 @@ if (policyFiles.length < 2) {
     + `4 levels at a purse of 4 and 2 at 6)`);
 }
 
+/*
+ * ---- a harness lock names a field the game READS ---------------------------
+ *
+ * `x.field = 1e9` is unambiguous in a probe: it means "this clock must never
+ * fire again". So the field has to be one the game actually reads, or the
+ * line locks nothing -- and reads, to a reader, exactly like a lock.
+ *
+ * `w.spawnLock = 1e9` was that line. Born at build 174 in `regress.mjs`, it
+ * was written 174 times across three probe scripts and had ZERO occurrences
+ * in `src/` -- not removed from the game, never in it: `git log -S spawnLock
+ * -- src/` is empty over the whole history, so it was dead for 217 builds
+ * and never once live. Eighty-five of its 87 pins had the real lock (`update`
+ * stubbed, or `timer`/`driftTimer` pinned) on a neighbouring line, so the
+ * belt was covering for a brace that was already holding; at ONE site it was
+ * the only thing named, and there the intent was kept by nothing but
+ * `CFG.openingGrace`. Measured: a live director puts 22 bodies on the field
+ * over 66 seconds and 0 over that block's own window.
+ *
+ * DERIVED rather than a refusal of the name, because the name is the fault's
+ * instance and not the fault. The corpus says so: of the seven fields the
+ * probes pinned to 1e9 in CODE, six are read in `src/` and only `spawnLock`
+ * was not -- so this arm has a measured zero false-positive rate over all
+ * the harness already pins, would have failed the build at 174, and catches
+ * the next one whatever it is called. It errs toward PASSING, since a short
+ * field name matches something unrelated somewhere in `src/`, which is build
+ * 313's right direction for a sweep of this shape: it can say a lock is
+ * definitely dead, never that one is live.
+ */
+const PIN_RE = /[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\.([A-Za-z_$][\w$]*)\s*=\s*1e9\b/g;
+const allSrc = readdirSync(new URL('../src/', import.meta.url))
+  .filter((f) => f.endsWith('.js'))
+  .map((f) => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')).join('\n');
+const pinnedBy = new Map();
+for (const name of scriptNames) {
+  const code = codeOf(readFileSync(new URL(`../scripts/${name}`, import.meta.url), 'utf8'));
+  for (const m of code.matchAll(PIN_RE)) {
+    if (!pinnedBy.has(m[1])) pinnedBy.set(m[1], new Set());
+    pinnedBy.get(m[1]).add(name);
+  }
+}
+if (pinnedBy.size < 4) {
+  console.error(`pins: only ${pinnedBy.size} field(s) are pinned to 1e9 across `
+    + `${scriptNames.length} probe(s), against six measured at build 392 -- the `
+    + 'detection has drifted, not the exposure.');
+  process.exit(1);
+}
+const deadPins = [...pinnedBy].filter(([f]) => !new RegExp(`\\b${f}\\b`).test(allSrc));
+if (deadPins.length) {
+  const [f, who] = deadPins[0];
+  console.error(`pins: ${[...who].sort().join(', ')} ${who.size > 1 ? 'pin' : 'pins'} `
+    + `\`${f} = 1e9\` as a lock and `
+    + `\`${f}\` does not occur anywhere in src/ -- so it locks NOTHING and the probe is `
+    + 'measuring whatever the game does on its own. Pin a clock the game reads '
+    + '(`director.timer` / `director.driftTimer`), or stub `director.update`. '
+    + `${deadPins.length} dead field(s) in all: ${deadPins.map(([n]) => n).join(' ')}.`);
+  process.exit(1);
+}
+console.log(`pins: all ${pinnedBy.size} field(s) the probes pin to 1e9 (${
+  [...pinnedBy.keys()].sort().join(' ')}) are read in src/`);
+
 const weavers = ENEMY_TYPES.filter((t) => t.gait === 'serpent');
 const stainBad = [];
 for (const t of weavers) {
