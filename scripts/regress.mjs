@@ -39148,6 +39148,7 @@ if (MINE_LINE) {
   const r = await page.evaluate(async () => {
     const { WAVES, CFG, TYPE_BY_ID } = await import('/src/config.js');
     const E = await import('/src/enemies.js');
+    const { mouthReach } = await import('/src/portal.js');
     const g = window.__sim;
     const w = g.world;
     const out = {};
@@ -39316,16 +39317,115 @@ if (MINE_LINE) {
     clean();
     w.autoAim = false;
     w.autoFire = false;
-    d.setTier(32);
-    d.traits = [];
-    d.load(w, { of: [['veil', 1]], band: 5 });
-    out.grouped = d.jobs.length && d.jobs[0].n > 1;
-    d.jobs = [{ ...d.jobs[0], n: 1 }];
-    d.update = function (world) { if (this.jobs.length) this.emit(world); };
+    /*
+     * ---- THE GAP IS A DRAW, AND THE FLOOR IS THE BODY'S OWN WIDTH --------
+     *
+     * Build 394. `closest < gap * 0.35` is the claim -- it crossed to its
+     * lane -- and it means nothing on a release that started ON the lane, so
+     * the gap needs a floor. It was a flat `> 50`, and build 388 made the
+     * portal span the field: `mouthHalf` went from about 56 world units to
+     * the whole width, so the release x spans 274 to 783 where it spanned
+     * 405 to 580. Measured off the dumps, `gap` reads 243 to 332 over the
+     * thirteen draws of builds 370-387 and **37, 107, 126, 235, 239, 312,
+     * 335** from 388 on -- headroom 4.9x down to 0.74x, and nothing failed
+     * for it for five builds. THAT IS THE CLASS: a widening owes a re-read
+     * to every floor keyed on a spawn position, and an assertion
+     * insensitive to a quantity hides its own margin until a different
+     * build changes the distribution underneath it.
+     *
+     * The geometry is exact and worth having, because it is what makes the
+     * floor derivable rather than fitted. With one sheet loose
+     * `sheetLaneFor`'s search is `|x - mount|` minimised against nothing,
+     * so the lane is the candidate FURTHEST from the machine -- the wall on
+     * the body's own side, at `r + edgeEase` from the field edge. And
+     * `mouthHalf`'s binding term at this radius is `rx - edgeEase - r`,
+     * which is THE SAME COLUMN: measured, `mouthReach(w, 52)` and
+     * `|mount - lane|` are both 335.9 to the tenth. So
+     *
+     *     gap === reach - |startX - mount|
+     *
+     * -- predicted to the tenth on ten of ten releases -- and the gap runs
+     * from 0 (released at the mouth's own edge, which IS the lane) to
+     * `reach` (released dead centre). A share of the reach is therefore a
+     * share of the largest gap the geometry can produce.
+     *
+     * The floor is the capsule's own WIDTH, which is that share with no
+     * fitted decimal in it: 104 against a reach of 335.9 is 0.310, and
+     * below its own width "off the lane" is not a distance the body can be
+     * said to have crossed. It is read off the type's own `bar` block, so
+     * it follows the table the way build 393's bound follows `overclockGap`.
+     *
+     * AND THE FLOOR IS THE WHOLE OF THE VACUITY GUARD, which is worth
+     * measuring rather than assuming: over fourteen releases run with no
+     * floor at all the ratio reads **0.042 to 0.072** -- the sheet closes
+     * about 94% of whatever gap it was given, whether that gap is 33 units
+     * or 311 -- so `closest < gap * 0.35` never comes within a factor of
+     * five of its own bound and CANNOT fail for a release that had nothing
+     * to cross. Three of those fourteen were under the floor and all three
+     * satisfied the ratio. So the ratio is scale-invariant and the floor is
+     * the only conjunct in the pair that is about a distance; a green with
+     * the floor removed is exactly what build 393 was reading.
+     *
+     * And the release is RETRIED rather than the floor lowered, which is
+     * build 338's idiom: the mechanism is identical on every release -- the
+     * gait, the lane rule, the crossing -- and what varies is only where
+     * the mouth put the body, so re-releasing is refusing to measure a
+     * crossing on a release that had nothing to cross rather than choosing
+     * a favourable roll (which is what pinning the seed would be). Pooled
+     * over 70 draws, 12 are under the floor: 17.1%, worst 28.6% on a
+     * fourteen-draw sample, so six attempts are 2.5e-5 to 5.5e-4 of a
+     * spurious red. The attempts are REPORTED, so a case that starts
+     * needing the whole budget every run says so instead of paying for it
+     * quietly. Cost is bounded and small because the gap is known on the
+     * first loose frame: an attempt is the staged march alone (about 900
+     * frames, mean 1.40 attempts) and the crossing runs once.
+     *
+     * No `check-build` arm, deliberately: what this holds is a runtime
+     * property of a distribution, and a static one would have to pin the
+     * SHAPE of the retry -- which is what build 370 refused in favour of
+     * driving the rule and what cost build 355 a vacuity arm one build
+     * later. What holds it is the floor being read off the type's own block
+     * plus four proofs, each firing on its own conjunct: the floor made
+     * unreachable exhausts the budget and reds at 6 of 6 (so the exhaustion
+     * is not a quiet pass); the floor removed PASSES on a gap of 78, which
+     * reproduces the old green rather than merely reddening the new case;
+     * the floor written TWICE -- the retry stopping on `> 104` and the
+     * check asking `> reach * 0.9` -- reds with the budget UNSPENT at
+     * attempt 1 of 6, which is build 348's `held > 10` fault with its own
+     * tell in the message; and no release at all reds on a null gap.
+     */
+    const bar394 = E.barOf(TYPE_BY_ID.veil);
+    const FLOOR = bar394.half * 2;
+    const TRIES = 6;
+    const reach = mouthReach(w, TYPE_BY_ID.veil.r);
     let e1 = null;
     let x0 = null;
     let closest = 1e9;
     let laneAt = null;
+    let tries = 0;
+    const gapsSeen = [];
+    for (let t = 0; t < TRIES; t++) {
+      tries = t + 1;
+      clean();
+      d.setTier(32);
+      d.traits = [];
+      d.load(w, { of: [['veil', 1]], band: 5 });
+      if (t === 0) out.grouped = d.jobs.length && d.jobs[0].n > 1;
+      d.jobs = [{ ...d.jobs[0], n: 1 }];
+      d.update = function (world) { if (this.jobs.length) this.emit(world); };
+      e1 = null;
+      for (let f = 0; f < 3000; f++) {
+        g.update(1 / 60);
+        if (!e1) e1 = w.enemies.find((e) => e.type.id === 'veil' && !e.isDrop) || null;
+        if (e1 && !e1.staged) break;
+      }
+      if (!e1 || e1.staged) { e1 = null; continue; }
+      x0 = e1.x;
+      laneAt = e1.sheetLane;
+      closest = Math.abs(x0 - laneAt);
+      gapsSeen.push(Math.round(closest));
+      if (closest > FLOOR) break;
+    }
     /*
      * ---- THE WINDOW IS DERIVED FROM THE BODY'S OWN COLUMN AND SPEED ------
      *
@@ -39344,7 +39444,7 @@ if (MINE_LINE) {
      * about 171 seconds against a worst draw of 84 after coming loose, 2.0x
      * clear, and it moves with the era rather than being right at one.
      */
-    let cap = 6000;
+    let cap = 0;
     let usedFrames = 0;
     /*
      * ---- ARRIVING IS GEOMETRY, NOT MEMBERSHIP OF `world.attackers` -------
@@ -39369,25 +39469,19 @@ if (MINE_LINE) {
      */
     let nearest = 1e9;
     let atMount = false;
-    for (let f = 0; f < cap; f++) {
-      g.update(1 / 60);
-      if (!e1) e1 = w.enemies.find((e) => e.type.id === 'veil' && !e.isDrop) || null;
-      if (!e1) continue;
-      if (!e1.staged && x0 === null) {
-        x0 = e1.x;
-        laneAt = e1.sheetLane;
-        const kk = Math.max(0.01, TYPE_BY_ID.veil.accel / 100);
-        const deliv = TYPE_BY_ID.veil.speed * kk / (kk + CFG.physics.linearDamping);
-        cap = f + Math.ceil(((s.y - e1.y) / deliv) * 60 * 2.5);
-      }
-      if (x0 !== null) closest = Math.min(closest, Math.abs(e1.x - laneAt));
-      usedFrames = f + 1;
-      if (!e1.staged) {
+    if (e1) {
+      const kk = Math.max(0.01, TYPE_BY_ID.veil.accel / 100);
+      const deliv = TYPE_BY_ID.veil.speed * kk / (kk + CFG.physics.linearDamping);
+      cap = Math.ceil(((s.y - e1.y) / deliv) * 60 * 2.5);
+      for (let f = 0; f < cap; f++) {
+        g.update(1 / 60);
+        usedFrames = f + 1;
+        closest = Math.min(closest, Math.abs(e1.x - laneAt));
         const dist = Math.hypot(e1.x - s.x, e1.y - s.y);
         if (dist < nearest) nearest = dist;
         if (dist <= e1.r + s.r) atMount = true;
+        if (e1.dead || atMount) break;
       }
-      if (e1.dead || atMount) break;
     }
     const sheetEnd = { arrived: atMount, dead: e1 ? !!e1.dead : null,
       attacking: e1 ? !!e1.attacking : null,
@@ -39429,7 +39523,12 @@ if (MINE_LINE) {
       }),
       startX: x0 === null ? null : Math.round(x0),
       gap: x0 === null || laneAt === null ? null : Math.round(Math.abs(x0 - laneAt)),
-      closest: Math.round(closest),
+      closest: closest === 1e9 ? null : Math.round(closest),
+      floor: FLOOR,
+      reach: +reach.toFixed(1),
+      tries,
+      maxTries: TRIES,
+      gapsSeen,
       arrived: sheetEnd.arrived,
       nearest: sheetEnd.nearest,
       hold: sheetEnd.hold,
@@ -39512,13 +39611,27 @@ if (MINE_LINE) {
     !r.grouped
     // it picked one of the authored columns
     && G.lane !== null && G.lanes.some((x) => Math.abs(x - G.lane) <= 1)
-    // ...and crossed to it: it started off the lane and got close to it
-    && G.gap > 50 && G.closest < G.gap * 0.35
+    /*
+     * ...and crossed to it: it started at least its own WIDTH off the lane
+     * and closed two thirds of that. The floor is the capsule's own span
+     * off the type's `bar` block, the release is retried up to `maxTries`
+     * to find one, and this one conjunct does both jobs -- a budget that
+     * exhausted leaves the last attempt's gap under the floor and reds
+     * here, so the floor lives in ONE constant read by the retry and the
+     * assertion alike (build 348's rider, after `held > 10` was written
+     * twice and could disagree with itself).
+     */
+    && G.gap > G.floor && G.closest < G.gap * 0.35
     // ...and it ARRIVES, which the guide's own path for this gait does not
     && G.arrived && G.endY > G.mount - 120
     // ...against a control that arrives too, so arriving is not the claim
     && G.controlArrived,
-    `released at x ${G.startX}, lane ${G.lane} of [${G.lanes.join(' ')}], a gap of `
+    `released at x ${G.startX} on attempt ${G.tries} of ${G.maxTries} `
+    + `(gaps drawn [${G.gapsSeen.join(' ')}], floor ${G.floor} -- the capsule's own `
+    + `width, which is ${(G.floor / G.reach).toFixed(2)} of the mouth's own reach `
+    + `${G.reach}, and the reach IS the lane's offset from the mount, so that is a `
+    + `share of the largest gap the geometry can make), lane ${G.lane} of `
+    + `[${G.lanes.join(' ')}], a gap of `
     + `${G.gap} closed to ${G.closest}; arrived ${G.arrived} (dead ${G.dead}) at y `
     + `${G.endY} in ${G.secs}s of a derived ${G.capSecs}s window, against a mount at `
     + `${G.mount}, grouped ${G.grouped}. Closest approach ${G.nearest} against the `

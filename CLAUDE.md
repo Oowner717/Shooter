@@ -16132,7 +16132,8 @@ came from before believing the other one covers it.
   every floor keyed on a spawn position, which is not a class anybody greps
   for.
   **RECORDED, NOT FIXED, and the fix is named because the obvious ones do not
-  work.** An absolute on `closest` cannot replace the ratio: undriven, a sheet
+  work. TAKEN AT BUILD 394, which shipped the named remedy and found that the
+  ratio beside the floor does not discriminate at any gap either.** An absolute on `closest` cannot replace the ratio: undriven, a sheet
   goes straight down and `closest` equals the gap, so on a 37-unit draw the two
   populations overlap and no threshold separates them. Nor can the case move
   the release -- it comes through `Director.emit` and the mouth's jitter is the
@@ -16144,3 +16145,118 @@ came from before believing the other one covers it.
   It is a third subject in a build about two other cases (build 304's rule) and
   it costs a second suite run, so it is the next build's with the population
   above as its input.
+
+- **BUILD 394 TAKES THE ITEM BUILD 393 RECORDED AS NOT FIXED, AND MEASURING IT
+  FOUND THAT THE CONJUNCT BESIDE THE FAILING ONE HAS NEVER DISCRIMINATED
+  ANYTHING.** The VEIL gait arm is `gap > 50 && closest < gap * 0.35` -- it
+  crossed to its lane -- and the floor is what stops a sheet that started ON
+  its lane proving anything by staying there. Build 393 priced the floor off
+  24 dumps (243-332 over builds 370-387, then **37, 107, 126, 235, 239, 312,
+  335** from 388, headroom 4.9x -> 0.74x) and named the remedy. What it could
+  not see without the other end measured is that **the RATIO is worth nothing
+  at any gap**: over fourteen releases run with no floor at all it reads
+  **0.042 to 0.072** -- the sheet closes about 94% of whatever gap it was
+  given, whether that gap is 33 units or 311 -- so it never comes within a
+  factor of five of its own 0.35 bound, and three draws under the floor
+  satisfied it 3 of 3. The ratio is SCALE-INVARIANT, so the floor is the only
+  conjunct of the pair that is about a distance and the whole of the vacuity
+  guard. **Measure the conjunct that is passing, not only the one that
+  failed**: a pair where one term cannot fail is a single-term claim, and
+  which term that is only shows from the broken end.
+- **THE GEOMETRY IS EXACT, WHICH IS WHAT MAKES THE FLOOR DERIVABLE RATHER THAN
+  FITTED.** With one sheet loose `sheetLaneFor`'s search minimises nothing, so
+  the lane is the candidate FURTHEST from the machine -- the wall on the body's
+  own side, at `r + edgeEase` from the field edge -- and `mouthHalf`'s binding
+  term at this radius is `rx - edgeEase - r`, which is **THE SAME COLUMN**:
+  measured, `mouthReach(w, 52)` and `|mount - lane|` are both **335.9 to the
+  tenth**. So `gap === reach - |startX - mount|`, predicted to the tenth on ten
+  of ten releases, and the gap runs from 0 (released at the mouth's own edge,
+  which IS the lane) to `reach` (released dead centre). A share of the reach is
+  therefore a share of the largest gap the geometry can make -- and it follows
+  build 388's widening automatically, which is the property that broke.
+  The floor is the capsule's own WIDTH, which is that share with **no fitted
+  decimal in it**: 104 against 335.9 is 0.310, it is read off the type's own
+  `bar` block the way build 393's bound reads `overclockGap`, and below its own
+  width "off the lane" is not a distance the body can be said to have crossed.
+- **THE RELEASE IS RETRIED RATHER THAN THE FLOOR LOWERED, AND THE BUDGET IS
+  PRICED FROM 70 DRAWS.** Build 338's idiom: the mechanism is identical on
+  every release -- the gait, the lane rule, the crossing -- and what varies is
+  only where the mouth put the body, so re-releasing is refusing to measure a
+  crossing on a release that had nothing to cross rather than choosing a
+  favourable roll (which is what pinning the seed would be, and which build 338
+  refuses by name). **12 of 70 pooled draws are under the floor: 17.1%, worst
+  28.6% on a fourteen-draw sample**, so six attempts are 2.5e-5 to 5.5e-4 of a
+  spurious red. The attempts are REPORTED, so a case that starts needing the
+  whole budget every run says so instead of paying for it quietly.
+  **And the cost is bounded because the gap is known on the FIRST LOOSE
+  FRAME**, which is the restructure worth copying: an attempt is the staged
+  march alone (about 900 frames, mean 1.40 attempts) and the crossing -- the
+  expensive part, about 4,300 frames -- runs once, after the retry has
+  committed. A retry that re-ran the whole measurement would have cost six
+  times the arm.
+- **ONE CONSTANT FOR THE RETRY AND THE ASSERTION, AND THE PROOF FOR IT HAS ITS
+  OWN TELL IN THE MESSAGE.** Build 348's rider, after `held > 10` was written
+  twice and the retry could stop on a hold the check then rejected. Here one
+  conjunct does both jobs: a budget that exhausted leaves the last attempt's
+  gap under the floor and reds on `gap > G.floor`. Proved by writing the floor
+  twice -- the retry stopping on `> 104` while the check asks `> reach * 0.9`
+  -- which reds **with the budget UNSPENT at attempt 1 of 6**, and that is the
+  signature to look for: a red beside a low attempt count means the two copies
+  disagree, where a red beside `6 of 6` means the scenario did not arise.
+- **FOUR PROOFS, EACH ON ITS OWN CONJUNCT, AND THE SECOND REPRODUCES THE OLD
+  GREEN RATHER THAN MERELY REDDENING THE NEW CASE.** The floor made
+  unreachable (`reach * 2`) exhausts and reds at **6 of 6 with all six gaps
+  printed** (269 302 270 198 181 118), so exhaustion is not a quiet pass; the
+  floor removed (`FLOOR = 0`) **PASSES on a gap of 78 -- under the shipped
+  floor of 104** -- which is exactly the class of green build 393 was reading,
+  and its own detail prints `floor 0` so the reader can see the guard was
+  taken out; the two-copies form above; and no release at all
+  (`TRIES = 0`) reds on a null gap, which is the liveness arm. Every landing
+  `grep -c`'d first, every verdict read as a MESSAGE rather than `$?`, and the
+  tree restored from a `cp` snapshot and diffed IDENTICAL -- never
+  `git checkout --`, which in a build in progress restores to a HEAD that
+  predates the fix.
+- **AND `secs` / `capSecs` NOW COUNT FROM THE LOOSE FRAME RATHER THAN FROM THE
+  RELEASE, which is a change to a printed figure and is more correct.** The
+  derived window is the CROSSING -- build 331 derived it from the depth the
+  body has left and the speed its type delivers -- and it was being reported
+  with the staged march down the throat added to both terms. It reads 66.5s of
+  a derived 171.3s window where it read about 81s of 186s, the difference being
+  the march. Anybody subtracting this arm across build 394 will see both move
+  together for that reason and not because the crossing changed.
+- **No `check-build` arm, deliberately.** What this holds is a runtime property
+  of a distribution, and a static arm would have to pin the SHAPE of the retry
+  -- which is what build 370 refused in favour of driving the rule, and what
+  cost build 355 a vacuity arm one build later. What holds it is the floor
+  being read off the type's own block plus the four proofs above.
+- **`NODE_PATH` DOES NOT APPLY TO ESM RESOLUTION, so a scratch `.mjs` probe
+  cannot `import ... from 'playwright'`.** It dies with `ERR_MODULE_NOT_FOUND`
+  and a "Did you mean playwright/index.js" hint that sends the reader at the
+  wrong fix; `regress.mjs` has used `createRequire(import.meta.url)` since it
+  was written and its own header says the variable is needed, which reads as
+  though the variable is sufficient. Every probe in this repo is `.mjs`, so the
+  three lines are the boilerplate.
+- **AND A PROBE LAUNCHED WITHOUT THE SUITE'S VIEWPORT MEASURES A DIFFERENT
+  FIELD, WITH EVERY FIGURE PLAUSIBLE.** Playwright's default is 1280x720, so
+  the first gap census read an era-2 field **3,176 units wide against the
+  suite's 968**, a reach of 1,246 against 336 and lanes at 148..3028 -- a
+  complete, self-consistent table about a screen the game does not run at, and
+  the tell was one number being three times too big rather than anything
+  failing. `newContext({ viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 1 })` is what `regress.mjs` opens with. That is build
+  352's stale-viewport fault from the other side: there the viewport did not
+  update and the assertion could not see it, here it was never set at all.
+- **The hash is not owed and was not run.** This build changes
+  `scripts/regress.mjs` and the BUILD literal and no executable `src/` line, so
+  there is nothing for the ORDINAL probe to measure -- the same call builds
+  345-349, 360, 372, 374, 378, 382, 383, 391 and 393 made. What had something
+  to say is the 70-draw gap population, the fourteen-release ratio table, the
+  ten-release identity check, the four proofs and the suite.
+- **802 of 802, 0 console or page errors, and the shipped run drew a gap of
+  297 on attempt 1 -- 2.9x clear of the floor**, against build 393's failing
+  37. Subtracted, **647 of 802 arms are byte-identical and 155 moved**, which
+  is the ordinary per-run population (build 348 measured 599/158 across three
+  builds that changed nothing at all, and build 390 657/144, because
+  `restart()` re-rolls `runSeed` off `Math.random`). `check-build` 0 and the
+  bundle clean in both forms, 46 modules with the rev stamp at bytes 43 and
+  106 inside the 2 KB window.
