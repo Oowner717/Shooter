@@ -65,7 +65,31 @@ export function syncPortal(world, entryY, chromeY = 0) {
   const line = entryY + CFG.entryDepth;
   const rim = Math.max(line, chromeY + C.pad + 2 * C.ry);
   P.x = world.width / 2;
-  P.rx = C.rx;
+  /*
+   * ---- END TO END: `rx` IS THE FIELD'S AND `ry` IS THE GLASS'S -----------
+   *
+   * Build 388. `rx` was `CFG.portal.rx`, 128 BASE world units in SCALED -- so
+   * the rift held its SIZE ON THE GLASS at either era (159 CSS px), and what
+   * that made it a constant fraction of was the screen rather than the field.
+   * Measured, the same rift spanned 49.6% of the width at 320 and 40.7% at
+   * 390, which is the "right for one screen" fault this repo keeps paying
+   * for: the number was authored against one phone and the field it lies in
+   * is derived from another.
+   *
+   * It is the half width now, so the rift runs from one end of the field to
+   * the other at every screen and both eras BY CONSTRUCTION rather than by a
+   * constant somebody picked. `ry` stays in SCALED and stays a picture: the
+   * rift is as wide as the field and as deep as it LOOKS, and the two halves
+   * of that sentence are two different kinds of number. That also keeps the
+   * rim where it was -- it is `max(line, chromeY + pad + 2 ry)` and no term
+   * of it contains `rx` -- so `entryLine` does not move, and nothing that
+   * reads the line (the staged march, the yard's mouth, the debug picker's
+   * floor, `standHeight`) changes at all.
+   *
+   * `world.width` is set twenty lines above the call in `Game.resize`, which
+   * is the single funnel every door comes through, so it is always there.
+   */
+  P.rx = world.width / 2;
   P.ry = C.ry;
   P.rim = rim;
   P.y = rim - C.ry;
@@ -84,7 +108,51 @@ export function syncPortal(world, entryY, chromeY = 0) {
  * line.
  */
 function mouthHalf(P, r) {
-  return Math.max(8, P.rx * CFG.portal.mouth - r - 4);
+  /*
+   * ---- TWO BOUNDS, AND BOTH OF THEM BIND ON A REAL PHONE -----------------
+   *
+   * THE SURFACE: the outer fifth of an ellipse is nearly level with its
+   * centre line, so a body born there is out of the surface long before it
+   * clears the rim. That error is `ry * (1 - sqrt(1 - f^2))` for `f` the
+   * fraction of `rx` -- a function of the FRACTION and not of `rx` -- so
+   * build 388's widening does not touch it, and with the band below usually
+   * binding it gets BETTER: measured at era 1, 24.8 units before and 13.0
+   * after.
+   *
+   * THE BAND: `CFG.physics.edgeEase` pushes anything within 96 units of a
+   * side back toward the middle, so a birth inside it is a birth the game
+   * immediately slides away from -- the birth position would be a lie. This
+   * is the idiom `rollOn` takes for its turn, `sheetLaneFor` for its lanes
+   * and `standSlotFor` for its columns, all of them `r + edgeEase`: before
+   * adding a rule about where a body may go, use the one that already says
+   * where it may not. At exactly this bound `near === edgeEase`, so the nudge
+   * is zero by construction rather than small.
+   *
+   * `P.rx` IS the half width from build 388, so the band needs no world.
+   * Which bound binds is a property of the screen and BOTH are live on real
+   * devices -- they cross at a field of 1022 world units, which is a 414-wide
+   * phone at era 2: measured, the band binds at 320/360/375/390/402 and the
+   * surface binds from 414 up and on a tablet at both eras. Neither is
+   * decoration, and `check-build` holds that.
+   */
+  const surface = P.rx * CFG.portal.mouth - r - 4;
+  const band = P.rx - CFG.physics.edgeEase - r;
+  return Math.max(8, Math.min(surface, band));
+}
+
+/**
+ * The mouth's half width, for callers outside this file. `Infinity` without a
+ * portal, which is what "no bound" means to a caller comparing against it.
+ *
+ * Exported because the suite and `check-build` both need the REAL bound: they
+ * restated `P.rx * CFG.portal.mouth` in three places, which was the whole
+ * bound until build 388 and is now only one of its two terms -- a restatement
+ * that stays green while testing something wider than the rule is this repo's
+ * own vacuity fault, so there is one owner instead.
+ */
+export function mouthReach(world, r) {
+  const P = world.portal;
+  return P ? mouthHalf(P, r) : Infinity;
 }
 
 /**
@@ -171,6 +239,22 @@ export function portalDepth(world, e) {
  */
 export function portalBirth(world, e) {
   const P = world.portal;
+  /*
+   * ---- THE x TEST IS A BELT AND THE CALLER IS THE BRACE (build 388) ------
+   *
+   * `|x - P.x| > P.rx + r` refused a body put down on the field, and that
+   * worked because the rift covered 41% of the width. End to end it admits a
+   * body at any x -- and that is COHERENT rather than broken: the portal is
+   * the whole far end now, so anything crossing the rim crossed the portal.
+   *
+   * It is deliberately NOT tightened to the mouth. A body that swayed in the
+   * throat or was shoved sideways crosses away from where it was born and is
+   * still a birth. What keeps "a placed body is not a birth" is that this
+   * function has exactly ONE caller in the game -- `Enemy.update`, inside
+   * `if (this.staged)`, on the frame the body passes the entry line -- and a
+   * body put down on the field is never staged. The suite tests that door
+   * rather than this line.
+   */
   if (!P || Math.abs(e.x - P.x) > P.rx + e.r) return false;
   e.born = true;
   e.bornFor = 0;
@@ -242,9 +326,19 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   ctx.save();
 
   /* ---- the spill, first, so everything is drawn over it ------------------
-   * A widening wedge down the field from the rim rather than a disc, because
-   * a disc says "a lamp" and a wedge says "a way out". At era 2 it runs to
-   * the wall, which is where the light of the enemy's side ends.
+   * Light pooling down the field from the rim. It was authored as a WIDENING
+   * WEDGE against a narrow rift, on the argument that "a disc says a lamp and
+   * a wedge says a way out" -- and that argument stopped describing the shape
+   * at build 388, when `rx` became the field's half width: the top edge is
+   * `rx * 0.8`, so the wedge now starts at 80% of the field and widens by one
+   * `60 * k` either side, which is a CURTAIN and not a wedge.
+   *
+   * Kept as it is, and the prose corrected rather than the geometry, because
+   * the light has to come from where the rift is and the rift is the whole far
+   * end. What it says now is neither a lamp nor a way out but "the far end is
+   * open", which is the better sentence and the one the object is about.
+   * Rendered and looked at before deciding. At era 2 it runs to the wall,
+   * which is where the light of the enemy's side ends.
    */
   const spillTo = world.yard ? world.yard.wallY + 40 * k : P.rim + CFG.portal.spill * k;
   const spill = ctx.createLinearGradient(0, P.rim - P.ry * 0.4, 0, spillTo);
@@ -313,6 +407,21 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
      * frames and a paused run both hold still.
      */
     const arms = 4;
+    /*
+     * 28 and NOT derived from `rx`, which build 388 checked rather than
+     * assumed. The rift's half width went 128 -> 314.5 at era 1, so the arms'
+     * paths roughly tripled and the chord per step went about 7 -> 25 world
+     * units at the widest part of the sweep. What matters is whether that is
+     * SEEN, and it is not: an arm is an ellipse of semi-axes `rx * rho` and
+     * `ry * rho`, so at the widest part of the sweep the radius of curvature
+     * is `rx^2 / ry` = about 1,700 units and the sagitta of a 25-unit chord is
+     * `c^2 / 8R` = 0.045 world units, well under a device pixel. Near the ENDS
+     * of the flat ellipse the curvature is tight (`ry^2 / rx`, about 11 units)
+     * and the steps there are small for the same reason -- the point moves
+     * `ry * rho` per radian, not `rx * rho`. So the faceting is sub-pixel at
+     * both extremes and a derived count would buy nothing but 4x the lineTo
+     * calls a frame.
+     */
     const pts = 28;
     const arm = (a, from, to, alpha, width) => {
       ctx.strokeStyle = rgba(accent, alpha);

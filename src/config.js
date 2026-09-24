@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '387';
+export const BUILD = '388';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '387';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '350ee65';
+export const REV = '94d33ca';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -9168,20 +9168,28 @@ CFG.title = {
  *
  * Where everything the simulation sends comes through, at BOTH eras from
  * build 297. A rift lying in the far end of the field, drawn in the same
- * perspective the grid is: `rx` by `ry` world units, an ellipse foreshortened
- * about 2.2 to 1, with its lower rim ON the entry line -- see
+ * perspective the grid is, with its lower rim ON the entry line -- see
  * `syncPortal` in portal.js for the one case where the line moves down to
  * keep the whole of it below the chrome.
  *
- * `rx`, `ry` and `pad` are in SCALED, so the picture is the same size on the
- * glass at either era: 159 x 72 CSS px on a 320-wide screen. `mouth` is the
- * fraction of `rx` births are spread across -- the outer fifth of an ellipse
- * is nearly level with its centre line, and a body born there is out of the
- * surface long before it clears the line. `spill` is how far the light pools
+ * ---- THERE IS NO `rx` HERE, AND THAT IS THE POINT (build 388) ------------
+ *
+ * It was 128 BASE units in SCALED, which held the rift's SIZE ON THE GLASS
+ * (159 CSS px) and therefore made it a fraction of the SCREEN rather than of
+ * the field: measured, 49.6% of the width at 320 against 40.7% at 390. It is
+ * `world.width / 2` in `syncPortal` now, so the rift runs end to end at every
+ * screen and both eras by construction. The rift is as WIDE AS THE FIELD and
+ * as DEEP AS IT LOOKS, and those are two different kinds of number -- which is
+ * why `ry` and `pad` stay in SCALED and there is nothing here to author.
+ *
+ * `mouth` is the fraction of `rx` births are spread across, and from 388 it is
+ * ONE OF TWO bounds rather than the whole of it -- see `mouthHalf`, which also
+ * keeps births out of the band `edgeEase` pushes a body away from. Both bind on
+ * real phones and `check-build` holds that. `spill` is how far the light pools
  * down the field at era 1; at era 2 it runs to the wall.
  */
 CFG.portal = {
-  rx: 128, ry: 58, pad: 16, mouth: 0.82, spill: 150,
+  ry: 58, pad: 16, mouth: 0.82, spill: 150,
   /*
    * ---- how a body comes THROUGH, from build 298 ----
    * `settle` is the seconds after birth over which a body's route lateral
@@ -9315,8 +9323,15 @@ const SCALED = [
   // the bar
   'decoy.r', 'decoy.ahead', 'decoy.blast.r',
   'pile.r0', 'pile.r', 'ward.r', 'ward.heaveR', 'prism.r', 'prism.beamLen',
-  // the portal and the yard, which are pictures and keep their size on the glass
-  'portal.rx', 'portal.ry', 'portal.pad', 'portal.spill',
+  /*
+   * The portal's DEPTH and the yard, which are pictures and keep their size on
+   * the glass. `portal.rx` was here until build 388 and is derived from
+   * `world.width` now, so the rift spans the field rather than a constant
+   * slice of the screen -- and because the guard below tests the LEAF, naming
+   * a path CFG no longer carries throws at module load rather than quietly
+   * scaling nothing.
+   */
+  'portal.ry', 'portal.pad', 'portal.spill',
   'yard.gap', 'yard.tooth', 'yard.clear',
   // The emplacements, for the same reason everything turret-owned is here:
   // they stand on a field 1.54x deeper and have to cover the same fraction of

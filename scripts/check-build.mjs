@@ -866,6 +866,136 @@ console.log(`staged: all ${stagedSeen.length} gait branches in drive refuse a st
   + `(${stagedSeen.join(' ')})`);
 
 /*
+ * ---- THE RIFT SPANS THE FIELD, AND THE MOUTH HAS TWO LIVE BOUNDS --------
+ *
+ * Build 388. `CFG.portal.rx` was 128 BASE units in SCALED, so the rift held
+ * its size ON THE GLASS and was therefore a fraction of the SCREEN and not of
+ * the field: measured, 49.6% of the width at 320 against 40.7% at 390. It is
+ * `world.width / 2` in `syncPortal` now, so it runs end to end everywhere by
+ * construction.
+ *
+ * Three things can quietly undo that and none of them fails anywhere else.
+ * The DERIVATION can go back to a constant, which is a one-word edit. The
+ * CONSTANT can come back into CFG and be read again -- note that removing it
+ * from CFG while leaving `'portal.rx'` in SCALED throws at module load, since
+ * that guard tests the leaf, so only the pair is silent. And the MOUTH's
+ * second bound can be dropped, which would put births back inside the band
+ * `edgeEase` pushes a body out of.
+ *
+ * The last arm is the one worth having: it sweeps every width iOS actually
+ * hands over and asserts BOTH of the mouth's terms bind SOMEWHERE, so neither
+ * is decoration. They cross at a field of about 1022 world units, which is a
+ * 414-wide phone at era 2 -- the band binds at 320/360/375/390/402 and the
+ * surface from 414 up, plus a tablet at both eras. A `min` whose two terms are
+ * both live on shipped devices is a bound; one whose second term can never
+ * bind is a comment.
+ */
+const portalSrc = readFileSync(new URL('../src/portal.js', import.meta.url), 'utf8');
+const cfgSrc = readFileSync(new URL('../src/config.js', import.meta.url), 'utf8');
+const portalBad = [];
+
+// 1. the derivation is in `syncPortal` and is the field's, not a constant
+/*
+ * The anchors are matched with a `(` after the name, because `indexOf` on a
+ * bare name is satisfied by a PREFIX -- renaming `syncPortal` to `syncPortalX`
+ * left the first version of this guard reporting all clear, which its own
+ * revert proof is what found. And the slice is checked for the two fields
+ * `syncPortal` cannot be without, so a slice that has drifted onto some other
+ * function fails rather than passing on whatever it happened to cut.
+ */
+const syncAt = portalSrc.search(/export function syncPortal\s*\(/);
+const syncEnd = portalSrc.search(/\nfunction mouthHalf\s*\(/);
+if (syncAt < 0 || syncEnd < 0 || syncEnd <= syncAt) {
+  throw new Error('check-build: cannot slice syncPortal out of portal.js '
+    + `(start ${syncAt}, end ${syncEnd}) -- the portal guard would be vacuous`);
+}
+const syncBody = portalSrc.slice(syncAt, syncEnd);
+if (!/P\.rim\s*=/.test(syncBody) || !/P\.ry\s*=/.test(syncBody)) {
+  throw new Error('check-build: the syncPortal slice does not set P.rim and P.ry -- '
+    + 'the anchors have drifted onto something else and the portal guard is vacuous');
+}
+if (!/P\.rx\s*=\s*world\.width\s*\/\s*2\s*;/.test(syncBody)) {
+  portalBad.push('syncPortal does not set P.rx from world.width -- the rift is back to a '
+    + 'constant slice of the SCREEN rather than the whole FIELD (build 388)');
+}
+// 2. ...and the constant is gone from both places it would have to live
+if (CFG.portal.rx !== undefined) {
+  portalBad.push(`CFG.portal.rx is back (${CFG.portal.rx}) -- a second source of truth for a `
+    + 'width that is derived');
+}
+if (/'portal\.rx'/.test(cfgSrc)) {
+  portalBad.push("SCALED still names 'portal.rx' -- with the leaf gone that throws at module "
+    + 'load, and with it back the rift is a glass size again');
+}
+// 3. the mouth is the tighter of a SURFACE bound and an EDGE bound
+const mouthAt = portalSrc.search(/\nfunction mouthHalf\s*\(/);
+const mouthEnd = portalSrc.indexOf('\n}', mouthAt);
+const mouthBody = mouthAt < 0 ? '' : portalSrc.slice(mouthAt, mouthEnd);
+if (!mouthBody) {
+  throw new Error('check-build: cannot slice mouthHalf out of portal.js -- '
+    + 'the portal guard would be vacuous');
+}
+if (!/Math\.min\(/.test(mouthBody) || !/CFG\.portal\.mouth/.test(mouthBody)
+  || !/CFG\.physics\.edgeEase/.test(mouthBody)) {
+  portalBad.push('mouthHalf is not the MIN of a CFG.portal.mouth term and a '
+    + 'CFG.physics.edgeEase term -- births go back inside the band edgeEase pushes '
+    + 'a body away from, so the birth position becomes a lie (build 388)');
+}
+if (!/export function mouthReach/.test(portalSrc)) {
+  portalBad.push('portal.js no longer exports mouthReach -- the suite and this guard would '
+    + 'have to restate the bound, which is how one of its two terms goes untested');
+}
+
+// 4. both terms bind somewhere in the range of screens the game is shipped on
+const PHONE_W = [320, 360, 375, 390, 402, 414, 428, 440];
+const SWEEP_W = [...PHONE_W, 768];
+const portalCells = [];
+for (const vw of SWEEP_W) {
+  for (const era of [1, 2]) {
+    const width = vw / CFG.ZOOMS[era];
+    const rx = width / 2;
+    const r = 20; // a representative loose body; the bound is monotone in r
+    const surface = rx * CFG.portal.mouth - r - 4;
+    const band = rx - CFG.physics.edgeEase - r;
+    const reach = Math.max(8, Math.min(surface, band));
+    portalCells.push({ vw, era, width, reach,
+      binds: surface < band ? 'mouth' : 'edgeEase',
+      pct: (2 * reach) / width * 100, phone: PHONE_W.includes(vw) });
+  }
+}
+const bindsMouth = portalCells.filter((c) => c.binds === 'mouth');
+const bindsEdge = portalCells.filter((c) => c.binds === 'edgeEase');
+if (!bindsMouth.length) {
+  portalBad.push('the mouth fraction binds on NO supported screen -- CFG.portal.mouth has '
+    + 'stopped being able to change anything, which is a dead field wearing a bound\'s clothes');
+}
+if (!bindsEdge.length) {
+  portalBad.push('the edgeEase band binds on NO supported screen -- the second term of the '
+    + 'mouth bound is decoration');
+}
+if (!bindsMouth.some((c) => c.phone) || !bindsEdge.some((c) => c.phone)) {
+  portalBad.push('one of the mouth\'s two bounds binds only on a tablet -- the crossover '
+    + 'used to sit between a 402 and a 414 phone at era 2, and a bound that no phone '
+    + 'reaches is one nobody measures');
+}
+// ...and the widening is DELIVERED: births reach well past half the field everywhere
+const worstCell = portalCells.reduce((a, c) => (c.pct < a.pct ? c : a), portalCells[0]);
+if (worstCell.pct <= 50) {
+  portalBad.push(`births reach only ${worstCell.pct.toFixed(1)}% of the width at `
+    + `${worstCell.vw} era ${worstCell.era} -- build 388 took the worst supported cell from `
+    + '25.7% to 55%, so anything at or under half the field is the widening undone');
+}
+if (portalBad.length) {
+  for (const line of portalBad) console.error(`portal: ${line}`);
+  process.exit(1);
+}
+console.log(`portal: the rift is world.width / 2 at every screen and era, and the mouth is the `
+  + `tighter of its two bounds -- edgeEase binds on ${bindsEdge.length} of `
+  + `${portalCells.length} swept cells and the mouth fraction on ${bindsMouth.length} `
+  + `(they cross at a 414-wide phone at era 2); births reach ${worstCell.pct.toFixed(1)}% of `
+  + `the width at worst (${worstCell.vw} era ${worstCell.era}), against 25.7% before 388`);
+
+/*
  * ---- THE FUSE'S CAUSES ARE LOOKED UP, NOT COMPARED ----------------------
  *
  * `Director.burnFrom` names which of the fuse's two signals is filling it, and

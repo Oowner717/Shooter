@@ -15088,3 +15088,216 @@ came from before believing the other one covers it.
   included**, so the extra figure reaches the form the phone installs. Build
   127's rule: a form `wrap()` has not been taught passes through verbatim and
   the page then boots to its title screen and nothing else ever runs.
+
+- **BUILD 388 MAKES THE PORTAL SPAN THE FIELD END TO END, AND THE FAULT IT WAS
+  FIXING IS THE ONE THIS REPO KEEPS PAYING FOR: `rx` WAS AUTHORED AGAINST ONE
+  PHONE AND THE FIELD IT LIES IN IS DERIVED FROM ANOTHER.** `CFG.portal.rx`
+  was 128 BASE world units in SCALED, and SCALED's own comment says why -- the
+  portal is "a picture and keeps its size on the glass", 159 CSS px at either
+  era. What that makes it a constant fraction of is the SCREEN: measured, the
+  same rift spanned **49.6% of the field at 320 and 40.7% at 390**, and births
+  reached only **25.7% to 34.6%** of the width. `P.rx` is `world.width / 2` in
+  `syncPortal` now, so the rift runs end to end at every screen and both eras
+  by construction, and the constant is deleted rather than defaulted.
+  **The split is the statement: the rift is as WIDE AS THE FIELD and as DEEP AS
+  IT LOOKS.** `ry` and `pad` stay in SCALED and stay a picture; only `rx` moved
+  kind. That also keeps the rim exactly where it was -- it is
+  `max(line, chromeY + pad + 2 ry)` and no term of it contains `rx` -- so
+  `entryLine` does not move and nothing that reads the line (the staged march,
+  the yard's mouth, the debug picker's floor, `standHeight`) changes at all,
+  which is most of what kept the blast radius down.
+- **THE MOUTH HAS TWO BOUNDS NOW AND BOTH OF THEM BIND ON A SHIPPED PHONE,
+  WHICH IS WHAT STOPS THE SECOND ONE BEING DECORATION.** `mouthHalf` was
+  `rx * mouth - r - 4` alone -- the SURFACE bound, because the outer fifth of
+  an ellipse is nearly level with its centre line and a body born there is out
+  of the surface before it clears the rim. Widened, that alone would put
+  births inside the band `CFG.physics.edgeEase` pushes a body away from, so
+  the birth position would be a lie. The second term is `rx - edgeEase - r`,
+  which is the idiom `rollOn` takes for its turn, `sheetLaneFor` for its lanes
+  and `standSlotFor` for its columns: **before adding a rule about where a
+  body may go, use the one that already says where it may not.** At exactly
+  that bound `near === edgeEase`, so the nudge is zero by construction rather
+  than small.
+  **They cross at a field of 1022 world units, which is a 414-wide phone at
+  era 2** -- measured across every width iOS hands over: the band binds at
+  320/360/375/390/402 and the surface from 414 up, plus a tablet at both eras.
+  A `min` whose two terms are both live on real devices is a bound; one whose
+  second term can never bind is the `CFG.remnant.mark` fault wearing a bound's
+  clothes, and `check-build` sweeps for exactly that.
+- **...AND THE SURFACE ERROR THE FIRST BOUND EXISTS FOR GETS BETTER, NOT
+  WORSE, WHICH IS ARITHMETIC RATHER THAN LUCK.** The error is
+  `ry * (1 - sqrt(1 - f^2))` for `f` the fraction of `rx` a birth sits at -- a
+  function of the FRACTION and not of `rx`, so widening at a fixed `mouth`
+  would leave it identical. With the band usually binding, `f` falls: measured
+  at era 1 the error goes **24.8 units before to 13.0 after**, and at era 2
+  38.2 to 31.2. So the widening does not reintroduce the problem `mouth` was
+  written for -- it halves it.
+- **WHAT THE REQUEST BOUGHT, MEASURED THROUGH THE REAL DIRECTOR ON 57
+  BODIES:** births span **39.6% -> 69.5% of the width at era 1 and 36.8% ->
+  74.5% at era 2**, and across every supported screen the bound allows 55% to
+  79.5% against 25.7% to 34.6% before. The rift itself is 100% everywhere.
+- **THE TRANSIT COST IS ZERO, AND MY OWN READING OF A TRACE SAID OTHERWISE
+  UNTIL IT WAS MEASURED.** A traced edge-born body descended at `vy` ~31
+  against a centre-born body's ~88, with its x climbing 132 -> 303, and I
+  wrote that up as "a body born at the edge takes much longer to arrive".
+  Measured properly -- one body placed under the rim at a chosen x and walked
+  to the mount, five offsets, both sides, both eras -- the arrival time is
+  **flat**: era 1 21.0s at the centre against 21.6s at 38% off, era 2 31.7
+  against 30.0, all inside the ±2-4s route-roll spread. A 4% longer diagonal
+  costs 4%. **`vy` is not arrival time**, and the rule this file already
+  carries is to measure the thing you are claiming at the moment the claim is
+  about: a velocity component sampled mid-swing is a property of the route's
+  phase and not of the journey.
+- **WHAT IT DOES CHANGE IS THE WAVE, BY A THIRD, AND THE MECHANISM IS THE
+  THROAT QUEUE: EVERY HEAVY FORMATION AT ERA 1 ARRIVED SINGLE-FILE.**
+  `mouthSlots` pitches rows at `2r + 8` across the mouth, and `mouthHalf` for
+  an r-45 BULWARK at era 1 was `128 * 0.82 - 49` = **56 units against a pitch
+  of 98**, so `per` floored to 1. Measured, a group of 22 at era 1: BULWARK 1
+  abreast in 22 rows reaching **2,531 units above the mouth** -- against a
+  field about 1,200 deep -- VEIL 2,898, HERALD 1,166, MOTE 798. Widened they
+  are 844 / 1,380 / 111 / 38, and at era 2 a MOTE group is **22 abreast in one
+  row, 0 units tall**.
+  So the wave's length was the queue. A/B'd with `P.rx` as the only switch
+  inside one page, same seed, same tree bought, same asked count and peak --
+  `bulwarkx2+heraldx1` at era 2 rung 32, fully bought, gun on:
+  **46.3/38.9/66.4/60.0s wide against 60.0/63.4/98.4/88.8s narrow, 4 of 4, a
+  mean of 52.9 against 77.7 -- 32% shorter**, in both trait regimes (two seeds
+  drew SWARM and asked 44 instead of 22). That is build 330's VEIL finding
+  ("30 sheets arriving as a formation left 20 of 30 staged in the throat")
+  generalised to every heavy formation, and it is the favourable direction:
+  band 5 was measured at build 382 at 224 of 224 cells inside the 120s cap
+  with a worst of 110s. **Recorded and NOT tuned**, which is build 304's rule
+  -- a third off deep waves is a real pacing change and it belongs to a
+  pacing pass, not to the build whose content is the geometry.
+- **AND `clears.mjs` CANNOT SEE A PORTAL CHANGE, WHICH IS WORTH KNOWING
+  BEFORE SOMEBODY REACHES FOR IT.** Build 356's note recommends "the clear
+  table either side" for a pacing question generally, and that instrument
+  spawns through `debugSpawnGroup` -> `spawnGroup`, which places a formation
+  at a RANDOM `cx` above the field and never calls `throughMouth` or
+  `mouthSlots` at all. Run either side anyway: the 16 waves of band 5 at rung
+  32 came back at ratios spanning **0.42 to 1.62 with 6 of 16 pointing the
+  wrong way**, which is the probe's own draw (build 382 recorded the same wave
+  running 19-73s inside one arm). **A probe whose spawn path bypasses the
+  mechanism reports noise with a straight face** -- and the tell was
+  structural, found by reading `spawnGroup` rather than by the numbers
+  disagreeing. The instrument that works is a wave played through
+  `Director.emit`, which is the door that goes through the mouth.
+- **A DERIVED `rx` EXPOSED A STALE-VIEWPORT FAULT THAT A CONSTANT `rx` HAD
+  BEEN HIDING FOR THIRTY-SIX BUILDS.** The portal case loops two viewports
+  with `page.setViewportSize` and never called `g.resize()` -- build 352's
+  fault verbatim, where "the page handles the resize on its own schedule and
+  `world.floorY` is only re-derived inside `Game.resize`". So each row read
+  the PREVIOUS viewport's width and the two rows came out swapped, 320
+  reporting 390's figures. It was invisible because the thing asserted across
+  the two screens was `rxPx`, and `rx` was a SCALED constant -- **the same at
+  both widths BY CONSTRUCTION, so a stale width could not move it.** The
+  general shape: **an assertion insensitive to a fault hides it until
+  something else makes the quantity depend on it**, and the tell here was my
+  own new figures being the right numbers in the wrong columns.
+- **`portalBirth`'S REFUSAL BECAME AN IDENTITY, AND THE RIGHT ANSWER WAS TO
+  FIND OUT WHICH HALF WAS HOLDING.** It refuses on `|x - P.x| > P.rx + r` --
+  the ELLIPSE's half width, not the mouth -- which worked while the rift
+  covered 41% of the field and admits a body at any x once it spans all of it.
+  The suite's arm for it ("a body put down on the field is not a birth")
+  failed, correctly. Tightening it to the mouth would be WRONG: a body that
+  swayed in the throat or was shoved crosses the rim away from where it was
+  born and is still a birth. What actually keeps the rule is the CALLER --
+  `portalBirth` has exactly ONE call site in the game, inside
+  `Enemy.update`'s `if (this.staged)` on the frame the body passes the entry
+  line, and a body put down on the field is never staged. **So the guard is a
+  belt and the door is the brace** (build 386's rule, which measures which one
+  is holding rather than assuming), and the arm tests the door now: place a
+  body, step it, assert it never reads `born` and added no marks.
+- **THE BOUND HAD BEEN RESTATED IN THREE PLACES AND ONE OWNER REPLACED THEM,
+  BECAUSE A RESTATEMENT OF ONE OF TWO TERMS STAYS GREEN.** The suite carried
+  `P.rx * CFG.portal.mouth` at three sites -- the births' overshoot, the
+  formation bound and a span comment -- which WAS the whole bound and is now
+  one term of it, about 35 units wider than the rule at era 1. Each would have
+  gone on passing while testing something the mouth no longer allows: a bound
+  nothing can violate, counted as passing. `mouthReach(world, r)` is exported
+  and all three ask for it.
+- **AND THE CONTROL THAT "TELLS A FIELD FROM A MOUTH" WENT VACUOUS, SO IT IS
+  AN ABSOLUTE NOW RATHER THAN A RE-TUNED THRESHOLD.** The no-portal arm
+  bounded the births' span at 0.45 on the stated ground that the mouth was
+  about two fifths of the width. The mouth is 55-76% now and the PORTAL run
+  itself spreads births across 51-74%, so 0.45 sits inside what the portal
+  produces. Raising it would be a threshold on a draw -- the no-portal span
+  measures 91-95% here and this case's own history records a run at 59%. The
+  claim it was always really making is an absolute: **with no portal at least
+  one birth lands outside anywhere the mouth would have allowed**, which one
+  body proves, cannot be flattered by a wide sample, and follows the mouth
+  automatically because the reach is asked for. Measured, 7 of 17.
+- **THE SPILL'S OWN ARGUMENT STOPPED DESCRIBING THE SHAPE, AND THE PROSE LOST
+  RATHER THAN THE GEOMETRY.** It was authored as "a widening wedge ... because
+  a disc says a lamp and a wedge says a way out", and its top edge is
+  `rx * 0.8` -- so against a field-width rift it starts at 80% of the field
+  and widens by one `60 * k`, which is a CURTAIN. Rendered and looked at
+  before deciding: the light has to come from where the rift is and the rift
+  is the whole far end, so what it says now is neither a lamp nor a way out
+  but "the far end is open", which is the better sentence. **A docstring whose
+  argument has stopped holding is the fault, not the code it describes.**
+- **AND A DERIVATION WAS REFUSED ON ARITHMETIC RATHER THAN ADDED ON
+  INSTINCT.** The vortex arms are `pts = 28` fixed, and the rift's half width
+  went 128 -> 314.5, so the chord per step went about 7 -> 25 world units and
+  the obvious move is to derive the count. Measured instead: an arm is an
+  ellipse of semi-axes `rx * rho` and `ry * rho`, so at the widest part of the
+  sweep the radius of curvature is `rx^2 / ry` = about 1,700 units and the
+  sagitta of a 25-unit chord is `c^2 / 8R` = **0.045 world units**, well under
+  a device pixel; and near the flat ellipse's ENDS, where curvature is tight
+  (`ry^2 / rx`, about 11 units), the steps are small for the same reason,
+  because the point moves `ry * rho` per radian rather than `rx * rho`. So the
+  faceting is sub-pixel at both extremes, the render agrees, and a derived
+  count would have bought four times the `lineTo` calls a frame and nothing
+  else. **The question for a constant that no longer suits a size is not "is
+  it bigger" but "is it SEEN".**
+- **THE DRAW COST IS PRICED, BECAUSE A FULL-WIDTH RIFT IS A FULL-WIDTH FILL.**
+  Best of seven over 60 frames of the whole frame draw, the same field with
+  `P.rx` as the only switch: era 1 **9.137 -> 9.718 ms (+6.4%)** and era 2
+  8.875 -> 9.102 (+2.6%). That is a software rasteriser with no GPU, so the
+  absolute figures are far worse than a device and the RATIO is the reading.
+  Build 329 priced the broadphase cell the same way for the same reason: a
+  derived global that grows owes a number.
+- **THE HASH DID NOT MOVE AND IT WAS OWED, AND ITS BLINDNESS HERE IS
+  STRUCTURAL RATHER THAN A SHRUG.** `-954811922`, all six intermediate marks
+  and all six body counts identical, build 387 served from a worktree on :8094
+  and 388 live, with the served BUILD confirmed in each probe heading. It was
+  owed because spawn x is exactly the channel build 297 moved it through, and
+  `syncPortal` now runs different arithmetic on every resize of that fight.
+  What it cannot see is the spawn half: `fight.mjs` opens from `openBoss`,
+  `Game.update` is `if (w.boss) {...} else { director.update() }` so the
+  director never releases, and every body on that field is `fixed`, which
+  `edgeEase` -- the one reader of `rimUnder` and so of `P.rx` -- returns early
+  for. So an unchanged hash says the geometry reached nothing already using it,
+  and the instruments for the rest are the born-span A/B and the suite's own
+  mouth case.
+- **AND A REVERT PROOF DID NOT FIRE, WHICH FOUND A REAL WEAKNESS IN MY OWN
+  GUARD.** `check-build`'s vacuity arm sliced `syncPortal` with
+  `indexOf('export function syncPortal')` -- and `'...syncPortalX'` CONTAINS
+  that string as a PREFIX, so renaming the function left the guard reporting
+  all clear. Anchored on `/export function syncPortal\s*\(/` and the slice is
+  checked for the two fields `syncPortal` cannot be without, so an anchor that
+  has drifted onto another function throws rather than passing on whatever it
+  cut. Both vacuity arms then fire and each names which end drifted (start -1
+  against end -1). Eight proofs in all, each on its own conjunct with its own
+  message. **A proof that does not fire is a finding about the guard**, and
+  `indexOf` on a bare identifier is a prefix match -- which is the same family
+  as build 344's `grep -c` passing because a docstring contained the string.
+- **AND ONE FOUND-NOT-FIXED, WHOSE REACHABILITY CHAIN TOOK THREE READS RATHER
+  THAN THE ONE I FIRST WROTE DOWN.** `CFG.portal.spill` is in SCALED and its
+  one read site multiplies by `CFG.scale` AGAIN --
+  `P.rim + CFG.portal.spill * k` in `drawPortal`, where `k = CFG.scale`. The
+  first draft of this note called that branch "era-1-only, because
+  `world.yard` is null unless era 2", which is FALSE in the direction that
+  matters: `syncYard` returns early on `world.era !== 2 || world.sandbox`, so
+  the **era-2 ASSAY** has a null yard too and would take the same branch at
+  `CFG.scale` 1.5385. What actually makes it unobservable is one line in a
+  different function -- `syncPortal`'s own first statement,
+  `if (world.sandbox) { world.portal = null; return null; }`, against
+  `drawPortal`'s `if (!P) return` -- so there is no portal to spill in the one
+  place the factor would bite. Left as it is, because the fix is one character
+  on a served file and this build's suite run is already spent; it would be
+  1.54x if a portal ever existed at era 2 with no yard.
+  **A chain that is unobservable for a reason you did not name is a chain you
+  have not checked**, which is build 361's rule about a reachability argument
+  arriving on my own prose -- and the half I had is the half that reads as
+  sufficient.

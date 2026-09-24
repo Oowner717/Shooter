@@ -23123,10 +23123,26 @@ if (MINE_LINE) {
     await page.setViewportSize(size);
     rows.push(await page.evaluate(async (vw) => {
       const { CFG } = await import('../src/config.js');
-      const { syncPortal, entryLine } = await import('../src/portal.js');
+      const { syncPortal, entryLine, mouthReach } = await import('../src/portal.js');
       const g = window.__sim;
       const w = g.world;
       g.restart();
+      /*
+       * ---- AND THE GAME HAS TO BE TOLD (build 352's fault, found at 388) --
+       *
+       * `page.setViewportSize` does not resize the game: the page handles it
+       * on its own schedule and `world.width` is only re-derived inside
+       * `Game.resize`. So each row read the PREVIOUS viewport's width, and
+       * the two rows came out swapped -- 320 reporting 390's figures.
+       *
+       * It was invisible until build 388 because the thing asserted across
+       * the two screens was `rxPx`, and `rx` was a SCALED constant: the same
+       * at both widths BY CONSTRUCTION, so a stale width could not move it.
+       * Deriving `rx` from the field is what made the staleness visible,
+       * which is the general shape -- an assertion insensitive to a fault
+       * hides it until something else makes the quantity depend on it.
+       */
+      g.resize();
       const out = { w: vw };
       const read = (P) => P && {
         rxPx: +(P.rx * CFG.zoom).toFixed(2),
@@ -23135,7 +23151,22 @@ if (MINE_LINE) {
         rimPx: +(P.rim * CFG.zoom).toFixed(1),
         onLine: Math.abs(P.rim - CFG.entryDepth) < 1e-9,
         centred: Math.abs(P.x - w.width / 2) < 1e-9,
-        fits: P.rx < w.width / 2,
+        /*
+         * ---- `fits` WAS `P.rx < w.width / 2`, AND THAT IS THE CLAIM BUILD
+         * 388 OVERTURNED. The rift spanned a constant slice of the SCREEN --
+         * measured, 49.6% of the field at 320 against 40.7% at 390, because
+         * `rx` was 128 SCALED units and the field is derived. It is the half
+         * width now, so it spans the field END TO END at every screen and
+         * both eras, and what used to be asserted as "strictly inside" is
+         * asserted as "exactly equal".
+         */
+        spans: Math.abs(P.rx - w.width / 2) < 1e-9,
+        spanPct: +((2 * P.rx) / w.width * 100).toFixed(2),
+        // ...and the MOUTH's own two bounds, which is what births are held to
+        reach: +mouthReach(w, 20).toFixed(1),
+        reachPct: +((2 * mouthReach(w, 20)) / w.width * 100).toFixed(1),
+        surf: +(P.rx * CFG.portal.mouth - 20 - 4).toFixed(1),
+        band: +(P.rx - CFG.physics.edgeEase - 20).toFixed(1),
       };
       // The chrome's end, off the same probe `resize` reads.
       const probe = document.createElement('div');
@@ -23206,14 +23237,43 @@ if (MINE_LINE) {
       + `back after ${r.afterBench}`)
       .join('; '));
 
-  check('...and it holds its size on the glass, centred, whole, and clear of the chrome',
-    Math.abs(small.one.rxPx - big.one.rxPx) < 0.5 && Math.abs(small.one.rxPx - small.two.rxPx) < 0.5
+  /*
+   * ---- AS WIDE AS THE FIELD AND AS DEEP AS IT LOOKS ------------------------
+   *
+   * Build 388 split one claim in two, and the split is the whole of it. The
+   * DEPTH is still a picture: `ry` is in SCALED, so `ryPx` is the same at both
+   * screens and both eras, which is what the old arm asserted of BOTH axes.
+   * The WIDTH is the field's: `rx` is `world.width / 2`, so the span is
+   * exactly 100% everywhere rather than a fraction of the screen that ran
+   * 49.6% at 320 against 40.7% at 390.
+   *
+   * The equality ACROSS SCREENS is kept and its subject moved -- it was
+   * `rxPx`, and it is the span fraction now, which is 1 by construction. That
+   * is the arm still being able to fail: a reverted `rx` gives 40.7 and 49.6
+   * and fails BOTH the exactness and the agreement.
+   */
+  check('...and it spans the field end to end, holds its DEPTH on the glass, and clears the chrome',
+    // the depth is a picture: the same CSS px at both screens and both eras
+    Math.abs(small.one.ryPx - big.one.ryPx) < 0.5
+    && Math.abs(small.one.ryPx - small.two.ryPx) < 0.5
     && Math.abs(small.one.ryPx - big.two.ryPx) < 0.5
-    && rows.every((r) => [r.one, r.two].every((p) => p.centred && p.fits && p.onLine
-      && p.topPx >= r.chromePx + 4)),
-    `${small.one.rxPx * 2}x${small.one.ryPx * 2} CSS px at both eras and both screens; the top `
-    + `sits at ${small.one.topPx}px against a chrome ending at ${small.chromePx}px, and the rim `
-    + `is the entry line (${small.one.rimPx}px)`);
+    // ...and the width is the field's, exactly, at every screen and era
+    && rows.every((r) => [r.one, r.two].every((p) => p.spans
+      && Math.abs(p.spanPct - 100) < 0.01
+      && p.centred && p.onLine && p.topPx >= r.chromePx + 4))
+    // ...and the two screens AGREE about it, which is the fault that was fixed
+    && Math.abs(small.one.spanPct - big.one.spanPct) < 0.01
+    // ...and the mouth is bounded to well over half the field, not a quarter
+    && rows.every((r) => [r.one, r.two].every((p) => p.reachPct > 50))
+    // ...and it really is the tighter of the two bounds
+    && rows.every((r) => [r.one, r.two].every((p) =>
+      Math.abs(p.reach - Math.min(p.surf, p.band)) < 0.01)),
+    `the rift spans ${small.one.spanPct}% of the field at 320 and ${big.one.spanPct}% at 390, `
+    + `both eras, against 49.6 and 40.7 before build 388; the depth holds `
+    + `${small.one.ryPx * 2} CSS px at both. Births reach ${small.one.reachPct}% of the width at `
+    + `320 and ${big.one.reachPct}% at 390 (surface ${big.one.surf} against band `
+    + `${big.one.band}, the tighter one binding). The top sits at ${small.one.topPx}px against a `
+    + `chrome ending at ${small.chromePx}px, and the rim is the entry line (${small.one.rimPx}px)`);
 
   check('...and under a deeper chrome the rim gives way and the entry line follows it',
     rows.every((r) => Math.abs(r.notch.rim - r.notch.want) < 0.01
@@ -23323,10 +23383,33 @@ if (MINE_LINE) {
     out.pastRim = e.y - e.r > P.rim;
     for (let i = 0; i < 70; i++) g.update(1 / 60);
     out.ringsLater = P.births.length;
-    // ...and a body put down on the field is not a birth.
-    const placed = { x: w.width - 30, y: P.rim - 5, r: 10 };
-    out.placedBirth = portalBirth(w, placed);
-    out.ringsAfterPlaced = P.births.length;
+    /*
+     * ---- ...AND A BODY PUT DOWN ON THE FIELD IS NOT A BIRTH -------------
+     *
+     * This called `portalBirth` directly on a stand-in placed at the far
+     * edge, and the refusal it was reading is `|x - P.x| > P.rx + r` -- the
+     * ELLIPSE's half width, which was 41% of the field. From build 388 the
+     * rift spans the field, so that test admits a body at any x and cannot
+     * refuse anything: the arm failed, correctly, on a guard that had become
+     * an identity.
+     *
+     * Tightening it to the MOUTH would be wrong -- a body that swayed or was
+     * shoved across the rim away from the centre really was born, because it
+     * came down the throat. What actually keeps the rule is the CALLER:
+     * `portalBirth` has exactly ONE call site in the game
+     * (`enemies.js`, inside `if (this.staged)`, on the frame the body
+     * crosses the entry line), and a body put down on the field is never
+     * staged. So the guard is a belt and the door is the brace, and this arm
+     * tests the door -- which is the rule that a case calling the method the
+     * handler calls tests the logic and not the control.
+     */
+    const placed = g.debugSpawn('mote', w.width - 30, P.rim - 5);
+    if (placed) { placed.staged = false; placed.born = false; }
+    const ringsBeforePlaced = P.births.length;
+    for (let i = 0; i < 30; i++) g.update(1 / 60);
+    out.placedBirth = placed ? !!placed.born : null;
+    out.ringsAfterPlaced = P.births.length - ringsBeforePlaced;
+    out.placedThere = !!placed;
 
     /*
      * ---- and `Game.draw` paints every body exactly once ------------------
@@ -23365,10 +23448,11 @@ if (MINE_LINE) {
   check('...and a birth is marked on the rim on the frame the body clears it, and is gone in a second',
     rr.bornAt > 0 && rr.pastRim && rr.ringsAt === 1 && rr.flareAt > 0.9
     && Math.abs(rr.ringX - rr.bodyX) < 60 && rr.ringsLater === 0
-    && rr.placedBirth === false && rr.ringsAfterPlaced === 0,
+    && rr.placedThere && rr.placedBirth === false && rr.ringsAfterPlaced === 0,
     `born on frame ${rr.bornAt}, past the rim ${rr.pastRim}: ${rr.ringsAt} ring at x ${rr.ringX} `
     + `(body at ${rr.bodyX}), flare ${rr.flareAt}; ${rr.ringsLater} left 70 frames on; a body `
-    + `placed outside the mouth is a birth: ${rr.placedBirth}`);
+    + `put down on the field (placed ${rr.placedThere}) reads born ${rr.placedBirth} and added `
+    + `${rr.ringsAfterPlaced} marks over half a second`);
 
   check('...and Game.draw paints every body exactly once, in the throat or out of it',
     rr.drawThroat === 1 && rr.drawLoose === 1,
@@ -23901,6 +23985,7 @@ if (MINE_LINE) {
   const r = await page.evaluate(async () => {
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
     const { spawnFormation } = await import('../src/enemies.js');
+    const { mouthReach } = await import('../src/portal.js');
     const g = window.__sim;
     const w = g.world;
 
@@ -23944,7 +24029,18 @@ if (MINE_LINE) {
     const out = {};
     const mouthOf = (era, born) => {
       const P = w.portal;
-      const half = P.rx * CFG.portal.mouth;
+      /*
+       * ---- THE BOUND IS ASKED FOR, NOT RESTATED (build 388) --------------
+       *
+       * This was `P.rx * CFG.portal.mouth` less the body's own radius, which
+       * WAS the whole bound until 388 gave the mouth a second term -- the band
+       * `edgeEase` pushes a body out of. Restated, it would now be about 35
+       * units WIDER than the rule at era 1, so `worst <= 0` would pass while
+       * testing something the mouth no longer allows: a bound nothing can
+       * violate, counted as passing, which is this repo's own vacuity fault.
+       * `mouthReach` is the one owner and it takes the radius, so the 40 units
+       * of slack below are now slack and nothing else.
+       */
       // Only births above the rim: anything born below it came off a parent.
       const doors = born.filter((b) => b.y < P.rim);
       return {
@@ -23954,8 +24050,15 @@ if (MINE_LINE) {
         // The towed MASS rides its head out with a `spread(30)` of its own,
         // which is a deliberate exemption and is why the bound carries it.
         worst: doors.length
-          ? +Math.max(...doors.map((b) => Math.abs(b.x - P.x) - half - 40 - b.r)).toFixed(1)
+          ? +Math.max(...doors.map((b) => Math.abs(b.x - P.x) - mouthReach(w, b.r) - 40)).toFixed(1)
           : 999,
+        // ...and how far across the field the births actually spread, which is
+        // the second half of what build 388 was asked for.
+        spanPct: doors.length > 1
+          ? +(((Math.max(...doors.map((b) => b.x)) - Math.min(...doors.map((b) => b.x)))
+            / w.width) * 100).toFixed(1)
+          : 0,
+        reachPct: +((2 * mouthReach(w, 20)) / w.width * 100).toFixed(1),
         kinds: [...new Set(doors.map((b) => b.id))].length,
         drift: doors.some((b) => b.id === 'drift'),
         rim: +P.rim.toFixed(1),
@@ -23994,12 +24097,33 @@ if (MINE_LINE) {
       g.resize();
       return born;
     };
+    // Read BEFORE the portal is taken away, because that is the bound the
+    // no-portal run has to be shown to exceed.
+    out.looseReach = +mouthReach(w, 20).toFixed(1);
     const loose = runLoose(40);
     out.looseTotal = loose.length;
     const xs = loose.map((b) => b.x);
     out.looseSpan = xs.length ? +((Math.max(...xs) - Math.min(...xs)) / w.width).toFixed(2) : 0;
     out.looseAbove = loose.some((b) => b.y < 0);
     out.portalBack = !!w.portal;
+    /*
+     * ---- AND THE DISCRIMINATOR IS AN ABSOLUTE, NOT A SPAN (build 388) -----
+     *
+     * The span was bounded at 0.45 as "the line that tells a field from a
+     * mouth", against a mouth that was about two fifths of the width. The
+     * mouth is 55% to 76% now, and measured, the PORTAL run itself spreads
+     * births across 51% to 74% -- so 0.45 sits INSIDE what the portal
+     * produces and had stopped telling the two apart. Raising it would be a
+     * threshold on a draw: the no-portal span measures 91% to 95% here and
+     * this case's own history records a run at 59%.
+     *
+     * So the claim is what it was always really about: with no portal at
+     * least one birth lands OUTSIDE anywhere the mouth would have allowed.
+     * One body proves it, it cannot be flattered by a wide sample, and it
+     * follows the mouth automatically because the reach is asked for rather
+     * than restated. The span is still reported.
+     */
+    out.looseOutside = loose.filter((b) => Math.abs(b.x - w.width / 2) > out.looseReach).length;
 
     /*
      * A formation has to come out of the door WITHOUT landing on itself. The
@@ -24024,7 +24148,9 @@ if (MINE_LINE) {
       w.director.update = () => {};
       const made = spawnFormation(w, [t], n);
       const P = w.portal;
-      const outside = made.filter((e) => Math.abs(e.x - P.x) > P.rx * CFG.portal.mouth + 2).length;
+      // ...against the REAL bound and not a restatement of one of its terms;
+      // see `mouthOf` above for why build 388 stopped restating it.
+      const outside = made.filter((e) => Math.abs(e.x - P.x) > mouthReach(w, e.r) + 2).length;
       let closest = Infinity;
       for (let i = 0; i < made.length; i++) {
         for (let j = i + 1; j < made.length; j++) {
@@ -24058,9 +24184,25 @@ if (MINE_LINE) {
 
   // Clear of the truth, not near it: forty seconds of director output swings
   // 13-30 births run to run, and this asked for 20 and then 15.
-  const mouthOk = (m) => m.doors >= 8 && m.kinds >= 2 && m.drift && m.worst <= 0;
+  /*
+   * ---- AND THEY SPREAD, WHICH IS BUILD 388'S HALF OF THE CLAIM ------------
+   *
+   * `worst <= 0` says no birth is outside the mouth, which was the whole of
+   * this arm and is satisfied by a mouth of any width -- including one that
+   * funnels everything down a narrow column, which is what it did until 388.
+   * `spanPct` is the other direction: the births have to actually USE the
+   * width. Measured either side of the widening over this arm's own
+   * forty-second window, era 1 goes 39.6% -> 51/59/59.4 and era 2 36.8% ->
+   * 53.9/67/74 -- so the two populations are 36.8-39.6 against 51-74 and 45
+   * sits in the gap, 14% above the old best and 13% under the new worst. Six
+   * samples, printed in the detail so the next reader has the population
+   * rather than one figure.
+   */
+  const mouthOk = (m) => m.doors >= 8 && m.kinds >= 2 && m.drift && m.worst <= 0
+    && m.spanPct > 45;
   const mouthLine = (m) => `era ${m.era}: ${m.doors} of ${m.total} births were at the mouth `
-    + `(${m.kinds} kinds, drift among them ${m.drift}); the worst overshot it by `
+    + `(${m.kinds} kinds, drift among them ${m.drift}), spread across ${m.spanPct}% of the `
+    + `field against a mouth allowing ${m.reachPct}%; the worst overshot it by `
     + `${m.worst > 0 ? m.worst : 0} units, rim at ${m.rim}`;
   check('everything a wave sends comes through the portal, at era 2',
     mouthOk(r.two), mouthLine(r.two));
@@ -24081,9 +24223,10 @@ if (MINE_LINE) {
      * once -- so 0.45 is the line that tells a field from a mouth and is clear
      * of the swing in both directions.
      */
-    r.looseTotal >= 6 && r.looseSpan > 0.45 && r.looseAbove && r.portalBack,
+    r.looseTotal >= 6 && r.looseOutside >= 1 && r.looseAbove && r.portalBack,
     `no portal: ${r.looseTotal} bodies across ${(r.looseSpan * 100).toFixed(0)}% of the `
-    + `field width, from above the line ${r.looseAbove}; the portal came back with `
+    + `field width, ${r.looseOutside} of them outside the ${r.looseReach} the mouth would `
+    + `have allowed, from above the line ${r.looseAbove}; the portal came back with `
     + `resize ${r.portalBack} — without this arm the cases above pass on a build `
     + `that released nothing`);
 
