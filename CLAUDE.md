@@ -15642,3 +15642,143 @@ came from before believing the other one covers it.
   the case. A static arm would have to pin the SHAPE of a call, which is what
   build 370 refused in favour of driving the rule and what cost build 355 a
   vacuity arm one build later.
+
+- **BUILD 391 IS THE ITEM BUILD 390 LEFT FOR THE NEXT SESSION, AND THE NOTE IT
+  LEFT NAMED A MECHANISM THAT IS NOT THERE.** 390 recorded the BELL tick arm's
+  vacuity floor reading 26 of 40 and wrote the fix down: "a tick is drawn per
+  MOVING body and the arm counts whatever seven hundred cases upstream happened
+  to leave moving, so the fix is for it to LAY a known number of moving bodies
+  rather than to fit a constant to the worst draw." **The case has laid its own
+  eight since build 311** -- it clears six field lists and spawns them at fixed
+  positions with fixed velocities -- so the recommended fix was already in the
+  file and the diagnosis was of a fault that did not exist. The tell was one
+  `sed` of the case rather than anything clever: read the setup before believing
+  a note about what the setup inherits.
+- **THE CHANNEL IS THE SKY, AND `tickPx` WAS NEVER A PROPERTY OF THE TICK.** It
+  counts the pixels the tick lit OVER DARK GROUND (`B[i] && !A[i]`, on a 90-sum
+  threshold), so **a threshold on a difference cannot see a bright mark on
+  bright ground** and the count is a measurement of the frame's own brightness
+  where the ticks land as much as of the tick. Measured on a clean page, 38% of
+  the tick's pixels are invisible to it even under `staging`; the reading tracks
+  the frame's lit count inversely (`litA` 21k to 44k against `tickPx` 272 to
+  187, correlated run for run).
+  **And `Game.reset` re-targets the sky through `syncSky()` WITHOUT snapping
+  it**, so the live palette eases at about 0.8 a second and arm 1's three
+  seconds get it roughly nine tenths of the way -- leaving a share of whatever
+  the suite left, which is why the recorded population is a continuum rather
+  than a set of discrete values. Measured at build 391, a fresh page per sky,
+  the eleven moods the game can set: **unpinned 50, 88, 123, 138, 140, 141,
+  146, 154, 154, 168, 169 -- a factor of 3.4, the two brightest skies at the
+  bottom -- and pinned 208 to 217 from all eleven.** The 88 is `boss3` and it is
+  **build 389's recorded 87 to the unit**, which is what says the suite had been
+  sitting in a boss sky rather than drifting for some other reason.
+- **THE PIN DOES NOT REACH THE SECOND CHANNEL, AND IN A LONG-LIVED PAGE THAT
+  ONE IS BIGGER.** The background's five falling glyph columns and ninety-five
+  dust motes advance on every update and are re-seeded by nothing, so their
+  phase is a draw on a page that has run seven hundred cases -- a column lying
+  across the bodies is a low draw. Thirty runs in one page with the sky and the
+  canvas pinned: **`tickPx` still 51 to 282 and the swallowed share 0.05 to
+  0.84.** So pinning the sky alone would have been a 3.4x channel removed and a
+  5.5x one left, which is a smaller case than it looks.
+- **SO THE FLOOR MOVED ONTO THE QUANTITY THE GROUND CANNOT MOVE, AND IT WAS
+  ONE LINE OF ARITHMETIC AWAY THE WHOLE TIME.** `tickDrew` is every pixel the
+  tick BRIGHTENED, found by value (`B.sum - A.sum > 12`) rather than by a
+  threshold, so it does not care what was underneath -- which is exactly the
+  claim a vacuity floor wants to make, that the tick was drawn at all. Measured
+  directly over twenty accumulated runs it reads **293 to 299 -- a 2% spread --
+  where `tickPx` over the SAME twenty reads 187 to 278**, and it is **0** for a
+  build that draws no tick. Floor 150, 1.95x under the worst draw. The suite's
+  own reading is 295, square in the middle of that band.
+  `tickPx` keeps a floor because it is the set the hold FRACTION is measured
+  over, and it is placed by ARITHMETIC rather than against a population: at 8
+  frames a set of n pixels is 8n samples and a 0.97 bound allows `0.24n`
+  pixel-frames, so 20 gives a budget of 4.8 and no single pixel can decide it.
+  **The rule: when a vacuity floor keeps needing to be re-placed -- this one
+  three times, at 100, then 40, then red at 26 -- stop pricing the distribution
+  and ask whether a nearby quantity is insensitive to the confound.** Four
+  builds of re-placing that floor never asked.
+- **THE PIN STILL EARNS ITS PLACE AND ITS PROOF IS A DISTRIBUTION RATHER THAN A
+  RUN**, which is worth saying because a single unpinned run passes. Unpinned at
+  a `boss3` ambient over thirty accumulated runs: `tickPx` reads **8, 10, 24,
+  26, 42, 52, ...** -- two of thirty under the floor of 20, with the swallowed
+  share reaching 0.97, and **build 390's recorded 26 sits in that very sample**.
+  Pinned over thirty, the minimum is 51, 2.55x clear. So the pin is what keeps
+  the tail off the floor, and `staging` is the right sky for it because that is
+  the field a BELL is actually played on (its wave is band 2, so no boss and no
+  room). `snap` is true for build 232's reason: an un-snapped mood is still
+  moving.
+- **...AND THE RESTORE HAS TO SNAPSHOT A PART-EASED BLEND, BECAUSE
+  `background` HAS NO MOOD NAME TO READ BACK.** `mood` is a map of hexes and
+  `moodF` holds three-element arrays that `background.update` eases IN PLACE, so
+  the capture is a shallow copy of the map, a DEEP copy of the arrays, plus
+  `target` and `moodRate`. Restoring "the mood it found" by name is not
+  available: what it found was usually no mood at all but a blend part-way
+  between two.
+- **FOUR PROOFS, EACH ON ITS OWN CONJUNCT.** `drawBearings` moved into the
+  buffer before `present` reads **tickHold 0.855 against the field's 0.891**
+  with `tickDrew` 296 and `tickPx` 216 both healthy -- so the mechanism conjunct
+  fires and the two vacuity conjuncts correctly stay quiet, which is the
+  attribution build 353 asked for. `drawBearings` gutted reads `tickDrew` 0 and
+  `tickPx` 0. The restore defeated reads `skyOk`/`qOk` false with every measured
+  figure healthy -- and it needed a hostile ambient first, which is build 379's
+  own note about `lobeQOk` being unable to fail on a fresh page. And the pin, as
+  the thirty-run tail above.
+- **TWO INSTRUMENT FAULTS OF MINE, AND BOTH READ AS RESULTS.** My first mood
+  sweep did not restore the quality or the sky between runs, so once 0.45 was
+  set every later run was at 0.45 and once `sandbox` was set the next run
+  inherited it -- it printed `crossed 0` for a run with no mood set at all, and
+  the contamination looked exactly like a finding about that run. And my first
+  PINNED population (193 to 195 across eleven moods) was taken with an ordering
+  the shipped body does not use, without arm 1's three seconds of easing, so it
+  was a figure about a different experiment -- build 352's rule. Re-taken
+  through the SHIPPED body, sliced out of `regress.mjs`, it is 208 to 217 fresh
+  and 179 to 258 accumulated. **A population quoted for a case has to be
+  measured through that case's own code**, which is what the sliced-out harness
+  is for and what I reached for only on the second attempt.
+- **RECORDED AND NOT DONE: the background's furniture is not pinned.** It could
+  be -- snapshot and restore `columns` and `dust` -- and it would make the
+  reading deterministic and the `--json` dumps comparable run to run. It is not,
+  for two reasons: the floor is now on a quantity the furniture cannot move, so
+  determinism is not needed for the case to hold; and reaching into two arrays
+  of ninety-five and five live objects is a lot of machinery for a vacuity
+  guard. If a later build wants this case's dumps comparable -- which is build
+  320's whole point and a fair thing to want -- that is the edit, and the
+  measured spread it would remove is 51 to 282.
+- **AND THE SUITE'S OWN READING IS THE BEST CONFIRMATION THERE IS: IT FOUND THE
+  GOVERNOR ON ITS FLOOR.** 802 of 802 with 0 console or page errors, against
+  build 390's 801 of 802 with this arm red. The arm's in-suite figures are
+  `tickDrew` **295**, `tickPx` **275**, swallowed **20 (0.07)**, `tickHold`
+  **0.997** against a field of 0.832, and **`qFound` 0.45** -- so the suite
+  really had driven quality to the governor's floor, exactly as build 351
+  recorded, and the pin lifted it to 1 and handed it back. Subtracted across
+  five dumps the same arm's `tickPx` reads **172, 201, 87, 26, 275** over builds
+  387 to 391: the pin puts it at the top of its own history and `tickDrew`
+  underneath it is 295.
+- **AND `TRACE=1`'S STDERR IS WRITTEN IN CHUNKS, SO ONE `tail` IS NOT A
+  LIVENESS TEST -- which cost two wrong "stalled" readings in this session.**
+  Build 380 added the trace and recorded that "stderr to a file is synchronous
+  in node, so it really is live". The LINE is written synchronously and the
+  FILE is flushed in blocks: measured, the trace sat at case 176 across two
+  reads four minutes apart and then jumped to **554** in one go, the file
+  growing 12 KB to 39 KB. So a repeated `tail` reads the same stale block and
+  looks exactly like a stall. What IS live is the file's SIZE or mtime
+  (`stat -c '%s %y'`), and the renderer's CPU is the second signal -- it read
+  6:08 then 8:03 then 9:26 across the same window, i.e. fully busy, while the
+  trace appeared frozen. Build 380's rule stands and wants that rider: watch
+  the trace's SIZE, not its last line.
+- **AND A COMMENT-ONLY EDIT TO `regress.mjs` DURING A RUN IS SAFE, BUT IT HAS
+  TO BE PROVED RATHER THAN ASSERTED.** Node loads that file once at startup, so
+  an edit after launch is invisible to the run and the validated tree is not
+  the shipped tree -- build 356's rule about `src/`, and it applies to the
+  runner itself. I edited three docstrings mid-run. What makes that sound is a
+  MEASUREMENT and not the fact that they looked like comments: reconstruct the
+  pre-edit file by reversing the replacements, strip block and line comments
+  from both, collapse whitespace and hash. Identical (`7858bcb467b9eb55`), so
+  the run validated the shipping executable code. Two minutes, and the
+  alternative was a thirteen-minute re-run or an unproved claim.
+- **The hash is NOT owed and was not run.** This build changes
+  `scripts/regress.mjs` and the BUILD literal and no executable `src/` line, so
+  there is nothing for the ORDINAL probe to measure -- the same call builds
+  345-349, 360, 372, 374, 378, 382 and 383 made. What had something to say is
+  the two thirty-run tails, the fresh-page sky sweep, the four proofs and the
+  suite.

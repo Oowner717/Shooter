@@ -32285,6 +32285,8 @@ if (MINE_LINE) {
     const { CFG, TYPE_BY_ID } = await import('../src/config.js');
     const { glitch } = await import('../src/glitch.js');
     const { spawnByGait, drawSpecimen } = await import('../src/enemies.js');
+    const { background } = await import('../src/background.js');
+    const { fx } = await import('../src/fx.js');
     const out = { ring: CFG.bell.ring };
     const clear = () => {
       for (const list of ['enemies', 'drops', 'debris', 'projectiles', 'mines', 'effects']) {
@@ -32303,6 +32305,54 @@ if (MINE_LINE) {
     w.director.driftTimer = 1e9;
     w.autoAim = false;
     w.autoFire = false;
+    /*
+     * THE SKY AND THE CANVAS ARE PINNED, and what they are pinned against is
+     * the GROUND the arm-2 difference is taken over: a tick pixel is found by
+     * a THRESHOLD, so a tick drawn on ground already counted as lit is
+     * invisible to the difference AND vacuous for the hold, since such a pixel
+     * reads lit whatever the shader did. `Game.reset` pins neither -- it
+     * re-targets the sky through `syncSky()` and does NOT snap it, so the live
+     * palette eases at about 0.8 a second and arm 1's three seconds get it
+     * roughly nine tenths of the way, leaving a share of whatever the suite
+     * left. Measured at build 391, a fresh page per sky, the eleven moods the
+     * game can set: unpinned `tickPx` reads 50, 88, 123, 138, 140, 141, 146,
+     * 154, 154, 168 and 169 -- a factor of 3.4, with the two brightest skies
+     * at the bottom -- and pinned it reads 208 to 217 from all eleven. The 88
+     * is `boss3` and it is build 389's recorded 87 to the unit, which is what
+     * says the suite had been sitting in a boss sky.
+     *
+     * `staging` is the pin because it is the field a BELL is actually played
+     * on (its wave is band 2, so no boss and no room), and `snap` is true for
+     * build 232's reason: an un-snapped mood would still be moving. Quality is
+     * build 379's pin on the SAMPLE SIZE and not on the mechanism -- the tick
+     * is a line, so its pixel count scales with the backing store, which the
+     * governor sizes and which only `resize()` applies. Both are RESTORED at
+     * the foot of the case, or it charges every later case for them.
+     *
+     * WHAT THE PIN DOES NOT REACH is the background's own furniture: five
+     * falling glyph columns and ninety-five dust motes that advance on every
+     * update and are re-seeded by nothing, so their phase is a draw on a page
+     * that has run seven hundred cases. Measured over thirty runs in one page
+     * with the sky and the canvas pinned, `tickPx` still reads 51 to 282 and
+     * the swallowed share 0.05 to 0.84 -- it tracks the frame's own lit count
+     * inversely, and a column lying across the bodies is a low draw. That is
+     * why the floor below is NOT on `tickPx`: over the same thirty runs
+     * `tickDrew` -- every pixel the tick brightened, which does not care what
+     * was underneath -- reads 283 to 310, and `tickHold` 0.974 to 1.000.
+     */
+    const KEYS = ['top', 'mid', 'low', 'line', 'accent'];
+    const wasSky = {
+      mood: { ...background.mood },
+      // ...deep, because `moodF`'s entries are three-element arrays that
+      // `background.update` eases IN PLACE.
+      moodF: Object.fromEntries(KEYS.map((k) => [k, [...background.moodF[k]]])),
+      target: background.target,
+      rate: background.moodRate,
+    };
+    const wasQ = fx.quality;
+    background.setMood('staging', true);
+    fx.quality = 1;
+    g.resize();
 
     // ---- 1. shot, it rings; dissolved, it does not -----------------------
     const put = () => {
@@ -32359,20 +32409,48 @@ if (MINE_LINE) {
     }
     const C = g.canvas;
     const X = g.ctx;
+    /*
+     * The lit map is what the tick's pixels are FOUND by and what the hold is
+     * measured on, and the raw sums come back beside it because the two
+     * together say how much of the tick the threshold cannot see. That share
+     * is not a curiosity: a tick drawn over ground already counted as lit is
+     * invisible to the difference AND vacuous for the hold, since such a
+     * pixel reads lit whatever the shader did. So the arm needs the ticks over
+     * DARK ground, and `swallowed` is the figure that says whether they were.
+     */
     const shot = () => {
       g.draw();
       const d = X.getImageData(0, 0, C.width, C.height).data;
-      const lit = new Uint8Array(C.width * C.height);
-      for (let i = 0; i < lit.length; i++) {
-        lit[i] = (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2]) > 90 ? 1 : 0;
+      const n = C.width * C.height;
+      const lit = new Uint8Array(n);
+      const sum = new Uint16Array(n);
+      for (let i = 0; i < n; i++) {
+        const v = d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2];
+        sum[i] = v;
+        lit[i] = v > 90 ? 1 : 0;
       }
-      return lit;
+      return { lit, sum };
     };
     glitch.level = 0;
     w.bell = 0;
-    const A = shot();
+    const A0 = shot();
+    const A = A0.lit;
     w.bell = CFG.bell.ring;
-    const B = shot();
+    const B0 = shot();
+    const B = B0.lit;
+    // Every pixel the tick actually brightened, and how many of those the
+    // threshold above swallowed because their ground was already lit.
+    let moved = 0;
+    let swallowed = 0;
+    for (let i = 0; i < A.length; i++) {
+      if (B0.sum[i] - A0.sum[i] > 12) {
+        moved++;
+        if (A[i]) swallowed++;
+      }
+    }
+    out.tickDrew = moved;
+    out.tickSwallowed = swallowed;
+    out.tickSwShare = +(swallowed / Math.max(1, moved)).toFixed(2);
     const Wd = C.width;
     // A THIN pixel: lit, with at least two of four neighbours dark. A solid
     // region survives the shader's jitter and would be a vacuous control.
@@ -32398,7 +32476,7 @@ if (MINE_LINE) {
     let tickHeld = 0;
     let fieldHeld = 0;
     for (let f = 0; f < out.frames; f++) {
-      const G = shot();
+      const G = shot().lit;
       for (const i of tick) if (G[i]) tickHeld++;
       for (const i of fieldS) if (G[i]) fieldHeld++;
     }
@@ -32409,10 +32487,10 @@ if (MINE_LINE) {
     // ---- 3. a moving body carries one, a still one does not --------------
     glitch.level = 0;
     w.bell = 0;
-    const still = shot();
+    const still = shot().lit;
     for (const b of made) { b.vx = 0; b.vy = 0; }
     w.bell = CFG.bell.ring;
-    const none = shot();
+    const none = shot().lit;
     let extra = 0;
     for (let i = 0; i < still.length; i++) if (none[i] && !still[i]) extra++;
     out.stillExtra = extra;
@@ -32448,6 +32526,22 @@ if (MINE_LINE) {
     }
     g.restart();
     clear();
+    /*
+     * Put both back. The canvas is build 198's rule -- a case that leaves
+     * `fx.quality` on the floor charges every later case for it -- and the sky
+     * is the same argument for the same reason, since it is the ground every
+     * later pixel reading is taken over. Restored to the part-eased blend that
+     * was found rather than to a NAME, because there is no name to read back.
+     */
+    Object.assign(background.mood, wasSky.mood);
+    for (const k of KEYS) background.moodF[k] = wasSky.moodF[k];
+    background.target = wasSky.target;
+    background.moodRate = wasSky.rate;
+    fx.quality = wasQ;
+    g.resize();
+    out.skyOk = KEYS.every((k) => background.mood[k] === wasSky.mood[k]);
+    out.qFound = wasQ;
+    out.qOk = fx.quality === wasQ;
     return out;
   });
 
@@ -32461,30 +32555,66 @@ if (MINE_LINE) {
     + `three; a DISSOLVING bell rings ${r.dissolved} and a MOTE ${r.notABell}`);
 
   /*
-   * `tickPx` is a VACUITY floor and not the claim -- enough tick pixels for a
-   * hold FRACTION to mean anything -- and at 100 it was inside its own
-   * distribution. Priced off nine `--json` dumps: 98, 127, 146, 150, 168,
-   * 188, 189, 198, 235. Two things move it and neither is the mechanism. The
-   * live canvas, because the quality governor resizes it and what the suite
-   * reaches by this point is a draw (measured 1, 0.7 and 0.45 across five
-   * runs): at 332 rows the reading is 127-235 and at 273 it is 98-198, the
-   * ratio of the areas. And the field, because a tick is drawn per MOVING
-   * body and how many are moving here is whatever the cases upstream left --
-   * which is the larger term, since the reading spans 127 to 235 at ONE
-   * canvas size. 40 is 2.45x under the worst draw and still hundreds of times
-   * more pixels than a three-decimal fraction needs.
+   * THE VACUITY FLOOR IS ON `tickDrew` AND NOT ON `tickPx`, AND THAT IS THE
+   * WHOLE OF WHY THIS ONE KEPT MOVING. It was 100, then 40 at build 351
+   * against a population of 98 to 235, and then read 26 at build 390 -- three
+   * placements of a bound on a quantity that is a DRAW, because `tickPx`
+   * counts only the tick pixels whose ground was dark and the ground is
+   * animated. Build 390's note blamed the body count, on the ground that a
+   * tick is drawn per MOVING body and that what moves here is whatever the
+   * cases upstream left; THAT IS FALSE -- the block above clears the field and
+   * lays its own eight -- and the two real channels are measured at the head
+   * of this case: the sky, which the pin there removes, and the background's
+   * own furniture, which the pin deliberately does not reach.
+   *
+   * `tickDrew` is every pixel the tick BRIGHTENED, found by value rather than
+   * by a threshold, so it does not care what was underneath -- which is
+   * exactly the claim a vacuity floor wants to make ("the tick was drawn at
+   * all"). Measured over twenty accumulated runs it reads 293 to 299 -- a 2%
+   * spread -- where `tickPx` over the SAME twenty read 187 to 278, and over
+   * fifty pinned runs 51 to 282. It is 0 for a build that draws no tick. 150
+   * is 1.95x under the worst draw, and the suite's own reading is 295.
+   *
+   * `tickPx` keeps a floor because it is the set the hold FRACTION is measured
+   * over, and it is placed by arithmetic rather than against a population: at
+   * 8 frames a set of n pixels is 8n samples and the 0.97 bound allows
+   * `0.24n` pixel-frames, so 20 gives a budget of 4.8 and no single pixel can
+   * decide it. It sits 2.55x under the worst PINNED draw over those thirty
+   * runs (51) and it is what the pin is protecting: unpinned from a `boss3`
+   * sky the same thirty-run tail reads 8, 10, 24, 26 -- two of thirty under
+   * it, with build 390's recorded 26 in that sample. It also catches the one
+   * failure mode that leaves no diagnosis at all, a sky bright enough to
+   * swallow the set entirely, where `tickPx` is 0 and `tickHold` computes 0
+   * out of nothing.
+   *
+   * `tickSwShare` is REPORTED and not asserted, which is build 379's rule for
+   * a figure that does not discriminate: pinned it draws 0.05 to 0.84 over the
+   * same thirty runs and unpinned 0.22 to 0.74, so the two populations sit
+   * inside one another. It is in the message because it is the figure that
+   * says WHY a low `tickPx` was low -- which the three previous placements of
+   * this floor had no way to know, and each had to guess at.
    */
   check('...and the tick is drawn AFTER the corruption shader, not into it',
-    r.glitchOn && r.tickPx > 40
+    // The tick was drawn at all -- the ground-independent count.
+    r.glitchOn && r.tickDrew > 150
+    // ...and enough of it landed on dark ground for the fraction below to be
+    // more than one pixel's worth.
+    && r.tickPx > 20
     // The tick's own pixels hold where they were put...
     && r.tickHold > 0.97
     // ...while the field's thin pixels, drawn into the torn buffer, do not --
     // and the control must actually LOSE some, or the shader did nothing and
     // the comparison is empty.
-    && r.fieldHold < 0.95 && r.tickHold > r.fieldHold + 0.05,
+    && r.fieldHold < 0.95 && r.tickHold > r.fieldHold + 0.05
+    // ...and the sky and the canvas this was measured over were the pinned
+    // ones and were handed back, or every figure above is a reading of
+    // whatever the suite happened to leave.
+    && r.skyOk && r.qOk,
     `with the shader at full over ${r.frames} frames, ${r.tickPx} tick pixels held `
     + `${r.tickHold} of their places against ${r.fieldHold} for the same number of the field's `
-    + `own thin pixels -- which are drawn into the buffer the shader tears`);
+    + `own thin pixels -- which are drawn into the buffer the shader tears; the tick brightened `
+    + `${r.tickDrew} pixels of which ${r.tickSwallowed} (${r.tickSwShare}) were already lit; `
+    + `sky and quality (found ${r.qFound}) put back: ${r.skyOk} and ${r.qOk}`);
 
   check('...and a bearing is a DIRECTION, so a body going nowhere has none',
     r.stillExtra === 0,
