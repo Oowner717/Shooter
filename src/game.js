@@ -49,6 +49,16 @@ const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
 /** Seconds between one automatic checkpoint and the next. */
 const SAVE_EVERY = 4;
+/*
+ * What the last `resolvePair` decided about plowing, for the contact loop.
+ *
+ * One reusable object rather than a return value or an allocation per pair:
+ * that loop runs over every overlapping pair on the field every frame, and it
+ * is read on the line after the call that wrote it. `resolvePair` clears both
+ * fields on entry, so a call that returns early leaves no stale flag -- which
+ * matters, because the reader is guarded on `impact > 0` and not on the call.
+ */
+const PLOWED = { aPlow: false, bPlow: false };
 
 /*
  * Decoration must not move the simulation.
@@ -3000,7 +3010,7 @@ export class Game {
       // not shove the turret it is no longer attached to, and it must not
       // knock the wave that replaces it off its line.
       if (a.dead || b.dead || a.fizzle > 0 || b.fizzle > 0) return;
-      const impact = resolvePair(a, b);
+      const impact = resolvePair(a, b, PLOWED);
       if (impact <= 0) return;
       // Wreckage bounces off things and hurts none of them, in either
       // direction. Skipped here rather than in applyDamage so the object it
@@ -3024,13 +3034,39 @@ export class Game {
       }
       const dmg = impactDamage(a, b, impact);
       if (dmg <= 0) return;
+      /*
+       * ---- a PLOW deals impact damage and does not take it ---------------
+       *
+       * `plow` gives a hurled MASS momentum immunity and never gave it damage
+       * immunity, and the damage was what actually stopped it: `impactDamage`
+       * is the reduced mass times the closing speed, so one body at a relative
+       * 348 is 300 to each side -- more than a MASS's whole 280 health.
+       * Measured at build 390, a MASS thrown at a healed BULWARK 300 units out
+       * DIED at 370 having moved it 9 units, and one thrown across an empty
+       * lane arrived with 20 health of 259 because it had passed through the
+       * HEAD that threw it. So the type's whole read -- "it is coming and you
+       * are in the way" -- was true of the momentum and false of the outcome.
+       *
+       * Per side rather than a `return`, because the asymmetry IS the
+       * mechanism: what a wrecking ball hits is still wrecked. That is the one
+       * thing the `slugged` block above cannot express -- it spares both, and
+       * says why in its own paragraph.
+       *
+       * Note what this does NOT exempt, and note it is `resolvePair`'s guards
+       * doing it rather than a second test here: the plow does not apply
+       * against something that cannot be moved, so a MASS still takes the
+       * whole of the turret, the DECOY and an ANVIL. It still dies on the
+       * turret, which is the one outcome the type must have.
+       */
+      const skipA = PLOWED.aPlow;
+      const skipB = PLOWED.bPlow;
       const mx = (a.x + b.x) / 2;
       const my = (a.y + b.y) / 2;
       for (let i = 0; i < 3; i++) {
         spark(mx, my, spread(impact * 1.4), spread(impact * 1.4), '#ffffff', 0.16, 1.8);
       }
-      if (a.applyDamage) a.applyDamage(w, dmg, 0, 0, 0, 0, 0, false, 'contact');
-      if (b.applyDamage) b.applyDamage(w, dmg, 0, 0, 0, 0, 0, false, 'contact');
+      if (a.applyDamage && !skipA) a.applyDamage(w, dmg, 0, 0, 0, 0, 0, false, 'contact');
+      if (b.applyDamage && !skipB) b.applyDamage(w, dmg, 0, 0, 0, 0, 0, false, 'contact');
     });
     /*
      * Popped on the flag it was pushed on, not on the condition re-read.

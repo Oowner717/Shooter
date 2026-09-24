@@ -3779,6 +3779,46 @@ export class Enemy {
        * it is; see the note at SLUG's own fire call and the case that pins it.
        */
       if (throwOff) this.thrown = Math.max(this.thrown || 0, CFG.pile.thrown);
+      /*
+       * ---- and a deliberate throw BREAKS a plow -------------------------
+       *
+       * This is what makes a press an ANSWER to a hurled MASS rather than a
+       * rounding error on it. The impulse always landed -- `plow` is read by
+       * the contact solver and not here -- but a MASS is light for its size
+       * (invMass 0.095) against a 620 u/s hurl, so measured at build 390 a
+       * fully bought PULSE caught at three quarters of its blast radius took
+       * 25.5 u/s off 335: seven and a half per cent, which reads as the button
+       * doing nothing.
+       *
+       * Scaling the impulse up would be the wrong lever -- it is shared with
+       * every other body -- so the press takes the EXEMPTIONS instead, which
+       * is where all of the load's advantage actually lives. `plow` cleared,
+       * it takes its share of every contact and the crowd it was crossing can
+       * hurt it, and it flies under ordinary drag rather than
+       * CFG.physics.plowDrag. `thrown` cleared -- rather than REFRESHED by the
+       * line above -- it is back under `cruise * maxSpeedFactor` on the very
+       * next substep and steering again, which for this body is 156 u/s and a
+       * closing walk of 13.6.
+       *
+       * So the counter is the CLAMP and not the shove, and that is the honest
+       * arithmetic rather than a compromise: the load carries 6,500 of
+       * momentum and the largest press in the game is 1,050 of impulse, so no
+       * push this game has can turn 620 u/s around. What a press can do is end
+       * the throw, and the throw was the whole of the speed.
+       *
+       * Deliberately overriding that line rather than sitting above it: for
+       * every other body `thrown` is what stops the shove being clipped, and
+       * for this one the clip IS the answer. Measured at build 390, a press at
+       * three quarters of PULSE's blast radius: 578 u/s and arriving 0.44s
+       * later either way with `plow` alone cleared, against 156 and 2.2s with
+       * both.
+       *
+       * Only a `throwOff` caller -- a button with a clock on it -- and only
+       * where there is an impulse to land, so gunfire cannot do it. That is
+       * the same line PULSE, PILE, HEAVE and HAIL already earn by cadence, and
+       * it is why SLUG is refused it (see the note above).
+       */
+      if (throwOff && this.plow > 0) { this.plow = 0; this.thrown = 0; }
       const push = impulse * this.invMass * fade;
       /*
        * The linear part is UNCHANGED, and deliberately so: an impulse applied

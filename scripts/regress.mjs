@@ -43862,6 +43862,331 @@ if (MINE_LINE) {
     + ` gate ${pa.waited}f after the blow`);
 }
 
+/*
+ * A HURLED MASS IS TOO HEAVY TO STOP, AND THE WELL DRAGS THE WRECKAGE TOO.
+ *
+ * Four claims, and the first three are the same one seen from three sides:
+ * `plow` gave the load momentum immunity and nothing else, so three separate
+ * things stopped a wrecking ball anyway.
+ *
+ *  1. WELL walked `enemies` and `drops` and not `debris`, in the one ability
+ *     whose own row says it drags EVERYTHING. Measured at build 390, eight
+ *     chunks laid 90 units from a well of reach 430: they moved 10.8 units
+ *     over ninety frames -- all of it shoving each other -- and the nearest
+ *     was still 79 units out.
+ *  2. `impactDamage` is billed to BOTH sides of a contact, so the load died of
+ *     what it flattened: measured, a MASS thrown at a healed BULWARK 300 units
+ *     out DIED at 370 having moved it 9 units, and one thrown across an empty
+ *     lane arrived with 20 health of 259 because it had passed through the
+ *     HEAD that threw it.
+ *  3. `thrown` lifts the speed CEILING and never lifted the DRAG, so a 620
+ *     u/s hurl was down to 226 by the time it crossed the field -- and a
+ *     throw from a head killed mid-wind (`hurl.partial`, 360 u/s) ran out 310
+ *     units short at 106 u/s and walked the rest at 6: 13.5 seconds at era 1
+ *     and 24.1 at era 2 for the last third of the throw.
+ *  4. ...and then the load had to be ANSWERABLE, which is the other half of
+ *     making it work. A press always landed its impulse -- `plow` is read by
+ *     the contact solver, not by `applyDamage` -- but a MASS is light for its
+ *     size (invMass 0.095) against 620 u/s, so a fully bought PULSE caught at
+ *     three quarters of its blast radius took 25.5 u/s off 335. Seven and a
+ *     half per cent, which reads as the button doing nothing. A `throwOff`
+ *     press clears `plow` AND `thrown` now, so the counter is the ordinary
+ *     speed clamp rather than the shove: no push in this game can turn 6,500
+ *     of momentum around, and ending the throw is what a press can do.
+ *
+ * What none of it exempts, and it is `resolvePair`'s OWN guards doing it
+ * rather than a second test in the contact loop: a plow does not apply
+ * against something that cannot be moved. So the load still takes the whole
+ * of the turret, the DECOY and an ANVIL -- which is the one outcome the type
+ * must have, and the ANVIL arm below is what says so.
+ */
+{
+  const hm = await page.evaluate(async () => {
+    const { CFG } = await import('/src/config.js');
+    const { ABILITIES } = await import('/src/abilities.js');
+    const { shed } = await import('/src/debris.js');
+    const g = window.__sim;
+    const w = g.world;
+    const DEF = (id) => ABILITIES.find((a) => a.id === id);
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const sp = (e) => Math.hypot(e.vx, e.vy);
+    /*
+     * `restart()` is not a reset of everything a case can leave behind, and
+     * this one depends on an EMPTY field in every arm: a hurled MASS crossing
+     * seven hundred cases' worth of leftovers is a MASS measured against
+     * whatever they left. The director is stubbed and `spawnLock` pinned for
+     * the same reason and BOTH are put back at the end (see `putBack`).
+     */
+    const clean = (era) => {
+      g.restart();
+      for (const k of ['enemies', 'drops', 'debris', 'projectiles', 'effects',
+        'mines', 'pendingBlasts', 'ghosts', 'respawns']) if (w[k]) w[k].length = 0;
+      w.director.update = () => {};
+      w.spawnLock = 1e9;
+      w.director.traits = [];
+      w.timeScale = 1;
+      g.setAim('off');
+      w.autoFire = false;
+      if (era && w.era !== era) g.setEra(era);
+    };
+    const out = { plowDrag: CFG.physics.plowDrag, damping: CFG.physics.linearDamping };
+
+    // --- 1. the well drags wreckage -----------------------------------------
+    // A/B on the WELL and nothing else: the same chunks, laid at the same
+    // places with their velocity zeroed, over the same frames. A control is
+    // needed because a chunk with no well still drifts -- they are laid
+    // touching and shove each other apart, which is the 10.8 units the
+    // pre-390 reading was made of.
+    const wellRun = (stand) => {
+      clean(1);
+      const cx = w.width * 0.5;
+      const cy = w.floorY * 0.5;
+      shed(w, { x: cx + 90, y: cy, r: 24, type: { color: '#5d9cff', debris: 8 }, vx: 0, vy: 0 }, 8);
+      for (const c of w.debris) { c.vx = 0; c.vy = 0; c.life = 999; }
+      const pre = w.debris.map((c) => ({ x: c.x, y: c.y, d: Math.hypot(c.x - cx, c.y - cy) }));
+      let well = null;
+      if (stand) {
+        w.up.well = 1;
+        DEF('well').run(w);
+        well = w.effects.find((e) => e.constructor && e.constructor.name === 'Well');
+        if (well) { well.x = cx; well.y = cy; }
+      }
+      for (let f = 0; f < 90; f++) {
+        g.update(1 / 60);
+        // `densestPoint` sites a well where the bodies are and there are none,
+        // so it is pinned rather than aimed: the claim is about which LISTS
+        // the knot walks, not about where it chose to stand.
+        if (well && !well.dead) { well.x = cx; well.y = cy; }
+        for (const c of w.debris) c.life = 999;
+      }
+      let closed = 0;
+      let nearest = 1e9;
+      let moved = 0;
+      for (let i = 0; i < Math.min(pre.length, w.debris.length); i++) {
+        const c = w.debris[i];
+        const d = Math.hypot(c.x - cx, c.y - cy);
+        if (d < pre[i].d - 20) closed++;
+        nearest = Math.min(nearest, d);
+        moved = Math.max(moved, Math.hypot(c.x - pre[i].x, c.y - pre[i].y));
+      }
+      return { chunks: pre.length, stood: !!well, closed, nearest: +nearest.toFixed(0),
+        moved: +moved.toFixed(0), startD: +pre[0].d.toFixed(0) };
+    };
+    out.wellOn = wellRun(true);
+    out.wellOff = wellRun(false);
+
+    /*
+     * --- the shared release, straight above the turret -----------------------
+     *
+     * Through the real door: `debugSpawnGroup` goes through `release()`, which
+     * is what MAKES the pair -- `debugSpawn` gives you the head alone, and a
+     * probe that builds a TOW that way measures 135hp against the 415 the game
+     * sends. The head is then placed at its own `hurl.range` so the throw
+     * starts where the game starts it, and `Tow.release` is called rather than
+     * the velocity written by hand.
+     */
+    const hurl = (era, full, extra) => {
+      clean(era);
+      const s = w.shooter;
+      g.debugSpawnGroup('tow', 1);
+      const head = w.enemies.find((e) => e.type.id === 'tow');
+      const mass = w.enemies.find((e) => e.type.id === 'towMass');
+      if (!head || !mass) return { err: `no pair: ${w.enemies.map((e) => e.type.id).join(',')}` };
+      const d0 = head.type.hurl.range;
+      head.x = s.x; head.y = s.y - d0;
+      mass.x = s.x; mass.y = s.y - d0 - head.type.tows.length;
+      head.vx = 0; head.vy = 0; mass.vx = 0; mass.vy = 0;
+      head.staged = false; mass.staged = false;
+      head.hp = head.maxHp; mass.hp = mass.maxHp;
+      if (extra) extra(head, mass, s);
+      head.release(w, full);
+      return { head, mass, s };
+    };
+
+    // --- 2. it plows through, and it still stops on what cannot be moved ----
+    const wall = (id) => {
+      const h = hurl(1, 1, (head, mass, s) => {
+        if (id) {
+          g.debugSpawn(id, s.x, s.y - 300);
+          const bd = w.enemies.find((e) => e.type.id === id);
+          // Healed rather than pinned: a body held in place cannot separate,
+          // and a contact that cannot separate bills `impactDamage` to both
+          // every frame -- which is the instrument killing the load rather
+          // than the game. Only its HEALTH is held.
+          if (bd) { bd.hp = 1e7; bd.maxHp = 1e7; bd.vx = 0; bd.vy = 0; }
+        }
+      });
+      if (h.err) return h;
+      const { mass, s } = h;
+      const bd = id ? w.enemies.find((e) => e.type.id === id) : null;
+      const b0 = bd ? { x: bd.x, y: bd.y } : null;
+      let arrived = false;
+      let minD = 1e9;
+      let spPast = null;
+      let t = 0;
+      for (let f = 0; f < 60 * 8; f++) {
+        g.update(1 / 60); t += 1 / 60;
+        if (bd) bd.hp = 1e7;
+        if (mass.dead) break;
+        const d = dist(mass, s);
+        minD = Math.min(minD, d);
+        if (spPast === null && d < 280) spPast = +sp(mass).toFixed(0);
+        if (d <= mass.r + s.r + 2) { arrived = true; break; }
+      }
+      return { id: id || 'nothing', arrived, closest: +minD.toFixed(0), t: +t.toFixed(2),
+        dead: mass.dead, hp: +Math.max(0, mass.hp).toFixed(0), of: mass.maxHp, spPast,
+        planted: !!(bd && bd.type.planted),
+        threw: bd && b0 ? +Math.hypot(bd.x - b0.x, bd.y - b0.y).toFixed(0) : null };
+    };
+    out.thruNothing = wall(null);
+    out.thruBulwark = wall('bulwark');
+    out.onAnvil = wall('anvil');
+
+    // --- 3. inertia carries it -----------------------------------------------
+    // The worst case the config's own numbers can produce: a head killed
+    // before it wound at all, which is `hurl.partial` of the speed. Driven at
+    // both eras, because the thing it has to cross is a COLUMN and the column
+    // is 671 units at era 1 and 1202 at era 2.
+    const coast = (era) => {
+      const h = hurl(era, 0);
+      if (h.err) return h;
+      const { mass, s } = h;
+      const start = dist(mass, s);
+      const v0 = sp(mass);
+      let arrived = false;
+      let t = 0;
+      for (let f = 0; f < 60 * 30; f++) {
+        g.update(1 / 60); t += 1 / 60;
+        if (mass.dead) break;
+        if (dist(mass, s) <= mass.r + s.r + 2) { arrived = true; break; }
+      }
+      return { era, start: +start.toFixed(0), v0: +v0.toFixed(0), arrived, t: +t.toFixed(2),
+        endSp: +sp(mass).toFixed(0), endD: +dist(mass, s).toFixed(0) };
+    };
+    out.coast1 = coast(1);
+    out.coast2 = coast(2);
+
+    // --- 4. a press ends the throw -------------------------------------------
+    // A/B on the PRESS and nothing else, at the same distance in both arms:
+    // same body, same place, same release, same frames, pressed or not.
+    const press = (doIt) => {
+      const h = hurl(1, 1);
+      if (h.err) return h;
+      const { mass, s } = h;
+      w.up.pulsePush = 1;
+      w.up.pulseR = 1;
+      const blastR = 340 * w.up.pulseR;
+      let at = null;
+      let after = null;
+      let t = 0;
+      let arrived = false;
+      for (let f = 0; f < 60 * 25; f++) {
+        if (!at && dist(mass, s) < blastR * 0.75) {
+          at = { d: +dist(mass, s).toFixed(0), sp: +sp(mass).toFixed(0),
+            plow: +mass.plow.toFixed(2), thrown: +mass.thrown.toFixed(2) };
+          if (doIt) DEF('pulse').run(w);
+          after = { plow: +mass.plow.toFixed(2), thrown: +mass.thrown.toFixed(2) };
+        }
+        g.update(1 / 60);
+        if (at) t += 1 / 60;
+        if (mass.dead) break;
+        if (at && dist(mass, s) <= mass.r + s.r + 2) { arrived = true; break; }
+        // one frame past the press, which is where the clamp has landed
+        if (at && after && after.spNext === undefined) after.spNext = +sp(mass).toFixed(0);
+      }
+      return { pressed: doIt, blastR, at, after, t: +t.toFixed(2), arrived,
+        cap: +((mass.cruise || 60) * CFG.physics.maxSpeedFactor).toFixed(0) };
+    };
+    out.pressOn = press(true);
+    out.pressOff = press(false);
+
+    /*
+     * ...and the director goes back, ASSERTED rather than performed. `reset()`
+     * keeps the same Director object, so a stub on the instance outlives every
+     * `restart()` after it -- and `= undefined` shadows the prototype's method
+     * and starves the suite exactly as a stub does, which is why the test is
+     * that the own property is GONE and not that the field is truthy.
+     */
+    delete w.director.update;
+    w.spawnLock = 0;
+    out.putBack = typeof w.director.update === 'function'
+      && !Object.prototype.hasOwnProperty.call(w.director, 'update')
+      && w.spawnLock === 0;
+    return out;
+  });
+
+  check('a hurled MASS is too heavy to stop, and the well drags the wreckage too',
+    !hm.err
+    /*
+     * 1. The knot closes on wreckage. `closed` counts chunks that ended at
+     * least 20 units nearer the well than they started, which the control
+     * cannot reach by shoving: measured 8 of 8 against 0 of 8, nearest 2
+     * units against 79 from a start of 90.
+     */
+    && hm.wellOn.chunks >= 6
+    && hm.wellOn.closed === hm.wellOn.chunks
+    && hm.wellOff.closed === 0
+    && hm.wellOn.nearest < hm.wellOff.nearest * 0.25
+    /*
+     * 2. It crosses a body it could not survive before and the body is thrown
+     * clear -- and the plow is what does it, so the BULWARK arm is the one
+     * that has to pass. `threw` is the liveness half: a MASS that arrived
+     * because the blocker was never there proves nothing.
+     */
+    && hm.thruBulwark.arrived && !hm.thruBulwark.dead
+    && hm.thruBulwark.threw > 100
+    && hm.thruBulwark.spPast > 400
+    && hm.thruNothing.arrived && !hm.thruNothing.dead
+    /*
+     * ...and it does NOT cross an ANVIL, which is `resolvePair`'s own guard
+     * and not a second test. This is the conjunct that says the exemption is
+     * scoped to what can be moved -- so the turret is still the wall the type
+     * is about.
+     */
+    && hm.onAnvil.planted && !hm.onAnvil.arrived && hm.onAnvil.closest > 300
+    /*
+     * 3. The worst throw the config can produce crosses the whole column at
+     * both eras and arrives with real speed on the clock. Measured 2.18s and
+     * 2.13s at 109 u/s, against 13.47s and 24.10s at 6 and 8 u/s before --
+     * and the 6 u/s is the "comes to a complete stop" report.
+     */
+    && hm.coast1.arrived && hm.coast1.t < 4 && hm.coast1.endSp > 60
+    && hm.coast2.arrived && hm.coast2.t < 4 && hm.coast2.endSp > 60
+    /*
+     * 4. A press ends the throw. The claim is the ARRIVAL and not the shove:
+     * `plow` and `thrown` both read 0 the instant the press lands, and the
+     * load then takes eight times as long to cross the same 253 units --
+     * measured 2.78s against 0.35s. Both arms arrive, which is deliberate: a
+     * press buys time against a wrecking ball, it does not delete one.
+     */
+    && hm.pressOn.at && hm.pressOff.at
+    && hm.pressOn.at.plow > 0 && hm.pressOn.at.thrown > 0
+    && hm.pressOn.after.plow === 0 && hm.pressOn.after.thrown === 0
+    && hm.pressOff.after.plow > 0 && hm.pressOff.after.thrown > 0
+    && hm.pressOn.t > hm.pressOff.t * 3
+    // ...and the counter really is the clamp: one frame past the press the
+    // load is under its own ordinary ceiling.
+    && hm.pressOn.after.spNext <= hm.pressOn.cap
+    && hm.pressOff.after.spNext > hm.pressOn.cap
+    && hm.putBack === true,
+    `well: ${hm.wellOn.closed}/${hm.wellOn.chunks} chunks closed on the knot from`
+    + ` ${hm.wellOn.startD} to ${hm.wellOn.nearest} against ${hm.wellOff.closed} and`
+    + ` ${hm.wellOff.nearest} with no well;`
+    + ` plow: through a BULWARK in ${hm.thruBulwark.t}s at ${hm.thruBulwark.spPast} u/s,`
+    + ` threw it ${hm.thruBulwark.threw} units, arrived ${hm.thruBulwark.arrived} on`
+    + ` ${hm.thruBulwark.hp}/${hm.thruBulwark.of} hp (empty lane: ${hm.thruNothing.hp}/${hm.thruNothing.of});`
+    + ` ANVIL stops it at ${hm.onAnvil.closest} (arrived ${hm.onAnvil.arrived});`
+    + ` coast at drag ${hm.plowDrag} against ${hm.damping}: partial throw`
+    + ` ${hm.coast1.v0} u/s crosses ${hm.coast1.start} in ${hm.coast1.t}s at era 1`
+    + ` (${hm.coast1.endSp} u/s left) and ${hm.coast2.t}s at era 2 (${hm.coast2.endSp});`
+    + ` press at ${hm.pressOn.at.d} of a ${hm.pressOn.blastR} blast:`
+    + ` plow ${hm.pressOn.at.plow}->${hm.pressOn.after.plow},`
+    + ` thrown ${hm.pressOn.at.thrown}->${hm.pressOn.after.thrown},`
+    + ` ${hm.pressOn.at.sp} u/s -> ${hm.pressOn.after.spNext} against a cap of ${hm.pressOn.cap}`
+    + ` (unpressed ${hm.pressOff.after.spNext}), and ${hm.pressOn.t}s to the mount`
+    + ` against ${hm.pressOff.t}s; director back ${hm.putBack}`);
+}
+
 // --- report -----------------------------------------------------------------
 console.log('');
 let failed = 0;

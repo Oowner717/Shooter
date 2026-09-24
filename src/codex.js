@@ -195,7 +195,32 @@ export const CODEX = [
   {
     id: 'towMass',
     name: 'MASS',
-    line: 'The far end of a cable. It arrives by being swung, and it arrives regardless.',
+    /*
+     * "It arrives regardless" was FALSE until build 390, and the line is
+     * unchanged because what changed is that it became true: `plow` gave the
+     * load momentum immunity and never damage immunity, so it died of whatever
+     * it flattened (measured, dead at 370 against a healed BULWARK), and
+     * `thrown` lifted the speed ceiling and never the drag, so a throw from a
+     * head killed mid-wind ran out 310 units short and walked the rest at 6
+     * u/s. Both are fixed; the sentence is the same sentence.
+     *
+     * What the line owes now is the COUNTER, because there is one and the
+     * codex is the only place a player can learn it -- and this is build 319's
+     * rule read forwards for once: that build had to strike two counters that
+     * did not work, and this is a counter that works and was not named. It is
+     * MEASURED, like every other counter here: same body, same place, same
+     * frames, a fully bought PULSE as the only switch -- 578 u/s to 151
+     * against the load's own ceiling of 152, and 2.77 seconds to the mount
+     * against 0.35.
+     *
+     * "Buys time" and not "stops it", deliberately: both arms of that A/B
+     * still ARRIVE. And the shove is not what does it -- the load carries
+     * 6,500 of momentum against the largest press in the game's 1,050 of
+     * impulse -- so the line says the press takes the SWING out of it, which
+     * is what clearing `plow` and `thrown` means and is honest about why a
+     * push that big does that much.
+     */
+    line: 'The far end of a cable. It arrives by being swung, and it arrives regardless -- it will not be slowed by the crowd it crosses, and what it crosses is thrown aside. Nothing you own can turn that much weight around, but a press takes the swing out of it: PULSE catching it inside the blast leaves it under its own walking speed with the rest of the field to cross. That buys time rather than the kill. What it will not pass is something that cannot be moved at all.',
   },
   {
     id: 'scion',

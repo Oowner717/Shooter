@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '389';
+export const BUILD = '390';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '389';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '6c834cb';
+export const REV = '8d1d2ce';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -3445,6 +3445,34 @@ export const CFG = {
      * steering again before it has gone anywhere.
      */
     plowThrow: 0.5,
+    /*
+     * The drag a PLOWING body flies under, in place of `linearDamping` above.
+     *
+     * `plow` means "too heavy to stop", and drag is a thing that stops it. The
+     * hurl is 620 u/s and the ordinary 0.55 takes a coast's asymptote to
+     * `620 / 0.55` = 1127 units -- so a throw that has to cross the field
+     * arrives at a fraction of what it left with, and a throw the head did not
+     * finish winding does not arrive at all. Measured at build 390, a MASS
+     * released from a dead head (`hurl.partial`, 360 u/s) ran out 310 units
+     * short of the turret at 106 u/s, and then walked the rest at 6 u/s: 13.5
+     * seconds at era 1 and 24.1 at era 2 for the last third of the throw. That
+     * is the "comes to a complete stop" report, and it is drag rather than
+     * anything about the plow.
+     *
+     * Not zero, for two reasons and both are about the clock rather than
+     * taste. `plow` runs 2.2 seconds, and a frictionless 620 covers 1364 units
+     * against an era-2 rim-to-mount column of 1202 -- so a throw released at
+     * the far end arrives with the clock still running and a throw released
+     * near the turret would be past it, and `clampToArena` bouncing a MASS off
+     * the floor at 620 is not a wrecking ball, it is a pinball. And a value of
+     * its own rather than a share of `linearDamping` because the two answer
+     * different questions: that one is how quickly the field settles, this one
+     * is how much of a deliberate throw survives the flight.
+     *
+     * At 0.08 the same partial throw keeps 302 u/s where it used to keep 106
+     * and crosses the whole column, which is what the request asked for.
+     */
+    plowDrag: 0.08,
     collisionDamage: 0.42, // damage per unit of (impact speed * reduced mass)
     collisionThreshold: 62, // impact speed below this is a harmless bump
   },

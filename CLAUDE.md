@@ -15425,3 +15425,220 @@ came from before believing the other one covers it.
   suite case that does import `drawPortal` runs at era 1, where the factor is
   exactly 1 and the expression is the identity. What had something to say is
   the four-state table above, the five proofs, the suite and the bundle boot.
+
+- **BUILD 390 MAKES A HURLED MASS TOO HEAVY TO STOP, AND THE FINDING IS THAT
+  `plow` GAVE IT MOMENTUM IMMUNITY AND NOTHING ELSE, SO THREE OTHER THINGS
+  STOPPED IT ANYWAY.** Four asks, and three of them turned out to be one fault
+  seen from three sides. Every figure below was measured before a line was
+  written, which is what found the third side -- the one nobody asked about.
+- **THE DAMAGE WAS WHAT ACTUALLY STOPPED IT, AND THAT IS THE ONE NOBODY
+  NAMED.** `impactDamage` is billed to BOTH sides of a contact, and it is the
+  reduced mass times the closing speed clamped at 300 -- so one body met at a
+  relative 348 is 300 to each side against a MASS's whole 280 health. Measured
+  at 389, a MASS thrown at a HEALED BULWARK 300 units out **died at 370 having
+  moved it 9 units**, and one thrown across an EMPTY lane arrived with **20
+  health of 259** because it had passed through the HEAD that threw it. So the
+  plow's own sentence -- "it is coming and you are in the way" -- was true of
+  the momentum and false of the outcome, and the type's whole read was decided
+  by a mechanism its own header does not mention. A plowing body deals impact
+  damage and does not take it now: **through a BULWARK in 1.22s at 580 u/s,
+  throwing it 290 units, arriving on 24 of 264 health.**
+- **...AND IT IS `resolvePair`'S OWN GUARDS THAT KEEP THE TURRET, NOT A SECOND
+  TEST.** The contact loop could have re-derived "is this plow in force" and
+  that would have been a second copy of an expression that has to agree --
+  which is the fault this repo keeps paying for. `resolvePair(a, b, out)`
+  reports what it decided instead, one owner, the same rule as `hitCircleAt`:
+  so the exemption is off against anything that cannot be moved and the MASS
+  still takes the whole of the turret, the DECOY and an ANVIL. Measured, the
+  ANVIL arm **stops it at 375 with the mass alive on 67 of 307** -- build 328's
+  ruling intact, and the conjunct that says the exemption is scoped.
+- **`thrown` LIFTS THE CEILING AND NEVER LIFTED THE DRAG, WHICH IS THE WHOLE OF
+  "IT COMES TO A COMPLETE STOP".** `integrate` exempts a thrown body from
+  `cruise * maxSpeedFactor` and then applies `linearDamping` 0.55 to it like
+  anything else, so a 620 u/s hurl has an asymptote of `620 / 0.55` = 1127
+  units and was down to **226 u/s** by the time it crossed the field. The
+  honest worst case is the one the config itself produces: a head killed
+  before it wound at all throws at `hurl.partial`, 360 u/s, and measured that
+  throw **ran out 310 units short of the turret at 106 u/s and then walked the
+  rest at 6** -- 13.47 seconds at era 1 and **24.10 at era 2** for the last
+  third of a wrecking ball's flight. `CFG.physics.plowDrag` 0.08 is the drag a
+  plowing body flies under: the same throw now crosses the whole column in
+  **2.18s and 2.13s with 109 u/s left**.
+  **Not zero, and the reason is the clock rather than taste.** `plow` runs 2.2
+  seconds and a frictionless 620 covers 1364 units against an era-2
+  rim-to-mount column of 1202, so a throw released at the far end would arrive
+  with the clock still running and `clampToArena` would bounce a MASS off the
+  floor at 620 -- which is a pinball, not a wrecking ball. And a value of its
+  own rather than a share of `linearDamping`, because the two answer different
+  questions: that one is how quickly the field settles, this one is how much of
+  a deliberate throw survives the flight.
+- **A PRESS ALWAYS LANDED ITS IMPULSE AND THE IMPULSE WAS NEVER THE ANSWER: THE
+  ARITHMETIC SAYS NO PUSH IN THIS GAME CAN TURN 620 u/s AROUND.** `plow` is read
+  by the contact solver and not by `applyDamage`, so PULSE was reaching the load
+  the whole time -- measured, a fully bought press caught at three quarters of
+  its blast radius took **25.5 u/s off 335, seven and a half per cent**, which
+  reads as the button doing nothing. The load carries `10.5 x 620` = 6,500 of
+  momentum and the largest press in the game is 1,050 of impulse, so scaling
+  the impulse is not a lever that exists; and it is shared with every other
+  body, so scaling it would be a change to the knockback ladder wearing a TOW
+  fix's clothes.
+  **So the press takes the EXEMPTIONS, which is where all of the load's
+  advantage lives.** A `throwOff` impulse clears `plow` AND `thrown`: the load
+  is back under its own `cruise * maxSpeedFactor` on the next substep,
+  steering, taking its share of every contact and flying under ordinary drag.
+  Measured, same body, same place, same frames, the press as the only switch:
+  **578 u/s -> 151 against a cap of 152, and 2.77s to the mount against
+  0.35s** -- a factor of eight. Both arms still ARRIVE, deliberately: a press
+  buys time against a wrecking ball, it does not delete one.
+- **...AND `thrown = 0` IS THE LOAD-BEARING HALF, WHICH ONLY A PROOF OF THE
+  FIRST DRAFT SHOWS.** Clearing `plow` alone was the obvious fix and it is
+  worth nothing: the `throwOff` block above REFRESHES `thrown` to
+  `CFG.pile.thrown`, so the load keeps the 720 ceiling and coasts in on the
+  velocity it already had. Measured as revert proof E -- **`plow` 1.33 -> 0,
+  `thrown` 1.33 -> 1.33, 578 u/s -> 548, and 0.40s to the mount against an
+  unpressed 0.35s**. So the counter is the CLAMP and not the shove, and the
+  clause has to override the line above it rather than sit beside it: for every
+  other body `thrown` is what stops a shove being clipped, and for this one the
+  clip IS the answer.
+- **WELL WALKED TWO OF THE THREE LISTS ON THE FIELD, IN THE ONE ABILITY WHOSE
+  OWN ROW SAYS IT DRAGS EVERYTHING.** `grab(world.enemies); grab(world.drops);`
+  and not `world.debris`, under a filter whose comment reads "WELL drags
+  EVERYTHING". Measured, eight chunks laid 90 units from a well of reach 430:
+  they moved **10.8 units over ninety frames and the nearest was still 79 units
+  out** -- and all of that was the chunks shoving each other, which is why the
+  case has a no-well control that reads 0 closed and 76 units out. `Boss.infall`
+  has grabbed all three lists since it was written. After: **8 of 8 closed, from
+  80 units to 3.** Rendered and looked at rather than trusted to the numbers:
+  three separate piles of a BULWARK's wreckage converge into one packed knot
+  inside a second, which is what a singularity is supposed to look like --
+  wreckage is the only thing in the game that is visibly INERT, so it is what
+  makes the pull read as real rather than as a graphic.
+- **AND A CHUNK IS EXEMPT FROM THE `thrown` LINE, BECAUSE THERE THE FLAG WOULD
+  LOWER A CEILING RATHER THAN LIFT ONE.** `Chunk`'s `cruise` is 160 precisely
+  so `integrate`'s `cruise * maxSpeedFactor` is 960 and a thrown chunk is never
+  clipped -- its own comment says so -- and the crush asks for at most `270 *
+  2.6` = 702. Marking it `thrown` would replace a 960 ceiling with
+  `thrownSpeed`'s 720. So the line tests `inert` beside `isDrop`, and a chunk
+  passes the filter above it by carrying NONE of the states that filter is
+  about (`spent`, `fizzle`, `staged` are all undefined on a `Chunk`; `dead` is
+  the one it has).
+- **THE PROBE THAT SAID "IT DIES ON A BULWARK" FIRST SAID IT FOR ITS OWN
+  REASON, AND THE REASON IS IN THIS FILE ALREADY.** The first wall arm pinned
+  the blocker's POSITION every frame as well as healing it -- and a body held
+  in place cannot separate, so the contact bills `impactDamage` to both every
+  frame at the closing speed and the load dies of the instrument. It read
+  `closest 344, blocker moved 249` for a MOTE and `377, moved 11` for a
+  BULWARK, i.e. the MOTE case looked like a working plow and the BULWARK case
+  like a broken one, purely on which one the pin could hold. Healed but free to
+  move, the same pair reads `arrived, threw it 290`. Build 316's note is
+  verbatim ("a body pinned against the turret does not survive being healed
+  once a frame") and build 322's is the same fault on a clamp; **hold a witness's
+  HEALTH, never its position.**
+- **AND A PRESS MEASURED OUT OF REACH READS AS A PRESS THAT DOES NOTHING.** The
+  first PULSE arm pressed on a fixed frame count and reported `dv 0, dmg 0` at
+  both eras, which is what a refusal looks like -- and the load was 600 units
+  out against a blast radius of **340**. PULSE's `R` is `340 * up.pulseR` and
+  `intakeReach` is `max(CFG.energy.pulse, 340 * up.pulseR)`, and I had reached
+  for the second: the intake's disc and the blast's are not the same number,
+  which is exactly what that expression's own docstring is about. The press has
+  to be timed off the load's DISTANCE, and once it was the same arm read
+  `dv -25.5` -- the seven and a half per cent that is the actual finding.
+- **RECORDED AND NOT TUNED: the TOW got materially stronger, and by how much is
+  the deliverable rather than a thing to answer here.** A load that used to
+  arrive at 226 u/s having lost most of its health to anything in the way now
+  arrives at 578 u/s in 1.2 seconds with three quarters of its health, and a
+  partial throw that used to crawl in over 24 seconds arrives in 2.1. What that
+  costs the player is the corruption spike (`tow.hurl.shock` 0.62, the largest
+  `world.shock` write in the game), an attacker on the mount, and the glitch
+  fuse -- and build 297's own note is that the spike "fired only when the load
+  SURVIVED: the harder it hit you, the less likely it was to register", with
+  four of eight releases measured doing nothing at all. So the direction is the
+  one that note asked for. It is still a difficulty change on a band-5 type and
+  authoring a balance answer inside the build whose content is the mechanism is
+  build 304's mistake; the numbers are here for the pacing pass.
+- **THE HASH DID NOT MOVE AND IT WAS OWED.** `-954811922`, all six intermediate
+  marks and all six body counts identical, build 389 served from a worktree on
+  :8094 and 390 live, the served BUILD confirmed in each probe heading and the
+  two runs byte-identical apart from the `serving` line. This build changes
+  `integrate` and the contact loop -- which run on every body of that fight
+  every frame -- and adds a clause to `applyDamage`, the door every hit comes
+  through. All three reduce to the identity for a body with `plow` 0, and only
+  a hurled MASS sets `plow` (`Enemy`'s constructor says so), so no body on a
+  rung-1 ORDINAL field can take any of the new branches. That is an argument
+  from inspection, which build 329 records this repo as not accepting: an
+  unchanged hash is what "three changes on the physics hot path reached nothing
+  already using them" looks like measured.
+- **FIVE REVERT PROOFS, EACH ON ITS OWN CONJUNCT WITH ITS OWN DETAIL, and two
+  of them reproduce the original fault rather than merely reddening the case.**
+  `grab(world.debris)` removed reads `0/8 closed, from 81 to 72` with every
+  other figure unchanged; the plow damage exemption neutered reads `arrived
+  false on 0/298 hp, threw it 12 units` -- the 389 measurement, reproduced;
+  `plowDrag` pointed back at `linearDamping` reads **`13.42s at era 1 with 13
+  u/s left and 30s at era 2 with 8`**, which is the 13.47/24.10 crawl measured
+  on 389 agreeing to the tenth from a second code path; the press clause
+  removed reads `plow 1.33->1.33, 0.37s against 0.35s`; and the first draft
+  reads `thrown 1.33->1.33, 0.40s`. Every landing was `grep -c`'d before the
+  result was read, every verdict read as a MESSAGE rather than `$?` (check-build
+  exits 1 on a stale REV whatever the guard does), and the tree was restored
+  from a `cp` snapshot and diffed byte-identical -- never `git checkout --`,
+  which in a build in progress restores to a HEAD that predates the fix.
+- **AND THE MASS'S CODEX LINE WAS ALREADY TRUE AND NAMED NO COUNTER, WHICH IS
+  BUILD 319'S RULE READ FORWARDS FOR ONCE.** "It arrives by being swung, and it
+  arrives regardless" has been the line since the type existed and was FALSE on
+  every build before this one -- the load died of whatever it flattened and, from
+  a head killed mid-wind, crawled the last third of the field at 6 u/s. So the
+  sentence did not have to change; what changed is that it became true, which is
+  as good a corroboration of a mechanism fix as this repo gets.
+  What it owed is the COUNTER. Build 319 had to strike two counters that did not
+  work (a mine on a system with no door, a blast that cannot be aimed behind a
+  plate); this is the same rule from the other side -- a counter that works and
+  was not named, in the one place a player can learn it. The line now says the
+  press takes the SWING out of it rather than stopping it, because both arms of
+  that A/B still arrive and because the shove is not what does the work; and it
+  names what the load will NOT pass ("something that cannot be moved at all"),
+  which is `resolvePair`'s own guard and therefore follows the code rather than
+  a figure. Every clause is measured, which is what that entry's own docstring
+  demands of a codex line.
+- **AND THE SUITE WAS KILLED AT CASE 180 AND RELAUNCHED RATHER THAN RUN TWICE,
+  which is the cheaper of the two honest options.** A shipped string is read by
+  the codex sweep and the glossary cases, and build 356's rule is that a `src/`
+  edit after `page.goto` is invisible to the run -- so the tree the suite
+  validated would not have been the tree that ships. The choices were a second
+  full run (13 minutes) or throwing away the six minutes already spent; killing
+  and relaunching costs six and buys the whole change in ONE green run, which is
+  what the working agreement's ceiling actually asks for. Killed BY PID, never
+  `pkill -f`, which this file records matching its own shell four times over.
+- **AND THE ONE RED IS A VACUITY FLOOR ON A QUANTITY THE CASE DOES NOT CONTROL,
+  NOTED RATHER THAN CHASED.** 801 of 802, 0 errors, and the failure is the BELL
+  tick arm's `tickPx >= 40` reading **26**. Every discriminating figure in that
+  line is healthy and always has been -- the tick held **0.995** of its pixels
+  under the shader against **0.923** for the field's own thin pixels, and across
+  five dumps that pair reads 0.991/0.839, 0.997/0.861, 0.993/0.883, 0.999/0.907,
+  0.995/0.923. What moved is the COUNT: **172, 152, 201, 87, 26** over builds
+  387 to 390, against build 351's recorded population of 98 to 235. So the floor
+  is inside its own distribution for the second time, and the low end has been
+  drifting for two builds -- 87 arrived at 389, whose whole content is one
+  expression inside `drawPortal`.
+  Ruled out as mine by two readings rather than by argument, because this build
+  DOES have three TOW cases upstream of it and could in principle reach the
+  field that arm inherits: it passes **3 of 3 standalone** on the shipping tree,
+  and the two dumps are **657 of 802 details byte-identical with 144 movers**,
+  which is the ordinary per-run population (build 348 measured 599/158 across
+  three builds that changed nothing at all -- `restart()` re-rolls `runSeed` off
+  `Math.random`, so every run draws differently).
+  Not re-run for a green draw and NOT lowered again, which is build 351's own
+  ruling about this arm: the parameter is the SAMPLE SIZE and not the floor. A
+  tick is drawn per MOVING body and the arm counts whatever seven hundred cases
+  upstream happened to leave moving, so the fix is for it to LAY a known number
+  of moving bodies rather than to fit a constant to the worst draw -- which is
+  an edit to a case this build did not otherwise touch, and a second suite run.
+  Recorded with the population so the next session starts from the numbers.
+- **No new `check-build` arm, and the reason is that `resolvePair` has exactly
+  ONE caller.** What could rot silently is the out-param: a future edit that
+  stops passing `PLOWED` would leave the contact loop reading a stale flag. It
+  cannot -- `grep -rn "resolvePair("` over `src/` and `scripts/` finds one call
+  site, so nothing else writes that object and dropping the argument leaves it
+  at its initialiser `{false, false}`, which is exactly revert proof B and reds
+  the case. A static arm would have to pin the SHAPE of a call, which is what
+  build 370 refused in favour of driving the rule and what cost build 355 a
+  vacuity arm one build later.

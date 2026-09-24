@@ -179,6 +179,10 @@ class Well {
          */
         // ...and `shielded`, because the knot writes `vx`/`vy` by hand and
         // a body behind the wall is not the player's to move.
+        //
+        // Every one of these reads as undefined on a `Chunk` (the third list,
+        // below) except `dead`, which it has -- so wreckage passes the filter
+        // by carrying none of the states the filter is about.
         if (e.dead || e.spent || e.fizzle || shielded(world, e)) continue;
         const dx = this.x - e.x;
         const dy = this.y - e.y;
@@ -209,11 +213,37 @@ class Well {
          * well lets go, and while it is up the body coasts instead of
          * steering, which is what being dragged into a singularity is.
          */
-        if (!e.isDrop) e.thrown = Math.max(e.thrown || 0, 0.2);
+        if (!e.isDrop && !e.inert) e.thrown = Math.max(e.thrown || 0, 0.2);
       }
     };
     grab(world.enemies);
     grab(world.drops);
+    /*
+     * ...and the WRECKAGE, which is the third of the three lists on the field
+     * that has a position and a velocity.
+     *
+     * "WELL drags EVERYTHING" is what the note above the filter says and what
+     * the ability's own row promises, and debris was simply not walked --
+     * measured at build 390, eight chunks laid 90 units from a well of reach
+     * 430 moved 10.8 units over ninety frames and the nearest was still 79
+     * units out, all of which was the chunks shoving each other. A knot with a
+     * BULWARK's wreckage lying beside it untouched is the one thing on screen
+     * saying the pull is a graphic.
+     *
+     * It costs the mechanism nothing: a chunk has `vx`/`vy`, `dead` and a
+     * `mass`, it carries none of the marks the filter tests, and `Boss.infall`
+     * has grabbed all three lists since it was written. What it buys is the
+     * picture -- wreckage is the only thing in the game that is visibly
+     * INERT, so it is what makes a singularity read as one.
+     *
+     * A chunk is exempt from the `thrown` line above, which is why that line
+     * tests `inert`: `Chunk`'s own `cruise` is 160 precisely so that
+     * `integrate`'s `cruise * maxSpeedFactor` ceiling is 960 and a thrown
+     * chunk is never clipped, and the crush asks for at most 702 -- so
+     * marking it `thrown` would REPLACE a 960 ceiling with `thrownSpeed`'s
+     * 720. The flag exists to lift a cap and here it would lower one.
+     */
+    grab(world.debris);
 
     // infalling matter
     const streams = this.crush > 0 ? 3 : 1;

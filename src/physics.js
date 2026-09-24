@@ -125,7 +125,20 @@ export function integrate(b, dt) {
   b.y += b.vy * dt;
   b.angle += b.av * dt;
 
-  const d = Math.exp(-P.linearDamping * dt);
+  /*
+   * ...and a PLOWING body flies under its own drag.
+   *
+   * `plow` is "too heavy to stop" (see the header below) and the whole of what
+   * was stopping it was this line: the exemption above lifts the speed
+   * CEILING, and nothing had ever lifted the DRAG, so a 620 u/s hurl was down
+   * to 226 by the time it crossed the field and a throw the head did not
+   * finish winding ran out and crawled the last third at 6 u/s. See
+   * CFG.physics.plowDrag for the measurement and for why it is not zero.
+   *
+   * Only the hurled MASS sets `plow` (Enemy's constructor says so), so this is
+   * the identity for every other body on the field.
+   */
+  const d = Math.exp(-(b.plow > 0 ? P.plowDrag : P.linearDamping) * dt);
   b.vx *= d;
   b.vy *= d;
   b.av *= Math.exp(-P.angularDamping * dt);
@@ -164,7 +177,19 @@ export function integrate(b, dt) {
  * and the contact resolves as though both were static, which returns 0 rather
  * than dividing by an inverse sum of nothing.
  */
-export function resolvePair(a, b) {
+/*
+ * ---- and `out` is how the caller learns what this decided --------------
+ *
+ * `out.aPlow` / `out.bPlow` are written on every call that gets as far as the
+ * plow test, and false otherwise. The contact loop needs them because a
+ * plowing body deals impact damage and does not take it (see game.js), and
+ * whether a plow APPLIES depends on the two guards below rather than on
+ * `a.plow` alone -- so the caller re-deriving it would be a second copy of an
+ * expression that has to agree, which is the fault this file keeps paying for.
+ * One owner, the same rule as `hitCircleAt`.
+ */
+export function resolvePair(a, b, out) {
+  if (out) { out.aPlow = false; out.bPlow = false; }
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const rr = a.r + b.r;
@@ -203,6 +228,7 @@ export function resolvePair(a, b) {
   const bFixed = !!(b.type && b.type.planted);
   const aPlow = a.plow > 0 && b.invMass > 0 && !bFixed;
   const bPlow = b.plow > 0 && a.invMass > 0 && !aFixed;
+  if (out) { out.aPlow = aPlow; out.bPlow = bPlow; }
   const ia = aPlow || aFixed ? 0 : a.invMass;
   const ib = bPlow || bFixed ? 0 : b.invMass;
   const invSum = ia + ib;
