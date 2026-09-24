@@ -13334,29 +13334,102 @@ if (!GUN_LINE) {
      * "0.541s armed against 0s plain" and the zero was the loop not happening.
      */
     /*
-     * Pooled over many loads. `formAt` groups three or more of a type into ONE
-     * job, so an authored wave is about two jobs and a single load yields two
-     * samples -- the first version averaged those two and read 0.873s against
-     * an expected 1.275s, which is two unlucky draws from a range of
-     * [0.85, 1.7] and not a defect. Twenty-odd samples settles it.
+     * ---- THE TWO NOISE TERMS COME OUT RATHER THAN BEING AVERAGED, SO THE
+     * RATIO IS AN IDENTITY (build 393) ----
+     *
+     * This read `hot < plain * 0.62` -- a ratio between two independently
+     * measured means against a decimal fitted beside `overclockGap`'s own
+     * 0.5 -- and the CONTROL arm is what moved: 0.541 at build 391, then
+     * 0.548 and 0.410 at 392, which is a ratio of 0.710 on a build whose
+     * whole content was a dead field. Measured on a clean page over twenty
+     * trials the ratio draws 0.461 to 0.551, so the bound had 12% of
+     * headroom on its own worst draw.
+     *
+     * `emit` sets the gap as `rand(gap) * press * squeeze / stream`, and
+     * `squeeze` is the ONLY term that differs between the two arms.
+     * Build 392's note blamed the trait draw for the arms differing, and
+     * that is refuted: `traitsFor` is pure in the runSeed, the cycle, the
+     * tier and the wave index, all four of which are pinned here, so the
+     * two arms draw the IDENTICAL set -- measured, 20 of 20 trials, along
+     * with the same `jobsAt`. What the trait draw moves is one RUN against
+     * the next (`restart()` re-rolls `runSeed`), which no amount of pooling
+     * inside one run can see.
+     *
+     * So both noise terms are removed at the source. `gap` is pinned to one
+     * value, and the field is CLEARED BEFORE EVERY RELEASE -- which is the
+     * one thing that makes the arms diverge, because a capped `emit` sets
+     * the timer and then holds the job rather than shifting it, so `done`
+     * stalls at whatever the shuffled job order had reached (measured, a
+     * SWARM roll puts 58 motes on a field of 57 and 119 of 144 samples are
+     * capped, at a mean `done` of 0.441 against 0.479 in the other arm).
+     * With both pinned the timer sequence is deterministic and the
+     * ELEMENTWISE ratio is exactly `CFG.waves.tier.overclockGap` -- the
+     * number the mechanism is made of, rather than a decimal beside it.
+     *
+     * Three passes instead of twelve, because a deterministic reading
+     * repeated is not a larger sample; what the passes buy is `steady`,
+     * which asserts they really do agree.
+     *
+     * The count is small because `formAt` groups three or more of a type
+     * into ONE job, so this wave is three jobs and a pass yields three
+     * samples -- which is also the history: the first version of this arm
+     * averaged ONE load's worth and read 0.873s against an expected
+     * 1.275s, two unlucky draws from a range of [0.85, 1.7] and not a
+     * defect. Twelve passes were the answer to that; pinning the roll is a
+     * better one, and it is why the midpoint above is 1.275.
      */
+    const wasGap = CFG.waves.gap;
+    CFG.waves.gap = [1.275, 1.275];   // the midpoint of the authored roll
     const gapsUnder = (armed) => {
       const out2 = [];
-      for (let pass = 0; pass < 12; pass++) {
-        g.debugClearField();
+      for (let pass = 0; pass < 3; pass++) {
         d.order = [real]; d.at = 0; d.resting = false;
         d.load(w, WAVES[real]);
+        /*
+         * ...and the job ORDER is pinned, because `load` SHUFFLES the list
+         * and `spawnFormation` RE-QUEUES a remainder that does not fit the
+         * field (build 333) -- so a 58-body job is 58 releases short of one
+         * and the two arms walked different `done` ladders, which is what
+         * the elementwise pairing is between. Measured, that is the whole
+         * of the SWARM divergence: this arm read ratios 0.5 / 0.707 /
+         * 0.854 / 0.293 over twelve unaligned samples against a pinned
+         * order's single 0.5 over nine. Build 322's confound, in the one
+         * A/B whose two halves must play the same wave.
+         */
+        d.jobs.sort((a, b) => (a.type.id < b.type.id ? -1
+          : a.type.id > b.type.id ? 1 : a.n - b.n));
         d.overclock.armed = armed;
-        for (let i = 0; i < 12 && d.jobs.length; i++) { d.emit(w); out2.push(d.timer); }
+        const row = { jobsAt: d.jobsAt, t: [] };
+        for (let i = 0; i < 12 && d.jobs.length; i++) {
+          g.debugClearField();
+          d.emit(w);
+          row.t.push(d.timer);
+        }
+        out2.push(row);
       }
       d.overclock.armed = false;
       return out2;
     };
     const gaps = gapsUnder(true);
     const slow = gapsUnder(false);
+    CFG.waves.gap = wasGap;
+    const flat = (rows) => rows.flatMap((x) => x.t);
+    const hot = flat(gaps), plain = flat(slow);
     const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
-    out.gap = { hot: +mean(gaps).toFixed(3), plain: +mean(slow).toFixed(3),
-      n: Math.min(gaps.length, slow.length) };
+    const same = (rows) => rows.every((x) => x.t.join() === rows[0].t.join());
+    const paired = hot.length === plain.length && hot.length > 0;
+    out.gap = {
+      hot: +mean(hot).toFixed(4), plain: +mean(plain).toFixed(4),
+      n: Math.min(hot.length, plain.length), paired,
+      // the elementwise ratio IS `squeeze`, and it should be one value
+      ratios: paired ? [...new Set(hot.map((t, i) => +(t / plain[i]).toFixed(6)))] : [],
+      dev: paired ? Math.max(...hot.map((t, i) => Math.abs(t / plain[i] - T.overclockGap))) : 1,
+      want: T.overclockGap,
+      jobsAt: [...new Set([...gaps, ...slow].map((x) => x.jobsAt))],
+      steady: same(gaps) && same(slow),
+      put: CFG.waves.gap === wasGap,
+      rules: d.traits.map((x) => x.id).join('+') || '-',
+    };
 
     g.debugClearField();
     g.restart();
@@ -13384,10 +13457,17 @@ if (!GUN_LINE) {
     + `${JSON.stringify(r.refuses)}`);
   check('OVERCLOCK arms once, pays double, and halves the gap',
     r.armed && !r.armedTwice && r.overSpent.held === 0 && r.paysDouble
-    && r.gap.hot < r.gap.plain * 0.62 && r.gap.n >= 20,
+    // the roll is pinned and the field cleared, so this is an identity
+    && r.gap.want < 1 && r.gap.paired && r.gap.dev < 1e-9 && r.gap.steady
+    && r.gap.n >= 6 && r.gap.jobsAt.length === 1 && r.gap.hot < r.gap.plain
+    && r.gap.put,
     `armed ${r.armed}, again ${r.armedTwice}; bounty x${2} ${r.paysDouble}; `
-    + `mean release gap ${r.gap.hot}s armed against ${r.gap.plain}s plain `
-    + `(${r.gap.n} samples each)`);
+    + `release gap ${r.gap.hot}s armed against ${r.gap.plain}s plain over `
+    + `${r.gap.n} paired samples (${r.gap.paired}) of ${r.gap.jobsAt.join('/')} `
+    + `job(s), rules ${r.gap.rules}: elementwise ratio `
+    + `${r.gap.ratios.join('/')} against overclockGap ${r.gap.want}, worst `
+    + `deviation ${r.gap.dev.toExponential(1)}; every pass agreed `
+    + `${r.gap.steady} and the roll was put back ${r.gap.put}`);
 }
 
 // --- the rail says how it is going, and the sheet is really held ------------
@@ -36307,6 +36387,12 @@ if (MINE_LINE) {
         hostsOverRim: hosts.filter((x) => x.y0 < rim).length,
         rim: Math.round(rim),
         rings: rings.sort((a, b) => b - a),
+        // What is asserted: every latch that arrived is ON a ring, and no
+        // ring is over the cap. See the check for why the count of FULL
+        // rings is reported rather than asserted.
+        aboard: rings.reduce((a, b) => a + b, 0),
+        worst: rings.length ? Math.max(...rings) : 0,
+        used: rings.length,
         full: rings.filter((n) => n >= CFG.graft.stack).length,
         stack: CFG.graft.stack,
         loose: w.enemies.filter((e) => e.type.id === 'latch' && !e.dead).length,
@@ -36660,11 +36746,55 @@ if (MINE_LINE) {
   const wv = r.wave;
   const od = r.order;
   const ck = r.clock;
-  check('the wave brings them down the portal and they fill one ring before they spread',
+  /*
+   * ---- WHAT THIS ARM ASSERTS ABOUT THE RINGS, AND WHY IT IS NOT THE
+   * TITLE IT USED TO CARRY (build 393) ----
+   *
+   * It was `full >= 1` -- some ring reaching `CFG.graft.stack` -- under a
+   * title promising "they fill one ring before they spread". Neither is a
+   * rule this game has. `hunt` picks the BIGGEST non-full body inside its
+   * reach with distance breaking the tie, so against a wave of same-sized
+   * BLOOMs it is the NEAREST non-full host, and how seven latches arriving
+   * across the mouth distribute over five of them is spawn geometry:
+   * measured, the rings come out 3/3/1, 3/3/1, 3/2/1/1, 3/3/3/3/2 and (build
+   * 392, in the suite) 2/2/2/1 -- so the count of FULL rings drew 2, 2, 1,
+   * 4 and ZERO, one draw in five under the bound. A claim about a random
+   * partition, asserted on one draw.
+   *
+   * Nor is a full ring forced: with L latches over H hosts the pigeonhole
+   * needs `L > H * (stack - 1)` and the wave is 7 over 5 (or 14 over 10)
+   * against 5 * 2, so the release can legitimately fill none.
+   *
+   * What the ALLOCATOR really promises, and what is asserted instead, is
+   * two absolutes that held in all ten draws: every latch that arrived is
+   * ON a ring (conservation -- none lost to its clock, none left loose),
+   * and no ring is over the cap. The shape is REPORTED beside them,
+   * because the shape is the interesting thing and the next reader should
+   * see its spread rather than infer it.
+   *
+   * ...AND THE SPREAD IS THE CAP'S DOING, WHICH IS WHAT SETTLES THE OLD
+   * TITLE. The cap is refused in TWO places -- `hunt` skips a full host
+   * when it chooses, and `graft` refuses one at the door -- and measuring
+   * which is holding says they are not interchangeable. Remove `graft`'s
+   * and nothing changes, because `hunt` never offers it a full host (3 of 3
+   * draws identical, and that proof does NOT fire). Remove `hunt`'s and the
+   * CONSERVATION breaks instead: `hunt` writes `dead` unconditionally after
+   * calling `graft`, so a latch that reaches a full host dies unboarded --
+   * measured, 6 of 7 aboard. Remove BOTH and the rings come out `4/2/1` and
+   * then `7` over ONE of the five hosts: all seven latches pile onto the
+   * nearest body, which is "fill one ring before they spread" exactly. So
+   * that sentence describes the game with its cap taken off, and the cap is
+   * the thing that makes them spread.
+   *
+   * Which makes `worst <= stack` a joint claim on the pair rather than on
+   * either, and it is named as one: no single revert can fail it.
+   */
+  check('the wave brings them down the portal and every one of them finds a ring',
     wv.latches >= 3 && wv.hosts >= 2
     && wv.overRim === wv.latches && wv.stagedIn === wv.latches
     && wv.hostsOverRim === wv.hosts
-    && wv.full >= 1 && wv.loose === 0
+    && wv.aboard === wv.latches && wv.worst <= wv.stack && wv.used >= 1
+    && wv.loose === 0
     // the staged guard, and the same body once loose as the control
     && od.staged.ran === 0 && od.staged.aboard === 0 && od.staged.seconds > 0.3
     && od.loose.ran > 0 && od.loose.aboard === 1
@@ -36675,9 +36805,11 @@ if (MINE_LINE) {
     && Math.abs(r.speed.got - r.speed.blend) < r.speed.blend * 0.05
     && r.refused.n === r.refused.of && r.refused.legal,
     `rung 15, wave ${wv.at}: ${wv.latches} latches and ${wv.hosts} BLOOMs, all `
-    + `${wv.overRim} of them started above the rim at ${wv.rim} and staged, and the `
-    + `rings came out ${wv.rings.join('/')} -- ${wv.full} of them FULL at `
-    + `${wv.stack}, which is the claim -- with ${wv.loose} latches left loose. `
+    + `${wv.overRim} of them started above the rim at ${wv.rim} and staged, and all `
+    + `${wv.aboard} of them are aboard: rings ${wv.rings.join('/')} over `
+    + `${wv.used} of the ${wv.hosts} hosts, worst ${wv.worst} against a cap of `
+    + `${wv.stack} (${wv.full} of them full, which is a draw and is not the `
+    + `claim), with ${wv.loose} latches left loose. `
     + `Staged for ${od.staged.seconds}s it drifted ${od.staged.closed} with `
     + `${od.staged.ran}s off its clock and ${od.staged.aboard} aboard; loose it took `
     + `${od.loose.seconds}s more, spent ${od.loose.ran}s and is ${od.loose.aboard} `

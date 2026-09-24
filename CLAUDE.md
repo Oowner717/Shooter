@@ -15938,7 +15938,9 @@ came from before believing the other one covers it.
   before they spread") is a statement about the ALLOCATION rule and wants a
   claim that survives the draw -- the share of latches on the fullest host, or
   a population of runs -- and deciding which is a build with a measurement in
-  it rather than a line in this one.
+  it rather than a line in this one. **Taken at build 393, and neither
+  candidate is what it wanted**: `hunt` has no fill-before-spread rule at all,
+  and the sentence turns out to describe the game with its ring cap taken off.
 - **AND THE RE-RUN WAS 801 OF 802 WITH A DISJOINT RED SET, WHICH IS THE
   ATTRIBUTION FINISHING ITSELF.** Both of the first run's reds came back green
   and a THIRD case went red -- "OVERCLOCK arms once, pays double, and halves
@@ -15962,6 +15964,16 @@ came from before believing the other one covers it.
   pin (making an A/B's halves share a roll) rather than build 338's forbidden
   one (choosing the roll that passes). RECORDED, not taken: it is a third
   subject in a build about a dead field, which is build 304's rule.
+  **EVERY SENTENCE OF THAT PARAGRAPH BUT THE FIRST SIX WORDS IS WRONG, AND
+  BUILD 393 MEASURED IT.** `gapsUnder` did NOT pin the order -- `load`
+  shuffles the job list and nothing re-imposed one. `traitsFor` is PURE in
+  the runSeed, the cycle, the tier and the wave index, all four of which that
+  helper pins, so the two arms draw the IDENTICAL trait set (measured, 20 of
+  20 trials, with the same `jobsAt`) and the proposed `runSeed` pin would have
+  changed nothing. What diverges is the `done` ladder, through the shuffled
+  ORDER plus build 333's re-queue of a job too big for the field. The channel
+  was named wrongly and the file was named rightly, which is what a recorded
+  remedy is worth.
 - **AND THIS BUILD SHIPPED WITHOUT A SINGLE ALL-GREEN RUN, DELIBERATELY, WHICH
   IS A DEPARTURE AND IS SAID OUT LOUD.** The rule is one green run before
   pushing and its purpose is to know the tree is good. What is in hand instead
@@ -15974,3 +15986,161 @@ came from before believing the other one covers it.
   one-in-four chance of green, and running for it is exactly what this file
   means by chasing a known flake. **The honest form is to publish the two runs
   and the diagnosis rather than to re-roll until the report looks clean.**
+
+- **BUILD 393 TAKES THE TWO FLAKES BUILD 392 SHIPPED AROUND, AND BOTH TURNED
+  OUT TO BE A CONJUNCT ASSERTING SOMETHING THE GAME DOES NOT PROMISE.** 392
+  published two suite runs with disjoint red sets rather than re-rolling for a
+  green one, and recorded a one-line remedy for each. **Both remedies named the
+  wrong mechanism, and measuring first is what found it** -- which is this
+  file's own rule about a fan-out's finding arriving on its own prose: a
+  recorded remedy is a pointer to the right file, and the mechanism is still
+  yours to measure.
+- **THE OVERCLOCK BOUND WAS RIDING ON THE NOISE IT WAS TRYING TO AVERAGE
+  AWAY.** `hot < plain * 0.62` is a ratio between two independently measured
+  means against a decimal fitted beside `CFG.waves.tier.overclockGap`'s own
+  **0.5**. Measured on a clean page over twenty trials it draws **0.461 to
+  0.551** -- 12% of headroom on its own worst draw -- and the suite read 0.710.
+  `emit` sets the gap as `rand(gap) * press * squeeze / stream` and `squeeze`
+  is the only term that differs between the arms, so the ratio should be
+  `overclockGap` and nothing else.
+  **Build 392 blamed the trait draw for the two arms differing and that is
+  refuted.** `traitsFor` is PURE in the runSeed, the cycle, the tier and the
+  wave index -- all four pinned by this case -- so both arms draw the identical
+  set: measured, **20 of 20 trials, along with the same `jobsAt`**. What the
+  trait draw moves is one RUN against the next (`restart()` re-rolls
+  `runSeed`), which no amount of pooling inside one run can see, and pinning
+  it as that note proposed would have changed nothing at all.
+- **WHAT DOES DIVERGE IS THE `done` LADDER, AND IT TAKES TWO MECHANISMS TO
+  GET THERE.** `load` SHUFFLES the job list, and `spawnFormation` RE-QUEUES a
+  remainder that does not fit the field (build 333) -- so a SWARM roll puts 58
+  motes on a field of 57, `emit` sets the timer and then HOLDS the job rather
+  than shifting it, and `done` stalls at whatever the shuffled order had
+  reached. Measured, **119 of 144 samples capped, at a mean `done` of 0.441 in
+  one arm against 0.479 in the other** -- so the elementwise pairing was
+  between different releases.
+  Both noise terms come out at the source rather than being averaged: `gap` is
+  pinned to one value, the field is **cleared before every release** so the cap
+  can never bind, and the job **order is pinned** so the two arms play the same
+  wave (build 322's confound, in the one A/B whose halves must). The timer
+  sequence is then deterministic and the elementwise ratio is exactly
+  `overclockGap` -- **dev 0.0e+0 across twelve readings**, eight through the
+  shipped harness and four on forced seeds. Three passes instead of twelve,
+  because a deterministic reading repeated is not a larger sample; what the
+  passes buy is `steady`, which asserts they really do agree.
+- **AND THE OLD BOUND PASSES THE REVERT THAT LEAVES THE ROLL LOOSE, WHICH IS
+  WHAT SAYS THE NOISE WAS LOAD-BEARING.** Proof B reads **0.2536 against
+  0.4839**, and `0.2536 < 0.4839 * 0.62` is true -- so the pre-393 conjunct
+  would have called that a pass while the nine elementwise ratios underneath it
+  ran **0.309 to 0.905**. A margin that survives by averaging over the thing it
+  cannot see is not a margin on the mechanism.
+- **FOUR PROOFS, EACH ON ITS OWN CONJUNCT AND EACH FAILING DIFFERENTLY.**
+  **A**, `squeeze` neutered in `src` -- ratio exactly **1**, dev 5.0e-1, with
+  `steady` still TRUE, which is the right diagnosis rather than a smear.
+  **B**, the gap roll left loose -- nine ratios, dev 4.0e-1, `steady false`.
+  **C**, the per-release clear removed -- the two arms produce **different
+  sample counts** (27 against 36, `paired false` in 2 of 4 draws), so that term
+  fails on a conjunct of its own rather than duplicating B.
+  **D**, the order left shuffled -- fires **1 run in 6**, which is the SWARM
+  roll's own rate, and its deterministic form is the forced-seed probe: **3 of
+  4 seeds** read multiple ratios up to 0.854 at dev 2.1e-1 to 3.5e-1 against a
+  pinned order's single 0.5. A proof whose rate IS the flake's rate is the
+  proof that the flake is what was fixed.
+- **THE SPECIFIC INHERITED STATE WAS NOT RUN DOWN, AND THE FIX DOES NOT NEED
+  IT.** A clean page draws 0.461-0.551 and the suite drew 0.710, so something
+  in eleven thousand lines of upstream state moved it and that channel is
+  unfound. What makes it unnecessary is that the reading is now an identity
+  **for any `jobsAt`, any trait set and any tier**: the ratio is taken
+  elementwise between two runs of the same sequence, so whatever the leftover
+  does it does to both arms. Build 319's portal-brake note is the same
+  resolution -- drop the absolute for a within-body ratio and the environment
+  stops mattering.
+- **AND THE NEW INSTRUMENT DIAGNOSED ITSELF ON ITS FIRST RUN, WHICH IS THE
+  WHOLE ARGUMENT FOR IT.** The version with the roll pinned and the field
+  cleared but the ORDER still shuffled failed with
+  `rules swarm ... 12 paired samples ... ratio 0.5/0.707317/0.854167/0.292683
+  ... every pass agreed false` -- which names the regime, the divergence and
+  the non-determinism in one line. The bound it replaced said `0.291 against
+  0.410` and named nothing, which is why 392 had to go looking.
+- **THE LATCH RING CLAIM ASSERTED A RULE `hunt` DOES NOT HAVE.** It was
+  `full >= 1` -- some ring reaching `CFG.graft.stack` -- under a title
+  promising "they fill one ring before they spread". `hunt` picks the BIGGEST
+  non-full body inside its reach with distance breaking the tie, so against a
+  wave of same-sized BLOOMs it is the NEAREST non-full host, and how seven
+  latches arriving across the mouth distribute over five of them is spawn
+  geometry: measured over ten draws the rings come out **3/3/1, 3/2/1/1,
+  3/2/2, 3/3/3/3/2** and (392, in the suite) **2/2/2/1**, so the count of full
+  rings drew 2, 2, 1, 4 and **ZERO**. Nor is a full ring forced -- the
+  pigeonhole needs `latches > hosts * (stack - 1)` and the wave is 7 over 5
+  against 5 x 2. **A claim about a random partition, asserted on one draw.**
+  What is asserted instead is two absolutes that held in all ten draws: every
+  latch that arrived is **ON a ring** (conservation -- none lost to its clock,
+  none left loose), and **no ring is over the cap**. The shape is REPORTED
+  beside them, which is what lets the next reader see its spread rather than
+  infer it.
+- **...AND THE SPREAD IS THE CAP'S DOING, WHICH SETTLES WHAT THE OLD TITLE WAS
+  DESCRIBING.** The cap is refused in TWO places and measuring which one is
+  holding says they are not interchangeable. Remove **`graft`'s** door and
+  nothing changes -- `hunt` never offers it a full host, 3 of 3 draws
+  identical, and **that proof does not fire**. Remove **`hunt`'s** chooser
+  guard and the CONSERVATION breaks instead, because `hunt` writes `dead`
+  unconditionally after calling `graft`: a latch that reaches a full host dies
+  unboarded, measured **6 of 7 aboard**. Remove BOTH and the rings come out
+  `4/2/1` and then **`7` over ONE of the five hosts** -- all seven latches pile
+  onto the nearest body, which is "fill one ring before they spread" exactly.
+  **So that sentence describes this game with its cap taken off, and the cap is
+  the thing that makes them spread.** Which makes `worst <= stack` a joint
+  claim on the pair rather than on either, no single revert can fail it, and it
+  is named as one at the site.
+  Build 386's rule, third instance and the clearest: **a belt and a brace look
+  identical until you measure which one is holding** -- and here the answer is
+  that each holds a DIFFERENT claim.
+- **No new `check-build` arm, and the reason is that both fixes are runtime
+  properties of a distribution.** What could rot is somebody "simplifying"
+  either conjunct back to a fitted decimal, and a static sweep for that shape
+  is exactly the guard build 351 refuses -- one that cannot fail for the reason
+  it exists. What holds instead is the seven proofs, each firing on its own
+  conjunct, and the identity's own form: a bound written against
+  `CFG.waves.tier.overclockGap` follows the config if somebody tunes it, where
+  the 0.62 it replaced would have gone stale in silence.
+- **The hash is not owed and was not run.** This build changes
+  `scripts/regress.mjs` and the BUILD literal and no executable `src/` line --
+  the five `src` edits above are revert proofs, each `grep -c`'d on the way in,
+  restored from a `cp` snapshot and `diff`'d byte-identical on the way out
+  (never `git checkout --`, which in a build in progress restores to a HEAD
+  that predates the fix). So there is nothing for the ORDINAL probe to measure:
+  the same call builds 345-349, 360, 372, 374, 378, 382, 383 and 391 made.
+  What had something to say is the twenty-trial clean-page population, the
+  twelve identity readings, the ten ring draws, the seven proofs and the suite.
+- **AND THE ONE RED IS BUILD 388'S WIDENING ARRIVING AT A FLOOR THAT HAD BEEN
+  UNREACHABLE, WHICH THE DUMPS DATE TO THE BUILD.** 801 of 802, 0 console or
+  page errors, both fixed cases green -- and the failure is the VEIL gait arm's
+  `gap > 50`, the vacuity floor that makes `closest < gap * 0.35` mean
+  something (a sheet that started ON its lane proves nothing by ending there).
+  Every other figure in that line is healthy: it picked an authored column,
+  closed a gap of 37 to **1**, arrived at y 1496 against a mount at 1558, and
+  the LURCHER control arrived too.
+  Subtracted across **twenty-four dumps**, the gap splits exactly at build 388:
+  **builds 370-387 read 243 to 332 over thirteen draws** (release x 405-580),
+  and **388 onward reads 37, 107, 126, 235, 239, 312, 335** (release x 274 to
+  783). Build 388 made the portal span the field, so `mouthHalf` went from
+  about 56 world units to the whole width -- and the lane this gait chooses is
+  a WALL, so a release that lands near that wall has nothing to cross.
+  **The floor's headroom went from 4.9x to 0.74x and nothing failed for it for
+  five builds.** That is build 387's own lesson inverted: an assertion
+  insensitive to a quantity hides its own margin until a DIFFERENT build
+  changes the distribution underneath it -- so a widening owes a re-read to
+  every floor keyed on a spawn position, which is not a class anybody greps
+  for.
+  **RECORDED, NOT FIXED, and the fix is named because the obvious ones do not
+  work.** An absolute on `closest` cannot replace the ratio: undriven, a sheet
+  goes straight down and `closest` equals the gap, so on a 37-unit draw the two
+  populations overlap and no threshold separates them. Nor can the case move
+  the release -- it comes through `Director.emit` and the mouth's jitter is the
+  point. What the claim needs is a release where it is MEASURABLE, which is
+  build 338's retry idiom: re-release until the gap clears a derived share of
+  the mouth's own reach, bounded, with the attempts reported. That is not
+  choosing a favourable roll -- the mechanism is identical on every draw -- it
+  is refusing to measure a crossing on a release that had nothing to cross.
+  It is a third subject in a build about two other cases (build 304's rule) and
+  it costs a second suite run, so it is the next build's with the population
+  above as its input.
