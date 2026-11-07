@@ -11,19 +11,25 @@ No build step, no dependencies, no network calls. Plain ES modules, one canvas.
 
 ## Play it on your phone
 
-1. **Publish it.** In the GitHub repo: **Settings → Pages → Build and
-   deployment → Source: *Deploy from a branch*** → pick the branch
-   `claude/iphone-shooter-game-m6fccr`, folder `/ (root)` → **Save**.
-   A minute later the site is live at
-   `https://<your-username>.github.io/<repo-name>/`.
-2. **Open that link in Safari on your iPhone** (it must be Safari — Chrome on
-   iOS cannot install home-screen apps).
-3. Tap the **Share** button → **Add to Home Screen** → **Add**.
-4. Launch it from the new icon. It opens borderless: no address bar, no
-   toolbars, full bleed into the notch and the home indicator.
+**Live: <https://oowner717.github.io/Shooter/>**
 
-It also works fine as a normal browser tab; it just has Safari's chrome around
-it. After the first load it is cached by a service worker and runs offline.
+1. **Open that link in Safari on your iPhone.** It plays straight away in the
+   browser tab.
+2. **Add it to the Home Screen.** Tap **Share** (on iOS 26 it is behind the
+   **•••** button) → **Add to Home Screen**. If the sheet shows an
+   **Open as Web App** switch, leave it on → **Add**.
+3. **Launch it from the new SIM 7749 icon.** It opens borderless: no address
+   bar, no toolbars, full bleed into the notch and the home indicator.
+
+After the first load a service worker caches it, so it runs offline. The
+home-screen copy updates itself when a new build is published: it asks the
+server on launch and every time it comes back to the foreground, and reloads
+once if the build has changed.
+
+The site is GitHub Pages: **Settings → Pages → Build and deployment → Source:
+*Deploy from a branch*** → `claude/iphone-shooter-game-m6fccr`, folder
+`/ (root)`. A push to that branch is live about a minute later; a push to any
+other branch is not published.
 
 *(Any static host works — Netlify drop, Vercel, `python3 -m http.server`.
 It must be served over HTTP(S), not opened as a `file://` URL, because ES

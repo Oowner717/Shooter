@@ -478,6 +478,16 @@ home-screen link actually is — has `sw.js`, which is network-first with a cach
 name derived from BUILD, plus an escape hatch inline in index.html's head. Both
 of those are correct and both fire on `load`.
 
+**It is live at `https://oowner717.github.io/Shooter/`**, deployed from
+`claude/iphone-shooter-game-m6fccr`, folder `/ (root)` -- classic "deploy from
+a branch", which is what `.nojekyll` is for. That URL is read off the Pages
+deploy job's own log ("Evaluated environment url"), because this container's
+proxy refuses `github.io` and the live site cannot be fetched from here; the
+repo's workflow runs (`pages build and deployment`, `head_sha`) say which
+commit is live. **A session whose designated branch is not that one publishes
+nothing** until its commits reach that branch, and the README's play link goes
+stale in silence if Pages is ever re-pointed.
+
 **`load` is once per COLD START, which is not once per launch.** A home-screen
 app's session survives backgrounding for days, so an install that is never
 evicted checks on its first launch and never again. That is how a phone sat on
