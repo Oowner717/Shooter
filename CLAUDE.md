@@ -16534,5 +16534,41 @@ came from before believing the other one covers it.
   advances to 2.00s, and the portal reports `ry` 58 and `dip` 23.18 -- which
   is `0.075 x sqrt(314.5^2 - 58^2)` at 390 wide, era 1, to the hundredth --
   with no page error and nothing 404.
+- **THE THIRD SUITE RUN WAS 803 OF 804, AND THE RED WAS BUILD 393'S
+  CONSERVATION CLAIM, WHICH THE GAME DOES NOT MAKE IN A DOUBLED CROWD.** The
+  LATCH wave case read 14 latches over 10 BLOOMs (the SWARM roll), rings
+  3/3/3/2/2 -- 13 aboard, 0 loose, one unaccounted for -- and its message said
+  "all 13 of them are aboard". Build 393 had asserted that every latch that
+  arrives is on a ring ("none lost to its clock, none left loose") because it
+  held in ten draws, of which one or two were SWARM. Measured through the
+  arm's own setup with the roll forced, **24 SWARM draws on a fresh page lost
+  a latch in 4: 1 of 12 on 397 and 3 of 12 on 396, so not this build's**, and
+  every one through a documented door. **Two left on their own clock**: the
+  hunt reach is 900, the whole field, so each one lost every race in a
+  doubled crowd. **Two died in the crowd** at about eight seconds, from
+  contact damage with the gun off. No host died in any of the 24.
+  What the code DOES promise is that a latch which takes the boarding door
+  lands a ball, and that is an identity rather than a margin: `graft` only
+  ever APPENDS a ball record and a ball shot off is marked rather than
+  removed, so the records on every host seen count every ball that ever
+  landed. The arm now reads how each latch ended off the bodies its map
+  already held (loose / destroyed / left on its clock / boarded) and asserts
+  `landed === boarded`, no latch loose, and most of them boarding -- a
+  liveness floor (13 of 14 was the worst of the 24, against more than half).
+  The losses are reported. **Revert proof: `hunt`'s full-host guard removed
+  reads "7 boarded and 6 ball(s) landed" and then "7 boarded and 3"**, two of
+  two -- the fault build 393 found, named in the message rather than inferred
+  from a short count. This is build 393's own rule arriving on build 393's
+  own replacement: a claim about a random crowd, asserted on the few draws
+  that happened to be taken.
+- **AND THE PROBE'S FIRST SWARM DETECTION MATCHED NOTHING, SO FOUR OF ITS SIX
+  "SWARM" RUNS WERE ORDINARY.** Traits are objects (`{ id: 'swarm', ... }`)
+  and `has(list, id)` in traits.js compares `.id`, so
+  `d.traits.includes('swarm')` is false whatever was rolled: the seed search
+  ran to its cap and printed `rules [object Object]`. The tell was in the
+  output: 7 latches on rows that were supposed to be 14. **A filter on a
+  field shape you did not read is build 357's `b.dead` on a ball record
+  again** -- read the helper the game uses (`hasTrait`) before writing your
+  own.
 - Skipped, per the working agreement: smoke, tiers, dps, variance and
   contact.

@@ -36776,6 +36776,22 @@ if (MINE_LINE) {
       const hosts = rows.filter((x) => x.id === 'bloom');
       const rings = w.enemies.filter((e) => e.graftCount)
         .map((e) => e.grafts.filter((x) => x.alive).length);
+      /*
+       * How each latch ENDED, read off the body the map still holds -- the
+       * doors `hunt` and `Enemy.destroy` have: alive is loose; dead without
+       * `dissolved` was destroyed (contact damage in the crowd, with the gun
+       * off); dissolved with its clock spent left by `rides.life`; dissolved
+       * with clock to spare boarded. And what LANDED, off the hosts the map
+       * still holds: `graft` only ever APPENDS a ball record and a ball shot
+       * off is marked `alive: false` rather than removed, so `grafts.length`
+       * counts every ball that ever landed, on a host alive or dead.
+       */
+      const latchBodies = [...seen.keys()].filter((e) => e.type.id === 'latch');
+      const hostBodies = [...seen.keys()].filter((e) => e.type.id === 'bloom');
+      const door = (e) => (!e.dead ? 'loose' : !e.dissolved ? 'killed'
+        : e.rideT <= 0 ? 'expired' : 'boarded');
+      const doors = { loose: 0, killed: 0, expired: 0, boarded: 0 };
+      for (const e of latchBodies) doors[door(e)]++;
       out.wave = {
         at,
         latches: latches.length,
@@ -36794,7 +36810,12 @@ if (MINE_LINE) {
         used: rings.length,
         full: rings.filter((n) => n >= CFG.graft.stack).length,
         stack: CFG.graft.stack,
-        loose: w.enemies.filter((e) => e.type.id === 'latch' && !e.dead).length,
+        loose: doors.loose,
+        boarded: doors.boarded,
+        expired: doors.expired,
+        killed: doors.killed,
+        landed: hostBodies.reduce((a, e) => a + (e.grafts ? e.grafts.length : 0), 0),
+        hostsLost: hostBodies.filter((e) => e.dead).length,
       };
       delete d.update;
     }
@@ -37187,12 +37208,37 @@ if (MINE_LINE) {
    *
    * Which makes `worst <= stack` a joint claim on the pair rather than on
    * either, and it is named as one: no single revert can fail it.
+   *
+   * ---- ...AND "NONE LOST TO ITS CLOCK" WAS NOT A RULE EITHER (build 397) --
+   *
+   * The conservation above held in ten draws, and the regime that breaks it
+   * is the one those draws barely sampled: SWARM, which doubles the wave to
+   * fourteen latches over ten BLOOMs. Measured on a fresh page through this
+   * arm's own setup with the roll forced, 24 SWARM draws: a latch was lost
+   * in 4 of them -- 1 of 12 on 397 and 3 of 12 on 396, so not this build's
+   * -- through the two doors the game documents. Two LEFT ON THEIR CLOCK
+   * (`rides.life`, dissolved, not a kill): the reach is 900, the whole
+   * field, so each was a latch that lost every race in a doubled crowd,
+   * every host it chased filling before it arrived. Two DIED IN THE CROWD
+   * at about eight seconds, contact damage with the gun off. 397's third
+   * suite run drew one (rings 3/3/3/2/2, 13 of 14 aboard, 0 loose) and the
+   * old message printed it as "all 13 of them are aboard".
+   *
+   * So the claim is the one the code makes: EVERY LATCH THAT TAKES THE
+   * BOARDING DOOR LANDS A BALL. An identity, not a margin -- the records on
+   * every host seen count every ball that ever landed -- and it is the one
+   * the `hunt`-guard revert above breaks, since there a latch dies at a full
+   * host through the boarding door with nothing landed. Beside it: no latch
+   * is left loose, and most of them board, which is a liveness floor and not
+   * a discriminator (13 of 14 was the worst of the 24, against more than
+   * half). How many left or died is reported, because both are design.
    */
-  check('the wave brings them down the portal and every one of them finds a ring',
+  check('the wave brings them down the portal, and every latch that boards lands a ball on a ring',
     wv.latches >= 3 && wv.hosts >= 2
     && wv.overRim === wv.latches && wv.stagedIn === wv.latches
     && wv.hostsOverRim === wv.hosts
-    && wv.aboard === wv.latches && wv.worst <= wv.stack && wv.used >= 1
+    && wv.landed === wv.boarded && wv.boarded * 2 > wv.latches
+    && wv.worst <= wv.stack && wv.used >= 1
     && wv.loose === 0
     // the staged guard, and the same body once loose as the control
     && od.staged.ran === 0 && od.staged.aboard === 0 && od.staged.seconds > 0.3
@@ -37203,12 +37249,15 @@ if (MINE_LINE) {
     // ...and what it delivers is the blend rather than the ask
     && Math.abs(r.speed.got - r.speed.blend) < r.speed.blend * 0.05
     && r.refused.n === r.refused.of && r.refused.legal,
-    `rung 15, wave ${wv.at}: ${wv.latches} latches and ${wv.hosts} BLOOMs, all `
-    + `${wv.overRim} of them started above the rim at ${wv.rim} and staged, and all `
-    + `${wv.aboard} of them are aboard: rings ${wv.rings.join('/')} over `
-    + `${wv.used} of the ${wv.hosts} hosts, worst ${wv.worst} against a cap of `
-    + `${wv.stack} (${wv.full} of them full, which is a draw and is not the `
-    + `claim), with ${wv.loose} latches left loose. `
+    `rung 15, wave ${wv.at}: ${wv.latches} latches and ${wv.hosts} BLOOMs; `
+    + `${wv.overRim} of the latches started above the rim at ${wv.rim} and `
+    + `${wv.stagedIn} staged. ${wv.boarded} boarded and ${wv.landed} ball(s) `
+    + `landed; ${wv.expired} left on its own clock and ${wv.killed} died in the `
+    + `crowd (the two documented doors, reported and not the claim), `
+    + `${wv.loose} left loose, ${wv.hostsLost} host(s) lost. Rings `
+    + `${wv.rings.join('/')} over ${wv.used} of the ${wv.hosts} hosts, worst `
+    + `${wv.worst} against a cap of ${wv.stack} (${wv.full} of them full, `
+    + `which is a draw and is not the claim). `
     + `Staged for ${od.staged.seconds}s it drifted ${od.staged.closed} with `
     + `${od.staged.ran}s off its clock and ${od.staged.aboard} aboard; loose it took `
     + `${od.loose.seconds}s more, spent ${od.loose.ran}s and is ${od.loose.aboard} `
