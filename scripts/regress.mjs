@@ -35869,55 +35869,9 @@ if (MINE_LINE) {
       const rc = document.querySelector('#roundCell');
       const bands = [...document.querySelectorAll('#quickBar .qGroup')]
         .map((e) => e.getBoundingClientRect());
-      /*
-       * The four cells, in the order the request names them. Read off the
-       * RENDERED boxes, because `space-between`, `flex-start`, padding and
-       * `gap` all produce plausible DOM and only the boxes say where things
-       * landed. Rounded to the half pixel for the message; compared raw.
-       */
-      const four = ['roundCell', 'cfgAmmo', 'tgAutoAim', 'tgAutoFire']
-        .map((id) => document.getElementById(id).getBoundingClientRect());
-      const gapsAt = [0, 1, 2].map((i) => four[i + 1].left - four[i].right);
-      // The one gap value the stylesheet declares for the row. Asserted
-      // against, so two gap numbers that merely agree today cannot pass.
-      const want = parseFloat(getComputedStyle(document.getElementById('quickBar'))
-        .getPropertyValue('--strip-gap'));
-      // Everything on the strip that is showing, less the two rows that open
-      // OVER it -- they span the bar on purpose and are not the strip.
-      const showing = [...document.querySelectorAll('#quickBar button')]
-        .filter((b) => !b.closest('#ammoRow, #aimModes'))
-        .map((b) => b.getBoundingClientRect()).filter((b) => b.height > 0);
-      const y = (four[0].top + four[0].bottom) / 2;
-      const inStrip = (x) => {
-        const t = document.elementFromPoint(Math.round(x), Math.round(y));
-        return !!(t && t.closest('#quickBar'));
-      };
-      const line = {
-        lefts: four.map((b) => +b.left.toFixed(1)),
-        ordered: four.every((b, i) => i === 0 || b.left > four[i - 1].right),
-        sizes: [...new Set(four.map((b) => `${b.width}x${b.height}`))],
-        // ...and what is IN them sits on one line: the door's icon was 15px
-        // against 14 and rode its label 1px low, which is the uneven the eye
-        // catches first in a row of four equal boxes.
-        labels: [...new Set(['roundCell', 'cfgAmmo', 'tgAutoAim', 'tgAutoFire']
-          .map((id) => document.querySelector(`#${id} .qLbl`).getBoundingClientRect().top))],
-        gaps: gapsAt.map((g) => +g.toFixed(1)),
-        want,
-        evenGaps: gapsAt.every((g) => Math.abs(g - want) < 0.5),
-        atLeft: Math.abs(four[0].left - bar.left) < 0.5,
-        // How far along the strip the row ends, and whether anything showing
-        // ends further right than its last cell.
-        reach: +((four[3].right - bar.left) / bar.width).toFixed(3),
-        stray: showing.filter((b) => b.right > four[3].right + 0.5).length,
-        // A near-miss between two cells lands on the strip, not the field...
-        gapsHeld: gapsAt.every((g, i) => inStrip(four[i].right + g / 2)),
-        // ...and the clear side really is field.
-        clear: !inStrip(bar.right - 20),
-      };
       return {
         barH: +bar.height.toFixed(1),
         bands: bands.length,
-        line,
         // The BOX, not the property. `hidden` has never once hidden anything
         // the stylesheet gives a display to.
         rowH: +rb.height.toFixed(1),
@@ -35953,8 +35907,93 @@ if (MINE_LINE) {
     const closed = read();
     return { shut, open, after, closed, reopened, was, now, cellH: +cellH.toFixed(1) };
   });
+
+  /*
+   * The row's geometry, measured ONE way at three widths: the two phones the
+   * suite already uses and a tablet, which is the only width that reaches the
+   * gap's cap. Self-contained so the same function runs at every size.
+   */
+  const rowAt = () => {
+    const g = window.__sim;
+    // `setViewportSize` does not resize the game (build 352), and the turret
+    // the pair is centred under is a WORLD position re-derived only here.
+    g.resize();
+    const w = g.world;
+    const bar = document.getElementById('quickBar').getBoundingClientRect();
+    const ids = ['roundCell', 'cfgAmmo', 'tgAutoAim', 'tgAutoFire'];
+    /*
+     * The four cells, in the order the request names them. Read off the
+     * RENDERED boxes, because `space-between`, `flex-start`, padding, margin
+     * and `gap` all produce plausible DOM and only the boxes say where things
+     * landed. Rounded for the message; compared raw.
+     */
+    const four = ids.map((id) => document.getElementById(id).getBoundingClientRect());
+    const gaps = [0, 1, 2].map((i) => four[i + 1].left - four[i].right);
+    // The turret, off the world rather than off `innerWidth / 2`: the claim is
+    // "under the turret", and the stylesheet's `50vw` is a derivation of it.
+    const turret = w.shooter.x * w.scale;
+    const pairMid = (four[2].left + four[3].right) / 2;
+    // Everything on the strip that is showing, less the two rows that open
+    // OVER it -- they span the bar on purpose and are not the strip.
+    const showing = [...document.querySelectorAll('#quickBar button')]
+      .filter((b) => !b.closest('#ammoRow, #aimModes'))
+      .map((b) => b.getBoundingClientRect()).filter((b) => b.height > 0);
+    const y = (four[0].top + four[0].bottom) / 2;
+    const inStrip = (x) => {
+      const t = document.elementFromPoint(Math.round(x), Math.round(y));
+      return !!(t && t.closest('#quickBar'));
+    };
+    // ...and the slots opened and put away again do not move the row.
+    const press = (el) => el.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    press(document.getElementById('roundCell'));
+    const openLefts = ids.map((id) => document.getElementById(id).getBoundingClientRect().left);
+    press(document.getElementById('roundCell'));
+    return {
+      vw: innerWidth,
+      lefts: four.map((b) => +b.left.toFixed(1)),
+      ordered: four.every((b, i) => i === 0 || b.left > four[i - 1].right),
+      sizes: [...new Set(four.map((b) => `${b.width}x${b.height}`))],
+      // ...and what is IN them sits on one line: the door's icon was 15px
+      // against 14 and rode its label 1px low, which is the uneven the eye
+      // catches first in a row of four equal boxes.
+      labels: [...new Set(ids.map((id) => document.querySelector(`#${id} .qLbl`)
+        .getBoundingClientRect().top))],
+      gaps: gaps.map((gp) => +gp.toFixed(1)),
+      evenGaps: gaps[0] > 0 && Math.max(...gaps) - Math.min(...gaps) < 0.5,
+      turret: +turret.toFixed(1),
+      pairMid: +pairMid.toFixed(1),
+      turretSane: turret > bar.left && turret < bar.right,
+      centred: Math.abs(pairMid - turret) < 0.5,
+      atLeft: Math.abs(four[0].left - bar.left) < 0.5,
+      // The gap held at half a cell, which only a screen past the largest
+      // phone reaches.
+      capped: Math.abs(gaps[0] - four[0].width / 2) < 0.5,
+      // How far along the strip the row ends, and whether anything showing
+      // ends further right than its last cell.
+      reach: +((four[3].right - bar.left) / bar.width).toFixed(3),
+      stray: showing.filter((b) => b.right > four[3].right + 0.5).length,
+      // A near-miss between two cells lands on the strip, not the field...
+      gapsHeld: gaps.every((gp, i) => inStrip(four[i].right + gp / 2)),
+      // ...and both clear sides really are field: the right always, and the
+      // left of the row wherever the cap has pushed it in from the edge.
+      clear: !inStrip(bar.right - 20),
+      leftField: four[0].left - bar.left < 20 || !inStrip(bar.left + 10),
+      moved: openLefts.some((x, i) => Math.abs(x - four[i].left) > 0.5),
+      shutAgain: !document.body.classList.contains('ammoOpen'),
+    };
+  };
+  const rows = [];
+  for (const size of [{ width: 320, height: 568 }, { width: 390, height: 844 },
+    { width: 768, height: 1024 }]) {
+    await page.setViewportSize(size);
+    await page.waitForTimeout(120);
+    rows.push(await page.evaluate(rowAt));
+  }
   await page.setViewportSize(held);
   await page.waitForTimeout(120);
+  // ...and the world is sized for the viewport the rest of the suite runs at.
+  await page.evaluate(() => window.__sim.resize());
 
   check('the ammunition is one row, not a column down the side of the field',
     r.shut.barH <= r.cellH + 2 && r.shut.bands === 3,
@@ -35981,40 +36020,51 @@ if (MINE_LINE) {
     + `it is up (${r.open.dim} / ${r.closed.dim})`);
 
   /*
-   * Build 395, and the request is the spec, clause by clause: "Put Ammo
-   * button beside the ammo quick select button on left. Keep right side
-   * clear. Even out sizes and spacing of the four buttons on that row."
+   * Builds 395 and 396, and the requests are the spec, clause by clause.
+   * 395: "Put Ammo button beside the ammo quick select button on left. Keep
+   * right side clear. Even out sizes and spacing of the four buttons on that
+   * row." 396: "Keep AIM and FIRE centred under the turret."
    *
-   *   beside       round, door, AIM, FIRE in that order, from the strip's own
-   *                left edge -- not merely the door somewhere left of AIM.
-   *   sizes        one rendered size across all four. `.qc.wide` is the only
-   *                rule that sizes them; `.roundCell` and `.qc.cfg` each wrote
-   *                a width that never won, and both are gone.
-   *   spacing      every gap equal to the ONE value the stylesheet declares,
-   *                so two numbers that happen to agree today cannot pass.
+   *   beside       round, door, AIM, FIRE in that order, the round at the
+   *                strip's own left edge on a phone.
+   *   sizes        one rendered size across all four, labels on one line.
+   *                `.qc.wide` sizes them all, off `--cell-w`.
+   *   spacing      three gaps equal to each other. The gap is DERIVED in the
+   *                stylesheet (it is the one number that satisfies both
+   *                "one gap" and "centred"), so it is asserted against the
+   *                turret rather than against a declared value.
+   *   centred      the AIM/FIRE midpoint within half a pixel of the turret's
+   *                own screen x, off the world.
    *   right side   nothing showing ends past FIRE, the row stops by 70% of the
-   *                strip (64% measured at 320, the narrowest), and a point on
-   *                the clear side hit-tests to the field.
+   *                strip, and a point on the clear side hit-tests to the
+   *                field.
+   *   the cap      at 768 the gap is held at half a cell and the row moves in
+   *                from the edge by a MARGIN, so the pair stays centred and
+   *                the space left of the row is still field.
    *
    * Plus the thing evening out could have cost: the gaps are padding on a
    * band rather than the bar's own `gap`, so a near-miss between two cells
    * lands on the strip instead of reaching the canvas and taking a shot --
    * `.qGroup`'s own note. And opening the slots does not move the row.
    */
-  const R = r.shut.line;
-  check('...and the four cells are one row from the left: the door beside the round, one size, one gap, the right side clear',
-    R.ordered && R.atLeft && R.sizes.length === 1 && R.labels.length === 1
-    && R.want > 0 && R.evenGaps
-    && R.stray === 0 && R.reach <= 0.7 && R.gapsHeld && R.clear
-    && r.open.line.lefts.join() === R.lefts.join(),
-    `round, AMMO, AIM, FIRE at ${R.lefts.join(' / ')} (in order ${R.ordered}, from `
-    + `the strip's left edge ${R.atLeft}); sizes ${R.sizes.join(', ')}, labels on `
-    + `${R.labels.length} line(s); gaps `
-    + `${R.gaps.join(' / ')} against the declared ${R.want}; the row ends `
-    + `${(R.reach * 100).toFixed(1)}% along the strip with ${R.stray} control(s) `
-    + `past it; a near-miss in a gap is held by the strip ${R.gapsHeld}, the right `
-    + `side is field ${R.clear}; the row moved when the slots opened `
-    + `${r.open.line.lefts.join() !== R.lefts.join()}`);
+  const rowOk = (x) => x.ordered && x.sizes.length === 1 && x.labels.length === 1
+    && x.evenGaps && x.turretSane && x.centred && x.stray === 0 && x.reach <= 0.7
+    && x.gapsHeld && x.clear && x.leftField && !x.moved && x.shutAgain;
+  const [p320, p390, tab] = rows;
+  check('...and the four cells are one row: the door beside the round, one size, one gap, AIM and FIRE centred under the turret, the right side clear',
+    rows.every(rowOk)
+    // the phones: from the left edge, under the cap
+    && p320.atLeft && !p320.capped && p390.atLeft && !p390.capped
+    // the tablet: held at the cap and pushed in from the edge
+    && tab.capped && !tab.atLeft,
+    rows.map((x) => `${x.vw}: round, AMMO, AIM, FIRE at ${x.lefts.join(' / ')} `
+      + `(in order ${x.ordered}, sizes ${x.sizes.join(', ')}, labels on `
+      + `${x.labels.length} line(s)); gaps ${x.gaps.join(' / ')}`
+      + `${x.capped ? ' (capped)' : ''}; AIM/FIRE midpoint ${x.pairMid} against `
+      + `the turret's ${x.turret}; from the left edge ${x.atLeft}; ends `
+      + `${(x.reach * 100).toFixed(1)}% along with ${x.stray} past it; gaps held `
+      + `${x.gapsHeld}, right side field ${x.clear}, left of the row field `
+      + `${x.leftField}; moved when the slots opened ${x.moved}`).join(' | '));
 }
 
 // --- a step back is something you SEE on the ladder -------------------------

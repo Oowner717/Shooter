@@ -354,21 +354,23 @@ export class Hud {
      * include this band, so every pixel of it sits on playable ground. The
      * stack was a permanent column displaying a choice made once a wave.
      *
-     * It is one row now: the loaded round, the AMMO door beside it, then AIM
-     * and FIRE -- four cells laid from the LEFT edge, one size and one gap,
-     * with the right side of the strip left empty. Pressing the round fans
-     * the slots out across the bar -- the same `#aimModes` pattern the assist
-     * has used since build 185, lifted out of flow and spanning the strip.
+     * It is one row now: the loaded round at the left edge, the AMMO door
+     * beside it, then AIM and FIRE centred under the turret -- one size and
+     * one gap, with the right side of the strip left empty. Pressing the
+     * round fans the slots out across the bar -- the same `#aimModes` pattern
+     * the assist has used since build 185, lifted out of flow and spanning
+     * the strip.
      *
-     * Build 395, by request: the door was on the right edge, balancing the
-     * round cell so `space-between` could centre AIM and FIRE (294's rule),
-     * and the ask was the door BESIDE the round it configures, the right side
-     * clear, and the four evened out. So the door's band is laid SECOND, the
-     * strip is `.oneRow` (`flex-start`, see styles.css) and every gap in the
-     * row is one value -- including AIM to FIRE, which is inside a band of
-     * its own and would otherwise keep a second number. The bands stay
-     * separate because the dims are written per band (`body.ammoOpen
-     * .q_auto`, `body.aimOpen .q_round`) and that is the only thing they buy.
+     * Builds 395 and 396, by request: the door was on the right edge,
+     * balancing the round cell so `space-between` could centre AIM and FIRE
+     * (294's rule), and the ask was the door BESIDE the round it configures,
+     * the right side clear, the four evened out -- and then AIM and FIRE kept
+     * centred under the turret. So the door's band is laid SECOND, the strip
+     * is `.oneRow`, and the one gap every pair shares is DERIVED in the
+     * stylesheet as the value that puts the AIM/FIRE midpoint at the turret
+     * (see `#quickBar.oneRow` in styles.css). The bands stay separate because
+     * the dims are written per band (`body.ammoOpen .q_auto`, `body.aimOpen
+     * .q_round`) and that is the only thing they buy.
      */
     const mineLine = CFG.mines.inPlay;
     const mines = mineLine ? band('qGroup q_mines') : null;
@@ -432,10 +434,10 @@ export class Hud {
      *
      * From 294 to 394 the two edge bands were the round cell and the AMMO
      * door, both `.qc.wide`, so `space-between` centred AIM and FIRE by
-     * construction. Build 395 moved the door beside the round cell and laid
-     * the whole row from the left edge instead -- see the note above the
-     * bands. All four are still `.qc.wide`, and that one rule is the only
-     * thing that sizes any of them.
+     * construction. Builds 395 and 396 moved the door beside the round cell
+     * and keep AIM and FIRE centred by deriving the shared gap instead -- see
+     * the note above the bands. All four are still `.qc.wide`, and that one
+     * rule (off `--cell-w`) is the only thing that sizes any of them.
      */
     if (mineLine) {
       this.fillStack(mines, w, 'mines');

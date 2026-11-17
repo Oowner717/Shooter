@@ -19,6 +19,10 @@
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
   --bar-h: 64px;
+  /* The strip's cell width (`.qc.wide`), 44 on a narrow phone. A custom
+     property because the one-row strip derives its gap from it -- a width
+     written in two places is two numbers that happen to agree. */
+  --cell-w: 50px;
   /*
    * The ladder's band. `--rail-t` is the top bar's own top plus its 44 of
    * height and 4 of air -- the bar is as tall as the menu button in it, and
@@ -1544,7 +1548,9 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
  */
 #quickBar {
   position: absolute;
-  left: calc(var(--safe-l) + 8px);
+  /* Named, because the one-row gap below is measured from this edge. */
+  --strip-l: calc(var(--safe-l) + 8px);
+  left: var(--strip-l);
   right: calc(var(--safe-r) + 8px);
   /* The floor line: world.floorY is derived from these same three numbers.
      (game.js floors the viewport at 420px tall before doing that sum, so on
@@ -1570,10 +1576,25 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
 }
 
 /*
- * Out of play (the mine line is off), the strip is ONE ROW FROM THE LEFT
- * EDGE: the loaded round, the AMMO door beside it, AIM, FIRE -- one size and
- * one gap -- and the right side of the strip left clear. Build 395, by
- * request; `buildStrip` lays the door's band second and sets the class.
+ * Out of play (the mine line is off), the strip is ONE ROW: the loaded round
+ * at the left edge, the AMMO door beside it, then AIM and FIRE CENTRED UNDER
+ * THE TURRET -- one size, one gap -- and the right side of the strip left
+ * clear. Builds 395 and 396, by request; `buildStrip` lays the door's band
+ * second and sets the class.
+ *
+ * The gap is DERIVED, because "one gap" and "centred under the turret" are
+ * two constraints on one number. The turret is `world.width / 2` on a canvas
+ * the width of the screen, so it is at `50vw` (portrait-locked, so the safe
+ * insets either side are equal on a phone). Four cells of width w and gaps g
+ * from the strip's left edge put the AIM/FIRE midpoint at
+ * `left + 3w + 2.5g`; setting that to `50vw` gives
+ * g = (50vw - left - 3w) / 2.5 -- 8px at 320, 14.8 at 390, 24.8 at 440.
+ *
+ * Capped at half a cell. Past that four cells stop reading as one row (a
+ * tablet would get 90px gaps), so the gap holds at w/2 and the row is pushed
+ * in from the edge by exactly what keeps the pair centred: the first band's
+ * margin, which is 0 whenever the cap is not reached, i.e. on every phone in
+ * portrait. Margin and not padding, so the space left of the row is field.
  *
  * The gap is PADDING on the band that follows it rather than the bar's own
  * `gap`. The bar is `pointer-events: none`, so the space BETWEEN bands is
@@ -1586,7 +1607,15 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
  * `.autoCells` takes the same custom property, because a row with two gap
  * numbers in it is not evened out -- it is two numbers that happen to agree.
  */
-#quickBar.oneRow { justify-content: flex-start; gap: 0; --strip-gap: 6px; }
+#quickBar.oneRow {
+  justify-content: flex-start;
+  gap: 0;
+  --strip-gap: min(calc((50vw - var(--strip-l) - 3 * var(--cell-w)) / 2.5),
+    calc(var(--cell-w) / 2));
+}
+#quickBar.oneRow > .qGroup:first-child {
+  margin-left: calc(50vw - var(--strip-l) - 3 * var(--cell-w) - 2.5 * var(--strip-gap));
+}
 #quickBar.oneRow > .qGroup + .qGroup { padding-left: var(--strip-gap); }
 #quickBar.oneRow .autoCells { gap: var(--strip-gap); }
 /* Wide enough that a five-letter round -- TITHE, SPORE, SNARE -- has real
@@ -1675,7 +1704,7 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
   flex-direction: column;
   gap: 2px;
   height: 40px;
-  width: 50px;
+  width: var(--cell-w);
   padding: 0 4px;
 }
 /*
@@ -3596,7 +3625,8 @@ body.booting #quickBar {
      screenshotted. */
   .q_mines, .q_ammo { width: 54px; }
   .qc { height: 28px; gap: 3px; padding: 0 4px; }
-  .qc.wide { height: 38px; width: 44px; }
+  :root { --cell-w: 44px; }
+  .qc.wide { height: 38px; }
   /* The round cell and the door are `.qc.wide` and take that size; the slots
      in the row it opens are grid tracks and size themselves. */
   #ammoRow { bottom: calc(38px + 4px); }

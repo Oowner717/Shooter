@@ -16321,3 +16321,42 @@ came from before believing the other one covers it.
   build 290 and now describes the row. Skipped, per the working agreement: the
   ORDINAL hash (no energy, targeting or boss change), smoke, tiers, dps,
   variance and contact.
+
+- **BUILD 396 PUTS AIM AND FIRE BACK UNDER THE TURRET, BY REQUEST, AND THE
+  SHARED GAP IS DERIVED RATHER THAN CHOSEN.** Build 395's left-packed row
+  moved the pair about 25px off the turret at 390; the ask was "Keep AIM and
+  FIRE centred under the turret". With "one gap" (395) and "centred" (396)
+  both standing, the gap is not a free number: four cells of width w from the
+  strip's left edge put the AIM/FIRE midpoint at `left + 3w + 2.5g`, so
+  g = (50vw - left - 3w) / 2.5. Measured: 8px at 320, 11.8 at 375, 14.8 at
+  390, 19.6 at 414, 24.8 at 440, and the pair within 0.02px of the turret at
+  all of them. `50vw` IS the turret -- `world.shooter.x = world.width / 2` on
+  a canvas `max(320, innerWidth)` wide, portrait-locked -- and the case
+  checks it against the WORLD's turret, not against `innerWidth / 2`.
+- **Two names so the formula reads the stylesheet's own numbers.**
+  `--cell-w` on `:root` (50, 44 under 373) is now what `.qc.wide` is sized
+  by, and `--strip-l` on `#quickBar` is the bar's left inset; the gap reads
+  both. A width written in the rule and again in the formula is two numbers
+  that happen to agree, which is the thing 395 removed from the gap.
+- **Capped at half a cell, and the cap is what makes the layout sane past a
+  phone.** Uncapped a 768 tablet gets 90px gaps and four cells that read as
+  four unrelated buttons. Capped, the gap holds at w/2 and the first band
+  takes a MARGIN of `50vw - left - 3w - 2.5g` -- exactly 0 whenever the cap
+  is not reached, which is every phone in portrait (440 is 24.8 against 25)
+  -- so the pair stays centred and the row moves in from the edge. Margin, not
+  padding, so the space left of a pushed-in row is still field.
+- **The case can no longer assert against a declared gap**, because the
+  declared value is now a `min(calc(...))` token stream and parses as NaN.
+  It asserts the external anchor instead -- the AIM/FIRE midpoint against the
+  turret -- at three widths (320, 390 and 768, the last being the only one
+  that reaches the cap), with the measurement one self-contained function
+  run at each and `g.resize()` inside it because `setViewportSize` does not
+  resize the game (build 352). Eight revert proofs through the sliced-out
+  case, each on its own clause: `.autoCells` keeping 4px (gaps 8/8/4), 395's
+  fixed 6px gap (the margin then re-centres the pair and pushes the round off
+  the edge, caught by `atLeft`), no cap (90.4px at 768), no margin (pair at
+  220.5 against 384), offset as padding (left of the row stops being field),
+  the bar's gap instead of padding, the door laid after the pair, and the
+  15px icon back.
+- Skipped, per the working agreement: the ORDINAL hash (no energy, targeting
+  or boss change), smoke, tiers, dps, variance and contact.

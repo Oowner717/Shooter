@@ -53,15 +53,22 @@ and tap with the other.
 
 ### The strip
 
-**Four cells sit above the ability bar, in one row from the left edge:** the
-loaded round, **AMMO** beside it, then **AUTO AIM** and **AUTO FIRE**. All four
-are the same size with the same gap between each, and the right side of the
-row is left clear, so that part of the strip is still field.
+**Four cells sit above the ability bar, in one row:** the loaded round at the
+left edge, **AMMO** beside it, then **AUTO AIM** and **AUTO FIRE** centred
+under the turret. All four are the same size with the same gap between each —
+the gap is whatever puts AIM and FIRE under the turret on that screen: 8px on
+a 320-wide phone, about 15px at 390 and 25px at 440 — and the right side of
+the row is left clear, so that part of the strip is still field.
 
 ```
-[ BOLT ][ AMMO ][ AIM ][ FIRE ]
+                        (turret)
+[ BOLT ]  [ AMMO ]  [ AIM ]  [ FIRE ]
 [ PULSE ][ HAIL ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ WARD ]
 ```
+
+On a screen wider than any phone the gap stops growing at half a cell, and the
+row moves in from the left edge instead, so AIM and FIRE stay under the
+turret.
 
 The round cell shows what is in the barrel; pressing it fans the slots out in
 a row across the bar, and picking one loads it. **AMMO** opens the loadout,
