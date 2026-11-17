@@ -23067,6 +23067,8 @@ if (MINE_LINE) {
       out.two = a && {
         // in CSS px, which is the quantity that must not move between screens
         depth: +((a.wallY - a.mouthY) * CFG.zoom).toFixed(2),
+        // ...and the portal's own depth, on the same glass (build 397)
+        portalDepth: w.portal ? +(2 * w.portal.ry * CFG.zoom).toFixed(2) : null,
         mouthY: +(a.mouthY * CFG.zoom).toFixed(1),
         wallY: +(a.wallY * CFG.zoom).toFixed(1),
         // The mouth is the portal's rim, from build 297 -- and at these
@@ -23135,6 +23137,24 @@ if (MINE_LINE) {
     && Math.abs(small.two.mouthY - big.two.mouthY) < 0.5,
     `the mouth is at ${small.two.mouthY} CSS px on both screens, which is the `
     + `rim and is ENTRY_Y + CFG.entryDepth exactly`);
+
+  /*
+   * ---- ...and the wall stands at the portal's feet (build 397) ------------
+   *
+   * "Push the enemy barrier back closer to the portal." The wall hung 161.5
+   * world units under the rim -- 65.1 CSS px -- and from 397 it hangs 61.5,
+   * 24.8 CSS px. A case pinning the number would be a case that the number is
+   * the number; the RELATION is the request: the wall stands nearer the rim
+   * than the portal is deep, on the same glass, at both screens. It reads 24.8
+   * against 46.7 now, and the old gap put back on this build reads 65.1
+   * against 46.7 and fails. (Build 396 as a whole would pass it, 65.1 against
+   * 71.9 -- its portal was drawn half again as deep at era 2 -- so this holds
+   * the two halves of 397 together rather than either alone.)
+   */
+  check('...and the wall stands at the portal\'s feet: nearer its rim than the portal is deep',
+    rows.every((r) => r.two.portalDepth && r.two.depth > 0 && r.two.depth < r.two.portalDepth),
+    rows.map((r) => `${r.w}: the wall ${r.two.depth} CSS px under the rim, the portal `
+      + `${r.two.portalDepth} deep`).join('; '));
 }
 
 // --- the portal ---------------------------------------------------------------
@@ -23331,7 +23351,8 @@ if (MINE_LINE) {
       Math.abs(p.reach - Math.min(p.surf, p.band)) < 0.01)),
     `the rift spans ${small.one.spanPct}% of the field at 320 and ${big.one.spanPct}% at 390, `
     + `both eras, against 49.6 and 40.7 before build 388; the depth is ${small.one.ryW} world `
-    + `units at both eras -- ${small.one.ryPx * 2} CSS px at era 1 and ${small.two.ryPx * 2} at era 2 `
+    + `units at era 1 and ${small.two.ryW} at era 2 -- ${small.one.ryPx * 2} CSS px at era 1 and `
+    + `${small.two.ryPx * 2} at era 2 `
     + `(${big.two.ryPx * 2} at 390) -- and the view ry/rx goes ${small.one.view} -> ${small.two.view} `
     + `at 320 and ${big.one.view} -> ${big.two.view} at 390, with the throat's floor ${small.one.dipShare} `
     + `-> ${small.two.dipShare} and ${big.one.dipShare} -> ${big.two.dipShare} of the depth down. `
@@ -23349,13 +23370,145 @@ if (MINE_LINE) {
       .join('; '));
 
   /*
+   * ---- ...and it is DRAWN in perspective (build 397) ------------------------
+   *
+   * The geometry arm above says the depth is the world's and the view flatter
+   * at era 2. This one says the PICTURE agrees, because a drawing can be wrong
+   * while every number under it is right.
+   *
+   * THE INSTRUMENT, and why it is this one. The real `drawPortal`, sealed (so
+   * the vortex, the eye and the fourteen motes are not drawn and cannot land
+   * on a measured column), flare pinned at 0, onto black at four pixels to
+   * the CSS pixel -- with the sky's ACCENT AND LINE BOTH BLACK. Every layer
+   * drawn in those two colours then vanishes: the halo, the soft glow, the
+   * spill, the echo and the terraces. Outside the ellipse the one thing left
+   * is the rim band's outer half, drawn in `bright` -- which is grey when the
+   * accent is black -- so the ink outside the rim, near and far, IS the band,
+   * width times brightness. Two cheaper instruments were tried and both read
+   * nothing: a width at half the local maximum and the ink in a window round
+   * each rim. The far INNER wall is deliberately lit -- it faces you -- and
+   * lies right against the far rim, so both measured that wall along with the
+   * rim and read near and far as equal on a build where they plainly differ.
+   *
+   * Measured at both ends, at eleven columns across the middle of the rift:
+   * build 396 reads near/far 0.82 at both eras (a rim of one width; the far
+   * side reads a hair heavier off the curvature) and an era-2 near rim exactly
+   * as heavy as era 1's. 397 reads 3.71 and 1.94, and an era-2 near rim 0.63
+   * of era 1's. So:
+   *  - the near rim is the heavier at both eras (>= 1.4)
+   *  - a steeper view separates near from far more, so era 1's contrast is
+   *    the larger (> 1.3x era 2's) -- equal on 396
+   *  - era 2's rim is finer on the glass (<= 0.8 of era 1's), because every
+   *    stroke is authored at era 1's WORLD size
+   *  - and the two rims are drawn where the geometry puts them (within a
+   *    tenth), which is what says the instrument found them -- and, since
+   *    it is the DRAWN depth, that era 2 is shallower on the glass.
+   *
+   * The governor is pinned and put back: the hairline is derived from the
+   * canvas's own scale, and the governor's factor is part of it.
+   */
+  const persp = await page.evaluate(async () => {
+    const { drawPortal } = await import('../src/portal.js');
+    const { CFG } = await import('../src/config.js');
+    const { fx } = await import('../src/fx.js');
+    const g = window.__sim;
+    const w = g.world;
+    const wasQ = fx.quality;
+    fx.quality = 1;
+    g.setEra(1);
+    g.restart();
+    g.resize();
+    const black = { accent: '#000000', line: '#000000' };
+    const read = () => {
+      const P = w.portal;
+      const wasFlare = P.flare;
+      P.flare = 0;
+      const kk = CFG.zoom * 4;
+      const oc = document.createElement('canvas');
+      oc.width = Math.ceil(w.width * kk);
+      oc.height = Math.ceil((P.rim + 60) * kk);
+      const c = oc.getContext('2d', { willReadFrequently: true });
+      c.fillStyle = '#000';
+      c.fillRect(0, 0, oc.width, oc.height);
+      c.setTransform(kk, 0, 0, kk, 0, 0);
+      drawPortal(c, Object.create(w, { boss: { value: {} } }), black, [], null);
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      const flareBack = (P.flare = wasFlare, P.flare === wasFlare);
+      const d = c.getImageData(0, 0, oc.width, oc.height).data;
+      const lum = (x, y) => {
+        const i = (y * oc.width + x) * 4;
+        return d[i] + d[i + 1] + d[i + 2];
+      };
+      // The ink OUTSIDE the ellipse along one column, in CSS px of white.
+      const outside = (x, yRim, dir) => {
+        const y0 = Math.round(yRim * kk);
+        let sum = 0;
+        for (let k = 1; k <= Math.ceil(10 * kk); k++) {
+          const y = y0 + dir * k;
+          if (y < 0 || y >= oc.height) break;
+          sum += lum(x, y) / 765;
+        }
+        return (sum / kk) * CFG.zoom;
+      };
+      // ...and the brightest row round a rim, for where it is drawn.
+      const peakAt = (x, yRim) => {
+        const half = Math.ceil(P.ry * 0.2 * kk);
+        let best = -1;
+        let at = 0;
+        for (let y = Math.round(yRim * kk) - half; y <= Math.round(yRim * kk) + half; y++) {
+          const v = lum(x, y);
+          if (v > best) { best = v; at = y; }
+        }
+        return at;
+      };
+      const near = [];
+      const far = [];
+      for (let i = -5; i <= 5; i++) {
+        const f = i / 10;
+        const x = Math.round((P.x + f * P.rx) * kk);
+        const h = P.ry * Math.sqrt(1 - f * f);
+        near.push(outside(x, P.y + h, 1));
+        far.push(outside(x, P.y - h, -1));
+      }
+      const xc = Math.round(P.x * kk);
+      const sep = ((peakAt(xc, P.y + P.ry) - peakAt(xc, P.y - P.ry)) / kk) * CFG.zoom;
+      const med = (v) => [...v].sort((p, q) => p - q)[Math.floor(v.length / 2)];
+      return {
+        near: +med(near).toFixed(3), far: +med(far).toFixed(3),
+        ratio: +(med(near) / med(far)).toFixed(2),
+        sep: +sep.toFixed(1), want: +(2 * P.ry * CFG.zoom).toFixed(1), flareBack,
+      };
+    };
+    const one = read();
+    g.setEra(2);
+    const two = read();
+    g.setEra(1);
+    fx.quality = wasQ;
+    g.resize();
+    g.restart();
+    return { one, two, put: fx.quality === wasQ && w.era === 1 && one.flareBack && two.flareBack };
+  });
+  check('...and it is DRAWN in perspective: the near rim heavier than the far one, and finer at era 2, where it is further away',
+    [persp.one, persp.two].every((r) => r.near > 0.05 && r.ratio >= 1.4
+      && Math.abs(r.sep - r.want) <= r.want * 0.1)
+    && persp.one.ratio > persp.two.ratio * 1.3
+    && persp.two.near <= persp.one.near * 0.8
+    && persp.two.want < persp.one.want - 10
+    && persp.put,
+    `the rim's ink near/far ${persp.one.near}/${persp.one.far} CSS px (x${persp.one.ratio}) at era 1 `
+    + `and ${persp.two.near}/${persp.two.far} (x${persp.two.ratio}) at era 2, against 0.82 at both `
+    + `for a rim of one width; era 2's near rim ${(persp.two.near / persp.one.near).toFixed(2)} of `
+    + `era 1's; the rims drawn ${persp.one.sep} and ${persp.two.sep} CSS px apart against a geometry `
+    + `of ${persp.one.want} and ${persp.two.want}; governor, era and flare put back ${persp.put}`);
+
+  /*
    * ---- the three passes, rendered ------------------------------------------
    * An offscreen canvas, the real `drawPortal`, and a stub body draw that
    * paints a white disc -- so what is measured is where the portal LETS a
    * body be painted, against a baseline of the portal with nothing in it.
    */
   const rr = await page.evaluate(async () => {
-    const { drawPortal, portalBirth } = await import('../src/portal.js');
+    const { drawPortal, portalBirth, rimWidths } = await import('../src/portal.js');
     const { background } = await import('../src/background.js');
     const { TYPE_BY_ID } = await import('../src/config.js');
     const g = window.__sim;
@@ -23407,20 +23560,36 @@ if (MINE_LINE) {
     out.ghostIn = changed(gd, ghost.x - r, ghost.y - r, ghost.x + r, ghost.y + r);
     out.ghostOut = changed(gd, 0, P.rim + 2, w.width, P.rim + 200);
     // Straddling the rim: whole below it, and brighter than the ghost.
+    /*
+     * The rim is drawn OVER a body coming through it, by design -- that is
+     * what makes it read as the hoop the body is pushing through -- so "whole
+     * once through" starts where the rim's own band ENDS, not at the rim.
+     * The box began at `rim + 2` while the rim was one width all round, and
+     * its expected area was the segment below the rim itself, so it was
+     * really asking for 98% of what the box could see. Build 397 drew the
+     * NEAR rim heavier (the edge nearest you) and tipped it 3 pixels under.
+     * It reads the band off `rimWidths`, the drawing's own owner, with the
+     * flare pinned and no stale birth marks, so the band is the width the
+     * drawing says and the area is the segment the box can actually see.
+     */
+    P.flare = 0;
+    P.births.length = 0;
     const born = { x: P.x, y: P.rim - 10, r, staged: true };
     const bd = paint([born]);
-    out.bornBelow = changed(bd, born.x - r, P.rim + 2, born.x + r, P.rim + r + 2);
+    const below = P.rim + rimWidths(P).near / 2 + 2;
+    out.bornBelow = changed(bd, born.x - r, below, born.x + r, P.rim + r + 2);
     out.bornAbove = changed(bd, born.x - r, P.y - 2 * r, born.x + r, P.y - 1);
     // ...and the emerged part is painted at FULL alpha: read as a pixel, not
     // as a peak difference, because the ground under the rim is the rim's own
     // glow and a white disc over a bright ground is a small difference.
     const bi = (Math.round((P.rim + 14) * kk) * oc.width + Math.round(born.x * kk)) * 4;
     out.bornPx = bd[bi] + bd[bi + 1] + bd[bi + 2];
-    // The part of the disc below the rim is a circular SEGMENT -- the centre
-    // is 10 above the chord -- and the first version of this asked for a
-    // rectangle's worth (240) of a segment that measures 206 exactly.
-    const dd = 10;
+    // The part of the disc below the band is a circular SEGMENT -- its chord
+    // `below - born.y` from the centre -- and the first version of this asked
+    // for a rectangle's worth (240) of a segment that measured 206 exactly.
+    const dd = below - born.y;
     out.discBelow = Math.round((r * r * Math.acos(dd / r) - dd * Math.sqrt(r * r - dd * dd)) * kk * kk * 0.85);
+    out.bandHalf = +(below - P.rim).toFixed(2);
 
     /*
      * ---- a birth is marked on the rim, from the one place `staged` comes off
@@ -23507,7 +23676,8 @@ if (MINE_LINE) {
     && rr.bornBelow.n >= rr.discBelow && rr.bornPx >= 720 && rr.bornAbove.n === 0,
     `above the top: ${rr.hidden.n} pixels changed; inside: ${rr.ghostIn.n} changed at peak `
     + `${rr.ghostIn.peak} of 765, ${rr.ghostOut.n} below the rim; straddling: ${rr.bornBelow.n} `
-    + `below the rim (at least ${rr.discBelow} for the disc), painted at ${rr.bornPx} of 765, `
+    + `below the rim's band (at least ${rr.discBelow} for the disc, the box starting `
+    + `${rr.bandHalf} under the rim), painted at ${rr.bornPx} of 765, `
     + `${rr.bornAbove.n} above the centre line`);
 
   check('...and a birth is marked on the rim on the frame the body clears it, and is gone in a second',

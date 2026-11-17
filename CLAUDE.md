@@ -16360,3 +16360,95 @@ came from before believing the other one covers it.
   15px icon back.
 - Skipped, per the working agreement: the ORDINAL hash (no energy, targeting
   or boss change), smoke, tiers, dps, variance and contact.
+
+- **BUILD 397 IS TWO REQUESTS, AND THE FIRST FINDING IS THAT THE PORTAL HAD
+  NO PERSPECTIVE AT ALL: IT WAS THE SAME PICTURE TO THE PIXEL AT BOTH ERAS.**
+  Asked for: "push the enemy barrier back closer to the portal" and "change
+  the design of the portal to better reflect the perspective difference
+  between era 1 and era 2". Rendered either side before designing anything:
+  `rx` is the field's half width (build 388) and `ry` was in SCALED, so BOTH
+  axes held their size on the glass -- 390 wide and 72 CSS px deep at era 1
+  and at era 2 -- while the era that pulls the camera back 1.54x drew every
+  body, round and stroke 0.65 as large. The one thing at the far end of the
+  field was the one thing the camera never moved away from.
+- **SO THE ANGLE IS DERIVED, AND ONE RATIO DRIVES EVERY CUE.** A circle of
+  radius `rx` lying flat, seen at an angle whose sine is `ry / rx`, IS the
+  ellipse -- so `ry` became the WORLD's (58 units at both eras, out of
+  SCALED: 36 CSS px deep at era 1, 23.4 at era 2), and `drawPortal` reads the
+  rest off the ratio: 0.184 at era 1 and 0.120 at era 2 on a 390-point phone.
+  The throat SINKS (`P.dip = funnel x sqrt(rx^2 - ry^2)`, a funnel seen at
+  that angle), so the eye sits 0.40 of the depth down at era 1 and 0.62 at
+  era 2 -- a flatter view sees more far wall and less floor. The near rim is
+  a filled BAND (`rimBand`, offset along the ellipse's true normal) heavier
+  than the far one by a contrast off the same ratio (far at 0.41 of near at
+  era 1, 0.62 at era 2), the far wall is terraced, the near lip is shadow,
+  and every stroke and mark is authored at era 1's WORLD size (`strokeOf`),
+  so the detail shrinks on the glass at era 2 like everything else.
+  **Era 1's geometry is untouched** -- `ry` was 58 there already -- so its
+  rim, surface and every reader of them are what they were; what moved at
+  era 1 is the picture.
+- **ERA 2'S SURFACE GOT SHALLOWER, AND THAT WAS MEASURED RATHER THAN CALLED
+  "A FRACTION OF A SECOND".** The first draft of the docstring said exactly
+  that, unmeasured. Eight bodies of each, released 600 units above the rim at
+  390x844: a MOTE is born 0.23s sooner (5.30 -> 5.07), a LURCHER 0.53s and a
+  BULWARK 0.74s -- 4 to 5% of the march. And under a notch the portal fits
+  62.5 units higher, so the entry line sits nearer its authored 400 there; at
+  every viewport the suite runs the line binds and the rim does not move.
+  The floor is held at 0.8 of the depth because the projection runs off the
+  field's width, and a tablet at era 2 would put it past the near rim (1.23
+  of the depth at 768) and clip the eye away.
+- **THE WALL: `CFG.yard.gap` 105 -> 40, 161.5 -> 61.5 world units at era 2,
+  65.1 -> 24.8 CSS px.** Its consequences measured, not argued: six of the 37
+  loose hostile types (r 33 and up) now lean past the wall before they are
+  fully through the rim, which is the existing rule (`staged` never gated a
+  round, only the choosers); KITE's station is floored at the wall, so at
+  320x568 era 2 the line stands 385 from the mount instead of 285, and at
+  390x844 the reach circle binds and nothing moves; and SHRIKE's recorded
+  era-2 fault (hold band behind the wall) is gone with it. Three source
+  comments quoting the old wall were annotated rather than left reading as
+  current: the boss-suspension argument in `wallLine` (the ruling holds --
+  TERMINUS's core still sits behind the line), `lotAhead`'s bound, and the
+  KITE table.
+- **TWO PIXEL INSTRUMENTS READ NOTHING BEFORE THE THIRD READ THE RIM, AND
+  THE REASON IS THE DESIGN ITSELF.** The far INNER wall is deliberately lit
+  -- it faces you -- and lies against the far rim, so a width at half the
+  local maximum and the ink in a window round each rim both measured that
+  wall along with the rim and read near and far as equal (12/12 at era 1 on
+  a build where they plainly differ). The probe that first "confirmed" the
+  design read 26/17 only because it caught the rim mid-FLARE from a fresh
+  birth -- a reading that depended on what happened to be dying near the
+  rim. What works: draw with the sky's accent AND line both black, so the
+  halo, glow, spill, echo and terraces vanish and the only thing outside
+  the ellipse is the rim band's outer half; its ink, near and far, IS the
+  band. Build 396 reads near/far 0.82 at both eras, 397 reads 3.71 and 1.94,
+  and era 2's near rim is 0.63 of era 1's on the glass. **When a cue is
+  drawn on top of something deliberately bright, black out the bright thing
+  rather than thresholding against it.**
+- **THE EMERGED-PASS ARM WAS DEMANDING 98% OF WHAT ITS BOX COULD SEE.** It
+  measured from `rim + 2` but expected the segment below the rim itself,
+  times 0.85 -- so the heavier near rim (drawn OVER a body coming through,
+  by design) tipped it 3 pixels under, 172 against 175. It measures below
+  the band now, reading the band's width off `rimWidths` -- exported for the
+  suite and said so, the drawing's one owner -- with the flare pinned and
+  stale birth marks cleared, and the expected area is the segment that box
+  can actually see (171 against a floor of 111).
+- **AND A DETAIL STRING ASSERTED ITS OWN CONCLUSION, FOR THE SIXTH TIME.**
+  The rewritten geometry arm printed "the depth is 58 world units at both
+  eras" off era 1's figure alone, so the revert proof with `ry` back in
+  SCALED read "58 at both" beside a FAIL whose real era-2 depth was 89.2.
+  It prints each era's now. Found by reading the proof's message rather than
+  its verdict, which is the only way this one is ever found.
+- **FIVE REVERT PROOFS, EACH ON ITS OWN CONJUNCT, through the sliced-out
+  blocks:** a one-width rim (era 2 reads 1.23 against 1.4), strokes held on
+  the glass (era 2's rim 1.01 of era 1's), `ry` back in SCALED (the geometry
+  arm reads 71.9 CSS px at both eras, and the drawn depth fails too), a flat
+  throat (`dipShare` 0), and the old gap put back (the new yard arm reads the
+  wall 65.1 under a 46.75-deep portal). That last arm is a RELATION -- the
+  wall nearer the rim than the portal is deep -- because pinning the number
+  would test that the number is the number; build 396 as a whole would pass
+  it (its portal was deeper), so it holds the two halves of 397 together.
+- **THE CONTAINER REBOOTED MID-BUILD AND COST NOTHING, BECAUSE THE WORK WAS
+  ALREADY ON DISK AND THEN PUSHED.** Uptime read 0 minutes, both servers were
+  gone, the worktree and scratchpad survived -- and a WIP commit went to the
+  dev branch (not the Pages branch) immediately, per build 328's rule that a
+  build is most expensive to lose exactly when the measuring is done.

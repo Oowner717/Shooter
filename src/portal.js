@@ -376,7 +376,7 @@ export function updatePortal(world, dt) {
  *    same ratio: a steeper view separates near from far more, so the far
  *    rim is 0.41 of the near one's width at era 1 and 0.62 at era 2.
  *  - EVERY STROKE AND MARK is authored at era 1's world size and drawn at
- *    that world size at era 2 (`fine`, floored at the hairline), so the
+ *    that world size at era 2 (`strokeOf`, floored at the hairline), so the
  *    rift's detail shrinks on the glass with everything else on the field.
  *  - and the FAR WALL is terraced while the wall nearest us is in shadow --
  *    the inside of a pit faces you on its far side and away on its near one.
@@ -389,7 +389,6 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   const P = world.portal;
   if (!P) return;
   const k = CFG.scale;
-  const hl = CFG.hairline;
   const t = world.time || 0;
   const sealed = !!world.boss;
   const accent = mood.accent;
@@ -398,25 +397,12 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   const live = sealed ? 0.35 : 1;
   const W = world.width;
   const H = world.height;
-  /*
-   * `hl` is a DEVICE-pixel floor, so `hl * n` is the same on the glass at
-   * both eras. Dividing by the era's scale makes it the same WORLD width
-   * instead -- identical at era 1, where `k` is exactly 1, and 0.65 on the
-   * glass at era 2 -- with the hairline as the floor so nothing vanishes.
-   */
-  const fine = 1 / k;
-  const lw = (n) => Math.max(hl, hl * n * fine);
+  // Every stroke here is at era 1's WORLD size -- see `strokeOf`.
+  const lw = strokeOf;
   // How far a ring of the throat at fraction `rho` of the rim projects below
   // its own centre. 0 at the rim, `P.dip` at the eye.
   const sink = (rho) => P.dip * (1 - rho) ** 1.6;
-  /*
-   * The near/far contrast, off the same ratio that IS the view: 0.59 at era 1
-   * and 0.38 at era 2 on a 390-point phone. Clamped for the screens the
-   * ratio runs off: a tablet at era 2 reads 0.20, which would draw the far
-   * rim nearly as heavy as the near one, and nothing reachable goes past the
-   * top of it.
-   */
-  const persp = clamp((P.ry / P.rx) * 3.2, 0.25, 0.75);
+  const band = rimWidths(P);
   /*
    * A vertical gradient from the far rim to the near one. The rim is
    * `y = P.y + ry sin(phi)`, so nearness `(1 + sin phi) / 2` is LINEAR in y
@@ -700,9 +686,8 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   ctx.beginPath();
   ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, TAU);
   ctx.stroke();
-  const nearW = 3.6 + P.flare * 1.8;
-  ctx.fillStyle = nearFar(bright, rimA * (1 - persp * 0.8), rimA);
-  rimBand(ctx, P, lw(nearW * (1 - persp)), lw(nearW));
+  ctx.fillStyle = nearFar(bright, rimA * (1 - band.persp * 0.8), rimA);
+  rimBand(ctx, P, band.far, band.near);
   ctx.strokeStyle = nearFar(accent, 0.18 * live, 0.4 * live);
   ctx.lineWidth = lw(1);
   ctx.beginPath();
@@ -770,6 +755,40 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   }
 
   ctx.restore();
+}
+
+/**
+ * A stroke width: `n` hairlines at era 1's WORLD size.
+ *
+ * `CFG.hairline` is a DEVICE-pixel floor, so `hairline * n` is the same on the
+ * glass at both eras. Dividing by the era's scale makes it the same world
+ * width instead -- identical at era 1, where the scale is exactly 1, and 0.65
+ * on the glass at era 2 -- with the hairline as the floor so nothing vanishes.
+ */
+function strokeOf(n) {
+  const hl = CFG.hairline;
+  return Math.max(hl, (hl * n) / CFG.scale);
+}
+
+/**
+ * The rim band's width on the NEAR rim and the FAR one, in world units, and
+ * the contrast between them. One owner: `drawPortal` draws the band off it,
+ * and the suite's emerged-pass arm reads it to measure BELOW the band -- the
+ * rim is drawn over a body coming through it, by design, so where the band
+ * ends is where "whole once through" starts. Exported for the suite, which is
+ * a stated reason and not an accident.
+ *
+ * `persp` is the near/far contrast, off the same ratio that IS the view
+ * (`ry / rx`): 0.59 at era 1 and 0.38 at era 2 on a 390-point phone, so the
+ * far rim is drawn at 0.41 and 0.62 of the near one's width. Clamped for the
+ * screens the ratio runs off: a tablet at era 2 reads 0.20, which would draw
+ * the far rim nearly as heavy as the near one. A birth's flare widens the
+ * near rim, and the far one with it.
+ */
+export function rimWidths(P) {
+  const persp = clamp((P.ry / P.rx) * 3.2, 0.25, 0.75);
+  const nearW = 3.6 + P.flare * 1.8;
+  return { near: strokeOf(nearW), far: strokeOf(nearW * (1 - persp)), persp };
 }
 
 /**
