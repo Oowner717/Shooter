@@ -16452,3 +16452,45 @@ came from before believing the other one covers it.
   gone, the worktree and scratchpad survived -- and a WIP commit went to the
   dev branch (not the Pages branch) immediately, per build 328's rule that a
   build is most expensive to lose exactly when the measuring is done.
+- **THE FIRST SUITE RUN WAS 801 OF 804, AND ALL THREE REDS WERE CASES
+  INHERITING SOMETHING THIS BUILD MOVED.** None reproduced on a fresh page,
+  which is the inherited-state signature -- and each one's inheritance was
+  found by reproducing the suite's own figure to the unit before changing
+  anything.
+  - **The emerged-pass arm, at the governor's floor.** The suite reached it at
+    quality 0.45, which widens every hairline 1.43x, so the soft glow under
+    the rim reached the `rim + 14` pixel the arm reads the emerged body off
+    -- always so, and harmless while that glow was 0.2 alpha all round (726
+    against 720). The near glow is 0.26 from 397 and it read 714. Pinned to
+    quality 1 and put back, build 379's rule: a case not about the governor
+    must not inherit its draw.
+  - **The PILE half of the wall case can no longer ask its question, and
+    that is the wall request working.** The level-3 front reaches 369 at era
+    2 and the wall now stands 411 above the machine at 320x568 -- the
+    SHORTEST field, so further at every other screen -- so the front never
+    meets it and the arm's vacuity conjunct (`pileReach > pileToWall`)
+    failed correctly. The guard inside `Front.update` is LATENT at every
+    supported screen now and is still the guard, so the arm lengthens the
+    front to 120 past the wall for one push (`CFG.pile.r` overridden after
+    the last resize and put back on the next line, so the constructor
+    derives its own travel off it) and reports the natural reach. Proved by
+    deleting the guard: the body behind the wall is struck at 0.48.
+  - **The BELL tick case never set an era, and lays its bodies at fixed
+    world positions.** The suite reaches it at era 2, where y 330 is inside
+    the portal and y 480 sits on the moved wall's own band, both drawn into
+    the buffer the shader tears -- standalone at era 2 it reproduced the
+    suite's 219 tick pixels and 86 swallowed to the unit. Era 1 holds 0.991
+    on 396 and 0.992 on 397; era 2 held 0.997 on 396 and 0.979 on 397, and
+    0.966 in the suite against 0.97. A BELL is band 2, so its field is era
+    1's -- which the staging sky it already pins says -- and the era is set
+    and put back. Entered at era 2 with the governor at 0.45 it now reads
+    0.997 against a field of 0.866.
+  The general shape, and it is this file's oldest rule arriving three ways at
+  once: **a case that lays bodies at fixed world positions is a case about
+  whatever geometry happens to be at those positions**, so a build that
+  moves geometry owes every such case a re-read -- and `restart()` resets
+  neither the era nor the governor.
+- Skipped, per the working agreement: smoke, tiers, dps, variance and
+  contact. The ORDINAL hash is taken below rather than skipped, because the
+  wall is targeting at era 2 -- and it is structurally blind to both halves
+  of this build (an era-1 fight, no yard, `fight.mjs` never paints).

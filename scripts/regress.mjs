@@ -23511,9 +23511,23 @@ if (MINE_LINE) {
     const { drawPortal, portalBirth, rimWidths } = await import('../src/portal.js');
     const { background } = await import('../src/background.js');
     const { TYPE_BY_ID } = await import('../src/config.js');
+    const { fx } = await import('../src/fx.js');
     const g = window.__sim;
     const w = g.world;
+    /*
+     * The governor pinned, and put back at the end. The rim's layers are drawn
+     * in hairlines, and the hairline is derived from the canvas's own scale --
+     * the governor's factor included -- so at the governor's floor the soft
+     * glow under the rim is 1.43x as wide and reached the `rim + 14` pixel
+     * this case reads the emerged body off. That was always so; build 397
+     * made the NEAR glow brighter (the near rim is the heavier) and it read
+     * 714 against 720 in the suite and 765 alone. A case that is not about
+     * the governor must not inherit its draw (build 379).
+     */
+    const wasQ = fx.quality;
+    fx.quality = 1;
     g.restart();
+    g.resize();
     w.director.update = () => {};
     const P = w.portal;
     const kk = 0.5;
@@ -23666,18 +23680,23 @@ if (MINE_LINE) {
     out.drawLoose = counts.get(loose) || 0;
     g.debugClearField();
     delete w.director.update;
+    fx.quality = wasQ;
+    g.resize();
     g.restart();
+    out.qualityPut = fx.quality === wasQ;
     return out;
   });
 
   check('a staged body is drawn nowhere above the portal, ghosted inside it, and whole once through',
     rr.hidden.n === 0
     && rr.ghostIn.n > 40 && rr.ghostOut.n === 0 && rr.ghostIn.peak < 500
-    && rr.bornBelow.n >= rr.discBelow && rr.bornPx >= 720 && rr.bornAbove.n === 0,
+    && rr.bornBelow.n >= rr.discBelow && rr.bornPx >= 720 && rr.bornAbove.n === 0
+    && rr.qualityPut,
     `above the top: ${rr.hidden.n} pixels changed; inside: ${rr.ghostIn.n} changed at peak `
     + `${rr.ghostIn.peak} of 765, ${rr.ghostOut.n} below the rim; straddling: ${rr.bornBelow.n} `
     + `below the rim's band (at least ${rr.discBelow} for the disc, the box starting `
-    + `${rr.bandHalf} under the rim), painted at ${rr.bornPx} of 765, `
+    + `${rr.bandHalf} under the rim), painted at ${rr.bornPx} of 765 (governor put back `
+    + `${rr.qualityPut}), `
     + `${rr.bornAbove.n} above the centre line`);
 
   check('...and a birth is marked on the rim on the frame the body clears it, and is gone in a second',
@@ -26928,18 +26947,36 @@ if (MINE_LINE) {
      * PILE is a TURRET node, not an ability: its front is launched by the
      * shooter off `world.pileT`. The guard under test is inside `Front.update`,
      * so the front is pushed directly at its top level -- the trigger is not
-     * what is being asked about. 320x568 on purpose: the wall is 287 above the
-     * machine there and the level-3 front reaches 369, so the front actually
-     * meets it; on the tall screen it never does and the arm asks nothing.
+     * what is being asked about. 320x568 on purpose: it is the shortest field,
+     * so the wall is nearest the machine there.
+     *
+     * ---- AND FROM BUILD 397 THE FRONT HAS TO BE LENGTHENED TO MEET IT ------
+     * The wall hung 161.5 under the portal's rim and the level-3 front reached
+     * 369 against a wall 311.5 above the machine, so it met it. The wall hangs
+     * 61.5 under the rim from 397 and stands 411 above the machine here --
+     * further at every other screen -- so the front as configured never
+     * reaches it, and with it as configured the arm would ask nothing: the
+     * body behind the wall would be out of the front's reach whether or not
+     * the guard was there. The guard is LATENT at every supported screen now
+     * and is still the guard, so the front is built 120 past the wall for
+     * this one push -- `CFG.pile.r` overridden after the last resize on this
+     * path (`clean`), so the constructor derives its own travel and life off
+     * it, and put back on the next line -- and the natural reach is reported.
      */
     clean(2);
     const y4 = w.yard;
     const struck = body('lurcher', w.shooter.x, y4.wallY - 24 - 10);
     const open2 = body('lurcher', w.shooter.x + 60, y4.wallY + 60);
-    out.pileReach = +(CFG.pile.r[2]).toFixed(0);
     out.pileToWall = +(w.shooter.y - y4.wallY).toFixed(0);
+    out.pileNatural = +(CFG.pile.r[2]).toFixed(0);
+    const wasPileR = CFG.pile.r;
+    CFG.pile.r = wasPileR.map((v, i) => (i === 2 ? Math.max(v, out.pileToWall + 120) : v));
+    const front = new Front(w.shooter.x, w.shooter.y, 3);
+    CFG.pile.r = wasPileR;
+    out.pileReach = +front.r.toFixed(0);
+    out.pilePut = CFG.pile.r === wasPileR;
     struck.thrown = 0; open2.thrown = 0;
-    w.effects.push(new Front(w.shooter.x, w.shooter.y, 3));
+    w.effects.push(front);
     const sx4 = struck.y; const ox4 = open2.y;
     // The PEAK, not the end: `thrown` is a 0.5s clock that runs down every
     // frame, so a body struck on frame 20 reads 0 again by frame 60 -- the
@@ -27009,15 +27046,16 @@ if (MINE_LINE) {
     && r.safeSpeed > r.cruise * 0.3 && r.nearSpeed < r.cruise * 0.1
     && r.arcShot && r.legalHit === 'arc' && r.hiddenHit === null && r.arcsOver === 0
     && r.hiddenShielded && r.hiddenNear
-    && r.pileReach > r.pileToWall && r.struckThrown === 0 && r.openThrown > 0,
+    && r.pileReach > r.pileToWall && r.pilePut && r.struckThrown === 0 && r.openThrown > 0,
     `under STASIS a body behind the wall runs at ${r.safeSpeed} of ${r.cruise} `
     + `while one below it is held at ${r.nearSpeed} -- a separation of `
     + `${r.nearSpeed ? (r.safeSpeed / r.nearSpeed).toFixed(0) : 'inf'}x, which is the claim `
     + `(measured 79-207x over six runs against about 1x broken either way); ARC earthed the body it hit `
     + `(${r.legalHit}) and not the one behind the wall (${r.hiddenHit}), with `
-    + `${r.arcsOver} arcs drawn over it; PILE's front reaches ${r.pileReach} `
-    + `against a wall ${r.pileToWall} out and marked the body behind it `
-    + `${r.struckThrown} and the one below ${r.openThrown}`);
+    + `${r.arcsOver} arcs drawn over it; PILE's front, lengthened to ${r.pileReach} for the push `
+    + `(its own top reach is ${r.pileNatural}, which no longer meets the wall), against a wall `
+    + `${r.pileToWall} out, marked the body behind it ${r.struckThrown} and the one below `
+    + `${r.openThrown}; the config put back ${r.pilePut}`);
 }
 
 /*
@@ -32499,6 +32537,21 @@ if (MINE_LINE) {
       w.stasis = 0;
       w.bell = 0;
     };
+    /*
+     * ---- AND THE ERA IS PINNED TOO (build 397) -----------------------------
+     * The bodies below are laid at FIXED world positions -- y 330 and 480 --
+     * and the case never set an era, so it ran on whichever one the suite
+     * left. In the suite that is era 2, where the portal spans y 284-400 and
+     * the yard wall stands at 461.5 from 397: half the ticks lay inside the
+     * portal and the rest on the wall's own band, both drawn into the buffer
+     * the shader tears. Measured either side, standalone: era 1 holds 0.991
+     * on 396 and 0.992 on 397; era 2 held 0.997 on 396 and 0.979 on 397, and
+     * 0.966 in the suite against a bound of 0.97. A BELL is a band-2 body, so
+     * its field is era 1's -- which the staging sky pinned below already says
+     * -- and the era is put back at the foot, beside the sky and the canvas.
+     */
+    const wasEra = w.era;
+    if (w.era !== 1) g.setEra(1);
     g.restart();
     g.debugTeachAll();
     clear();
@@ -32733,7 +32786,12 @@ if (MINE_LINE) {
      * is the same argument for the same reason, since it is the ground every
      * later pixel reading is taken over. Restored to the part-eased blend that
      * was found rather than to a NAME, because there is no name to read back.
+     * The era first: `setEra` snaps the sky to the era's own mood, and the
+     * blend that was found goes back over that.
      */
+    if (w.era !== wasEra) g.setEra(wasEra);
+    out.eraOk = w.era === wasEra;
+    out.eraFound = wasEra;
     Object.assign(background.mood, wasSky.mood);
     for (const k of KEYS) background.moodF[k] = wasSky.moodF[k];
     background.target = wasSky.target;
@@ -32810,12 +32868,13 @@ if (MINE_LINE) {
     // ...and the sky and the canvas this was measured over were the pinned
     // ones and were handed back, or every figure above is a reading of
     // whatever the suite happened to leave.
-    && r.skyOk && r.qOk,
+    && r.skyOk && r.qOk && r.eraOk,
     `with the shader at full over ${r.frames} frames, ${r.tickPx} tick pixels held `
     + `${r.tickHold} of their places against ${r.fieldHold} for the same number of the field's `
     + `own thin pixels -- which are drawn into the buffer the shader tears; the tick brightened `
     + `${r.tickDrew} pixels of which ${r.tickSwallowed} (${r.tickSwShare}) were already lit; `
-    + `sky and quality (found ${r.qFound}) put back: ${r.skyOk} and ${r.qOk}`);
+    + `sky, quality (found ${r.qFound}) and era (found ${r.eraFound}) put back: `
+    + `${r.skyOk}, ${r.qOk} and ${r.eraOk}`);
 
   check('...and a bearing is a DIRECTION, so a body going nowhere has none',
     r.stillExtra === 0,
