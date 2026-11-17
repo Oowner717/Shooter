@@ -23179,6 +23179,13 @@ if (MINE_LINE) {
       const read = (P) => P && {
         rxPx: +(P.rx * CFG.zoom).toFixed(2),
         ryPx: +(P.ry * CFG.zoom).toFixed(2),
+        // the depth in WORLD units, which is what holds across eras from 397
+        ryW: P.ry,
+        // ...the view it implies, and where the throat's floor lands as a
+        // share of the depth -- the two numbers the drawing reads
+        view: +(P.ry / P.rx).toFixed(4),
+        dipShare: +(P.dip / P.ry).toFixed(4),
+        zoom: CFG.zoom,
         topPx: +(P.top * CFG.zoom).toFixed(1),
         rimPx: +(P.rim * CFG.zoom).toFixed(1),
         onLine: Math.abs(P.rim - CFG.entryDepth) < 1e-9,
@@ -23270,25 +23277,47 @@ if (MINE_LINE) {
       .join('; '));
 
   /*
-   * ---- AS WIDE AS THE FIELD AND AS DEEP AS IT LOOKS ------------------------
+   * ---- AS WIDE AS THE FIELD, AND AS DEEP AS THE WORLD SAYS ------------------
    *
    * Build 388 split one claim in two, and the split is the whole of it. The
-   * DEPTH is still a picture: `ry` is in SCALED, so `ryPx` is the same at both
-   * screens and both eras, which is what the old arm asserted of BOTH axes.
-   * The WIDTH is the field's: `rx` is `world.width / 2`, so the span is
-   * exactly 100% everywhere rather than a fraction of the screen that ran
-   * 49.6% at 320 against 40.7% at 390.
+   * WIDTH is the field's: `rx` is `world.width / 2`, so the span is exactly
+   * 100% everywhere rather than a fraction of the screen that ran 49.6% at
+   * 320 against 40.7% at 390.
+   *
+   * The DEPTH was a picture -- `ry` in SCALED, the same CSS px at both screens
+   * and BOTH ERAS -- and build 397 made it the world's, because a depth held
+   * on the glass at both eras is a far end the camera never moved away from:
+   * the portal was the same picture to the pixel at era 1 and era 2 while
+   * everything else on the era-2 field drew 0.65 as large. So what this asserts
+   * now is the opposite of what it did across eras and the same across
+   * screens: one WORLD depth at both eras (`ryW`), which puts era 2's on the
+   * glass at exactly the camera ratio of era 1's -- 23.4 CSS px against 36 --
+   * and still one CSS depth per era across the two screens. Reverting `ry` to
+   * SCALED gives 36 at both eras and fails the ratio.
+   *
+   * ...and the view follows: `ry / rx` is the sine of the angle the far end is
+   * seen at, so it is SMALLER at era 2 (flatter, further), and the throat's
+   * floor sits a LARGER share of the depth down there (`dipShare`), which is
+   * the cue the drawing is built on. Both inside (0, 0.8], where 0.8 is the
+   * hold `syncPortal` puts on the floor so the eye is never clipped away.
    *
    * The equality ACROSS SCREENS is kept and its subject moved -- it was
    * `rxPx`, and it is the span fraction now, which is 1 by construction. That
    * is the arm still being able to fail: a reverted `rx` gives 40.7 and 49.6
    * and fails BOTH the exactness and the agreement.
    */
-  check('...and it spans the field end to end, holds its DEPTH on the glass, and clears the chrome',
-    // the depth is a picture: the same CSS px at both screens and both eras
-    Math.abs(small.one.ryPx - big.one.ryPx) < 0.5
-    && Math.abs(small.one.ryPx - small.two.ryPx) < 0.5
-    && Math.abs(small.one.ryPx - big.two.ryPx) < 0.5
+  check('...and it spans the field end to end, holds one WORLD depth at both eras, and clears the chrome',
+    // the depth is the world's: one figure at both eras and both screens...
+    rows.every((r) => r.one.ryW === r.two.ryW) && small.one.ryW === big.one.ryW
+    // ...so on the glass it is one CSS depth per era across the screens...
+    && Math.abs(small.one.ryPx - big.one.ryPx) < 0.5
+    && Math.abs(small.two.ryPx - big.two.ryPx) < 0.5
+    // ...and era 2's is era 1's at exactly the camera ratio: further away
+    && rows.every((r) => Math.abs(r.two.ryPx - r.one.ryPx * (r.two.zoom / r.one.zoom)) < 0.05
+      && r.two.ryPx < r.one.ryPx - 5)
+    // ...so the view is flatter at era 2 and the floor sits further down
+    && rows.every((r) => r.two.view < r.one.view && r.two.dipShare > r.one.dipShare
+      && [r.one, r.two].every((p) => p.dipShare > 0 && p.dipShare <= 0.8))
     // ...and the width is the field's, exactly, at every screen and era
     && rows.every((r) => [r.one, r.two].every((p) => p.spans
       && Math.abs(p.spanPct - 100) < 0.01
@@ -23301,8 +23330,12 @@ if (MINE_LINE) {
     && rows.every((r) => [r.one, r.two].every((p) =>
       Math.abs(p.reach - Math.min(p.surf, p.band)) < 0.01)),
     `the rift spans ${small.one.spanPct}% of the field at 320 and ${big.one.spanPct}% at 390, `
-    + `both eras, against 49.6 and 40.7 before build 388; the depth holds `
-    + `${small.one.ryPx * 2} CSS px at both. Births reach ${small.one.reachPct}% of the width at `
+    + `both eras, against 49.6 and 40.7 before build 388; the depth is ${small.one.ryW} world `
+    + `units at both eras -- ${small.one.ryPx * 2} CSS px at era 1 and ${small.two.ryPx * 2} at era 2 `
+    + `(${big.two.ryPx * 2} at 390) -- and the view ry/rx goes ${small.one.view} -> ${small.two.view} `
+    + `at 320 and ${big.one.view} -> ${big.two.view} at 390, with the throat's floor ${small.one.dipShare} `
+    + `-> ${small.two.dipShare} and ${big.one.dipShare} -> ${big.two.dipShare} of the depth down. `
+    + `Births reach ${small.one.reachPct}% of the width at `
     + `320 and ${big.one.reachPct}% at 390 (surface ${big.one.surf} against band `
     + `${big.one.band}, the tighter one binding). The top sits at ${small.one.topPx}px against a `
     + `chrome ending at ${small.chromePx}px, and the rim is the entry line (${small.one.rimPx}px)`);

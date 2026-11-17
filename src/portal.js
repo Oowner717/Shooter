@@ -78,13 +78,51 @@ export function syncPortal(world, entryY, chromeY = 0) {
    *
    * It is the half width now, so the rift runs from one end of the field to
    * the other at every screen and both eras BY CONSTRUCTION rather than by a
-   * constant somebody picked. `ry` stays in SCALED and stays a picture: the
-   * rift is as wide as the field and as deep as it LOOKS, and the two halves
-   * of that sentence are two different kinds of number. That also keeps the
-   * rim where it was -- it is `max(line, chromeY + pad + 2 ry)` and no term
-   * of it contains `rx` -- so `entryLine` does not move, and nothing that
-   * reads the line (the staged march, the yard's mouth, the debug picker's
-   * floor, `standHeight`) changes at all.
+   * constant somebody picked. That also keeps the rim where it was -- it is
+   * `max(line, chromeY + pad + 2 ry)` and no term of it contains `rx` -- so
+   * `entryLine` does not move, and nothing that reads the line (the staged
+   * march, the yard's mouth, the debug picker's floor, `standHeight`)
+   * changes at all.
+   *
+   * ---- ...AND FROM BUILD 397 `ry` IS THE WORLD'S TOO ----------------------
+   *
+   * Build 388 left `ry` in SCALED, on the ruling that the rift is "as deep as
+   * it LOOKS" -- a picture that holds its size on the glass. With `rx` the
+   * field's half width, that made BOTH axes hold their size on the glass, so
+   * the rift was the same picture to the pixel at either era: 36.0 CSS px
+   * deep at era 1 and at era 2, while every body, round and stroke on the
+   * era-2 field drew 0.65 as large because the camera had pulled back. The
+   * one thing at the far end of the field had no perspective at all, and
+   * that is what was reported.
+   *
+   * It is 58 WORLD units at both eras now -- 36 CSS px at era 1, 23.4 at era
+   * 2 -- which is the same depth seen from 1.54x further away. A circle of
+   * radius `rx` lying flat and seen at an angle whose sine is `ry / rx` IS
+   * this ellipse, so that ratio is the view, and `drawPortal` reads every
+   * other perspective cue off it.
+   *
+   * What that moves is ERA 2's surface, and only its depth. Era 1 is 58
+   * either way, so its rim, `top`, centre and every reader of them are
+   * unchanged to the bit. At era 2 the surface a staged body is braked and
+   * ghosted through is 116 units deep against 178.5, so less of the march is
+   * spent braking: measured at 390x844, eight bodies of each released 600
+   * units above the rim, a MOTE is born 0.23s sooner (5.30 -> 5.07), a
+   * LURCHER 0.53s (9.78 -> 9.25) and a BULWARK 0.74s (17.37 -> 16.63) --
+   * 4 to 5% of the march, and nothing else about it moves. And
+   * the rim gives way to the chrome less often: under a notch the portal
+   * fits 62.5 units higher, so the entry line sits nearer its authored 400
+   * there. Where the line binds (every viewport the suite runs) the rim and
+   * therefore the line, the wall and everything reading them do not move.
+   *
+   * `P.dip` is the throat's floor, projected: a funnel `funnel` of its own
+   * radius deep, seen at that same angle, drops `depth x cos(angle)` on the
+   * glass -- `funnel x sqrt(rx^2 - ry^2)`. As a share of `ry` that is 0.40 at
+   * era 1 and 0.62 at era 2 on a 390-point phone: the flatter the view, the
+   * nearer the near rim the floor appears, which is what a grazing view of a
+   * pit does. Held at 0.8 of the depth, which no phone reaches (414 at era 2
+   * is 0.66) and a tablet at era 2 passes, where the floor would project past
+   * the near rim and the eye would be clipped away. A drawing quantity, read
+   * by `drawPortal` and nothing else.
    *
    * `world.width` is set twenty lines above the call in `Game.resize`, which
    * is the single funnel every door comes through, so it is always there.
@@ -94,6 +132,7 @@ export function syncPortal(world, entryY, chromeY = 0) {
   P.rim = rim;
   P.y = rim - C.ry;
   P.top = rim - 2 * C.ry;
+  P.dip = Math.min(C.funnel * Math.sqrt(P.rx * P.rx - P.ry * P.ry), 0.8 * P.ry);
   P.line = line;
   P.chromeY = chromeY;
   world.portal = P;
@@ -308,6 +347,43 @@ export function updatePortal(world, dt) {
  *
  * During an anomaly it is SEALED: the vortex stops, the rim dims, and nothing
  * is born -- the anomaly is what happens instead of the wave field.
+ *
+ * ---- THE SAME RIFT, SEEN FROM TWO DISTANCES (build 397) -------------------
+ *
+ * Until build 396 it was the same picture at both eras, to the pixel: `ry`
+ * was in SCALED and `rx` is the field's half width, so BOTH axes held their
+ * size on the glass. The era that pulls the camera back 1.54x shrank every
+ * body, every round and the machine's own detail by 0.65 and drew the far end
+ * of its field exactly as the near era did -- measured, 36.0 CSS px deep at
+ * either era and either screen. Reported as the portal not reflecting the
+ * perspective difference between the eras, which is exactly what it was not
+ * doing: it was the one thing on the field with no perspective at all.
+ *
+ * So it is drawn as what this file has always said it is -- a hole lying in
+ * the far end of the field, seen at an angle -- and the angle is DERIVED, not
+ * authored. A circle of radius `rx` lying flat and seen at an angle whose sine
+ * is `ry / rx` is exactly this ellipse, so that one ratio is the view:
+ *
+ *  - `ry` is the WORLD's (see `syncPortal`), so the same 58 units of depth
+ *    are 36 CSS px at era 1 and 23 at era 2 -- the same rift, further away.
+ *    The ratio is 0.184 at era 1 and 0.120 at era 2 on a 390-point phone.
+ *  - THE THROAT SINKS. A ring of the vortex below the rim projects lower on
+ *    the glass by its depth times the cosine of that angle, so the eye is
+ *    `P.dip` below the centre and the arms fall into it. A grazing view sees
+ *    more of the far wall and less of the floor, which is the cue: the eye
+ *    sits 0.40 of the depth down at era 1 and 0.62 at era 2.
+ *  - THE NEAR RIM IS HEAVY AND THE FAR RIM FINE, by a contrast that is the
+ *    same ratio: a steeper view separates near from far more, so the far
+ *    rim is 0.41 of the near one's width at era 1 and 0.62 at era 2.
+ *  - EVERY STROKE AND MARK is authored at era 1's world size and drawn at
+ *    that world size at era 2 (`fine`, floored at the hairline), so the
+ *    rift's detail shrinks on the glass with everything else on the field.
+ *  - and the FAR WALL is terraced while the wall nearest us is in shadow --
+ *    the inside of a pit faces you on its far side and away on its near one.
+ *
+ * Era 1's GEOMETRY is untouched (`ry` was 58 there before and is now): its
+ * rim, its surface and everything that reads them are what they were. What
+ * moved at era 1 is the picture, and at era 2 the depth.
  */
 export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   const P = world.portal;
@@ -322,6 +398,38 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   const live = sealed ? 0.35 : 1;
   const W = world.width;
   const H = world.height;
+  /*
+   * `hl` is a DEVICE-pixel floor, so `hl * n` is the same on the glass at
+   * both eras. Dividing by the era's scale makes it the same WORLD width
+   * instead -- identical at era 1, where `k` is exactly 1, and 0.65 on the
+   * glass at era 2 -- with the hairline as the floor so nothing vanishes.
+   */
+  const fine = 1 / k;
+  const lw = (n) => Math.max(hl, hl * n * fine);
+  // How far a ring of the throat at fraction `rho` of the rim projects below
+  // its own centre. 0 at the rim, `P.dip` at the eye.
+  const sink = (rho) => P.dip * (1 - rho) ** 1.6;
+  /*
+   * The near/far contrast, off the same ratio that IS the view: 0.59 at era 1
+   * and 0.38 at era 2 on a 390-point phone. Clamped for the screens the
+   * ratio runs off: a tablet at era 2 reads 0.20, which would draw the far
+   * rim nearly as heavy as the near one, and nothing reachable goes past the
+   * top of it.
+   */
+  const persp = clamp((P.ry / P.rx) * 3.2, 0.25, 0.75);
+  /*
+   * A vertical gradient from the far rim to the near one. The rim is
+   * `y = P.y + ry sin(phi)`, so nearness `(1 + sin phi) / 2` is LINEAR in y
+   * on it and one linear gradient gives every point of the ellipse exactly
+   * its own share -- a stroke or a fill with this style is lit by how near
+   * it is, with no segments and no seams.
+   */
+  const nearFar = (colour, aFar, aNear) => {
+    const g = ctx.createLinearGradient(0, P.y - P.ry, 0, P.y + P.ry);
+    g.addColorStop(0, rgba(colour, aFar));
+    g.addColorStop(1, rgba(colour, aNear));
+    return g;
+  };
 
   ctx.save();
 
@@ -338,7 +446,9 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
    * end. What it says now is neither a lamp nor a way out but "the far end is
    * open", which is the better sentence and the one the object is about.
    * Rendered and looked at before deciding. At era 2 it runs to the wall,
-   * which is where the light of the enemy's side ends.
+   * which is where the light of the enemy's side ends -- and from build 397
+   * the wall is 61.5 units under the rim rather than 161.5, so the curtain is
+   * short there and the picture is the rift with its wall at its feet.
    *
    * `spill` IS SCALED ONCE, IN `SCALED`, AND IS READ RAW HERE. It was written
    * with a `* k` from build 297 -- the same commit that put it in SCALED -- so
@@ -386,8 +496,14 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   /* ---- the hole -----------------------------------------------------------
    * A hole punched in the sky: darker than anything behind it, or -- as the
    * yard's first face was -- drawn, placed and invisible. Then the interior,
-   * dark at the centre and lit toward the rim, which is what a surface you
+   * dark round the floor and lit toward the rim, which is what a surface you
    * are looking INTO looks like.
+   *
+   * The light is centred on the FLOOR, not on the centre of the ellipse:
+   * `P.dip` below it, in the ellipse's own frame, and reaching the far rim
+   * exactly. So the far wall -- which faces you -- climbs the whole gradient
+   * to its brightest at the far rim, while the near wall, facing away, gets
+   * only the dim inner stops before it meets the near rim.
    */
   ctx.save();
   ctx.beginPath();
@@ -396,27 +512,50 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   ctx.fillStyle = `rgba(2,4,10,${sealed ? 0.8 : 0.9})`;
   ctx.fillRect(P.x - P.rx, P.y - P.ry, P.rx * 2, P.ry * 2);
   ctx.save();
+  const dn = P.dip / P.ry;
   ctx.translate(P.x, P.y);
   ctx.scale(P.rx, P.ry);
-  const well = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+  const well = ctx.createRadialGradient(0, dn, 0, 0, dn, 1 + dn);
   well.addColorStop(0, rgba(bright, 0.16 * live));
   well.addColorStop(0.18, rgba(mood.line, 0.03 * live));
   well.addColorStop(0.55, rgba(mood.line, 0.1 * live));
   well.addColorStop(0.86, rgba(accent, 0.34 * live));
   well.addColorStop(1, rgba(bright, 0.7 * live));
   ctx.fillStyle = well;
-  ctx.beginPath();
-  ctx.arc(0, 0, 1, 0, TAU);
-  ctx.fill();
+  ctx.fillRect(-1, -1, 2, 2);
   ctx.restore();
+
+  /*
+   * ---- the far wall, terraced --------------------------------------------
+   * Four contours of the throat, each `sink(rho)` below the ring it is a
+   * ring of, and only their FAR halves: that is the part of the inside of a
+   * pit that faces you. They step down the far wall from the rim toward the
+   * eye and fade with depth, which is what says "this goes DOWN" rather than
+   * "these are rings on a disc". Drawn sealed too -- the hole is still a
+   * hole while an anomaly holds it, only dimmer.
+   */
+  for (let i = 1; i <= 4; i++) {
+    const rho = 1 - 0.17 * i;
+    ctx.strokeStyle = rgba(accent, (0.3 - 0.055 * i) * live);
+    ctx.lineWidth = lw(1.4);
+    ctx.beginPath();
+    ctx.ellipse(P.x, P.y + sink(rho), P.rx * rho, P.ry * rho, 0, Math.PI, TAU);
+    ctx.stroke();
+  }
 
   if (!sealed) {
     /* ---- the vortex -------------------------------------------------------
-     * Three arms spiralling in, twice: a dim full-length pass and a bright
+     * Four arms spiralling in, twice: a dim full-length pass and a bright
      * outer pass, so each arm reads as brightening toward the rim it is
      * feeding. Two dashed rings turn the other way inside them. Everything
      * here is keyed on `P.spin`, which is game time, so the assay's frozen
      * frames and a paused run both hold still.
+     *
+     * From build 397 every point of it is `sink(rho)` lower than the flat
+     * ellipse would put it, so the arms fall INTO the eye rather than lying
+     * on a disc round it -- and the part of an arm on the near side runs into
+     * the near rim and is clipped by it, which is what the near lip of a pit
+     * does to anything below it.
      */
     const arms = 4;
     /*
@@ -432,7 +571,9 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
      * and the steps there are small for the same reason -- the point moves
      * `ry * rho` per radian, not `rx * rho`. So the faceting is sub-pixel at
      * both extremes and a derived count would buy nothing but 4x the lineTo
-     * calls a frame.
+     * calls a frame. (At era 2 from build 397 `ry` is the world's 58 against
+     * an `rx` of 484, so `rx^2 / ry` is about 4,000 and the argument only gets
+     * stronger; the sink adds a term that is monotone in `rho` and no curl.)
      */
     const pts = 28;
     const arm = (a, from, to, alpha, width) => {
@@ -443,42 +584,66 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
         const rho = from + (to - from) * (i / pts);
         const th = (a / arms) * TAU + P.spin * 0.7 + (1 - rho) * 4.6;
         const x = P.x + P.rx * rho * Math.cos(th);
-        const y = P.y + P.ry * rho * Math.sin(th);
+        const y = P.y + P.ry * rho * Math.sin(th) + sink(rho);
         if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
       }
       ctx.stroke();
     };
     ctx.lineCap = 'round';
     for (let a = 0; a < arms; a++) {
-      arm(a, 0.06, 0.98, 0.26, hl * 1.6);
-      arm(a, 0.55, 0.98, 0.55, hl * 2.4);
+      arm(a, 0.06, 0.98, 0.26, lw(1.6));
+      arm(a, 0.55, 0.98, 0.55, lw(2.4));
     }
     /*
-     * ...and the EYE: the throat at the centre the arms are feeding, the one
+     * ...and the EYE: the throat at the bottom the arms are feeding, the one
      * spot inside the surface that is lit rather than dark. It breathes with
-     * the rim, so the two read as one thing inhaling.
+     * the rim, so the two read as one thing inhaling. It stands on the floor,
+     * `P.dip` below the centre -- further down at era 2, where the view is
+     * flatter and the near lip hides more of the floor.
      */
     const eye = 0.1 + 0.03 * breath;
+    const ey = P.y + P.dip;
     ctx.fillStyle = rgba(bright, 0.18 + 0.12 * breath);
     ctx.beginPath();
-    ctx.ellipse(P.x, P.y, P.rx * eye * 2.4, P.ry * eye * 2.4, 0, 0, TAU);
+    ctx.ellipse(P.x, ey, P.rx * eye * 2.4, P.ry * eye * 2.4, 0, 0, TAU);
     ctx.fill();
     ctx.fillStyle = rgba('#ffffff', 0.55 + 0.25 * breath);
     ctx.beginPath();
-    ctx.ellipse(P.x, P.y, P.rx * eye, P.ry * eye, 0, 0, TAU);
+    ctx.ellipse(P.x, ey, P.rx * eye, P.ry * eye, 0, 0, TAU);
     ctx.fill();
-    ctx.setLineDash([9 * k, 13 * k]);
+    /*
+     * The dashes are WORLD units, so they are finer on the glass at era 2
+     * like every other stroke here, and the offset runs at `rate * k` so the
+     * rings turn at the same ANGULAR rate at both eras -- a ring at era 2 is
+     * about 1.54x longer in world units, and a dash moving at era 1's speed
+     * along it would turn it 0.65x as fast. The arms' `P.spin * 0.7` is an
+     * angle already, so they needed nothing. Exactly the old figures at era 1.
+     */
+    ctx.setLineDash([9, 13]);
     for (const [rho, rate, alpha] of [[0.42, -46, 0.3], [0.68, 31, 0.24]]) {
-      ctx.lineDashOffset = P.spin * rate;
+      ctx.lineDashOffset = P.spin * rate * k;
       ctx.strokeStyle = rgba(mood.line, alpha);
-      ctx.lineWidth = hl * 1.2;
+      ctx.lineWidth = lw(1.2);
       ctx.beginPath();
-      ctx.ellipse(P.x, P.y, P.rx * rho, P.ry * rho, 0, 0, TAU);
+      ctx.ellipse(P.x, P.y + sink(rho), P.rx * rho, P.ry * rho, 0, 0, TAU);
       ctx.stroke();
     }
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
   }
+  /*
+   * ---- the near lip ---------------------------------------------------------
+   * The inside of the wall nearest us faces away, so the ground just inside
+   * the near rim is shadow: a gradient up from the near rim, over whatever of
+   * the vortex reaches it -- the eye included, at era 2, where the floor is
+   * most of the way down to it.
+   */
+  const lipTop = P.y + P.ry * 0.35;
+  const lip = ctx.createLinearGradient(0, lipTop, 0, P.y + P.ry);
+  lip.addColorStop(0, 'rgba(2,4,10,0)');
+  lip.addColorStop(1, `rgba(2,4,10,${0.55 * live})`);
+  ctx.fillStyle = lip;
+  ctx.fillRect(P.x - P.rx, lipTop, P.rx * 2, P.y + P.ry - lipTop);
   ctx.restore();
 
   /* ---- what is coming: the ghost pass ------------------------------------ */
@@ -520,25 +685,28 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   }
 
   /* ---- the rim ------------------------------------------------------------
-   * Three rings: a wide soft one, the rim itself, and a thin inner echo. The
-   * rim is the one thing here drawn toward white -- it is the edge of the
-   * surface, and the flare of a birth lands on it.
+   * Three rings: a wide soft one, the rim itself, and a thin echo just inside
+   * it. The rim is the one thing here drawn toward white -- it is the edge of
+   * the surface, and the flare of a birth lands on it.
+   *
+   * All three are lit NEAR TO FAR by `nearFar`, and the rim itself is a BAND
+   * whose width runs from the far rim to the near one (`rimBand`) -- a stroke
+   * has one width, and the whole of this cue is that it has two. The echo is
+   * the lip's top edge and sinks with the throat.
    */
   const rimA = (0.82 + 0.18 * breath) * live;
-  ctx.strokeStyle = rgba(accent, 0.2 * live + P.flare * 0.2);
-  ctx.lineWidth = hl * 11;
+  ctx.strokeStyle = nearFar(accent, 0.1 * live + P.flare * 0.12, 0.26 * live + P.flare * 0.24);
+  ctx.lineWidth = lw(11);
   ctx.beginPath();
   ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, TAU);
   ctx.stroke();
-  ctx.strokeStyle = rgba(bright, rimA);
-  ctx.lineWidth = hl * (2.6 + P.flare * 1.4);
+  const nearW = 3.6 + P.flare * 1.8;
+  ctx.fillStyle = nearFar(bright, rimA * (1 - persp * 0.8), rimA);
+  rimBand(ctx, P, lw(nearW * (1 - persp)), lw(nearW));
+  ctx.strokeStyle = nearFar(accent, 0.18 * live, 0.4 * live);
+  ctx.lineWidth = lw(1);
   ctx.beginPath();
-  ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, TAU);
-  ctx.stroke();
-  ctx.strokeStyle = rgba(accent, 0.35 * live);
-  ctx.lineWidth = hl;
-  ctx.beginPath();
-  ctx.ellipse(P.x, P.y, P.rx * 0.93, P.ry * 0.9, 0, 0, TAU);
+  ctx.ellipse(P.x, P.y + sink(0.93), P.rx * 0.93, P.ry * 0.9, 0, 0, TAU);
   ctx.stroke();
 
   if (!sealed) {
@@ -555,7 +723,7 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
       const phi = Math.acos(clamp((e.x - P.x) / P.rx, -1, 1));
       const half = Math.min(1.2, (e.r * 1.4) / P.rx);
       ctx.strokeStyle = rgba(bright, 0.45 + 0.55 * bump);
-      ctx.lineWidth = hl * (2 + 6 * bump);
+      ctx.lineWidth = lw(2 + 6 * bump);
       ctx.beginPath();
       ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, phi - half, phi + half);
       ctx.stroke();
@@ -570,7 +738,7 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
       const phi = Math.acos(clamp((b.x - P.x) / P.rx, -1, 1));
       const half = Math.min(1.2, (b.r * 1.8) / P.rx) * (1 + 0.6 * u);
       ctx.strokeStyle = rgba('#ffffff', (1 - u) * 0.7);
-      ctx.lineWidth = hl * (1 + 2.4 * (1 - u));
+      ctx.lineWidth = lw(1 + 2.4 * (1 - u));
       ctx.beginPath();
       ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, phi - half, phi + half);
       ctx.stroke();
@@ -578,19 +746,23 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
 
     /* ---- the motes on the rim -------------------------------------------
      * Fourteen small lights riding the rim at their own rates, as the thing
-     * that says "this is turning" when nothing is being born.
+     * that says "this is turning" when nothing is being born. In WORLD units
+     * from build 397, so they are smaller on the glass at era 2, and larger
+     * and brighter on the near rim than the far one -- a light going round
+     * the hole comes toward you and goes away again.
      */
     for (let i = 0; i < 14; i++) {
       const a = (i / 14) * TAU + P.spin * (0.5 + 0.25 * (i % 3)) * (i % 2 ? 1 : -1);
       const rho = 1.02 + 0.06 * Math.sin(P.spin * 1.9 + i * 1.7);
       const x = P.x + P.rx * rho * Math.cos(a);
       const y = P.y + P.ry * rho * Math.sin(a);
-      const r = (1.4 + 0.5 * (i % 3)) * k;
-      ctx.fillStyle = rgba(accent, 0.22);
+      const near = (1 + Math.sin(a)) / 2;
+      const r = (1.4 + 0.5 * (i % 3)) * (0.6 + 0.6 * near);
+      ctx.fillStyle = rgba(accent, 0.1 + 0.16 * near);
       ctx.beginPath();
       ctx.arc(x, y, r * 2.6, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = rgba(bright, 0.85);
+      ctx.fillStyle = rgba(bright, 0.45 + 0.45 * near);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, TAU);
       ctx.fill();
@@ -598,6 +770,41 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   }
 
   ctx.restore();
+}
+
+/**
+ * The rim as a filled BAND whose width runs from `far` on the upper rim to
+ * `near` on the lower one -- the edge nearest you is the heaviest, which is
+ * what a stroke of one width cannot say.
+ *
+ * Offset along the ellipse's own NORMAL, `(ry cos phi, rx sin phi)`, and not
+ * radially in its parameter: on an ellipse this flat the parameter's radius
+ * points nearly sideways over most of the rim while the curve runs nearly
+ * level, so a radial offset would thin the band toward the ends for a reason
+ * that has nothing to do with nearness. The outer edge is traced forward and
+ * the inner one back, so the non-zero rule fills the ring and not the hole.
+ */
+function rimBand(ctx, P, far, near, segs = 96) {
+  const pt = (phi, side) => {
+    const c = Math.cos(phi);
+    const s = Math.sin(phi);
+    const nx = P.ry * c;
+    const ny = P.rx * s;
+    const nl = Math.hypot(nx, ny) || 1;
+    const w = (side * (far + (near - far) * (1 + s) * 0.5)) / 2;
+    return [P.x + P.rx * c + (nx / nl) * w, P.y + P.ry * s + (ny / nl) * w];
+  };
+  ctx.beginPath();
+  for (let i = 0; i <= segs; i++) {
+    const [x, y] = pt((i / segs) * TAU, 1);
+    if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+  }
+  for (let i = segs; i >= 0; i--) {
+    const [x, y] = pt((i / segs) * TAU, -1);
+    ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
 }
 
 /**

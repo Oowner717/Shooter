@@ -250,6 +250,13 @@ export function shielded(world, e) {
  * guard those four are untargetable and unkillable: `autoTarget` returns null
  * and every round is swallowed at the line.
  *
+ * (Build 397 hung the wall 61.5 under the rim rather than 161.5, so at
+ * 320x568 era 2 it stands at 461.5 and the open field is 411.5. That moves
+ * the figures and not the ruling: from the two recorded above, ORDINAL's core
+ * would now lean about 47 units past the line and TERMINUS's would still sit
+ * about 18.5 behind it -- so a boss can still stand where nothing of ours can
+ * reach it, and the suspension is still the guard.)
+ *
  * It cannot happen in the shipped game -- `Director.heldBy` returns 0 once an
  * anomaly is reconciled, and era 2 is gated on all seven being reconciled, so
  * `syncGate` never lights another aperture and there is no door onto a boss at

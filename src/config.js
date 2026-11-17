@@ -6150,7 +6150,10 @@ export const ENEMY_TYPES = [
      *    above the line and LEADING EDGE 68.5, and the edge is the figure
      *    that matters because `shielded` tests `e.y + e.r` -- where
      *    `shielded` refuses every damage path the player owns -- build 318's
-     *    recorded SHRIKE fault, on a body that stands still.
+     *    recorded SHRIKE fault, on a body that stands still. (The table is
+     *    build 335's. Build 397 hung the wall at 461.5 there, which a 420
+     *    station would clear; the derivation below is what holds either way,
+     *    and its floor is the wall.)
      *  - and held as a RADIUS rather than a HEIGHT, 22% of era 2's standing
      *    room is permanently outside `autoTarget`'s cone. A height is
      *    cone-safe by a factor of 5.8 at every viewport, because the cone
@@ -9206,9 +9209,32 @@ CFG.title = {
  * (159 CSS px) and therefore made it a fraction of the SCREEN rather than of
  * the field: measured, 49.6% of the width at 320 against 40.7% at 390. It is
  * `world.width / 2` in `syncPortal` now, so the rift runs end to end at every
- * screen and both eras by construction. The rift is as WIDE AS THE FIELD and
- * as DEEP AS IT LOOKS, and those are two different kinds of number -- which is
- * why `ry` and `pad` stay in SCALED and there is nothing here to author.
+ * screen and both eras by construction. That paragraph went on to say the
+ * rift is "as DEEP AS IT LOOKS", which kept `ry` in SCALED -- and that is
+ * the half build 397 undid.
+ *
+ * ---- `ry` IS IN WORLD UNITS FROM BUILD 397, AND NOT IN `SCALED` ----------
+ *
+ * With `rx` the field's and `ry` the glass's, BOTH axes held their size on the
+ * glass: the rift was the same picture to the pixel at either era, 36 CSS px
+ * deep, while every body on the era-2 field drew 0.65 as large because the
+ * camera had pulled back 1.54x. Reported as the portal not reflecting the
+ * perspective difference between the eras. 58 world units at both now is the
+ * same depth seen from further away -- 36 CSS px at era 1, 23.4 at era 2 --
+ * and `ry / rx` is then the sine of the angle the far end is seen at, which
+ * `drawPortal` derives the rest of the picture from. Era 1 is the same 58 it
+ * always was, so nothing about era 1's surface moved. `pad` stays in SCALED:
+ * it is a clearance against the CHROME, which is on the glass.
+ *
+ * `funnel` is the throat's depth as a fraction of its radius. Seen at that
+ * angle its floor projects `funnel x sqrt(rx^2 - ry^2)` below the centre
+ * (`P.dip`), so the flatter the view the nearer the near rim the eye sits:
+ * 0.40 of the depth at era 1 and 0.62 at era 2 on a 390-point phone, and
+ * 0.33 to 0.66 across the phones the suite and the notes measure (320 era 1
+ * to 414 era 2). At 0 it is the flat disc it was. The floor is held at 0.8 of
+ * the depth (`syncPortal`), because the projection runs off the field's width
+ * and a tablet at era 2 would otherwise put it past the near rim -- 1.23 of
+ * the depth at 768 -- where the eye is clipped away and there is no throat.
  *
  * `mouth` is the fraction of `rx` births are spread across, and from 388 it is
  * ONE OF TWO bounds rather than the whole of it -- see `mouthHalf`, which also
@@ -9228,7 +9254,7 @@ CFG.title = {
  * guard counts them, so this sentence does not.
  */
 CFG.portal = {
-  ry: 58, pad: 16, mouth: 0.82, spill: 150,
+  ry: 58, pad: 16, mouth: 0.82, spill: 150, funnel: 0.075,
   /*
    * ---- how a body comes THROUGH, from build 298 ----
    * `settle` is the seconds after birth over which a body's route lateral
@@ -9242,7 +9268,40 @@ CFG.portal = {
 };
 
 CFG.yard = {
-  gap: 105, tooth: 34, clear: 24,
+  /*
+   * ---- `gap` is how far below the portal's rim the wall hangs ------------
+   *
+   * 105 until build 396 -- 161.5 world units at era 2, 65 CSS px -- and 40
+   * from build 397, by request: "push the enemy barrier back closer to the
+   * portal". 61.5 world units, 24.8 CSS px, so the band in which their bodies
+   * are out of reach (`shielded`: the LOWEST pixel above the line) is 38% of
+   * what it was and the player's ground starts exactly 100 world units further
+   * up the era-2 field wherever the rim is the entry line -- and 162.5 under a
+   * notch, where the flatter portal of the same build lifts the rim as well
+   * (see the portal block).
+   *
+   * What that changes, measured rather than argued:
+   *  - a body is born when its TOP edge clears the rim, so it stands `2r`
+   *    under it -- and six of the thirty-seven loose hostile types (BLOOM,
+   *    SCION, QUARRY, BULWARK, VEIL, ANVIL; r 33 and up) now lean past the
+   *    wall before that, where none did at 105. That is the existing rule
+   *    rather than a new one: `staged` has never gated a round, only the
+   *    choosers, so the assist still will not pick one and a manual shot
+   *    could always reach anything leaning into our side.
+   *  - KITE's station is floored at the wall plus a radius, and at 320x568
+   *    era 2 that floor binds, so the line stands 100 units further out
+   *    there -- 385 from the mount against a stock reach of 615. At 390x844
+   *    the reach circle binds and nothing moves.
+   *  - SHRIKE's recorded era-2 fault -- its hold band behind the wall, at
+   *    `rim + 104` against a wall at `rim + 161` -- is gone with it: the wall
+   *    is at `rim + 61.5` now. Latent either way, since its band is era 1's.
+   *  - the four readers of the line (`wallLine`, `shielded`, `yardHold`,
+   *    `holdBelow`) and the draw all read `wallY`, so nothing restates it.
+   *
+   * It is in SCALED, so it holds its size on the glass: 24.8 CSS px at both
+   * screens, which is what the yard case asserts.
+   */
+  gap: 40, tooth: 34, clear: 24,
   // The four lots. Two works beside the machine and two emplacements in front
   // of it, measured off the turret so they hold their place on the glass at
   // either screen -- the field is 1.22x deeper at 390x844 and the interface
@@ -9288,7 +9347,10 @@ CFG.yard = {
    * hold line and the player has placed something above the wall. It is
    * asserted at both screens, and the outer pair was always the binding case
    * for the sideways clash too, which is why keeping their column costs
-   * nothing to check.
+   * nothing to check. (Those figures are build 275's. Build 397 hung the wall
+   * exactly 100 world units higher at era 2, so the hold line is 100 further
+   * from the turret at both screens and the bound is looser by 100 / 1.538 =
+   * 65 base units: about 207 rather than about 142. The lots did not move.)
    */
   lotAhead: 134, lotSpread: 144, gunW: 23, gunH: 20,
   /*
@@ -9363,14 +9425,20 @@ const SCALED = [
   'decoy.r', 'decoy.ahead', 'decoy.blast.r',
   'pile.r0', 'pile.r', 'ward.r', 'ward.heaveR', 'prism.r', 'prism.beamLen',
   /*
-   * The portal's DEPTH and the yard, which are pictures and keep their size on
-   * the glass. `portal.rx` was here until build 388 and is derived from
-   * `world.width` now, so the rift spans the field rather than a constant
-   * slice of the screen -- and because the guard below tests the LEAF, naming
-   * a path CFG no longer carries throws at module load rather than quietly
-   * scaling nothing.
+   * The portal's clearance and spill, and the yard, which are pictures and
+   * keep their size on the glass. `portal.rx` was here until build 388 and is
+   * derived from `world.width` now, so the rift spans the field rather than a
+   * constant slice of the screen -- and because the guard below tests the
+   * LEAF, naming a path CFG no longer carries throws at module load rather
+   * than quietly scaling nothing.
+   *
+   * `portal.ry` was here until build 397. It is the rift's DEPTH, and a depth
+   * held on the glass at both eras is a far end the camera never moved away
+   * from: with `rx` the field's, both axes held their size on the glass and
+   * the portal was the same picture to the pixel at either era. It is 58
+   * WORLD units at both now -- see the portal block above.
    */
-  'portal.ry', 'portal.pad', 'portal.spill',
+  'portal.pad', 'portal.spill',
   'yard.gap', 'yard.tooth', 'yard.clear',
   // The emplacements, for the same reason everything turret-owned is here:
   // they stand on a field 1.54x deeper and have to cover the same fraction of
