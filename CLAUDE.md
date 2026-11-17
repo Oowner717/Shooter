@@ -16570,5 +16570,15 @@ came from before believing the other one covers it.
   field shape you did not read is build 357's `b.dead` on a ball record
   again** -- read the helper the game uses (`hasTrait`) before writing your
   own.
+- **THE FOURTH SUITE RUN WAS 804 OF 804 WITH 0 CONSOLE OR PAGE ERRORS**, on
+  the tree that ships, and it is the one green run the working agreement
+  asks for. Four runs for one build is what it cost: the first found three
+  cases standing on geometry this build moved, and the second and third each
+  turned up one pre-existing fixture fault (the EMBER laid under the turret,
+  the LATCH conservation claim), both measured on 396 before being fixed
+  rather than re-rolled. The two rewritten cases read in this run: the EMBER
+  control 0 kills and dissolved, the LATCH wave "7 boarded and 7 ball(s)
+  landed" -- not a SWARM draw this time, which is the point of asserting an
+  identity rather than hoping for the regime.
 - Skipped, per the working agreement: smoke, tiers, dps, variance and
   contact.
