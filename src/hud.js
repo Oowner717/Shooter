@@ -332,11 +332,11 @@ export class Hud {
     this.el.toggles = {};
     this.el.quickBar.innerHTML = '';
 
-    // Five bands: the mines stacked at the left edge, a button to choose which
-    // mines those are, the two that run on their own in the middle where the
-    // thumb rests, the same button for ammunition, and the ammunition stacked
-    // at the right edge. The stacks grow upward from the floor line, along the
-    // edges, clear of the turret and the lever's arc in the centre.
+    // With the mine line in play, five bands: the mines stacked at the left
+    // edge, a button to choose which mines those are, the two that run on
+    // their own in the middle where the thumb rests, the same button for
+    // ammunition, and the ammunition stacked at the right edge. Out of play it
+    // is three, laid as one row from the left -- see below.
     const band = (cls) => {
       const d = document.createElement('div');
       d.className = cls;
@@ -354,21 +354,34 @@ export class Hud {
      * include this band, so every pixel of it sits on playable ground. The
      * stack was a permanent column displaying a choice made once a wave.
      *
-     * It is one row now: the loaded round on the left, AIM and FIRE in the
-     * middle where the thumb rests, the AMMO door on the right. Pressing the
-     * round fans the slots out across the bar -- the same `#aimModes` pattern
-     * the assist has used since build 185, lifted out of flow and spanning
-     * the strip. The round cell and the door are both `.qc.wide`, so the two
-     * edges are the same width BY CONSTRUCTION rather than by arithmetic and
-     * 292's centring rule cannot be broken by what is in them.
+     * It is one row now: the loaded round, the AMMO door beside it, then AIM
+     * and FIRE -- four cells laid from the LEFT edge, one size and one gap,
+     * with the right side of the strip left empty. Pressing the round fans
+     * the slots out across the bar -- the same `#aimModes` pattern the assist
+     * has used since build 185, lifted out of flow and spanning the strip.
+     *
+     * Build 395, by request: the door was on the right edge, balancing the
+     * round cell so `space-between` could centre AIM and FIRE (294's rule),
+     * and the ask was the door BESIDE the round it configures, the right side
+     * clear, and the four evened out. So the door's band is laid SECOND, the
+     * strip is `.oneRow` (`flex-start`, see styles.css) and every gap in the
+     * row is one value -- including AIM to FIRE, which is inside a band of
+     * its own and would otherwise keep a second number. The bands stay
+     * separate because the dims are written per band (`body.ammoOpen
+     * .q_auto`, `body.aimOpen .q_round`) and that is the only thing they buy.
      */
     const mineLine = CFG.mines.inPlay;
     const mines = mineLine ? band('qGroup q_mines') : null;
     const cfgMines = mineLine ? band('qGroup q_cfg') : null;
     const roundBand = mineLine ? null : band('qGroup q_round');
+    // Out of play, the door is the round cell's neighbour and is laid before
+    // the middle band; in play it keeps its seat between the middle and its
+    // own stack, which is the five-band layout `space-between` still centres.
+    const cfgBeside = mineLine ? null : band('qGroup q_cfg');
     const auto = band('qGroup q_auto');
-    const cfgAmmo = band('qGroup q_cfg');
+    const cfgAmmo = mineLine ? band('qGroup q_cfg') : cfgBeside;
     const ammo = mineLine ? band('qGroup q_ammo') : null;
+    this.el.quickBar.classList.toggle('oneRow', !mineLine);
 
     /*
      * A fold at the FOOT of each stack. Four mine slots and four ammunition
@@ -417,11 +430,12 @@ export class Hud {
      * 185 and it is the interaction the player already knows. The strip is
      * 44px and the field gets the other 77 back.
      *
-     * The two edge bands are the round cell and the AMMO door, both
-     * `.qc.wide`: equal widths by construction, so `space-between` centres
-     * AIM and FIRE without anything having to be measured. 292 got there by
-     * arithmetic -- emptying a 44px band to match an empty one -- and that is
-     * a centring any later edit can break by putting something in a band.
+     * From 294 to 394 the two edge bands were the round cell and the AMMO
+     * door, both `.qc.wide`, so `space-between` centred AIM and FIRE by
+     * construction. Build 395 moved the door beside the round cell and laid
+     * the whole row from the left edge instead -- see the note above the
+     * bands. All four are still `.qc.wide`, and that one rule is the only
+     * thing that sizes any of them.
      */
     if (mineLine) {
       this.fillStack(mines, w, 'mines');

@@ -16270,3 +16270,54 @@ came from before believing the other one covers it.
   `restart()` re-rolls `runSeed` off `Math.random`). `check-build` 0 and the
   bundle clean in both forms, 46 modules with the rev stamp at bytes 43 and
   106 inside the 2 KB window.
+
+- **BUILD 395 PUTS THE AMMO DOOR BESIDE THE ROUND CELL, BY REQUEST, AND THE
+  STRIP IS ONE ROW FROM THE LEFT EDGE.** The ask, verbatim: "Put Ammo button
+  beside the ammo quick select button on left. Keep right side clear. Even out
+  sizes and spacing of the four buttons on that row." So with the mine line
+  out of play the strip reads round, AMMO, AIM, FIRE from the left edge, one
+  size and one gap, and nothing on the right -- which retires build 294's
+  layout (round and door as two equal edge bands so `space-between` centred
+  AIM and FIRE). With the mine line IN, the five-band `space-between` layout is
+  untouched: `buildStrip` lays the door's band second only when the line is
+  out and toggles `#quickBar.oneRow` from `CFG.mines.inPlay`, so turning the
+  line back on is still a config flip. Measured at 390: 8-58 / 64-114 /
+  120-170 / 176-226 of a bar running 8-382; at 320, 44px cells ending 64% of
+  the way along.
+- **The gaps are PADDING on the following band, not the bar's `gap`, and that
+  is the one decision in it that is not cosmetic.** `#quickBar` is
+  `pointer-events: none` -- the space BETWEEN bands is field -- so packing the
+  bands with the bar's own gap would have opened two 6px holes where a
+  near-miss reaches the canvas and takes a shot, which is the exact fault
+  `.qGroup`'s note records being fixed inside a band. With padding, every gap
+  in the row hit-tests to the strip and the clear right side hit-tests to the
+  stage. One custom property (`--strip-gap`) feeds both the padding and
+  `.autoCells`, because AIM-to-FIRE lives inside a band and would otherwise
+  keep a second number that merely agrees.
+- **"Even out sizes" found three size declarations that had never once
+  applied.** `.roundCell { width }` (twice, one class against `.qc.wide`'s two)
+  and `.qc.cfg { height; width }` (same specificity, earlier in the file) were
+  all overridden by `.qc.wide` on every screen, so the four cells were already
+  one size -- and a width written on the door read as the door's while changing
+  nothing. All three are gone; `.qc.wide` is the one owner. What WAS uneven is
+  the content: the door's icon was 15px against 14 (and 15 against 13 on a
+  narrow phone, its rule outranking the narrow one) and rode its label 1px
+  low. Same icon size now, labels on
+  one line, asserted.
+- **The case asserts the request clause by clause, on rendered boxes**: order
+  from the strip's left edge, one size, labels on one line, three gaps equal to
+  the DECLARED `--strip-gap` (so two numbers that happen to agree cannot pass),
+  nothing showing past FIRE, the row ending by 70% of the strip, a gap
+  hit-testing to the strip, the clear side to the field, and the row not moving
+  when the slots open. Six revert proofs through the sliced-out case, each
+  failing on its own conjunct: the door laid after the middle band (order and a
+  stray past FIRE), the bar's gap instead of padding (`gapsHeld` alone),
+  `.autoCells` keeping 4px (gaps 6/6/4), the class off (everything), the 15px
+  icon back (labels on 2 lines alone) and a size that wins for the door (sizes
+  alone). The mine-line case's strip arm now asserts the class in both
+  directions, and its bar midpoint is the bar's on-screen midpoint -- it was the
+  WIDTH over two, 8px short at every size.
+- The README's strip section described the nine-cell stacked strip from before
+  build 290 and now describes the row. Skipped, per the working agreement: the
+  ORDINAL hash (no energy, targeting or boss change), smoke, tiers, dps,
+  variance and contact.

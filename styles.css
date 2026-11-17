@@ -1568,6 +1568,27 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
      between two cells used to reach the canvas and take a shot. */
   pointer-events: auto;
 }
+
+/*
+ * Out of play (the mine line is off), the strip is ONE ROW FROM THE LEFT
+ * EDGE: the loaded round, the AMMO door beside it, AIM, FIRE -- one size and
+ * one gap -- and the right side of the strip left clear. Build 395, by
+ * request; `buildStrip` lays the door's band second and sets the class.
+ *
+ * The gap is PADDING on the band that follows it rather than the bar's own
+ * `gap`. The bar is `pointer-events: none`, so the space BETWEEN bands is
+ * field, and a near-miss there reaches the canvas -- the thing the note on
+ * `.qGroup` above says used to take a shot. The gap between AIM and FIRE is
+ * inside a band and always swallowed it; padding makes the other two do the
+ * same, so the four cells are one target with no holes in it, and the part
+ * of the strip that is still field is the clear right side.
+ *
+ * `.autoCells` takes the same custom property, because a row with two gap
+ * numbers in it is not evened out -- it is two numbers that happen to agree.
+ */
+#quickBar.oneRow { justify-content: flex-start; gap: 0; --strip-gap: 6px; }
+#quickBar.oneRow > .qGroup + .qGroup { padding-left: var(--strip-gap); }
+#quickBar.oneRow .autoCells { gap: var(--strip-gap); }
 /* Wide enough that a five-letter round -- TITHE, SPORE, SNARE -- has real
    air on both sides. At 62px the label sat 3px off each edge, against a
    corner that is itself cut 6px, so the text touched the notch. The centre
@@ -1585,15 +1606,19 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
  * everywhere else.
  */
 .qc.cfg {
-  height: 40px;
-  width: 44px;
+  /* No size of its own: every `.cfg` is also `.qc.wide`, which comes later in
+     this file at the same specificity and has always won. A width written
+     here read as the door's and changed nothing -- build 395 took it out so
+     `.qc.wide` is the one rule that sizes the strip's four cells. */
   clip-path: none;
   border-radius: 3px;
   border-color: rgba(150, 190, 230, 0.26);
   background: linear-gradient(180deg, rgba(24, 38, 58, 0.92), rgba(14, 22, 36, 0.94));
   color: #a9c2da;
 }
-.qc.cfg svg { width: 15px; height: 15px; opacity: 0.85; }
+/* The same icon size as the other three, so the four labels sit on one line:
+   at 15px against 14 the door's label rode 1px low (build 395). */
+.qc.cfg svg { opacity: 0.85; }
 .qc.cfg .qLbl { opacity: 1; }
 .qc.cfg:active { transform: translateY(1px); }
 
@@ -1789,8 +1814,11 @@ body.sheetOpen #waveSheet button { pointer-events: auto; opacity: 1; }
  * Always `.on`, because it is not a toggle -- there is always a round loaded,
  * and the tone is how the bar says which. The label is the round's `short`,
  * which is what the slot cells have always shown.
+ *
+ * Its size is `.qc.wide`'s. A `.roundCell { width }` rule sat here and in the
+ * narrow-screen block, one class against two, so it never won -- build 395
+ * took both out rather than leave a width that reads as live.
  */
-.roundCell { width: 50px; }
 .roundCell[aria-expanded='true'] {
   border-color: color-mix(in srgb, var(--tone, var(--accent)) 80%, transparent);
 }
@@ -3569,9 +3597,8 @@ body.booting #quickBar {
   .q_mines, .q_ammo { width: 54px; }
   .qc { height: 28px; gap: 3px; padding: 0 4px; }
   .qc.wide { height: 38px; width: 44px; }
-  /* The round cell is a `.qc.wide` and takes that width; the slots in the
-     row it opens are grid tracks and size themselves. */
-  .roundCell { width: 44px; }
+  /* The round cell and the door are `.qc.wide` and take that size; the slots
+     in the row it opens are grid tracks and size themselves. */
   #ammoRow { bottom: calc(38px + 4px); }
   #ammoRow .qc { height: 38px; }
   .qc svg { width: 13px; height: 13px; }

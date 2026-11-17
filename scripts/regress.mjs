@@ -7363,12 +7363,18 @@ if (MINE_LINE) {
     g.hud.buildStrip();
     out.stackCells = document.querySelectorAll('.q_mines .qc').length;
     out.cfgButton = !!document.getElementById('cfgMines');
-    // The two bands stay, because #quickBar is space-between and dropping
-    // them would walk AIM and FIRE out from under the thumb.
+    // With the mine line in, the doors keep their bands because #quickBar is
+    // space-between and dropping them would walk AIM and FIRE out from under
+    // the thumb. Out of play it is three bands laid as one row (build 395).
     out.bands = document.querySelectorAll('#quickBar .qGroup').length;
+    out.oneRow = document.getElementById('quickBar').classList.contains('oneRow');
     const aim = document.getElementById('tgAutoAim').getBoundingClientRect();
+    const barBox = document.getElementById('quickBar').getBoundingClientRect();
     out.aimMid = Math.round(aim.left + aim.width / 2);
-    out.barMid = Math.round(document.getElementById('quickBar').getBoundingClientRect().width / 2);
+    // The bar's own midpoint on the screen. This was its WIDTH over two,
+    // which is 8px short of the midpoint at every size (the bar is inset).
+    out.barMid = Math.round(barBox.left + barBox.width / 2);
+    out.barHalf = Math.round(barBox.width / 2);
 
     g.restart();
     return out;
@@ -7403,20 +7409,27 @@ if (MINE_LINE) {
     + `${r.stackCells} stack cells, MINES button ${r.cfgButton}`);
 
   /*
-   * ...and the strip did not move. `#quickBar` is `space-between`, so the
-   * middle band sits in the middle only when the bands either side weigh the
-   * same -- which is why the count is asked of the config rather than written
-   * out. FIVE with the mine line in (two stacks, two doors, the middle) and
-   * THREE without (the round cell, the middle, the ammunition door), the two
-   * edges being `.qc.wide` and therefore the same width by construction.
-   * Build 292 kept two EMPTY bands to get the same effect by arithmetic and
-   * 294 replaced them with two real ones. Asserted as geometry either way,
-   * because that is the thing that would actually be wrong.
+   * ...and the strip did not move. With the mine line IN, `#quickBar` is
+   * `space-between` and the middle band sits in the middle only when the
+   * bands either side weigh the same -- FIVE bands (two stacks, two doors,
+   * the middle), asked of the config rather than written out, and asserted
+   * as geometry because that is the thing that would actually be wrong.
+   *
+   * With it OUT the strip is THREE bands laid as one row from the left edge:
+   * round, door, AIM and FIRE (build 395, by request -- 294 to 394 had the
+   * door on the right edge and AIM and FIRE centred). The row's geometry is
+   * the one-row case's claim, near the end of this file; what is asserted
+   * here is that the right layout was CHOSEN, in both directions, because the
+   * class is written from `CFG.mines.inPlay` and turning the line back on is
+   * meant to be a config flip.
    */
-  check('...and AIM and FIRE are still in the middle of the bar',
-    r.bands === (MINE_LINE ? 5 : 3)
-    && Math.abs(r.aimMid - r.barMid) < r.barMid * 0.25,
-    `${r.bands} bands; AIM sits at ${r.aimMid} against a bar midpoint of ${r.barMid}`);
+  check(MINE_LINE ? '...and AIM and FIRE are still in the middle of the bar'
+    : '...and the strip is its three bands, laid as the one row',
+    MINE_LINE
+      ? (r.bands === 5 && !r.oneRow && Math.abs(r.aimMid - r.barMid) < r.barHalf * 0.25)
+      : (r.bands === 3 && r.oneRow),
+    `${r.bands} bands, one row ${r.oneRow}; AIM sits at ${r.aimMid} against a bar `
+    + `midpoint of ${r.barMid}`);
 }
 
 /*
@@ -35831,10 +35844,12 @@ if (MINE_LINE) {
  *                `[hidden]`, which is the whole of the build-185 "the menu
  *                will not collapse" bug, reported three times and green every
  *                time.
- *   the centre   `#quickBar` is `space-between`, so AIM and FIRE sit in the
- *                middle only while the two edge bands weigh the same. They
- *                are both `.qc.wide` now, so that holds by construction --
- *                but a later edit can put something in either one.
+ *   the row      build 395, by request: the AMMO door BESIDE the round cell,
+ *                the four cells laid from the left edge at one size and one
+ *                gap, and the right side of the strip left clear. It was
+ *                `the centre` from 294 to 394 -- `space-between` with the
+ *                round cell and the door as two equal edge bands, which put
+ *                AIM and FIRE in the middle and the door on the right.
  */
 {
   const held = page.viewportSize();
@@ -35849,17 +35864,60 @@ if (MINE_LINE) {
       .getBoundingClientRect().height;
     const read = () => {
       const bar = document.querySelector('#quickBar').getBoundingClientRect();
-      const mid = document.querySelector('#quickBar .q_auto').getBoundingClientRect();
       const row = document.querySelector('#ammoRow');
       const rb = row.getBoundingClientRect();
       const rc = document.querySelector('#roundCell');
       const bands = [...document.querySelectorAll('#quickBar .qGroup')]
         .map((e) => e.getBoundingClientRect());
+      /*
+       * The four cells, in the order the request names them. Read off the
+       * RENDERED boxes, because `space-between`, `flex-start`, padding and
+       * `gap` all produce plausible DOM and only the boxes say where things
+       * landed. Rounded to the half pixel for the message; compared raw.
+       */
+      const four = ['roundCell', 'cfgAmmo', 'tgAutoAim', 'tgAutoFire']
+        .map((id) => document.getElementById(id).getBoundingClientRect());
+      const gapsAt = [0, 1, 2].map((i) => four[i + 1].left - four[i].right);
+      // The one gap value the stylesheet declares for the row. Asserted
+      // against, so two gap numbers that merely agree today cannot pass.
+      const want = parseFloat(getComputedStyle(document.getElementById('quickBar'))
+        .getPropertyValue('--strip-gap'));
+      // Everything on the strip that is showing, less the two rows that open
+      // OVER it -- they span the bar on purpose and are not the strip.
+      const showing = [...document.querySelectorAll('#quickBar button')]
+        .filter((b) => !b.closest('#ammoRow, #aimModes'))
+        .map((b) => b.getBoundingClientRect()).filter((b) => b.height > 0);
+      const y = (four[0].top + four[0].bottom) / 2;
+      const inStrip = (x) => {
+        const t = document.elementFromPoint(Math.round(x), Math.round(y));
+        return !!(t && t.closest('#quickBar'));
+      };
+      const line = {
+        lefts: four.map((b) => +b.left.toFixed(1)),
+        ordered: four.every((b, i) => i === 0 || b.left > four[i - 1].right),
+        sizes: [...new Set(four.map((b) => `${b.width}x${b.height}`))],
+        // ...and what is IN them sits on one line: the door's icon was 15px
+        // against 14 and rode its label 1px low, which is the uneven the eye
+        // catches first in a row of four equal boxes.
+        labels: [...new Set(['roundCell', 'cfgAmmo', 'tgAutoAim', 'tgAutoFire']
+          .map((id) => document.querySelector(`#${id} .qLbl`).getBoundingClientRect().top))],
+        gaps: gapsAt.map((g) => +g.toFixed(1)),
+        want,
+        evenGaps: gapsAt.every((g) => Math.abs(g - want) < 0.5),
+        atLeft: Math.abs(four[0].left - bar.left) < 0.5,
+        // How far along the strip the row ends, and whether anything showing
+        // ends further right than its last cell.
+        reach: +((four[3].right - bar.left) / bar.width).toFixed(3),
+        stray: showing.filter((b) => b.right > four[3].right + 0.5).length,
+        // A near-miss between two cells lands on the strip, not the field...
+        gapsHeld: gapsAt.every((g, i) => inStrip(four[i].right + g / 2)),
+        // ...and the clear side really is field.
+        clear: !inStrip(bar.right - 20),
+      };
       return {
         barH: +bar.height.toFixed(1),
         bands: bands.length,
-        edges: [+bands[0].width.toFixed(1), +bands[bands.length - 1].width.toFixed(1)],
-        midOff: +((mid.left + mid.right) / 2 - (bar.left + bar.right) / 2).toFixed(1),
+        line,
         // The BOX, not the property. `hidden` has never once hidden anything
         // the stylesheet gives a display to.
         rowH: +rb.height.toFixed(1),
@@ -35922,12 +35980,41 @@ if (MINE_LINE) {
     + `${r.closed.rowH} shut again; the rest of the strip is dimmed only while `
     + `it is up (${r.open.dim} / ${r.closed.dim})`);
 
-  check('...and AIM and FIRE are in the MIDDLE, which is what the edges are for',
-    Math.abs(r.shut.midOff) <= 2 && Math.abs(r.open.midOff) <= 2
-    && r.shut.edges[0] === r.shut.edges[1],
-    `the middle group's centre is ${r.shut.midOff}px off the strip's shut and `
-    + `${r.open.midOff}px open, against -49 at build 291 and -22 at 292; the two `
-    + `edge bands measure ${r.shut.edges.join(' and ')}px`);
+  /*
+   * Build 395, and the request is the spec, clause by clause: "Put Ammo
+   * button beside the ammo quick select button on left. Keep right side
+   * clear. Even out sizes and spacing of the four buttons on that row."
+   *
+   *   beside       round, door, AIM, FIRE in that order, from the strip's own
+   *                left edge -- not merely the door somewhere left of AIM.
+   *   sizes        one rendered size across all four. `.qc.wide` is the only
+   *                rule that sizes them; `.roundCell` and `.qc.cfg` each wrote
+   *                a width that never won, and both are gone.
+   *   spacing      every gap equal to the ONE value the stylesheet declares,
+   *                so two numbers that happen to agree today cannot pass.
+   *   right side   nothing showing ends past FIRE, the row stops by 70% of the
+   *                strip (64% measured at 320, the narrowest), and a point on
+   *                the clear side hit-tests to the field.
+   *
+   * Plus the thing evening out could have cost: the gaps are padding on a
+   * band rather than the bar's own `gap`, so a near-miss between two cells
+   * lands on the strip instead of reaching the canvas and taking a shot --
+   * `.qGroup`'s own note. And opening the slots does not move the row.
+   */
+  const R = r.shut.line;
+  check('...and the four cells are one row from the left: the door beside the round, one size, one gap, the right side clear',
+    R.ordered && R.atLeft && R.sizes.length === 1 && R.labels.length === 1
+    && R.want > 0 && R.evenGaps
+    && R.stray === 0 && R.reach <= 0.7 && R.gapsHeld && R.clear
+    && r.open.line.lefts.join() === R.lefts.join(),
+    `round, AMMO, AIM, FIRE at ${R.lefts.join(' / ')} (in order ${R.ordered}, from `
+    + `the strip's left edge ${R.atLeft}); sizes ${R.sizes.join(', ')}, labels on `
+    + `${R.labels.length} line(s); gaps `
+    + `${R.gaps.join(' / ')} against the declared ${R.want}; the row ends `
+    + `${(R.reach * 100).toFixed(1)}% along the strip with ${R.stray} control(s) `
+    + `past it; a near-miss in a gap is held by the strip ${R.gapsHeld}, the right `
+    + `side is field ${R.clear}; the row moved when the slots opened `
+    + `${r.open.line.lefts.join() !== R.lefts.join()}`);
 }
 
 // --- a step back is something you SEE on the ladder -------------------------

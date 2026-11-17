@@ -53,31 +53,29 @@ and tap with the other.
 
 ### The strip
 
-**Nine cells sit above the ability bar and never go away.** Four **mine**
-slots stack at the left edge, five **ammunition** slots stack at the right
-edge, and the two things that **run on their own** sit side by side in
-the middle. That is the whole of what you choose between, permanently on
-screen, one tap each.
-
-The stacks are at the edges because the middle of that band belongs to the
-lever: the turret sits above it and the grip swings through it. Both stacks
-grow upward from the floor line, into the part of the field that stays
-emptiest.
+**Four cells sit above the ability bar, in one row from the left edge:** the
+loaded round, **AMMO** beside it, then **AUTO AIM** and **AUTO FIRE**. All four
+are the same size with the same gap between each, and the right side of the
+row is left clear, so that part of the strip is still field.
 
 ```
-                                                            [ BOLT ]
-                                                            [  HE  ]
-                                                            [ SHOT ]
-[BLAST]                                                     [ ARC  ]
-[SNARE]                                                     [SPINE ]
-[WIRE ]
-[KNELL]              [AUTO AIM][AUTO FIRE]
-[ PULSE ][  FAN  ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ CHORUS ]
+[ BOLT ][ AMMO ][ AIM ][ FIRE ]
+[ PULSE ][ HAIL ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ WARD ]
 ```
+
+The round cell shows what is in the barrel; pressing it fans the slots out in
+a row across the bar, and picking one loads it. **AMMO** opens the loadout,
+which chooses what those slots hold. **AIM** opens the assist's positions in
+the same kind of row. A near-miss between two cells lands on the strip rather
+than reaching the field and taking a shot.
+
+(With the mine line in play — it is switched off in `CFG.mines.inPlay` — the
+strip goes back to the older layout: mine and ammunition stacks at the two
+edges with AUTO AIM and AUTO FIRE centred between them.)
 
 Every cell is bound on `pointerdown`, like the ability buttons are: a tap
-registers the instant the thumb lands, the simulation never stops, the menu
-never opens, and the tap never reaches the canvas — so changing rounds mid-wave
+registers the instant the thumb lands and never reaches the canvas, and
+picking a round never stops the simulation — so changing rounds mid-wave
 never costs you the shot you were about to take.
 
 Ammunition is a radio button: exactly one is lit at all times, **BOLT** is a
@@ -85,12 +83,6 @@ cell of its own, and re-picking the loaded one leaves it loaded. (It used to
 unload back to standard, which meant a fumbled double-tap silently dropped you
 to the weakest round in the middle of a fight.) The mines are a radio button
 too, but with no "none" cell — tapping the lit one stops laying them.
-
-Only the middle pair has to fit the 46px band between the lever's grip at rest
-and the ability bar, so only it is height-constrained; the stacks grow upward
-along the edges instead. Measured at 320x480, 320x568 and 390x844: nothing
-clipped, both stacks fully on screen and clear of the ability bar, and neither
-reaching into the turret's column.
 
 The whole thing is built from `ARSENAL` in `src/arsenal.js`. A new round or
 mine is a table entry and no markup.
