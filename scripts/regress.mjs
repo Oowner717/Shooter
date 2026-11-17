@@ -38193,9 +38193,23 @@ if (MINE_LINE) {
         for (let i = 0; i < 12; i++) g.update(1 / 60);
         return { seconds: +(f / 60).toFixed(2), kills: w.kills - k0, dissolved: !!e.dissolved, gone: e.dead };
       };
+      /*
+       * The EMBER is laid OFF the machine's column. At `width * 0.5` it rose
+       * straight up the turret's own column into the turret -- build 308 paid
+       * for the same column with this gait's clock probe. Measured on 396 and
+       * 397 alike, four cells of 24 across both eras: 6 to 9 of each 24
+       * struck the turret on the way up, and 1 of the 96 was still pressed
+       * against it at forty seconds (level with it, at y 1006 against 1012.6)
+       * and never dissolved -- which is how this control read `dissolved
+       * false` on 397's second suite run, and the likeliest reading of this
+       * case's red on 392's first, whose failing conjunct the message did not
+       * print then. At `width * 0.22`, 0 of 48 struck it at either era and all
+       * 96 dissolved: the control's claim is that a body which LEAVES is not
+       * a kill, and that wants a body free to leave.
+       */
       out.riders = {
         expired: arm(() => body('latch', w.width * 0.5, 400)),
-        ember: arm(() => body('ember', w.width * 0.5, w.floorY - 40)),
+        ember: arm(() => body('ember', w.width * 0.22, w.floorY - 40)),
       };
       clean();
       const k = w.kills;

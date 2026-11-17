@@ -16490,7 +16490,49 @@ came from before believing the other one covers it.
   whatever geometry happens to be at those positions**, so a build that
   moves geometry owes every such case a re-read -- and `restart()` resets
   neither the era nor the governor.
+- **THE SECOND SUITE RUN WAS 803 OF 804, AND THE RED WAS A CONTROL BODY LAID
+  UNDER THE TURRET -- NOT THIS BUILD'S, MEASURED ON 396, AND THE LIKELIEST
+  READING OF BUILD 392'S RED IN THE SAME CASE.** The REMNANT case's rider arm
+  uses an EMBER as its control (a body that LEAVES is not a kill) and laid it
+  at `width * 0.5, floorY - 40` -- the machine's own column, under it. A rise
+  body climbs straight up, so it climbed into the turret. Measured through a
+  probe of that arm's exact spawn, four cells of 24 across both eras of 396
+  and 397: **6 to 9 of each 24 struck the turret on the way up, and 1 of the
+  96 -- on build 396, at era 1 -- was still pressed against it at forty
+  seconds**, level with it (y 1006 against 1012.6), never dissolving. Build
+  392 recorded this case red with the failing conjunct unprinted (the message
+  did not carry `ember.dissolved` until that build added it). Build 308 paid
+  for the same column with this gait's clock probe ("a rise body spawned at
+  the machine's x starts inside the turret"), and the fix is the one it took:
+  laid at `width * 0.22`, **0 of 48 struck the turret at either era and all 96
+  dissolved**, and the shipped case passes all seven arms at both eras with
+  the governor on its floor. **Fixed rather than noted**, because "note a
+  known flake and move on" is for a flake whose channel is unknown, and this
+  one's channel was found: a control laid on the one column where a static
+  body stands is the previous bullet's rule arriving a fourth way.
+- **THE ORDINAL HASH DID NOT MOVE, AND THE NUMBER IS NOT THE ONE THIS FILE
+  CARRIES -- WHICH IS THE CONTAINER, MEASURED RATHER THAN ASSUMED.** Build 396
+  served from a worktree and 397 live, the served BUILD confirmed in each
+  heading: **838203935 either side, all six marks and all six body counts
+  identical**. The figure carried since build 343 is `-954811922`, and the
+  first two marks agree with that record (-549790228 / 2055604435) while the
+  third diverges (-605644707 against -1731762476), which is a last-bit
+  difference compounding over frames. **Build 390 -- the last build that took
+  the reading, in its own container -- reads 838203935 here too**, so two
+  containers give two numbers for one commit, and the move is the container
+  and not a build. Builds 391-394 changed no served line but the build
+  literal, so that one reading also clears 395 and 396, neither of which took
+  it. This is the differential rule at the head of this file working exactly
+  as written: **838203935 is this container's figure and nothing more**, and
+  the next session takes its own before rather than comparing to either
+  number. What the reading cannot see is this build's two halves: the probe
+  is an era-1 fight with no yard and never paints, so it proves the rework
+  reached nothing on that fight and says nothing about the field the wall is
+  on.
+- **THE SINGLE-FILE BUILD WAS SERVED AND BOOTED IN BOTH FORMS**, because
+  `rimWidths` is a new `export function`: `window.__sim` exists, the world
+  advances to 2.00s, and the portal reports `ry` 58 and `dip` 23.18 -- which
+  is `0.075 x sqrt(314.5^2 - 58^2)` at 390 wide, era 1, to the hundredth --
+  with no page error and nothing 404.
 - Skipped, per the working agreement: smoke, tiers, dps, variance and
-  contact. The ORDINAL hash is taken below rather than skipped, because the
-  wall is targeting at era 2 -- and it is structurally blind to both halves
-  of this build (an era-1 fight, no yard, `fight.mjs` never paints).
+  contact.
