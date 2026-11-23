@@ -2099,8 +2099,14 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * beside the array in `tiers.mjs`. What is owed is `--runs 3`, which is
  * three times the hours, and that is a build of its own.
  */
-const INCOME_PIN = 'd305b7b056b2';
-const INCOME_AT = 374;
+/*
+ * Moved at build 398 WITHOUT a re-measure, by request scope: INTAKE was
+ * removed from the tree (tree.total fell by its price) and contact
+ * collection is now automatic from the start. tiers.mjs's EARNED curve is
+ * therefore owed a fresh income.mjs pass -- it describes 397's economy.
+ */
+const INCOME_PIN = '67b28601079e';
+const INCOME_AT = 398;
 const TIER_CFG = CFG.waves.tier;
 const incomeTerms = {
   'energy.perMass': CFG.energy.perMass,

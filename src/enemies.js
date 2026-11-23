@@ -8484,21 +8484,23 @@ export function collectData(world, dt) {
   const S = CFG.energy;
   const s = world.shooter;
   const list = world.drops;
-  const auto = world.up.intake;
   for (let i = list.length - 1; i >= 0; i--) {
     const e = list[i];
     if (e.dead || !e.bytes) continue;
     const dx = s.x - e.x;
     const dy = s.y - e.y;
     const d2 = dx * dx + dy * dy;
-    if (auto) {
-      // Landed on the turret. Touching, not merely near: the reach is the two
-      // radii and a little, the same test contact uses for everything else.
-      const rr = s.r + e.r + 2;
-      if (d2 <= rr * rr) {
-        absorb(world, e);
-        continue;
-      }
+    /*
+     * Auto-collect, from the first second of a run (build 398). INTAKE was
+     * the upgrade that switched this on and it is gone: energy that reaches
+     * the turret is banked on contact, so nothing piles up on the machine.
+     * Generous reach -- a few units past touching -- so a mote that arrives
+     * in a crowd is not left orbiting the hull.
+     */
+    const rr = s.r + e.r + CFG.energy.touch;
+    if (d2 <= rr * rr) {
+      absorb(world, e);
+      continue;
     }
     const d = Math.sqrt(d2) || 1;
     e.vx += (dx / d) * S.pull * dt;

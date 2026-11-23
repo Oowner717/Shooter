@@ -123,9 +123,9 @@ const NOTES = [
   // rather than one because they answer three questions a new player has in
   // the same few seconds — is that thing dangerous, why is it moving toward
   // me, and what am I supposed to do about it. No, it is coming to you, and
-  // PULSE takes it in. The INTAKE upgrade is what eventually removes the third.
-  { at: 1, text: 'Broken objects leave DATA.\nIt is not an enemy. It drifts to you.' },
-  { at: 2, text: 'PULSE takes in the data near you.\nBYTES are the green number.' },
+  // it banks itself when it arrives (automatic since build 398).
+  { at: 1, text: 'Broken objects leave DATA.\nIt drifts to you and is collected on its own.' },
+  { at: 2, text: 'PULSE pulls in the data near you faster.\nBYTES are the green number.' },
   /*
    * The three lines that were here described ALLOCATION and AMENDMENT -- three
    * cards, one taken -- and neither exists. AMENDMENT went in build 83 and its

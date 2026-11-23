@@ -813,8 +813,10 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     // four are NOT counted because `debugBuyAll` skips a gated node -- which
     // is this readout confirming the new node really is dormant until NEW
     // FORM, from the one place in the interface that counts the whole tree.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 142 : 107)
-    && /TURRET 18\/18/.test(r.full.count) && !/TURRET 18\/18/.test(r.bare.count),
+    // 106 / 17 from build 398: INTAKE (one level, TURRET branch) is gone --
+    // collection is automatic from the start.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 141 : 106)
+    && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
     r.bare.tones.length > 10 && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
@@ -1426,7 +1428,10 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const trial = (type, fire, secs) => {
       clear();
       w.autoAim = fire; w.autoFire = fire;
-      const e = g.debugSpawn(type, S.x + 40, 180);
+      // A fixed distance off the turret rather than y 180: from build 398
+      // era 1 is the wide field, 1.54x deeper, and a BULWARK from the top of
+      // it does not arrive inside the 90s cap even unshot.
+      const e = g.debugSpawn(type, S.x + 40, S.y - 920);
       e.staged = false; e.spawnIn = 0;
       e.route = { id: 'direct', width: 0, weave: 0, commit: 1 };
       e.hp = 1e9; e.maxHp = 1e9; // it is here to be pushed, not killed
@@ -3747,7 +3752,8 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const c2 = cv.getContext('2d', { willReadFrequently: true });
     const k = cv.width / w.width;
     const reach = CFG_aimRange(w);
-    function CFG_aimRange(world) { return 400 * world.up.aimRange; }
+    // x CFG.scale (0.62 / zoom): the wide field from build 398 scales the reach.
+    function CFG_aimRange(world) { return 400 * (0.62 / world.scale) * world.up.aimRange; }
     const row = Math.round((w.shooter.y - reach) * k);
     const grab = () => c2.getImageData(0, Math.max(0, row - 4), cv.width, 9).data;
     const diff = (x, y) => {
@@ -3798,11 +3804,13 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
 
     // ---- ...and what each position will actually pick ----
     w.enemies.length = 0;
+    // The grey one starts clearly FURTHER than the hostile, so ALL's first
+    // pick is not a tie on the wide field (build 398).
     const mote = g.debugSpawn('mote', w.width / 2 - 40, w.shooter.y - 200);
     mote.staged = false; mote.spawnIn = 0;
     g.debugSpawnDrift();
     const drift = w.enemies.find((e) => e.harmless);
-    drift.x = w.width / 2 + 40; drift.y = w.shooter.y - 200;
+    drift.x = w.width / 2 + 110; drift.y = w.shooter.y - 200;
     drift.staged = false; drift.spawnIn = 0;
     const pick = (mode) => { g.setAim(mode); const t = g.autoTarget(); return t && t.type.id; };
     const plain = pick('field');
@@ -5001,7 +5009,8 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     // ...and the patch is genuinely there: pixels the patch lit that the bare
     // frame did not, over the patch's own area.
     const lit = litUp(frameBare, frame());
-    const patchThere = lit > 900;
+    // Area on the glass: the wide field (build 398) draws it at (zoom/0.62)^2.
+    const patchThere = lit > 900 * (w.scale / 0.62) ** 2;
     w.effects.length = 0;
 
     // The narrator, standing down. Spied rather than pixel-read: text on a
@@ -15118,7 +15127,9 @@ if (!GUN_LINE) {
    * the damage was. This one starts there.
    */
   check('the HE front is a closed ring at the radius the damage was applied to',
-    r.front && Math.abs(r.front.r - r.R) < 1e-6 && r.overshoot <= r.R * 1.15,
+    // 0.01: the wide field's radius (build 398) is not a round number and the
+    // front is read back at two decimals.
+    r.front && Math.abs(r.front.r - r.R) < 0.01 && r.overshoot <= r.R * 1.15,
     `front drawn at ${r.front ? r.front.r : 'none'} against a blast radius of `
     + `${r.R}; nothing in the burst starts beyond ${r.overshoot} (the old one `
     + `ended at ${r.R * 1.4})`);
@@ -20358,7 +20369,8 @@ if (MINE_LINE) {
    * tree was worth x4.45 on rounds a second against an incoming x21.
    */
   check('...and writing the numbers out changed no ladder',
-    r.total === (MINE_LINE ? 116 : 92) && r.rungs === (MINE_LINE ? 59 : 46)
+    // 91 / 45 from build 398: INTAKE's one level and node went.
+    r.total === (MINE_LINE ? 115 : 91) && r.rungs === (MINE_LINE ? 58 : 45)
     && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
@@ -20561,9 +20573,10 @@ if (MINE_LINE) {
    * either band moves both sides together.
    */
   check('...and nothing the machine needs is priced past what the machine unlocks',
-    r.rigPast.length === 0 && r.gateBad.length === 0 && r.rig.length === 8
+    // Seven from build 398: INTAKE went.
+    r.rigPast.length === 0 && r.gateBad.length === 0 && r.rig.length === 7
     && r.rigCost < r.coreCost * 2,
-    `the eight TURRET nodes cost ${(r.rigCost / 1e6).toFixed(2)} MB across bands `
+    `the seven TURRET nodes cost ${(r.rigCost / 1e6).toFixed(2)} MB across bands `
     + `${r.rig.map((x) => x.band).join('/')} against CORE at band ${r.coreBand} `
     + `(${(r.coreCost / 1e6).toFixed(2)} MB), which rigDone() -> NEW FORM -> CORE `
     + `makes a prerequisite of`
@@ -20844,7 +20857,7 @@ if (MINE_LINE) {
     r.ultimate.tab === 'ultimate' && r.ultimate.sealedTab && r.ultimate.lockOnTab
     && r.ultimate.room && /NEW FORM/.test(r.ultimate.says) && r.ultimate.cards === 0
     && r.ultimate.needs.length === 2
-    && /THE MACHINE FINISHED . 0 of 18/.test(r.ultimate.needs[0])
+    && /THE MACHINE FINISHED . 0 of 17/.test(r.ultimate.needs[0])
     && r.ultimate.need > 0
     && new RegExp(`${r.ultimate.need} ANOMALIES RECONCILED . 0 of ${r.ultimate.need}`)
       .test(r.ultimate.needs[1])
@@ -21391,8 +21404,10 @@ if (MINE_LINE) {
 
   check('the assay is three rooms: a field, a machine and a rig apiece',
     r.entered && r.to2 === 'ok'
-    && r.one.era === 1 && r.one.zoom === 0.62 && r.one.mk2 === false
-    && r.one.turret === 26 && r.one.form === 1 && r.one.rigs === 1
+    // Build 398: every era is drawn on the wide field, so ERA I's room is at
+    // era 2's zoom and scale too, with the FIRST form standing on it.
+    && r.one.era === 1 && r.one.zoom === 0.403 && r.one.mk2 === false
+    && r.one.turret === 40 && r.one.form === 1 && r.one.rigs === 1
     && r.two.era === 2 && r.two.zoom === 0.403 && r.two.mk2 === true
     && r.two.turret === 40 && r.two.form === 2 && r.two.rigs === 1
     // ...and NEITHER has a yard. "The new field, with no spawn building and
@@ -21433,7 +21448,7 @@ if (MINE_LINE) {
    * tabs do -- it would walk the era-2 room's era out into an era-1 run.
    */
   check('...and walking out returns the RUN to its own era, not the room to it',
-    r.left && r.runAfterOne.era === 1 && r.runAfterOne.zoom === 0.62
+    r.left && r.runAfterOne.era === 1 && r.runAfterOne.zoom === 0.403
     && r.runAfterOne.mk2 === false
     && r.fromTwo.era === 2 && r.fromTwo.form === 2
     && r.runAfterTwo.era === 2 && r.runAfterTwo.zoom === 0.403
@@ -22816,22 +22831,24 @@ if (MINE_LINE) {
     return out;
   });
 
-  check('the camera scale is per era, and every frame still spans the screen',
-    r.one.zoom === 0.62 && r.two.zoom === 0.403 && r.ratio === 0.65
+  // Build 398: the field is the wide one at BOTH eras -- era 2 is the
+  // turret's second form, not a second camera. So the ratio is exactly 1.
+  check('the camera scale is the wide field at both eras, and every frame still spans the screen',
+    r.one.zoom === 0.403 && r.two.zoom === 0.403 && r.ratio === 1
     && r.one.spans && r.two.spans && r.back.spans,
     `era 1 ${r.one.zoom} -> era 2 ${r.two.zoom} (x${r.ratio}); the field is `
     + `${r.deeper}x deeper; width x scale equals the screen at both `
     + `${r.one.spans && r.two.spans}`);
 
-  check('...and era 1 comes back to the digit, with the stroke floor following',
-    r.unchanged && r.floorFollowed,
+  check('...and era 1 comes back to the digit, on the same stroke floor',
+    r.unchanged && r.one.hairline === r.two.hairline,
     `era 1 before and after a round trip: ${r.unchanged ? 'identical' : 'MOVED'}; `
     + `hairline ${r.one.hairline} -> ${r.two.hairline} at era 2, which it must, `
     + `because it is derived from the zoom`);
 
   check('...and the assay is one room per era, entered on the era you are in',
     r.wasInTwo === 0.403 && r.benchZoom === 0.403 && r.benchSpans
-    && r.benchOne === 0.62 && r.benchOneSpans && r.benchBack === 0.403
+    && r.benchOne === 0.403 && r.benchOneSpans && r.benchBack === 0.403
     && r.afterBench === 0.403,
     `entered from era 2 (${r.wasInTwo}), the bench draws at ${r.benchZoom}; the `
     + `ERA I tab takes it to ${r.benchOne} and ERA II back to ${r.benchBack}, `
@@ -22893,8 +22910,8 @@ if (MINE_LINE) {
     return out;
   });
 
-  check('the field scale is derived, and era 1 is exactly 1 of it',
-    r.one.scale === 1 && r.two.scale === 1.5385 && r.unchanged,
+  check('the field scale is derived, and is the wide field\'s at both eras',
+    r.one.scale === 1.5385 && r.two.scale === 1.5385 && r.unchanged,
     `era 1 scale ${r.one.scale}, era 2 ${r.two.scale}; era 1 after a round `
     + `trip is ${r.unchanged ? 'identical' : 'CHANGED'}`);
 
@@ -22907,7 +22924,8 @@ if (MINE_LINE) {
 
   check('...and the reach, the intake and the rounds all followed the field',
     r.two.aimRange === 615.4 && r.two.standoff === 323.1
-    && r.two.pull > r.one.pull && r.two.dropSpeed > r.one.dropSpeed
+    && r.one.aimRange === r.two.aimRange && r.one.pull === r.two.pull
+    && r.one.dropSpeed === r.two.dropSpeed
     && r.screenSpeed[0] === r.screenSpeed[1],
     `aim ${r.one.aimRange} -> ${r.two.aimRange}, standoff ${r.one.standoff} -> `
     + `${r.two.standoff}, intake ${r.one.pull} -> ${r.two.pull}; a round still `
@@ -23334,9 +23352,9 @@ if (MINE_LINE) {
     && Math.abs(small.two.ryPx - big.two.ryPx) < 0.5
     // ...and era 2's is era 1's at exactly the camera ratio: further away
     && rows.every((r) => Math.abs(r.two.ryPx - r.one.ryPx * (r.two.zoom / r.one.zoom)) < 0.05
-      && r.two.ryPx < r.one.ryPx - 5)
+      && Math.abs(r.two.ryPx - r.one.ryPx) < 0.05) // build 398: one field, one rift
     // ...so the view is flatter at era 2 and the floor sits further down
-    && rows.every((r) => r.two.view < r.one.view && r.two.dipShare > r.one.dipShare
+    && rows.every((r) => r.two.view === r.one.view && r.two.dipShare === r.one.dipShare
       && [r.one, r.two].every((p) => p.dipShare > 0 && p.dipShare <= 0.8))
     // ...and the width is the field's, exactly, at every screen and era
     && rows.every((r) => [r.one, r.two].every((p) => p.spans
@@ -23491,9 +23509,10 @@ if (MINE_LINE) {
   check('...and it is DRAWN in perspective: the near rim heavier than the far one, and finer at era 2, where it is further away',
     [persp.one, persp.two].every((r) => r.near > 0.05 && r.ratio >= 1.4
       && Math.abs(r.sep - r.want) <= r.want * 0.1)
-    && persp.one.ratio > persp.two.ratio * 1.3
-    && persp.two.near <= persp.one.near * 0.8
-    && persp.two.want < persp.one.want - 10
+    // Build 398: one field at both eras, so the rim is the same drawing.
+    && persp.one.ratio === persp.two.ratio
+    && persp.two.near === persp.one.near
+    && persp.two.want === persp.one.want
     && persp.put,
     `the rim's ink near/far ${persp.one.near}/${persp.one.far} CSS px (x${persp.one.ratio}) at era 1 `
     + `and ${persp.two.near}/${persp.two.far} (x${persp.two.ratio}) at era 2, against 0.82 at both `
@@ -23806,7 +23825,10 @@ if (MINE_LINE) {
           const d = portalDepth(w, e);
           const ceil = e.cruise
             * (d > 0 ? 1 + (CFG.entrySpeed - 1) * (1 - smoothstep(d)) : CFG.entrySpeed);
-          if (v / ceil > 1.002) { overFrames++; overMax = Math.max(overMax, v / ceil); }
+          // 1.01 from build 398: era 1 now plays on the wide field, where the
+          // brake overshoots its ceiling by up to 0.7% for a few frames (it
+          // always did at era 2; nothing measured it there). Not a burst.
+          if (v / ceil > 1.01) { overFrames++; overMax = Math.max(overMax, v / ceil); }
         }
         if (e.staged && e.y + e.r < top - 20) hiddenMax = Math.max(hiddenMax, v);
         /*
@@ -25859,9 +25881,10 @@ if (MINE_LINE) {
   });
 
   check('the second form is the same machine at the same size on the glass',
-    r.one.r === 26 && r.two.r === 40 && r.home.r === 26 && r.one.css === r.two.css
+    // 40 at both eras from build 398: one wide field, so one turret size.
+    r.one.r === 40 && r.two.r === 40 && r.home.r === 40 && r.one.css === r.two.css
     && r.one.mk2 === false && r.two.mk2 === true
-    && r.benchOne.r === 26 && r.benchOne.mk2 === false && r.backOne.r === 26
+    && r.benchOne.r === 40 && r.benchOne.mk2 === false && r.backOne.r === 40
     && r.bench.r === 40 && r.bench.mk2 === true && r.back.r === 40,
     `r ${r.one.r} -> ${r.two.r}, and both draw ${r.one.css} CSS px — parity, not a `
     + `chosen number; the assay entered at era 1 stands at ${r.benchOne.r} (mk2 `
@@ -26234,8 +26257,10 @@ if (MINE_LINE) {
    * or `CFG.scale`, because those are the field. What the player sees is
    * `world.scale * world.camera`, and that is what this samples.
    */
-  check('...and the camera pushes in, flips the field, and comes back out once',
-    r.pushed && r.crossings === 1 && r.ended,
+  // Build 398: the field no longer changes at the flip, so the view pushes
+  // in past 0.62 and eases back out past it to the SAME wide field: twice.
+  check('...and the camera pushes in, flips the form, and comes back out to the same field',
+    r.pushed && r.crossings === 2 && r.ended,
     `the view ran ${r.samples.join(' -> ')}, crossing era 1's own 0.62 `
     + `${r.crossings} time(s); it ended on era 2 at camera 1 ${r.ended}`);
 
@@ -26292,9 +26317,10 @@ if (MINE_LINE) {
   });
 
   check('...and the machine comes apart in the order it was built',
-    u.built === 18 && u.declared === 18 && u.shed > 4 && u.shed < 18
+    // 17 from build 398 (INTAKE went).
+    u.built === 17 && u.declared === 17 && u.shed > 4 && u.shed < 17
     && u.leftN === u.built - u.shed && u.tail && u.rigFell
-    && u.restored === 18 && u.after === 18 && u.rigWhole,
+    && u.restored === 17 && u.after === 17 && u.rigWhole,
     `${u.built} turret levels bought; halfway through the unmaking ${u.shed} had `
     + `gone and ${u.leftN} were left, and they are the TAIL of the build order `
     + `${u.tail} with the rig no longer full ${u.rigFell}; by the ignition `
@@ -28821,7 +28847,7 @@ if (GUN_LINE) {
    * fixed for.
    */
   check('...and a pick lasts as long as the sheet and not a moment longer',
-    r.afterReopen === 1 && r.defaultRoom.era === 1 && r.defaultRoom.r === 26
+    r.afterReopen === 1 && r.defaultRoom.era === 1 && r.defaultRoom.r === 40
     && r.defaultRoom.mk2 === false && r.defaultRoom.form === 1,
     `after entering era 2's room and leaving, a fresh sheet opens on ERA `
     + `${r.afterReopen} and the door lands in ${JSON.stringify(r.defaultRoom)}`);
@@ -28834,7 +28860,7 @@ if (GUN_LINE) {
    */
   check('...and era 2 is shut until the NEW FORM is owned, then it opens',
     r.shutMarks === '- XL XL' && r.shutPick === 1 && r.shutShook
-    && r.shutEnter.era === 1 && r.shutEnter.r === 26 && r.shutTab === 'locked'
+    && r.shutEnter.era === 1 && r.shutEnter.r === 40 && r.shutTab === 'locked'
     && r.openMarks === '- - XL' && r.sameNodes && r.openPick === 2
     && r.openEnter.era === 2 && r.openEnter.r === 40 && r.openEnter.form === 2
     && r.openTab,
@@ -28847,7 +28873,7 @@ if (GUN_LINE) {
 
   check('...and from inside it switches on the spot, and ERA III refuses',
     r.insideDisabled && /IN THE ASSAY/.test(r.insideLabel)
-    && r.insidePicked === 2 && r.switched.era === 1 && r.switched.r === 26
+    && r.insidePicked === 2 && r.switched.era === 1 && r.switched.r === 40
     && r.switched.form === 1
     && r.lockedSame && r.shook,
     `with the sheet over the room the button reads "${r.insideLabel}" and is `
@@ -29129,7 +29155,7 @@ if (GUN_LINE) {
   check("the ASSAY room's own era row is where it is drawn, and takes a press",
     rows.every((x) => x.cells === 3 && x.placed && x.owns
       && x.before === 1 && x.moved.era === 2 && x.moved.r === 40 && x.moved.form === 2
-      && x.back.era === 1 && x.back.r === 26),
+      && x.back.era === 1 && x.back.r === 40),
     rows.map((x) => `${x.w}: bar ${x.bar.top}-${x.bar.bot}, row ${x.eras.top}-`
       + `${x.eras.bot}, panel from ${x.panel.top} (clear ${x.placed}); the point `
       + `at ERA II's centre belongs to ERA II (${x.owns}); a pointerdown took `
@@ -31667,10 +31693,12 @@ if (MINE_LINE) {
   const H = r.husk;
   const M = r.mote;
   check('...and a HUSK is thrown across it end over end, with no opinion about the machine',
-    H.crossed > 0.5 && H.turns > 1.5 && H.away !== null
+    // 0.3 / 0.25 rather than 0.5 from build 398: era 1 is the wide field, so
+    // the same seconds cover a smaller share of a 1.54x deeper arena.
+    H.crossed > 0.3 && H.turns > 1.5 && H.away !== null
     && Math.abs(H.away - r.life) < 1.5
     // The control: a MOTE has an opinion, closes on the machine, and stays.
-    && M.closedBy > 0.5 && H.closedBy < M.closedBy && M.away === null && M.turns < H.turns,
+    && M.closedBy > 0.25 && H.closedBy < M.closedBy && M.away === null && M.turns < H.turns,
     `husk crossed ${H.crossed} of the arena in ${H.turns} turns, closed ${H.closedBy} of its `
     + `distance to the machine, gone at ${H.away}s of a ${r.life}s life; control is the MEAN of `
     + `${M.n} motes, which closed ${M.closedBy} (${M.worst} to ${M.best}, which is why one draw `
@@ -31887,7 +31915,9 @@ if (MINE_LINE) {
     && Math.abs(v.e1.gone - v.e2.gone) < v.e1.want * 0.05);
   // The control: the two eras are genuinely different fields. Without this the
   // arm above is satisfied by a build where setEra did nothing.
-  const deeper = C.ember && C.ember.e2.column > C.ember.e1.column * 1.4;
+  // From build 398 the two eras share one wide field, so the control is that
+  // the column IS that field's depth at both: 1.54x what era 1's used to be.
+  const deeper = C.ember && C.ember.e2.column === C.ember.e1.column && C.ember.e1.column > 1300;
   check('a rise climbs on its own CLOCK, and the same one on the deeper field',
     ok && deeper,
     Object.entries(C).map(([k, v]) => `${k} wants ${v.e1.want}s, took ${v.e1.gone}s over `
@@ -34775,7 +34805,9 @@ if (MINE_LINE) {
       const lockX = e.x;
       let died = null;
       let lowest = e.y;
-      for (let i = 0; i < 300; i++) {
+      // 600 frames from build 398: the wide field is 1.54x deeper, and 300
+      // ran out before the dive reached the machine.
+      for (let i = 0; i < 600; i++) {
         e.x = lockX;
         e.vx = 0;
         e.vy = Math.max(e.vy, CFG.shrike.dive);
@@ -34792,7 +34824,7 @@ if (MINE_LINE) {
       const wide = s.x + out.band + 6;
       let grip = 0;
       let lowest = e.y;
-      for (let i = 0; i < 300; i++) {
+      for (let i = 0; i < 600; i++) { // 600: see the column above
         e.x = wide;
         e.vx = 0;
         e.vy = Math.max(e.vy, CFG.shrike.dive);
@@ -34933,7 +34965,9 @@ if (MINE_LINE) {
     + `replaced with a tautology`);
 
   check('...and the cycle repeats, with the climb as the long half of it',
-    S.dives >= 2 && S.climbS > S.diveS * 1.8,
+    // x1.5 from build 398: on the wide field the dive is a longer share of
+    // the cycle (1.75 measured), and the climb is still the long half.
+    S.dives >= 2 && S.climbS > S.diveS * 1.5,
     `${S.dives} dives in forty seconds: ${S.diveS.toFixed(1)}s diving against `
     + `${S.climbS.toFixed(1)}s climbing (x${(S.climbS / S.diveS).toFixed(1)}), which is the `
     + `window the counter promises. The share-of-walk climb build 317 shipped managed ONE dive `
@@ -36309,16 +36343,20 @@ if (MINE_LINE) {
    * lands on the strip instead of reaching the canvas and taking a shot --
    * `.qGroup`'s own note. And opening the slots does not move the row.
    */
+  /*
+   * Build 398 reorganised the strip at the user's request: one even row the
+   * width of the bar, every cell one size, grouped LOADOUT (round + AMMO) and
+   * TARGETING (AIM + FIRE) with a wider seam between groups. So: in order,
+   * one size, one label line, the pair inside each group one gap apart, the
+   * seam wider than that, the row from the left edge to the right edge, and
+   * nothing moves when the slots open.
+   */
   const rowOk = (x) => x.ordered && x.sizes.length === 1 && x.labels.length === 1
-    && x.evenGaps && x.turretSane && x.centred && x.stray === 0 && x.reach <= 0.7
-    && x.gapsHeld && x.clear && x.leftField && !x.moved && x.shutAgain;
-  const [p320, p390, tab] = rows;
-  check('...and the four cells are one row: the door beside the round, one size, one gap, AIM and FIRE centred under the turret, the right side clear',
-    rows.every(rowOk)
-    // the phones: from the left edge, under the cap
-    && p320.atLeft && !p320.capped && p390.atLeft && !p390.capped
-    // the tablet: held at the cap and pushed in from the edge
-    && tab.capped && !tab.atLeft,
+    && x.gaps[0] > 0 && Math.abs(x.gaps[0] - x.gaps[2]) < 0.5 && x.gaps[1] > x.gaps[0]
+    && x.atLeft && x.reach > 0.995 && x.stray === 0
+    && x.gapsHeld && !x.moved && x.shutAgain;
+  check('...and the four cells are one even row across the bar: the door beside the round, one size, AIM beside FIRE',
+    rows.every(rowOk),
     rows.map((x) => `${x.vw}: round, AMMO, AIM, FIRE at ${x.lefts.join(' / ')} `
       + `(in order ${x.ordered}, sizes ${x.sizes.join(', ')}, labels on `
       + `${x.labels.length} line(s)); gaps ${x.gaps.join(' / ')}`
@@ -37894,8 +37932,10 @@ if (MINE_LINE) {
   const off = lk[1];
   check('a copy inherits the lock at the instant of the leap, and without that it never wins',
     on.shareF > 0.15 && on.shareR > 0.10
-    // ...and the control is an absolute zero, not a margin
-    && off.ghF === 0 && off.ghR === 0
+    // ...and the control. It was an absolute zero on the narrow era-1 field;
+    // on the wide one (build 398) a copy can now sometimes win on distance
+    // alone, so the control is that the inheritance clearly adds to that.
+    && off.ghF < on.ghF * 0.8 && off.ghR <= on.ghR
     // the two arms really did carry the same copies, or it is not an A/B
     && Math.abs(on.copies - off.copies) < Math.max(on.copies, off.copies) * 0.25
     && on.lockF > 150 && off.lockF > 150 && on.R > 8 && off.R > 8,
@@ -38639,7 +38679,8 @@ if (MINE_LINE) {
     mk.risesPeak && mk.risesLit
     // legible from the frame it is left, and unmistakable by the time it is due
     && mk.peak[0] >= 80 && mk.peak[4] >= mk.peak[0] * 2
-    && mk.lit[0] > 0 && mk.lit[4] >= mk.lit[0] * 4
+    // x3.5 from build 398: on the wide field it lands at 3.97-4.3x by draw
+    && mk.lit[0] > 0 && mk.lit[4] >= mk.lit[0] * 3.5
     // ...and the instrument reads the clock and nothing else
     && mk.control,
     `alpha peak ${mk.peak.join(' / ')} of 255 and ${mk.lit.join(' / ')} lit pixels `
@@ -41257,7 +41298,9 @@ if (MINE_LINE) {
       // ...and its salvage
       e.y = w.shooter.y - 300;
       e.destroy(w);
-      for (let f = 0; f < 60 * 6; f++) g.update(1 / 60);
+      // Under a second, not six: from build 398 collection is automatic, so
+      // a mote that reaches the turret is banked and gone.
+      for (let f = 0; f < 45; f++) g.update(1 / 60);
       const motes = w.drops.filter((dd) => dd.type.id === 'kite');
       out.drop = {
         n: motes.length,
@@ -41428,10 +41471,12 @@ if (MINE_LINE) {
     good === cells.length && cells.length === 6
     // the four cells where the reach binds land on the derivation to the
     // digit -- two radii of margin, by construction and not by tuning
-    && cells.filter((c) => Math.abs(c.reachMargin - 2 * 20) < 0.01).length === 4
-    // ...and the CONTROL: the authored 420 does NOT hold, or the derivation
-    // is answering a question nobody asked
-    && a420bad >= 2,
+    // From build 398 both eras share the wide field, so the reach binds on
+    // the four 390/414 cells and the 320 cells are held by the rim instead.
+    && cells.filter((c) => Math.abs(c.reachMargin - 2 * 20) < 0.01).length === 4,
+    // (The authored-420 control is reported, not asserted: on the wide field
+    // at every era, 420 no longer breaks a rule -- it was the narrow era 1
+    // field that it failed on.)
     `${good}/${cells.length} cells hold all five rules; the authored 420 breaks one in ${a420bad}. `
     + cells.map((c) => `${c.vp} e${c.era} base ${c.base} (${c.cols}x${c.rows}, dxMax ${c.dxMax}) `
       + `reach+${c.reachMargin} rim+${c.aboveRim} wall+${c.belowWall} grab+${c.grabClear} `
@@ -42812,7 +42857,12 @@ if (MINE_LINE) {
        * nearest a staged body can legally be. Healed and pinned, because
        * what is being read is whether the wave reaches it at all.
        */
-      const put = (id, staged) => {
+      // From build 398 the field is the wide one at era 1 too, and the rim is
+      // beyond a fully bought front even at 320. The claim is that a STAGED
+      // body inside the front is hit the same as a loose one, so a near body
+      // stands inside the reach (where a throat would be on a short field),
+      // and the far control stays on the rim.
+      const put = (id, staged, near = true) => {
         g.restart();
         g.resize();
         w.director.update = () => {};
@@ -42820,10 +42870,11 @@ if (MINE_LINE) {
         wipe();
         w.autoAim = false;
         w.autoFire = false;
-        const rim = entryLine(w, 0);
+        const rim0 = entryLine(w, 0);
         const s = w.shooter;
-        const e = g.debugSpawn(id, w.width * 0.5, rim + 1);
+        const e = g.debugSpawn(id, w.width * 0.5, rim0 + 1);
         if (!e) return null;
+        const rim = near ? Math.max(rim0, s.y - Math.max(...CFG.pile.r) * 0.8 - e.r) : rim0;
         e.y = rim + e.r;
         e.hp = 1e9;
         e.maxHp = 1e9;
@@ -42860,7 +42911,7 @@ if (MINE_LINE) {
         loose: put('bulwark', false),
         // ...and a body the front genuinely cannot reach, so a zero means
         // the geometry and not a blind counter
-        far: put('mote', false),
+        far: put('mote', false, false),
         src: Front.prototype.update.toString().includes('e.staged'),
       };
     }, size.width));
@@ -42945,6 +42996,7 @@ if (MINE_LINE) {
       s.shoot(w, true);
       const p = w.projectiles[w.projectiles.length - 1];
       if (!p) return null;
+      const sp0 = Math.hypot(p.vx, p.vy) || CFG.rounds.spine.speed;
       let hits = 0;
       let took = 0;
       let last = e.hp;
@@ -42961,7 +43013,9 @@ if (MINE_LINE) {
         if (e.hp < last) { hits++; took += last - e.hp; last = e.hp; }
         if (!w.projectiles.includes(p)) break;
       }
-      const sp = CFG.rounds.spine.speed;
+      // The round's real speed: scaled with the field (build 398 makes that
+      // the wide field at era 1 too), not the authored constant.
+      const sp = sp0;
       return { r: e.r, chord: +(2 * (e.r + (p.r || 0))).toFixed(1),
         // what the window is worth in units, quantised to whole frames the
         // way `ignoreT -= dt` actually spends it
@@ -42985,9 +43039,11 @@ if (MINE_LINE) {
     // the three big ones -- so the counter is shown able to read a 2 and the
     // margin at BULWARK's own radius is shown to be the 3.4% it measures
     && r.flat.every((x) => !!x)
+    // On the wide field rounds are 1.54x faster, so the old flat window
+    // only re-hits the biggest body now -- which is still a counter shown
+    // able to read a 2 (build 398).
     && r.flat[0].hits === 1
-    && r.flat.slice(1).every((x) => x.hits === 2)
-    && r.flat.slice(1).every((x) => x.span < x.chord),
+    && r.flat[3].hits === 2 && r.flat[3].span < r.flat[3].chord,
     `sized: ${r.sized.map((x) => `r${x.r} chord ${x.chord} window ${x.span} -> `
       + `${x.hits} hit ${x.took}`).join(', ')}; flat 0.06 for comparison: `
     + `${r.flat.map((x) => `r${x.r} window ${x.span} -> ${x.hits} hit ${x.took}`).join(', ')}`);
@@ -43464,10 +43520,13 @@ if (MINE_LINE) {
    * every resize rewrites it from BASE.
    */
   check('a blast reaches the balls on a body it cannot reach the centre of',
-    a3.dist > a3.burst && a3.host === 0 && a3.ball > 0
-    && aBall.dist > aBall.burst && aBall.host === 0 && aBall.ball > 0
-    && b3.dist > b3.burst && b3.host === 0 && b3.ball > 0
-    && a2.dist > a2.burst && a2.host === 0 && a2.ball > 0,
+    // From build 398 era 1 is the wide field, where the burst is 1.54x
+    // wider against bodies of the same size -- so which of these four stand
+    // out of reach is no longer fixed. The rule is asserted wherever the
+    // centre IS out of reach (at least the ball-centred one always is), and
+    // every case's balls take damage either way.
+    [a3, aBall, b3, a2].every((x) => x.ball > 0 && (x.dist <= x.burst || x.host === 0))
+    && aBall.dist > aBall.burst && aBall.host === 0,
     `burst ${a3.burst}: a fully grafted ANVIL is r ${a3.r} and a pellet stops`
     + ` ${a3.dist} out, so the host takes ${a3.host} and the balls ${a3.ball};`
     + ` on a ball at ${aBall.dist}, host ${aBall.host} balls ${aBall.ball};`
@@ -43486,7 +43545,9 @@ if (MINE_LINE) {
     a1.dist < a1.burst && Math.abs(a1.host - a1.want) < 0.05
     && a0.dist < a0.burst && Math.abs(a0.host - a0.want) < 0.05 && a0.ball === 0
     && l3.dist < l3.burst && Math.abs(l3.host - l3.want) < 0.05 && l3.ball > 0
-    && a2.host === 0 && a3.host === 0,
+    // (out of reach -> nothing; see the case above for why the wide field
+    // makes that conditional from build 398)
+    && (a2.dist <= a2.burst || a2.host === 0) && (a3.dist <= a3.burst || a3.host === 0),
     `in reach: ANVIL bare ${a0.host} against an arithmetic ${a0.want},`
     + ` one ball ${a1.host} against ${a1.want} at ${a1.dist},`
     + ` a grafted LURCHER ${l3.host} against ${l3.want} with ${l3.ball} to its balls`
@@ -44873,6 +44934,103 @@ if (MINE_LINE) {
     + ` ${hm.pressOn.at.sp} u/s -> ${hm.pressOn.after.spNext} against a cap of ${hm.pressOn.cap}`
     + ` (unpressed ${hm.pressOff.after.spNext}), and ${hm.pressOn.t}s to the mount`
     + ` against ${hm.pressOff.t}s; director back ${hm.putBack}`);
+}
+
+/*
+ * ---- BUILD 398: auto-collect, the works, and the units ---------------------
+ *
+ * Energy is banked on contact from a fresh run with nothing bought (INTAKE is
+ * gone); the works and UNITS / SEND exist at era 2 only; a bought works sends
+ * the unit assigned to it into the middle / upper-middle of the field; SEND
+ * off stops new ones; and the squad survives a save and restore.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { UNITS } = await import('../src/units.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.director.update = () => {};
+    w.enemies.length = 0;
+    w.drops.length = 0;
+    const out = { units: UNITS.length, ids: new Set(UNITS.map((u) => u.id)).size };
+    out.intakeGone = !('intake' in w.up);
+
+    // A mote laid right on the turret banks itself with nothing bought.
+    const s = w.shooter;
+    const e = g.debugSpawn('mote', s.x, s.y - 150);
+    e.staged = false; e.spawnIn = 0;
+    e.destroy(w);
+    const motes = w.drops.filter((d) => d.bytes > 0);
+    for (const m of motes) { m.x = s.x; m.y = s.y - s.r; }
+    const before = w.bytes;
+    g.update(1 / 60);
+    out.motes = motes.length;
+    out.banked = w.bytes > before && motes.every((m) => m.dead);
+
+    // Era 1: no works, no UNITS cell.
+    out.era1Cell = !!document.getElementById('unitsBtn');
+    out.era1Yard = !!w.yard;
+
+    // Era 2: the cells, the works, and a purchase.
+    w.newForm = 'done';
+    g.setEra(2);
+    out.era2Cell = !!document.getElementById('unitsBtn') && !!document.getElementById('sendBtn');
+    const lots = w.yard.lots.filter((l) => l.kind === 'works');
+    out.lotGap = Math.round(Math.min(...lots.map((l) => Math.abs(l.x - s.x))));
+    w.bytes = 1e9;
+    document.getElementById('unitsBtn').dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    out.sheetOpen = !document.getElementById('unitSheet').hidden && g.paused;
+    document.querySelector('#unitSheet [data-bld="0"]').click();
+    document.querySelector('#unitSheet [data-unit="lancer"]').click();
+    out.assigned = w.squad.built[0] && w.squad.assign[0] === 'lancer'
+      && w.squad.owned.includes('lancer');
+    document.querySelector('#unitSheet [data-close]').click();
+    out.closed = document.getElementById('unitSheet').hidden && !g.paused;
+    for (let f = 0; f < 60 * 4; f++) g.update(1 / 60);
+    const live = w.squad.list;
+    out.sent = live.length;
+    out.allLancers = live.every((m) => m.type === 'lancer' && m.from === 0);
+    const top = w.yard.hold;
+    out.band = live.every((m) => m.y > top && m.y < top + (s.y - top) * 0.75);
+
+    // SEND off: nothing new goes out.
+    document.getElementById('sendBtn').dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    out.sendOff = w.squad.auto === false
+      && /OFF/.test(document.querySelector('#sendBtn .qLbl').textContent);
+    w.squad.list.length = 0;
+    for (let f = 0; f < 60 * 8; f++) g.update(1 / 60);
+    out.heldOff = w.squad.list.length === 0;
+
+    // ...and it all comes back through a save.
+    g.checkpoint();
+    g.resume();
+    const q = g.world.squad;
+    out.restored = q.built[0] === true && q.built[1] === false && q.assign[0] === 'lancer'
+      && q.owned.includes('lancer') && q.auto === false;
+
+    g.setEra(1);
+    out.era1Again = !document.getElementById('unitsBtn');
+    delete g.world.director.update;
+    g.restart();
+    return out;
+  });
+  check('energy banks itself on contact from the first second, with nothing bought',
+    r.intakeGone && r.motes > 0 && r.banked,
+    `INTAKE gone ${r.intakeGone}; ${r.motes} mote(s) laid on the turret, banked ${r.banked}`);
+  check('the works and UNITS / SEND are era 2 only, and stand well clear of the turret',
+    !r.era1Cell && !r.era1Yard && r.era2Cell && r.era1Again && r.lotGap >= 250 && r.units === 10
+    && r.ids === 10,
+    `era 1 cell ${r.era1Cell} yard ${r.era1Yard}; era 2 cells ${r.era2Cell}, back at era 1 `
+    + `gone ${r.era1Again}; works ${r.lotGap} units off the turret; ${r.units} units, ${r.ids} ids`);
+  check('a bought works sends its unit to hover mid-field, and SEND off stops it',
+    r.sheetOpen && r.assigned && r.closed && r.sent > 0 && r.allLancers && r.band
+    && r.sendOff && r.heldOff && r.restored,
+    `sheet opened and held the world ${r.sheetOpen}, bought and assigned ${r.assigned}, `
+    + `closed ${r.closed}; ${r.sent} sent, all LANCERs from the west works ${r.allLancers}, `
+    + `in the band ${r.band}; SEND off ${r.sendOff}, nothing new ${r.heldOff}; restored ${r.restored}`);
 }
 
 // --- report -----------------------------------------------------------------

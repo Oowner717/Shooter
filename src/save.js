@@ -315,6 +315,14 @@ export function captureRun(world, game) {
      */
     guns: [...(world.guns || [])],
     gunsOn: world.gunsOn !== false,
+    // The works, the unit types owned and what each building sends (build
+    // 398). Additive: an older file reads back as a run with none of it.
+    squad: world.squad ? {
+      built: [...world.squad.built],
+      assign: [...world.squad.assign],
+      owned: [...world.squad.owned],
+      auto: world.squad.auto !== false,
+    } : undefined,
     // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.
     remainder: world.remainder | 0,

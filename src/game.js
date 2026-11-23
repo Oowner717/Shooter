@@ -44,6 +44,7 @@ import { updateDummy } from './dummy.js';
 import { syncYard, updateYard, drawYard, lotAt, refuseLot, shielded, wallLine } from './yard.js';
 import { syncPortal, updatePortal, drawPortal, drawInstantiate } from './portal.js';
 import { syncGuns, updateGuns, drawGuns, gunGlow, buildGun, lotPrice, gunCount } from './turrets.js';
+import { freshSquad, squadRestore, updateUnits, drawUnits, drawBuildings } from './units.js';
 
 const STAGE_HEIGHT = 320; // how far above the screen objects may queue
 
@@ -415,6 +416,9 @@ export class Game {
       guns: [],
       gunAt: [],
       gunsOn: true,
+      // The works and what they send out (units.js). One object, not an
+      // array, so it stays outside the FIELD_LISTS / RUN_LISTS partition.
+      squad: freshSquad(),
       /*
        * The view multiplier, and the cinematic's own clock. Both declared here
        * rather than assigned when the evolution starts, because the suite runs
@@ -674,6 +678,7 @@ export class Game {
     w.guns = [];
     w.gunAt = [];
     w.gunsOn = true;
+    w.squad = freshSquad();
     /*
      * ...and the geometry derived from it, but ONLY when the scale is actually
      * stale. `reset()` has never called `resize()`, and setting the era back to
@@ -688,7 +693,7 @@ export class Game {
      * that had nothing to do with the era failed. Comparing the scale means a
      * same-era restart is untouched and only a return from era 2 pays.
      */
-    if (this.canvas && CFG.zoom !== CFG.ZOOMS[w.sandbox ? 1 : w.era]) this.resize();
+    if (this.canvas && (CFG.zoom !== CFG.ZOOMS[2] || CFG.mk2 !== (w.era === 2))) this.resize();
     w.runSeed = (Math.random() * 0x7fffffff) | 0;
     w.remainder = 0;
     w.remainderGained = 0;
@@ -962,6 +967,7 @@ export class Game {
     const refundLots = CFG.gun.inPlay ? 0 : w.guns.length;
     if (!CFG.gun.inPlay) w.guns = [];
     w.gunsOn = d.gunsOn !== false;
+    w.squad = squadRestore(d.squad);
     w.unlocked = new Set(d.unlocked);
     for (const k of STARTING) w.unlocked.add(k);
     /*
@@ -1349,7 +1355,10 @@ export class Game {
           v.charge > 0.55 ? '#dff6ff' : '#8fdcff', 0.34 + v.charge * 0.2, 2.2 + v.charge * 2.6);
       }
     }
-    const push = CFG.evolve.close / CFG.ZOOMS[1];
+    // The field no longer zooms out at the flip (build 398): the camera
+    // pushes in, the form changes under it, and it eases back to the SAME
+    // wide field. `push` is relative to the zoom the field is drawn at.
+    const push = CFG.evolve.close / CFG.zoom;
     if (v.t < at(E.acts[1])) {
       w.camera = 1;
     } else if (p4 <= flip) {
@@ -1385,10 +1394,10 @@ export class Game {
         audio.tone({ type: S.type, f0: S.f0, f1: S.f1, gain: S.gain,
           attack: S.attack, dur: S.dur * Math.max(k, 0.35) });
         // ...and the picture does not move on the frame the field does.
-        w.camera = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
+        w.camera = push;
         this.evolveFlash();
       }
-      const out = push * (CFG.ZOOMS[1] / CFG.ZOOMS[2]);
+      const out = push;
       w.camera = out + (1 - out) * ease(seg(E.acts[4], E.acts[5]));
     }
     v.act = E.acts.findIndex((m, i) => v.t < at(E.acts[i + 1] ?? 1e9));
@@ -1475,6 +1484,13 @@ export class Game {
     return this.endEvolve();
   }
 
+  /** The units screen changed the run: show the purse and save. */
+  squadChanged() {
+    const w = this.world;
+    this.hud.setBytes(w.bytes, intakeRate(w), dividend(w));
+    this.checkpoint();
+  }
+
   setEra(n, { instant = true, sky = 'snap', skyRate = 0 } = {}) {
     const w = this.world;
     const to = n === 2 ? 2 : 1;
@@ -1492,6 +1508,8 @@ export class Game {
     // caller -- a debug era step, a restore, the bench doors -- and 'ease' for
     // the one that is a transition rather than a change of place.
     this.syncSky(sky === 'snap', skyRate);
+    // The strip carries UNITS / SEND at era 2 only (build 398).
+    if (this.hud) this.hud.buildStrip();
     return true;
   }
 
@@ -1938,6 +1956,7 @@ export class Game {
   /** The simulation holds while the menu is open, so a change costs nothing. */
   get paused() {
     return !!this.sheetOpen
+      || !!(this.hud && this.hud.unitsOpen)
       || !!(this.hud && this.hud.menu && this.hud.menu.open);
   }
 
@@ -2917,6 +2936,7 @@ export class Game {
     if (CFG.gun.inPlay) updateGuns(w, dt);
     updatePortal(w, dt);
     updateYard(w, dt);
+    updateUnits(w, dt);
     /*
      * The copies' clock. HERE, outside the `if (w.boss) {...} else {
      * director.update() }` above, because a copy left standing when an
@@ -4184,6 +4204,7 @@ export class Game {
     // No price when nothing is for sale. `drawYard` draws the plate only on
     // a `gun` lot and there are none, so this is belt as well as braces.
     drawYard(ctx, w, background.mood, CFG.gun.inPlay ? lotPrice() : 0);
+    drawBuildings(ctx, w, background.mood);
 
     /*
      * ---- the portal, and everything still inside it -------------------------
@@ -4295,6 +4316,7 @@ export class Game {
       // the yard and under the effects. Inside `ours` like everything of ours,
       // though a lot cannot be past the wall in the first place.
       if (CFG.gun.inPlay) drawGuns(ctx, w);
+      drawUnits(ctx, w);
       for (const e of w.effects) if (!e.ground) e.draw(ctx, w);
     });
 

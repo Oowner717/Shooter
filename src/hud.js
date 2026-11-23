@@ -24,6 +24,7 @@ import { heldList, ANOMALIES } from './anomaly.js';
  */
 import { anomalyEra } from './boss.js';
 import { readRun, forgetRun } from './save.js';
+import { UNITS, UNIT_BY_ID, BUILDING_COST, BUILDING_NAME, unitsOpen as squadOpen, buyBuilding, buyUnit, assignUnit, setAutoSend, outFrom, unitIcon } from './units.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,14 @@ const $ = (id) => document.getElementById(id);
  * seventh node would be 24px of column for a two-digit number.
  */
 const RAIL_SEEN = 5;
+
+/** UNITS: three small craft. SEND: an arrow leaving a door. (Build 398.) */
+const UNITS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.8" stroke-linejoin="round">'
+  + '<path d="M12 3l3 5h-6z"/><path d="M5 12l3 5H2z"/><path d="M19 12l3 5h-6z"/></svg>';
+const SEND_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M5 21V11l7-5 7 5v10"/><path d="M12 17V9M9 12l3-3 3 3"/></svg>';
 
 /** Sliders. The one shape that reads as "choose what goes here" at 14px. */
 const CONFIG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"'
@@ -509,6 +518,189 @@ export class Hud {
      * one thing a mode control must never do.
      */
     this.setAim(w);
+    this.buildUnitCells(w);
+  }
+
+  /*
+   * ---- UNITS and SEND (build 398) ----
+   *
+   * A third band on the strip, from era 2 only: UNITS opens the units screen
+   * and SEND is the on/off switch for the works sending units out on their
+   * own. Rebuilt with the rest of the strip, so the switch's state is
+   * re-asserted here from the world every time.
+   */
+  buildUnitCells(w) {
+    this.el.unitsBtn = null;
+    this.el.sendBtn = null;
+    if (!squadOpen(w)) {
+      if (this.unitsOpen) this.showUnits(false);
+      return;
+    }
+    const d = document.createElement('div');
+    d.className = 'qGroup q_units';
+    const cells = document.createElement('div');
+    cells.className = 'autoCells unitCells';
+    d.appendChild(cells);
+    this.el.quickBar.appendChild(d);
+    const mk = (id, label, icon, on) => {
+      const b = document.createElement('button');
+      b.id = id;
+      b.className = 'qc wide';
+      b.innerHTML = `${icon}<span class="qLbl">${label}</span>`;
+      b.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        on();
+      });
+      b.addEventListener('contextmenu', (ev) => ev.preventDefault());
+      cells.appendChild(b);
+      return b;
+    };
+    this.el.unitsBtn = mk('unitsBtn', 'UNITS', UNITS_ICON, () => this.showUnits(!this.unitsOpen));
+    this.el.unitsBtn.setAttribute('aria-label', 'Units: buildings and unit types');
+    this.el.unitsBtn.classList.toggle('on', !!this.unitsOpen);
+    this.el.sendBtn = mk('sendBtn', 'SEND', SEND_ICON, () => {
+      setAutoSend(this.game.world, !this.game.world.squad.auto);
+      this.syncSend(this.game.world);
+      this.game.squadChanged();
+    });
+    this.syncSend(w);
+  }
+
+  syncSend(w) {
+    const b = this.el.sendBtn;
+    const on = !!(w.squad && w.squad.auto);
+    if (b) {
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', `Auto send units: ${on ? 'on' : 'off'}`);
+      const l = b.querySelector('.qLbl');
+      if (l) l.textContent = on ? 'SEND ON' : 'SEND OFF';
+    }
+    if (this.unitsOpen) this.renderUnits(w);
+  }
+
+  /** The units screen: open or close. Holds the world while it is up. */
+  showUnits(open) {
+    const w = this.game.world;
+    open = !!open && squadOpen(w);
+    if (!this.el.unitSheet) {
+      const sheet = document.createElement('div');
+      sheet.id = 'unitSheet';
+      sheet.hidden = true;
+      sheet.setAttribute('role', 'dialog');
+      sheet.setAttribute('aria-label', 'Units');
+      sheet.addEventListener('click', (ev) => this.unitsClick(ev));
+      document.body.appendChild(sheet);
+      this.el.unitSheet = sheet;
+    }
+    this.unitsOpen = open;
+    this.el.unitSheet.hidden = !open;
+    document.body.classList.toggle('unitsOpen', open);
+    if (this.el.unitsBtn) this.el.unitsBtn.classList.toggle('on', open);
+    if (open) {
+      if (this.unitPick == null) this.unitPick = 0;
+      this.renderUnits(w);
+    }
+  }
+
+  renderUnits(w) {
+    const el = this.el.unitSheet;
+    if (!el || !w.squad) return;
+    const q = w.squad;
+    const pick = this.unitPick || 0;
+    const side = pick ? 'EAST' : 'WEST';
+    const stat = (u) => {
+      const parts = [`HP ${u.hp}`];
+      if (u.dive) parts.push(`DIVE ${u.dmg}`);
+      else parts.push(`DMG ${u.dmg}${u.rate ? ` × ${u.rate}/s` : ''}`);
+      parts.push(`RANGE ${u.range}`);
+      parts.push(`${u.cap} OUT`);
+      return parts.join(' · ');
+    };
+    const bld = [0, 1].map((i) => {
+      const u = UNIT_BY_ID.get(q.assign[i]) || UNITS[0];
+      if (!q.built[i]) {
+        const afford = w.bytes >= BUILDING_COST[i];
+        return `<div class="uBld${pick === i ? ' sel' : ''}" data-pick="${i}">`
+          + `<div class="uBldName">${BUILDING_NAME[i]}</div>`
+          + `<div class="uBldNote">Not built yet</div>`
+          + `<button class="uBuy${afford ? '' : ' poor'}" data-bld="${i}">BUY · ${fmtBytes(BUILDING_COST[i])}</button></div>`;
+      }
+      return `<div class="uBld built${pick === i ? ' sel' : ''}" data-pick="${i}" style="--tone:${u.color}">`
+        + `<div class="uBldName">${BUILDING_NAME[i]}</div>`
+        + `<div class="uBldSend">${unitIcon(u, 18)}<span>${u.name}</span></div>`
+        + `<div class="uBldNote">${outFrom(w, i)} of ${u.cap} out${q.auto ? '' : ' · paused'}</div></div>`;
+    }).join('');
+    const row = (u) => {
+      const owned = q.owned.includes(u.id);
+      let act;
+      if (!owned) {
+        const afford = w.bytes >= u.cost;
+        act = `<button class="uBuy${afford ? '' : ' poor'}" data-unit="${u.id}">BUY<br>${fmtBytes(u.cost)}</button>`;
+      } else if (q.assign[pick] === u.id) {
+        act = `<button class="uSet on" disabled>SENT FROM<br>${side}</button>`;
+      } else {
+        act = `<button class="uSet" data-assign="${u.id}">SEND FROM<br>${side}</button>`;
+      }
+      return `<div class="uRow${owned ? ' owned' : ''}" style="--tone:${u.color}">`
+        + `<div class="uIcon">${unitIcon(u, 26)}</div>`
+        + `<div class="uText"><div class="uName">${u.name}<span class="uRole">${u.role === 'defend' ? 'DEFENDER' : 'ATTACKER'}</span></div>`
+        + `<div class="uLine">${u.line}</div><div class="uStat">${stat(u)}</div></div>`
+        + `<div class="uAct">${act}</div></div>`;
+    };
+    const have = UNITS.filter((u) => q.owned.includes(u.id));
+    const sale = UNITS.filter((u) => !q.owned.includes(u.id));
+    el.innerHTML = `<div class="uPanel">`
+      + `<div class="uHead"><span class="uTitle">UNITS</span><span class="uPurse">${fmtBytes(w.bytes)}</span>`
+      + `<button class="uClose" data-close="1" aria-label="Close">×</button></div>`
+      + `<div class="uScroll">`
+      + `<button class="uAuto${q.auto ? ' on' : ''}" data-auto="1" aria-pressed="${q.auto}">`
+      + `<span class="uAutoLbl">AUTO SEND</span><span class="uSwitch"><i></i></span><b>${q.auto ? 'ON' : 'OFF'}</b></button>`
+      + `<div class="uSec">BUILDINGS<span>Tap one to choose what it sends</span></div>`
+      + `<div class="uBlds">${bld}</div>`
+      + `<div class="uSec">AVAILABLE<span>${have.length} of ${UNITS.length}</span></div>`
+      + have.map(row).join('')
+      + (sale.length ? `<div class="uSec">FOR PURCHASE</div>${sale.map(row).join('')}` : '')
+      + `</div></div>`;
+  }
+
+  unitsClick(ev) {
+    const w = this.game.world;
+    const t = ev.target.closest('[data-close],[data-auto],[data-bld],[data-unit],[data-assign],[data-pick]');
+    if (!t) {
+      if (ev.target === this.el.unitSheet) this.showUnits(false);
+      return;
+    }
+    ev.stopPropagation();
+    const d = t.dataset;
+    let changed = false;
+    if (d.close) { this.showUnits(false); return; }
+    if (d.auto) {
+      setAutoSend(w, !w.squad.auto);
+      changed = true;
+    } else if (d.bld != null) {
+      const i = +d.bld;
+      const r = buyBuilding(w, i);
+      this.unitPick = i;
+      if (r === 'poor') this.alert(`${BUILDING_NAME[i]} · ${fmtBytes(BUILDING_COST[i])}`, 'info', 2);
+      changed = r === 'ok';
+    } else if (d.unit) {
+      const r = buyUnit(w, d.unit);
+      const u = UNIT_BY_ID.get(d.unit);
+      if (r === 'poor' && u) this.alert(`${u.name} · ${fmtBytes(u.cost)}`, 'info', 2);
+      // Bought for the building that is selected, which is what a player
+      // buying one from this screen almost always wants next.
+      if (r === 'ok') assignUnit(w, this.unitPick || 0, d.unit);
+      changed = r === 'ok';
+    } else if (d.assign) {
+      changed = assignUnit(w, this.unitPick || 0, d.assign) === 'ok';
+    } else if (d.pick != null) {
+      this.unitPick = +d.pick;
+    }
+    if (changed) this.game.squadChanged();
+    this.syncSend(w);
+    this.renderUnits(w);
   }
 
   /**

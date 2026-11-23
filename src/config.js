@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '397';
+export const BUILD = '398';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '397';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '3230eb2';
+export const REV = 'a78a8e7';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -3327,9 +3327,11 @@ export const CFG = {
     minValue: kB(1),
 
     drift: kB(6), // flat, for the harmless ones — income the tally never sees
-    // No collection radius. Build 59 took it out: wreckage drifts the whole
-    // way in and lands on the turret, and banking it means destroying it --
-    // unless INTAKE has been taken, which collects anything that touches.
+    // No collection radius: wreckage drifts the whole way in and is banked
+    // the moment it touches the turret. Automatic from the start since build
+    // 398 (the INTAKE upgrade that used to switch it on is gone), so nothing
+    // builds up on the machine. `touch` is the slack past the two radii.
+    touch: 6,
     /*
      * How hard a loose fragment is drawn turret-ward on its own. It is an
      * ACCELERATION and not a speed -- its one reader is `collectData`'s
@@ -8903,7 +8905,14 @@ export function setHairline(dpr) {
  * answer to "which era is this" and nothing to keep in step.
  */
 export function setZoom(era) {
-  CFG.zoom = CFG.ZOOMS[era] || CFG.ZOOMS[1];
+  /*
+   * Build 398: the battlefield is the WIDE one from the first second of a
+   * run. The zoom no longer follows the era -- era 2 is the turret's second
+   * form (and the buildings), not a second camera. Everything below still
+   * derives from the zoom, so the turret's reach covers the wide field at
+   * era 1 too; only the form and the power follow the era itself.
+   */
+  CFG.zoom = CFG.ZOOMS[2];
   /*
    * ---- and everything the field's size implies ----
    *
@@ -8931,7 +8940,7 @@ export function setZoom(era) {
    * the MK1's radius in the one room a player pays 20,000 energy for. One
    * source, so the form and the size cannot disagree.
    */
-  CFG.mk2 = CFG.scale > 1;
+  CFG.mk2 = era === 2;
   /*
    * ...and what a round or a mine is worth on the new field. One number, one
    * writer, derived from the same expression as the scale and the form, so
@@ -8946,7 +8955,7 @@ export function setZoom(era) {
    * "a CFG number read at a site the multiplier never reaches" fault this repo
    * has already paid for three times in one sweep.
    */
-  CFG.power = CFG.scale > 1 ? CFG.era2Power : 1;
+  CFG.power = era === 2 ? CFG.era2Power : 1;
   for (const path of SCALED) setPath(path, BASE[path], CFG.scale);
 }
 
@@ -9098,7 +9107,7 @@ CFG.evolve = {
     'Closer.',
     'Every part, in the order you built it.',
     'NEW FORM.',
-    'And a field to put it on.',
+    'And ground to build on.',
   ],
 };
 
@@ -9318,7 +9327,9 @@ CFG.yard = {
    * clash sweep catches; the works are narrower as well as further out, so
    * they move away from the machine without moving into the interface.
    */
-  lotSide: 118, lotW: 34, lotH: 30,
+  // Build 398: the works are BUILDINGS now (see units.js), stood well clear
+  // of the machine so the grip never lands on one.
+  lotSide: 195, lotW: 30, lotH: 28,
   /*
    * ---- the TWO ahead, and why they stand where the outer pair did --------
    *

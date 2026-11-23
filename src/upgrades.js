@@ -84,7 +84,6 @@ export function freshUpgrades() {
     wireDamage: 1, // per second of contact on a wire
     mineTrigger: 1,
     voidReach: 1, // VOID's mouth alone, which nothing else widens
-    intake: false, // data that touches the turret is taken in without a PULSE
     cooldown: 1, // multiplier on every ability's cooldown
     // turret
     slew: 1,
@@ -688,9 +687,6 @@ export const UPGRADES = {
      * fifth smaller.
      */
     { id: 'repulsor', name: 'REPULSOR', levels: 2, line: '+25% lode reach, +40% push.', apply: (u) => { u.lodeReach *= 1.25; u.lodePush *= 1.4; } , icon: MARK.repulsor },
-    { id: 'intake', name: 'INTAKE', levels: 1,
-      line: 'Data is taken in on contact, no PULSE needed. Louvres cut through the skirt.',
-      apply: set('intake', true), icon: MARK.intake },
     { id: 'shockfront', name: 'SHOCKFRONT', levels: 2,
       line: '+30% PULSE reach and push.',
       apply: (u) => { u.pulseR *= 1.3; u.pulsePush *= 1.3; }, icon: MARK.shockfront },
@@ -1052,7 +1048,7 @@ export const UPGRADES = {
       // asks for the four that stand under the hold it is the way out of. The
       // count comes off the one constant rather than being written out again.
       needsLine: `Needs ${CFG.ordinal.recast} anomalies reconciled, and the machine finished.`,
-      line: 'A new form for the turret, and a field to put it on.',
+      line: 'A new form for the turret, and two buildings to buy beside it.',
       // (up, world), like every other apply in this file. Buying it ARMS the
       // banner; it does not run the cinematic. "After purchase, a banner; when
       // clicked, the animation" is the ruling, and a thirty-second cutscene

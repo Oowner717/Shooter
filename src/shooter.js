@@ -19,7 +19,7 @@ import { fx, spark, ring, shake, ripple, shard as fxShard, ember as fxEmber } fr
  * that can never fill its last socket never lights. scripts/check-build.mjs
  * holds this to the tree now.
  */
-export const RIG_MAX = 18;
+export const RIG_MAX = 17;
 
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;
@@ -1532,31 +1532,6 @@ export class Shooter {
       ctx.fill();
     }
 
-    // ---- INTAKE: louvres cut through the skirt ----------------------------
-    if (g.intake) {
-      for (let i = -1; i <= 1; i++) {
-        const a = Math.PI / 2 + i * 0.44;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        const x = c * R * 0.84;
-        const y = sn * R * 0.84;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(a);
-        ctx.fillStyle = 'rgba(4,9,15,0.99)';
-        roundRectPath(ctx, -6, -5.5, 12, 11, 2);
-        ctx.fill();
-        ctx.strokeStyle = rgba('#7fe6c0', 0.75);
-        ctx.lineWidth = CFG.hairline * 1.6;
-        ctx.beginPath();
-        for (let k = -1; k <= 1; k++) {
-          ctx.moveTo(-4.5, k * 3);
-          ctx.lineTo(4.5, k * 3);
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
 
     // ---- ARRAY: a panel fin off the back, not a dish ----------------------
     for (let i = 0; i < g.aimrange; i++) {
@@ -1896,7 +1871,7 @@ export class Shooter {
   rig(world) {
     const taken = world.ledger;
     if (world.rig && world.rigAt === taken.length) return world.rig;
-    const rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, pile: 0, casing: 0, insulation: 0, intake: 0 };
+    const rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, pile: 0, casing: 0, insulation: 0 };
     for (const id of taken) if (id in rig) rig[id]++;
     /*
      * ...and how much of the branch is on, as one number.

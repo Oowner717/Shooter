@@ -53,6 +53,19 @@ node scripts/regress.mjs 2>&1 | tail -40
   id is covered by the tree.
 - `enemies.js` (huge), `boss.js`, `shooter.js`, `projectiles.js`, `yard.js`.
 - `save.js`: `VERSION` bump deletes every open save — avoid.
+- `units.js` (build 398): the era-2 works (yard lots of kind 'works') are
+  buildings; ten unit types; state in `world.squad` (an object, not an
+  array, to stay out of FIELD_LISTS/RUN_LISTS). UI: `buildUnitCells`,
+  `showUnits`, `renderUnits` in hud.js; `#unitSheet` pauses the game.
+
+## Design rulings (build 398)
+
+- The battlefield is the WIDE one (`ZOOMS[2]`) at every era: `setZoom`
+  ignores the era for zoom/scale. Era 2 = turret second form (`CFG.mk2`),
+  `era2Power`, the yard/wall and the buildings.
+- Energy is collected on contact automatically from the start; INTAKE is
+  gone (RIG_MAX 17).
+- The strip is one even row across the bar: LOADOUT | TARGETING | UNITS.
 
 ## Gotchas that have shipped bugs
 

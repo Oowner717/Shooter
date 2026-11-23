@@ -53,22 +53,16 @@ and tap with the other.
 
 ### The strip
 
-**Four cells sit above the ability bar, in one row:** the loaded round at the
-left edge, **AMMO** beside it, then **AUTO AIM** and **AUTO FIRE** centred
-under the turret. All four are the same size with the same gap between each —
-the gap is whatever puts AIM and FIRE under the turret on that screen: 8px on
-a 320-wide phone, about 15px at 390 and 25px at 440 — and the right side of
-the row is left clear, so that part of the strip is still field.
+**One even row of cells sits above the ability bar**, the same width as the
+bar, in three groups split by a thin seam (build 398): **LOADOUT** — the
+loaded round and **AMMO**; **TARGETING** — **AUTO AIM** and **AUTO FIRE**;
+and from era 2, **UNITS** — **UNITS** (opens the units screen) and **SEND**
+(auto-send on/off). Every cell is the same width with the same 6px gap.
 
 ```
-                        (turret)
-[ BOLT ]  [ AMMO ]  [ AIM ]  [ FIRE ]
+[ BOLT ][ AMMO ] | [ AIM ][ FIRE ] | [ UNITS ][ SEND ON ]
 [ PULSE ][ HAIL ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ WARD ]
 ```
-
-On a screen wider than any phone the gap stops growing at half a cell, and the
-row moves in from the left edge instead, so AIM and FIRE stay under the
-turret.
 
 The round cell shows what is in the barrel; pressing it fans the slots out in
 a row across the bar, and picking one loads it. **AMMO** opens the loadout,
@@ -93,6 +87,39 @@ too, but with no "none" cell — tapping the lit one stops laying them.
 
 The whole thing is built from `ARSENAL` in `src/arsenal.js`. A new round or
 mine is a table entry and no markup.
+
+### The battlefield, the second form and the works (build 398)
+
+**The field is the wide one from the first second of a run.** There is no
+longer a zoom-out at era 2. NEW FORM still evolves the turret into its second
+form (and its +30% round and mine damage): the cinematic pushes in on the
+machine, the form changes under the camera, and it eases back out to the same
+wide field.
+
+**From era 2, two buildings stand well out either side of the turret** — the
+WEST and EAST WORKS (3.00 MB and 5.00 MB). Before era 2 there is nothing
+there. Each one, once bought, keeps sending the unit assigned to it out onto
+the field, up to that unit's cap, where it hovers in the middle or
+upper-middle of the field and fights. **UNITS** on the strip opens the units
+screen: buy a building, tap it to select it, then pick what it sends from the
+units you own, or buy another. **SEND** (and the AUTO SEND switch on the
+screen) turns the sending on and off; units already out stay out.
+
+| Unit | Price | Role | What it does |
+|---|---|---|---|
+| DRONE | free | attacker | cheap, steady fire |
+| SENTRY | 1.5 MB | defender | tougher, holds the middle |
+| LANCER | 3 MB | attacker | long reach, one heavy shot |
+| GNAT | 4 MB | attacker | tiny and fast, six at a time |
+| ARCLET | 6 MB | attacker | each shot chains to two more |
+| MORTAR | 8 MB | attacker | splash over a crowd |
+| RIME | 11 MB | defender | slows what it hits |
+| HUNTER | 15 MB | attacker | dives into a target and bursts |
+| AEGIS | 20 MB | defender | heavy, grinds whatever touches it |
+| SERAPH | 30 MB | attacker | the best all-rounder |
+
+Unit damage scales with the turret's own damage upgrades. Hostiles that touch
+a unit wear it down. The table lives in `src/units.js`.
 
 ### Saving a run
 
@@ -819,9 +846,10 @@ is being taken in. That also means an uncollected floor no longer eats your own
 rounds, which it did between builds 59 and 66, when the same objects were
 wreckage and destroying each one was how you got paid.
 
-**INTAKE automates it.** One permanent upgrade, one level: energy is taken in
-on contact, no PULSE needed. **SCOUR**, a top-up, is the same verb with no
-limit on the reach and +50% on the take.
+**Collection is automatic from the start** (build 398): energy that reaches
+the turret is taken in on contact, so nothing piles up on the machine. The
+INTAKE upgrade that used to switch this on is gone. PULSE still pulls in
+everything within its reach at once.
 
 It is drawn to look like energy rather than like rubble: a filled core inside a
 pulsing halo, additive, at full brightness — it has no health to read, so
@@ -927,7 +955,7 @@ exactly the kind of thing that should turn up rather than be shopped for.
 
 | category | holds |
 |---|---|
-| **TURRET** | the machine — rate, hands off, slew, casing, sweep, intake |
+| **TURRET** | the machine — rate, hands off, slew, casing, sweep |
 | **AMMUNITION** | whole-rack upgrades, then BOLT (free) and the 8 bought rounds beside it |
 | **MINES** | BLAST (900), and the mine doctrine and other 7 mines behind it |
 | **ABILITIES** | cooldowns and reflex, then PULSE and FAN (free) and the 6 bought abilities beside them |

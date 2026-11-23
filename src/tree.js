@@ -74,7 +74,7 @@ const BAND_STEP = 0.6;
  */
 export const UNDER = {
   // ---- the machine ----
-  turret: ['rate', 'slew', 'aimrange', 'driftaim', 'pile', 'casing', 'insulation', 'intake'],
+  turret: ['rate', 'slew', 'aimrange', 'driftaim', 'pile', 'casing', 'insulation'],
 
   // ---- the rack ----
   // Whole-rack upgrades sit on the category; BOLT keeps only its own two.
@@ -215,7 +215,6 @@ const BAND = {
    */
   // ---- the machine ----
   rate: 1, slew: 2, aimrange: 2, driftaim: 4, pile: 4, casing: 2, insulation: 4,
-  intake: 1,
   // ---- the rack, whole ----
   hollowpoint: 3, core: 5, tracer: 1, ricochet: 1, heavy: 2, salvo: 1,
   // ---- BOLT ----

@@ -403,6 +403,8 @@ export function drawYard(ctx, world, mood, price = 0) {
   const built = world.guns || [];
   for (let li = 0; li < a.lots.length; li++) {
     const l = a.lots[li];
+    // The works are drawn by units.js from build 398: buildings you buy.
+    if (l.kind === 'works') continue;
     const f = l.refused;
     ctx.setLineDash([5 * k, 5 * k]);
     ctx.lineWidth = hl * (1.2 + f * 1.8);
