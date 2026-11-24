@@ -24,7 +24,7 @@ import { heldList, ANOMALIES } from './anomaly.js';
  */
 import { anomalyEra } from './boss.js';
 import { readRun, forgetRun } from './save.js';
-import { UNITS, UNIT_BY_ID, BUILDING_COST, BUILDING_NAME, unitsOpen as squadOpen, buyBuilding, buyUnit, assignUnit, setAutoSend, outFrom, unitIcon } from './units.js';
+import { UNITS, UNIT_BY_ID, BUILDING_COST, BUILDING_NAME, unitsOpen as squadOpen, buyBuilding, buyUnit, assignUnit, setAutoSend, outFrom, unitIcon, SQUAD_UPS, squadUpValue, squadUpLevel, squadUpCost, buySquadUp, unitLife, sendCount, sendEvery } from './units.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -615,7 +615,7 @@ export class Hud {
       if (u.dive) parts.push(`DIVE ${u.dmg}`);
       else parts.push(`DMG ${u.dmg}${u.rate ? ` × ${u.rate}/s` : ''}`);
       parts.push(`RANGE ${u.range}`);
-      parts.push(`${u.cap} OUT`);
+      parts.push(`LASTS ${unitLife(q)}s`);
       return parts.join(' · ');
     };
     const bld = [0, 1].map((i) => {
@@ -630,7 +630,7 @@ export class Hud {
       return `<div class="uBld built${pick === i ? ' sel' : ''}" data-pick="${i}" style="--tone:${u.color}">`
         + `<div class="uBldName">${BUILDING_NAME[i]}</div>`
         + `<div class="uBldSend">${unitIcon(u, 18)}<span>${u.name}</span></div>`
-        + `<div class="uBldNote">${outFrom(w, i)} of ${u.cap} out${q.auto ? '' : ' · paused'}</div></div>`;
+        + `<div class="uBldNote">${outFrom(w, i)} out · ${sendCount(q)} every ${sendEvery(q)}s${q.auto ? '' : ' · paused'}</div></div>`;
     }).join('');
     const row = (u) => {
       const owned = q.owned.includes(u.id);
@@ -649,6 +649,20 @@ export class Hud {
         + `<div class="uLine">${u.line}</div><div class="uStat">${stat(u)}</div></div>`
         + `<div class="uAct">${act}</div></div>`;
     };
+    const upRow = (t) => {
+      const lvl = squadUpLevel(q, t.id);
+      const max = t.values.length - 1;
+      const price = squadUpCost(q, t.id);
+      const now = squadUpValue(q, t.id);
+      const pips = t.values.slice(1).map((_, k) => `<i class="${k < lvl ? 'on' : ''}"></i>`).join('');
+      const act = price == null
+        ? `<button class="uSet on" disabled>MAX</button>`
+        : `<button class="uBuy${w.bytes >= price ? '' : ' poor'}" data-up="${t.id}">${t.values[lvl + 1]}${t.unit}<br>${fmtBytes(price)}</button>`;
+      return `<div class="uRow uUp owned" style="--tone:#8fdcff">`
+        + `<div class="uText"><div class="uName">${t.name}<span class="uPips">${pips}</span></div>`
+        + `<div class="uLine">${t.line}</div><div class="uStat">NOW ${now}${t.unit} · ${lvl} of ${max}</div></div>`
+        + `<div class="uAct">${act}</div></div>`;
+    };
     const have = UNITS.filter((u) => q.owned.includes(u.id));
     const sale = UNITS.filter((u) => !q.owned.includes(u.id));
     el.innerHTML = `<div class="uPanel">`
@@ -659,6 +673,8 @@ export class Hud {
       + `<span class="uAutoLbl">AUTO SEND</span><span class="uSwitch"><i></i></span><b>${q.auto ? 'ON' : 'OFF'}</b></button>`
       + `<div class="uSec">BUILDINGS<span>Tap one to choose what it sends</span></div>`
       + `<div class="uBlds">${bld}</div>`
+      + `<div class="uSec">UPGRADES<span>For both buildings</span></div>`
+      + SQUAD_UPS.map(upRow).join('')
       + `<div class="uSec">AVAILABLE<span>${have.length} of ${UNITS.length}</span></div>`
       + have.map(row).join('')
       + (sale.length ? `<div class="uSec">FOR PURCHASE</div>${sale.map(row).join('')}` : '')
@@ -667,7 +683,7 @@ export class Hud {
 
   unitsClick(ev) {
     const w = this.game.world;
-    const t = ev.target.closest('[data-close],[data-auto],[data-bld],[data-unit],[data-assign],[data-pick]');
+    const t = ev.target.closest('[data-close],[data-auto],[data-bld],[data-up],[data-unit],[data-assign],[data-pick]');
     if (!t) {
       if (ev.target === this.el.unitSheet) this.showUnits(false);
       return;
@@ -684,6 +700,11 @@ export class Hud {
       const r = buyBuilding(w, i);
       this.unitPick = i;
       if (r === 'poor') this.alert(`${BUILDING_NAME[i]} · ${fmtBytes(BUILDING_COST[i])}`, 'info', 2);
+      changed = r === 'ok';
+    } else if (d.up) {
+      const r = buySquadUp(w, d.up);
+      const price = squadUpCost(w.squad, d.up);
+      if (r === 'poor' && price != null) this.alert(`UPGRADE · ${fmtBytes(price)}`, 'info', 2);
       changed = r === 'ok';
     } else if (d.unit) {
       const r = buyUnit(w, d.unit);

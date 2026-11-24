@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '398';
+export const BUILD = '399';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '398';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = 'a78a8e7';
+export const REV = '6689d3b';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -54,8 +54,14 @@ export const GB = (n) => Math.round(n * 1e9);
  * places, and a case pinning `gates.length === 9` that failed the moment the
  * roster grew without one gate moving. Ask the structure, never restate it.
  */
-const BOSS_EVERY = 7;
-const DEPTH_CEILING = 49;
+/*
+ * Build 399: a boss every TENTH wave, and all nine anomalies placed -- so the
+ * ladder is ninety rungs. The per-rung slopes below (popStep, hpStep,
+ * bountyStep, perBand) were rescaled in the same build so rung 90 is as hard
+ * as rung 49 used to be: the same climb, spread over more, smaller steps.
+ */
+const BOSS_EVERY = 10;
+const DEPTH_CEILING = 90;
 
 /** Every rung that is a multiple of `every`, up to and including `ceiling`. */
 export const rungsEvery = (every, ceiling) => {
@@ -220,10 +226,10 @@ export const CFG = {
    * number would turn a rhythm into a score.
    */
   waves: {
-    clearTo: 2, // hostiles left before the next wave is allowed to start
+    clearTo: 4, // (build 399: 2 -> 4, waves overlap rather than wait) hostiles left before the next wave is allowed to start
     // A wave may also set `dwell`: the least time it is allowed to last, no
     // matter how fast the field clears. Only the opening uses it.
-    patience: 26, // ...and the longest it will ever wait for that
+    patience: 12, // (build 399: 26 -> 12) ...and the longest it will ever wait for that
     gap: [0.85, 1.7], // seconds between releases inside a regular wave
     /*
      * ---- the seam, CLOSED (build 301) ----------------------------------
@@ -267,12 +273,12 @@ export const CFG = {
      * `restCap` is what stops the swell at the top of the ladder turning that
      * beat into a wait. A wave of six earns 1.1s, one of thirty earns the cap.
      */
-    press: { open: 1.45, close: 0.6, restPer: 0.18, restCap: 1.4 },
+    press: { open: 1.45, close: 0.6, restPer: 0.08, restCap: 0.5 },
     // The opening is much slower on both counts. Objects join one at a time
     // with a long beat between them, because the whole point of the tutorial
     // waves is that there is time to look at each new thing.
-    teachGap: [2.6, 4.2],
-    teachRest: [4, 6],
+    teachGap: [1.5, 2.4], // [2.6, 4.2] until build 399: the opening flows too
+    teachRest: [2, 3], // [4, 6] until build 399
     drift: [4.5, 8], // a grey object every so often, for the whole run
     // maxDrift caps the *ambient* trickle. A wave placing drift on purpose is
     // a different thing and gets its own ceiling — the bonus wave is 22 at
@@ -321,7 +327,7 @@ export const CFG = {
        * walk ACROSS. A ramp over two rungs is a step; over six it is a band
        * that opens gently and ends on its own heaviest set-piece.
        */
-      perBand: 7,
+      perBand: 13, // 7 at 49 rungs; 13 at 90 (build 399)
       /*
        * ---- how many bodies a wave asks for (build 300) ------------------
        *
@@ -346,7 +352,7 @@ export const CFG = {
        * why the two have to move together. Raising this alone would make a
        * wave that takes four times as long at the same tempo.
        */
-      popStep: 1.0655,
+      popStep: 1.0348, // 1.0655 ** (48 / 89): same x21 at the top, over 90 rungs
       /*
        * ---- and how fast they arrive (build 300) -------------------------
        *
@@ -467,7 +473,7 @@ export const CFG = {
        * again, which is the finding build 177 published and build 227
        * reversed. Phase 3 is where the right one gets an instrument.
        */
-      hpStep: 1.028,
+      hpStep: 1.01503, // 1.028 ** (48 / 89), build 399
       /*
        * ---- what a rung pays (build 202) ----
        *
@@ -502,7 +508,7 @@ export const CFG = {
        * proxy that says the wrong thing the moment health stops being the
        * thing that climbs.
        */
-      bountyStep: 1.045, // salvage x bountyStep^(tier-1), against hpStep 1.028
+      bountyStep: 1.0240, // 1.045 ** (48 / 89), build 399. salvage x bountyStep^(tier-1), against hpStep 1.028
       /*
        * A surge pays half again on what that wave was worth, banked in one
        * lump at the turret. The ladder's own reward for the thing it most
@@ -691,7 +697,7 @@ export const CFG = {
        * scale with it. `anomalyEra` derives that from this number, so nothing
        * had to be re-declared -- and measured either side, see the notes.
        */
-      eraGate: 28,
+      eraGate: 40, // the fourth boss; 28 at seven-rung spacing (build 399)
       /*
        * ---- traits (build 204) ----
        *
@@ -700,8 +706,8 @@ export const CFG = {
        * which is what the first ten rungs are for; from `traitPair` two rules
        * arrive together and the pair is its own problem.
        */
-      traitFrom: 10,
-      traitPair: 25,
+      traitFrom: 18, // 10 at 49 rungs (build 399)
+      traitPair: 46, // 25 at 49 rungs
       // ARMORED: how often the plate turns a hit away.
       plateEvery: 1,
       // MENDING: fraction of max health a second, and the window in which two
@@ -789,7 +795,7 @@ export const CFG = {
     // what this one let out, floored at `clearTo`. Proportional rather than
     // fixed, or a fourteen-object wave would sit at the end of its patience
     // every time while a three-object one cleared instantly.
-    thinFrac: 0.25,
+    thinFrac: 0.5, // 0.25 until build 399: the next wave comes in under the tail of this one
     // Three or more of one type in a regular wave arrive together in formation
     // rather than filing in. Tutorial waves never do — they always file in.
     /*

@@ -2105,8 +2105,10 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  * collection is now automatic from the start. tiers.mjs's EARNED curve is
  * therefore owed a fresh income.mjs pass -- it describes 397's economy.
  */
-const INCOME_PIN = '67b28601079e';
-const INCOME_AT = 398;
+// Moved again at build 399, also without a re-measure: the ladder is ninety
+// rungs with every per-rung slope rescaled. Still owed an income.mjs pass.
+const INCOME_PIN = '721a450424cc';
+const INCOME_AT = 399;
 const TIER_CFG = CFG.waves.tier;
 const incomeTerms = {
   'energy.perMass': CFG.energy.perMass,

@@ -541,48 +541,17 @@ export class Game {
            * did not happen.
            */
           if (moved < 0) self.hud.markStep(from, tier);
-          self.hud.alert(moved < 0 ? `STEPPED BACK · ${reason} · TIER ${tier}`
-            : `WAVE RESET · ${reason}`, 'breach', 5);
           return;
         }
-        void verdict;
         /*
-         * A trial answers out loud whichever way it goes: it is a question the
-         * player asked, and a question that gets no answer is a bug report.
+         * Build 399: the wave count is not shown. No tier, surge, margin or
+         * held-at-the-gate alerts -- the run just flows, and what the player
+         * sees of the progression is the boss prompt every tenth wave
+         * (`syncGate`). `trial`, `reason` and `margin` are still returned for
+         * the probes.
          */
-        if (trial) {
-          self.hud.alert(trial === 'proven' ? `PROVEN ${tier}` : `NOT YET · ${reason}`,
-            trial === 'proven' ? 'good' : 'remainder', 4.5);
-          return;
-        }
-        if (margin > 0) self.hud.alert(`MARGIN +${fmtBytes(margin)}`, 'good', 3);
-        /*
-         * ---- every move says why ----
-         *
-         * A step you did not ask for is a thing that happened, not a number
-         * that quietly changed -- and the reason is what makes it a thing
-         * rather than a mood. Held at a gate is announced even though the
-         * ladder did not move, because a run standing still with a wave it
-         * just cleared is the one case where nothing changing IS the news.
-         */
-        const held = self.world.director.heldBy(self.world);
-        if (!moved) {
-          if (held && (verdict === 'surge' || verdict === 'clean')) {
-            self.hud.alert(`HELD AT THE GATE · ${nameOf(held)}`, 'remainder', 4);
-          }
-          return;
-        }
-        if (moved < 0) self.hud.alert(`STEPPED BACK · ${reason} · TIER ${tier}`, 'remainder', 4.5);
-        else if (moved > 1) self.hud.alert(`SURGE · ${reason} · TIER ${tier}`, 'good', 4);
-        else self.hud.alert(`TIER ${tier} · ${reason}`, 'info', 3);
+        void verdict; void trial; void reason; void margin;
       },
-      /*
-       * `alert` sat here too -- a passthrough to `hud.alert` with no caller
-       * anywhere, in src or in the suite. It went in build 220 alongside
-       * `abilityTaken`, which build 219 removed from this same block for the
-       * same reason: a hook the world offers and nothing takes is a hook that
-       * grows a maintainer.
-       */
       carry: (key) => self.carry(key),
     };
   }

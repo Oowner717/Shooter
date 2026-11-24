@@ -9564,9 +9564,16 @@ export class Director {
         trial: won ? 'proven' : 'failed' };
     }
 
+    /*
+     * Build 399: every finished wave is ONE step on, whatever its verdict.
+     * The run is one continuous climb -- a surge no longer jumps two and a
+     * slow clear no longer stands still -- so the wave count and the rung are
+     * the same number and a boss is every tenth wave. A glitch (`glitchOut`)
+     * is still the one thing that steps it back.
+     */
     let moved = 0;
-    if (verdict === 'surge' || verdict === 'clean') {
-      const step = verdict === 'surge' ? 2 : 1;
+    {
+      const step = 1;
       // HOLD pins the climb, and grace defers it by one wave. Both are spent
       // whether or not there was anything to hold back.
       if (this.grace > 0) this.grace--;

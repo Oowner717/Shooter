@@ -67,6 +67,16 @@ node scripts/regress.mjs 2>&1 | tail -40
   gone (RIG_MAX 17).
 - The strip is one even row across the bar: LOADOUT | TARGETING | UNITS.
 
+## Design rulings (build 399)
+
+- Bosses (anomalies) sit every 10th rung: `BOSS_EVERY` 10, ceiling 90, all 9
+  gated. Every finished wave climbs exactly one rung (`score()`); the wave
+  rail is hidden and tier/surge alerts are gone. The only progression the
+  player sees is the APERTURE boss prompt. RECALL/OVERCLOCK are dormant.
+- Units last `unitLife(q)` s (base 5) and send every `sendEvery(q)` s (base
+  5), `sendCount(q)` per send; `SQUAD_UPS` in units.js, levels in
+  `world.squad.ups`. `MAX_OUT` 12 per works is a guard only.
+
 ## Gotchas that have shipped bugs
 
 - Play controls bind on `pointerdown`; tests must dispatch `pointerdown` on

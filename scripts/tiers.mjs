@@ -351,6 +351,8 @@ const TREE_TOTAL = NODES
  * recorded beside it.
  */
 // measured: window 20 scored wave(s) a rung, 3 run(s) a rung, 3 damped pass(es) at w=0.5 RESUMED on build 371's curve, all four rolls loose, CORE not owned, build 373 rev 02b5255, this container
+// TRUNCATED at rung 49 -- measured on the 49-rung ladder (build 374); build 399
+// made the ladder 90 rungs and this curve is owed a re-measure to the ceiling.
 const EARNED = [[1, 0], [7, 550690], [14, 2341417], [21, 7195205], [28, 17069765], [35, 46551271], [42, 124516892], [49, 271530688]];
 /*
  * Past the last anchor, the growth of the last measured pair carries on.

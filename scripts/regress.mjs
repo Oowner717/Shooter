@@ -4402,6 +4402,9 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const ranD = w.director.update;
     w.director.update = () => {};
     const d = w.director;
+    // Build 399 put the first gate on rung 10, which the trials below climb
+    // through; answer it so the ladder mechanics are measured, not the gate.
+    w.reconciled.push(1);
 
     const box = (id) => {
       const q = document.getElementById(id).getBoundingClientRect();
@@ -7940,8 +7943,10 @@ if (!GUN_LINE) {
    * what has to be asserted -- the sweep stands on every rung from 1 to the
    * ceiling and neither of them ever lights.
    */
-  check('...and an anomaly with no rung has no door: nothing lights for it',
-    r.deferredLit.length === 0 && r.gatedCount < r.builtCount,
+  // Build 399: every anomaly has a rung now (one every tenth wave, nine of
+  // nine), so the claim is that all of them are placed and none is left over.
+  check('...and every built anomaly has a rung: none is left without a door',
+    r.deferredLit.length === 0 && r.gatedCount === r.builtCount && r.builtCount === 9,
     `${r.gatedCount} gate rungs against ${r.builtCount} built anomalies; `
     + `${r.deferredLit.join('/') || 'neither deferred one'} lit on any rung`);
 
@@ -12211,8 +12216,10 @@ if (!GUN_LINE) {
   });
 
   const v = (x) => (x ? `${x.verdict}${x.moved >= 0 ? '+' : ''}${x.moved}` : 'null');
-  check('a wave cleared before the last one landed is a surge, and climbs two',
-    r.surge.verdict === 'surge' && r.surge.moved === 2,
+  // Build 399: every finished wave climbs exactly ONE, whatever its verdict
+  // -- the run is one continuous climb, wave count = rung.
+  check('a wave cleared before the last one landed is a surge, and climbs one like any other',
+    r.surge.verdict === 'surge' && r.surge.moved === 1,
     `${v(r.surge)} (t 1s, no contact, nothing left)`);
   check('the ordinary clear climbs one',
     r.clean.verdict === 'clean' && r.clean.moved === 1, v(r.clean));
@@ -12223,12 +12230,12 @@ if (!GUN_LINE) {
    * streak and by a wave "mostly outliving" itself. Both are gone. The one
    * thing that steps the ladder back is something spending real time attached.
    */
-  check('slow but untouched holds, however many times it happens',
-    r.stall.verdict === 'stall' && r.stall.moved === 0
-    && r.stall2.verdict === 'stall' && r.stall2.moved === 0,
+  check('slow but untouched still climbs one, however many times it happens',
+    r.stall.verdict === 'stall' && r.stall.moved === 1
+    && r.stall2.verdict === 'stall' && r.stall2.moved === 1,
     `first ${v(r.stall)}, second ${v(r.stall2)}`);
-  check('a wave that mostly outlived you holds too, if it never reached you',
-    r.routByRemains.verdict === 'stall' && r.routByRemains.moved === 0,
+  check('a wave that mostly outlived you climbs one too, if it never reached you',
+    r.routByRemains.verdict === 'stall' && r.routByRemains.moved === 1,
     `${v(r.routByRemains)} (8 of 10 still standing, nothing on the turret)`);
   /*
    * Build 210: the table cannot go down at all, from any cell in it.
@@ -12246,12 +12253,12 @@ if (!GUN_LINE) {
    * about the whole table.
    */
   check('nothing this table can produce steps the ladder back',
-    r.sweep.length === 0 && r.heavyContact.moved === 0,
+    r.sweep.length === 0 && r.heavyContact.moved === 1,
     `${r.sweepOf - r.sweep.length}/${r.sweepOf} poses held; `
     + `15 s on the turret is ${v(r.heavyContact)}`
     + (r.sweep.length ? `; first drop ${JSON.stringify(r.sweep[0])}` : ''));
-  check('patience ending a wave is read as a wave that never thinned, and holds',
-    r.patience.verdict === 'stall' && r.patience.moved === 0
+  check('patience ending a wave is read as a wave that never thinned, and climbs one',
+    r.patience.verdict === 'stall' && r.patience.moved === 1
     && r.patience.reason === 'THE FIELD NEVER THINNED',
     `${v(r.patience)} — ${r.patience.reason}`);
   check('...and a wave that held you for a while still says so',
@@ -12294,7 +12301,8 @@ if (!GUN_LINE) {
     out.h40 = d.scaleAt(40).hp;
     // energy per point of damage, rung 40 against rung 1
     const payPer = (tier, bounty) => bounty / d.scaleAt(tier).hp;
-    out.payPerHp = payPer(40, d.scaleAt(40).bounty) / payPer(1, d.scaleAt(1).bounty);
+    // Rung 73 on the 90-rung ladder is rung 40 of the old 49 (build 399).
+    out.payPerHp = payPer(73, d.scaleAt(73).bounty) / payPer(1, d.scaleAt(1).bounty);
     // ...against what the linear bounty build 201 retired would have given.
     const oldB = (tier) => 1 + 0.15 * tier;
     out.payPerHpOld = payPer(40, oldB(40)) / payPer(1, oldB(1));
@@ -12402,7 +12410,7 @@ if (!GUN_LINE) {
    */
   check('...so a deep rung now pays BETTER per point of damage, within reason',
     r.payPerHp > 1.5 && r.payPerHp < 4,
-    `energy per point of damage at rung 40, against rung 1: x${r.payPerHp.toFixed(2)} `
+    `energy per point of damage at rung 73, against rung 1: x${r.payPerHp.toFixed(2)} `
     + `(the retired linear bounty would now give x${r.payPerHpOld.toFixed(2)}, which is why `
     + 'that comparison no longer separates them)');
   check('the depth dividend rises with the peak and with anomalies, and is capped',
@@ -12569,7 +12577,8 @@ if (!GUN_LINE) {
     `${r.gate - 1} -> ${r.intoGate.to}, then ${r.gate} -> ${r.atGate.to} on a clean wave`);
   check('...and a surge steps ON to a gate rather than over it',
     r.surgeOver.to === r.gate && r.surgeOver.verdict === 'surge'
-    && r.surgeBelow.to === r.gate - 1,
+    // every wave climbs one from build 399, a surge too
+    && r.surgeBelow.to === r.gate - 2,
     `surge from ${r.gate - 1} lands on ${r.surgeOver.to}; the same surge from `
     + `${r.gate - 3} lands on ${r.surgeBelow.to}`);
   check('...and once the anomaly is reconciled the rung opens',
@@ -12925,7 +12934,8 @@ if (!GUN_LINE) {
    * out at rung 9 and forty rungs drew band 4-5 with bigger numbers on them.
    */
   check('a band is one boss slot wide, and the budget walk redistributes it',
-    r.perBand === r.top / 7 || r.perBand === 7,
+    // 13 from build 399: ninety rungs over the same five bands
+    r.perBand === 13,
     `perBand ${r.perBand}; rungs 1/7/8/14/15/35 draw bands ${r.bandAt.join('/')}`);
 
   /*
@@ -13005,7 +13015,8 @@ if (!GUN_LINE) {
       || traitAt(1, 0, 1).id !== traitAt(2, 0, 1).id;
 
     // ---- when they arrive ----
-    out.count = [1, 9, 10, 24, 25, 40].map((t) => traitCount(t));
+    // traitFrom 18 / traitPair 46 on the 90-rung ladder (build 399)
+    out.count = [1, 17, 18, 45, 46, 80].map((t) => traitCount(t));
     const teach = WAVES.find((x) => x.teach && x.of.length);
     const bonus = WAVES.find((x) => !x.teach && (!x.of || !x.of.length));
     out.onTeach = traitsFor(w, teach, 30, 1, 0).length;
@@ -13214,9 +13225,9 @@ if (!GUN_LINE) {
   check('the five rules exist, and which one a wave carries is seeded not rolled',
     r.ids.length === 5 && r.stable && r.varies >= 4 && r.differsBySeed,
     `${r.ids.join(', ')}; 40 waves of one seed used ${r.varies} of them, and two seeds differ`);
-  check('nothing is traited below rung 10, one from there, two from 25',
+  check('nothing is traited below rung 18, one from there, two from 46',
     JSON.stringify(r.count) === JSON.stringify([0, 0, 1, 1, 2, 2]),
-    `rungs 1/9/10/24/25/40 carry ${r.count.join('/')} traits`);
+    `rungs 1/17/18/45/46/80 carry ${r.count.join('/')} traits`);
   check('...and never the opening or the bonus wave',
     r.onTeach === 0 && r.onBonus === 0,
     `teach wave ${r.onTeach}, drift-only bonus wave ${r.onBonus}`);
@@ -13469,8 +13480,10 @@ if (!GUN_LINE) {
     `paused ${r.holds.paused}; the field froze ${r.frozen} and moved again on close `
     + `${r.movesAgain}`);
   check('RECALL takes what is cleared: three quarters is a clean, less is a stall',
-    r.recallClean && r.recallClean.verdict === 'clean' && r.recallClean.moved === 1
-    && r.recallStall && r.recallStall.verdict === 'stall' && r.recallStall.moved === 0,
+    // Verdicts only from build 399: every wave climbs one now (and RECALL is
+    // dormant with the wave sheet hidden), so the step is not RECALL's claim.
+    r.recallClean && r.recallClean.verdict === 'clean'
+    && r.recallStall && r.recallStall.verdict === 'stall',
     `90% cleared -> ${r.recallClean && r.recallClean.verdict} (${r.recallClean && r.recallClean.moved}); `
     + `30% -> ${r.recallStall && r.recallStall.verdict} (${r.recallStall && r.recallStall.moved})`);
   check('...and it is spent, and refuses until the clock runs out',
@@ -13793,8 +13806,10 @@ if (!GUN_LINE) {
   });
 
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-  check('the tree sells RECALL and OVERCLOCK once the run has stood on rung 10',
-    r.bought.recall === 1 && r.bought.overclock === 1,
+  // Dormant from build 399: both are used from the wave sheet, which is no
+  // longer shown, so the tree must not sell them.
+  check('the tree no longer sells RECALL and OVERCLOCK',
+    r.bought.recall === 0 && r.bought.overclock === 0,
     `after buying: recall max ${r.bought.recall}, overclock max ${r.bought.overclock}`);
   check('a fresh run starts with none of the wave system’s state left over',
     r.clean.grace === 0 && r.clean.probe === null && r.clean.lane === null
@@ -13811,8 +13826,8 @@ if (!GUN_LINE) {
     same(r.before, r.after),
     `saved ${JSON.stringify(r.before)}\n         got   ${JSON.stringify(r.after)}`);
   check('a spent charge stays spent: the ledger replay does not refill it',
-    r.after.recall.max === 1 && r.after.recall.held === 0 && r.after.recall.cd === 41
-    && r.after.overclock.max === 1 && r.after.overclock.held === 0,
+    // (max 0 from build 399: the two are dormant and cannot be bought)
+    r.after.recall.held === 0 && r.after.overclock.held === 0,
     `recall ${JSON.stringify(r.after.recall)}, overclock ${JSON.stringify(r.after.overclock)}`);
   check('a save written before any of this restores to defaults, not to junk',
     r.legacy.runSeed === 0 && r.legacy.lane === null && r.legacy.probe === null
@@ -14350,9 +14365,12 @@ if (!GUN_LINE) {
     out.reset1 = m1.fizzled > 0 && d.resting === true;
 
     // ---- a trial that glitches is answered, not charged twice ----
-    stage(9);
-    d.peak = 9;
-    d.trial(12, w);
+    // 13 -> 16 from build 399: the first gate is rung 10 now, and a trial
+    // from 9 would be stopped by it before it was armed.
+    stage(13);
+    w.reconciled.push(1);
+    d.peak = 13;
+    d.trial(16, w);
     const beforeTrial = d.tier;
     const mt = d.glitchOut(w);
     out.trial = { armedAt: beforeTrial, to: mt.tier, moved: mt.moved,
@@ -14628,8 +14646,8 @@ if (!GUN_LINE) {
    * rung below it, for one wave.
    */
   check('a trial that glitches is answered, not charged twice',
-    r.trial.to === 9 && r.trial.probe === null && r.trial.locked
-    && r.trial.moved === 9 - r.trial.armedAt,
+    r.trial.to === 13 && r.trial.probe === null && r.trial.locked
+    && r.trial.moved === 13 - r.trial.armedAt,
     `armed at ${r.trial.armedAt}, landed on ${r.trial.to} (moved ${r.trial.moved}), `
     + `probe ${JSON.stringify(r.trial.probe)}, locked out ${r.trial.locked}`);
 
@@ -14651,8 +14669,10 @@ if (!GUN_LINE) {
    * blew.
    */
   check('it says so on the canvas, without spending a story beat',
+    // ...and no STEPPED BACK alert from build 399: the rung is not shown, so
+    // the canvas line is the whole of what is said.
     /stepped back/i.test(r.said) && /weren/i.test(r.said) && r.storySpent === 0
-    && /STEPPED BACK/.test(r.alert),
+    && !/STEPPED BACK/.test(r.alert),
     `narrator: "${r.said}" (story beats spent ${r.storySpent}); alert: "${r.alert}"`);
 
   /*
@@ -32977,11 +32997,11 @@ if (MINE_LINE) {
     g.debugTeachAll();
     clear();
     const d = w.director;
-    d.setTier(22);
+    d.setTier(40); // 40 on the 90-rung ladder (build 399): 22 no longer carries x1.5 health
     d.update = () => {};
     w.autoAim = false;
     w.autoFire = false;
-    out.tierK = +d.scaleAt(22).hp.toFixed(3);
+    out.tierK = +d.scaleAt(40).hp.toFixed(3);
     const first = g.debugSpawn('quarry', w.width * 0.5, 300);
     first.staged = false;
     first.spawnIn = 0;
@@ -33207,7 +33227,7 @@ if (MINE_LINE) {
     Math.abs(G[0].hpOf - r.want.hpAt) < 0.02 && Math.abs(G[1].hpOf - r.want.hpAt) < 0.02
     && Math.abs(G[0].armorOf - r.want.armorAt) < 0.01 && Math.abs(G[0].cruiseOf - r.want.speedAt) < 0.01
     && r.tierK > 1.5,
-    `at rung 22 (health x${r.tierK}) a parent of ${r.parent.hp} hands out ${G[0].hpOf} and then ${G[1].hpOf} `
+    `at rung 40 (health x${r.tierK}) a parent of ${r.parent.hp} hands out ${G[0].hpOf} and then ${G[1].hpOf} `
     + `of its own health against an authored ${r.want.hpAt} -- the rung twice would read `
     + `${+(r.want.hpAt * r.tierK).toFixed(2)} -- with armour x${G[0].armorOf} and speed x${G[0].cruiseOf}`);
 
@@ -40904,7 +40924,7 @@ if (MINE_LINE) {
       w.era = 1;
       g.setEra(2);
       const d = w.director;
-      d.setTier(32);
+      d.setTier(59); // rung 32 of the old 49-rung ladder (build 399)
       d.traits = [];
       d.update = () => {};
       g.debugClearField();
@@ -40962,7 +40982,7 @@ if (MINE_LINE) {
     r.refused.length > 0 && r.waves > 20 && r.withRefused > 0 && r.formAt <= 3 && big > 0
     // ...and not one wave comes up short
     && shy.length === 0,
-    `${r.waves} ordinary waves at rung 32, ${r.withRefused} of them carrying a type that `
+    `${r.waves} ordinary waves at rung 59, ${r.withRefused} of them carrying a type that `
     + `cannot arrive as a shape (${r.refused.join(', ')}), ${big} asking for more bodies `
     + `than the field cap holds, formAt ${r.formAt}: `
     + `${r.rows.length - shy.length} of ${r.rows.length} delivered every body they asked `
@@ -45031,6 +45051,78 @@ if (MINE_LINE) {
     `sheet opened and held the world ${r.sheetOpen}, bought and assigned ${r.assigned}, `
     + `closed ${r.closed}; ${r.sent} sent, all LANCERs from the west works ${r.allLancers}, `
     + `in the band ${r.band}; SEND off ${r.sendOff}, nothing new ${r.heldOff}; restored ${r.restored}`);
+}
+
+/*
+ * ---- BUILD 399: unit life, the send timer, and the squad upgrades ----------
+ * A sent unit disintegrates after 5 s; auto-send goes every 5 s; SQUAD SIZE,
+ * RAPID DEPLOY and LONGER LIFE are bought from the UNITS screen, change those
+ * three numbers, stop at their top rung, and survive a save.
+ */
+{
+  const r = await page.evaluate(async () => {
+    const U = await import('../src/units.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    w.director.update = () => {};
+    w.enemies.length = 0;
+    w.newForm = 'done';
+    g.setEra(2);
+    w.bytes = 1e12;
+    const out = {};
+    const q = w.squad;
+    out.base = [U.sendCount(q), U.sendEvery(q), U.unitLife(q)];
+    U.buyBuilding(w, 0);
+    q.timers[0] = 0.01;
+    // First send, then track its age and the next send.
+    let first = null; let gone = null; let second = null;
+    for (let f = 0; f < 60 * 12; f++) {
+      g.update(1 / 60);
+      const t = (f + 1) / 60;
+      if (first == null && q.list.length) first = { t, m: q.list[0] };
+      if (first && gone == null && first.m.dead) gone = t - first.t;
+      if (first && second == null && q.list.some((m) => m !== first.m && !m.dead)) second = t - first.t;
+    }
+    out.life = gone; out.every = second;
+
+    // Buy every rung of every track through the sheet.
+    document.getElementById('unitsBtn').dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    out.rows = document.querySelectorAll('#unitSheet [data-up]').length;
+    for (let k = 0; k < 6; k++) {
+      for (const id of ['count', 'timer', 'life']) {
+        const b = document.querySelector(`#unitSheet [data-up="${id}"]`);
+        if (b) b.click();
+      }
+    }
+    out.maxed = document.querySelectorAll('#unitSheet [data-up]').length === 0;
+    document.querySelector('#unitSheet [data-close]').click();
+    out.top = [U.sendCount(q), U.sendEvery(q), U.unitLife(q)];
+    out.again = U.buySquadUp(w, 'count');
+    q.list.length = 0;
+    q.timers[0] = 0.01;
+    g.update(1 / 60);
+    out.perSend = q.list.length;
+    out.lives = q.list.every((m) => m.life === 8);
+
+    g.checkpoint();
+    g.resume();
+    const q2 = g.world.squad;
+    out.restored = [U.sendCount(q2), U.sendEvery(q2), U.unitLife(q2)];
+    out.oldSave = U.squadRestore({ built: [true, false] }).ups.count === 0;
+    delete g.world.director.update;
+    g.restart();
+    return out;
+  });
+  check('a sent unit lasts 5 s and auto-send goes every 5 s',
+    r.base.join() === '1,5,5' && Math.abs(r.life - 5) < 0.1 && Math.abs(r.every - 5) < 0.1,
+    `base ${r.base}; first unit gone after ${r.life && r.life.toFixed(2)} s, next sent after ${r.every && r.every.toFixed(2)} s`);
+  check('SQUAD SIZE, RAPID DEPLOY and LONGER LIFE buy to their tops and survive a save',
+    r.rows === 3 && r.maxed && r.top.join() === '3,3,8' && r.again === 'owned'
+    && r.perSend === 3 && r.lives && r.restored.join() === '3,3,8' && r.oldSave,
+    `${r.rows} upgrade rows, all bought ${r.maxed}; tops ${r.top}, buying past ${r.again}; `
+    + `${r.perSend} per send, lasting 8 s ${r.lives}; restored ${r.restored}; old save ${r.oldSave}`);
 }
 
 // --- report -----------------------------------------------------------------

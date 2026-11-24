@@ -5418,6 +5418,9 @@ body.unitsOpen #quickBar { opacity: 0.35; }
 #unitSheet .uText { flex: 1 1 auto; min-width: 0; }
 #unitSheet .uName { font-size: 13px; letter-spacing: 0.1em; color: var(--tone); }
 #unitSheet .uRole { margin-left: 8px; font-size: 9px; letter-spacing: 0.12em; color: var(--dim); }
+#unitSheet .uPips { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
+#unitSheet .uPips i { width: 10px; height: 4px; border-radius: 2px; background: rgba(143, 220, 255, 0.18); }
+#unitSheet .uPips i.on { background: var(--tone); }
 #unitSheet .uLine { margin-top: 3px; font-size: 11px; line-height: 1.35; color: #b9cde4; }
 #unitSheet .uStat { margin-top: 3px; font-size: 9.5px; color: var(--dim); }
 #unitSheet .uAct { flex: 0 0 auto; }
@@ -5438,3 +5441,10 @@ body.unitsOpen #quickBar { opacity: 0.35; }
 #unitSheet .uSet { border-color: color-mix(in srgb, var(--tone) 50%, transparent); background: rgba(10, 18, 32, 0.7); color: var(--tone); }
 #unitSheet .uSet.on { background: color-mix(in srgb, var(--tone) 18%, transparent); cursor: default; }
 #unitSheet .uBld .uBuy { margin-top: auto; min-width: 0; width: 100%; }
+
+/* Build 399: the wave count is not shown. The rail keeps its place in the top
+   bar (so the purse and the menu door do not move) but draws nothing and
+   takes no press; the progression shows itself as a boss prompt every tenth
+   wave. */
+#waveRail { visibility: hidden; pointer-events: none !important; }
+#waveRail * { pointer-events: none !important; }

@@ -28,39 +28,93 @@ import { shielded, yardHold } from './yard.js';
  * (`world.up.damage`), so units keep pace with the gun they fight beside.
  *
  *   role  'attack' hovers in the upper-middle band, 'defend' in the middle.
- *   cap   how many one building keeps out at once.
- *   every seconds between sends from one building.
  */
+/*
+ * Build 399: every unit DISINTEGRATES after `UNIT_LIFE` seconds, and a works
+ * on auto-send sends one every `SEND_EVERY` seconds. Both are flat for every
+ * type by ruling, so they live here once rather than in the table ten times.
+ */
+export const UNIT_LIFE = 5;
+export const SEND_EVERY = 5;
+
+/*
+ * Squad upgrades (build 399). Three tracks bought on the UNITS screen, shared
+ * by both works. `values[level]` is the live number; `cost[level]` buys the
+ * next one. Priced against the unit table (MB 1.5 to 30) so the first rung of
+ * each is about a mid unit and the last about a SERAPH: a full set roughly
+ * triples a works' output (3 per send, every 3 s, lasting 8 s).
+ */
+export const SQUAD_UPS = [
+  { id: 'count', name: 'SQUAD SIZE', line: 'More units in every send.', unit: '',
+    values: [1, 2, 3], cost: [MB(6), MB(18)] },
+  { id: 'timer', name: 'RAPID DEPLOY', line: 'Less time between sends.', unit: 's',
+    values: [5, 4.25, 3.6, 3], cost: [MB(2.5), MB(7), MB(16)] },
+  { id: 'life', name: 'LONGER LIFE', line: 'Units hold together longer.', unit: 's',
+    values: [5, 6, 7, 8], cost: [MB(2.5), MB(7), MB(16)] },
+];
+export const SQUAD_UP_BY_ID = new Map(SQUAD_UPS.map((t) => [t.id, t]));
+/** The most of one works' units out at once: a guard, not a design number. */
+export const MAX_OUT = 12;
+
+function upLevel(q, id) {
+  const t = SQUAD_UP_BY_ID.get(id);
+  const n = (q && q.ups && q.ups[id]) | 0;
+  return clamp(n, 0, t.values.length - 1);
+}
+export function squadUpValue(q, id) { return SQUAD_UP_BY_ID.get(id).values[upLevel(q, id)]; }
+export function squadUpLevel(q, id) { return upLevel(q, id); }
+/** The price of the next rung, or null when the track is full. */
+export function squadUpCost(q, id) {
+  const t = SQUAD_UP_BY_ID.get(id);
+  const n = upLevel(q, id);
+  return n < t.cost.length ? t.cost[n] : null;
+}
+export const sendEvery = (q) => squadUpValue(q, 'timer');
+export const unitLife = (q) => squadUpValue(q, 'life');
+export const sendCount = (q) => squadUpValue(q, 'count');
+
+export function buySquadUp(world, id) {
+  const q = world.squad;
+  if (!SQUAD_UP_BY_ID.has(id)) return 'no';
+  if (!unitsOpen(world)) return 'locked';
+  const price = squadUpCost(q, id);
+  if (price == null) return 'owned';
+  if (world.bytes < price) return 'poor';
+  world.bytes -= price;
+  q.ups[id] = upLevel(q, id) + 1;
+  return 'ok';
+}
+
 export const UNITS = [
   { id: 'drone', name: 'DRONE', cost: 0, color: '#7fe6c0', shape: 'tri', role: 'attack',
-    hp: 60, dmg: 14, rate: 2.5, range: 300, speed: 260, cap: 3, every: 4,
+    hp: 60, dmg: 14, rate: 2.5, range: 300, speed: 260,
     line: 'Cheap and steady. Plinks at whatever comes near.' },
   { id: 'sentry', name: 'SENTRY', cost: MB(1.5), color: '#9fd8ff', shape: 'square', role: 'defend',
-    hp: 150, dmg: 18, rate: 2, range: 340, speed: 200, cap: 3, every: 5,
+    hp: 150, dmg: 18, rate: 2, range: 340, speed: 200,
     line: 'Tougher. Holds the middle of the field, close to you.' },
   { id: 'lancer', name: 'LANCER', cost: MB(3), color: '#ffd27f', shape: 'arrow', role: 'attack',
-    hp: 70, dmg: 90, rate: 0.6, range: 620, speed: 220, cap: 2, every: 6,
+    hp: 70, dmg: 90, rate: 0.6, range: 620, speed: 220,
     line: 'Long reach. One slow shot that hits hard.' },
   { id: 'gnat', name: 'GNAT', cost: MB(4), color: '#c8ff7f', shape: 'dot', role: 'attack',
-    hp: 25, dmg: 6, rate: 6, range: 220, speed: 380, cap: 6, every: 1.5,
-    line: 'Tiny and fast, sent out in numbers.' },
+    hp: 25, dmg: 6, rate: 6, range: 220, speed: 380,
+    line: 'Tiny, fast and fires quickly.' },
   { id: 'arclet', name: 'ARCLET', cost: MB(6), color: '#b49cff', shape: 'diamond', role: 'attack',
-    hp: 80, dmg: 26, rate: 1.5, range: 320, speed: 240, cap: 3, every: 5, chain: 2,
+    hp: 80, dmg: 26, rate: 1.5, range: 320, speed: 240, chain: 2,
     line: 'Every shot jumps on to two more targets.' },
   { id: 'mortar', name: 'MORTAR', cost: MB(8), color: '#ff9f6b', shape: 'hex', role: 'attack',
-    hp: 110, dmg: 40, rate: 0.8, range: 460, speed: 180, cap: 2, every: 6, splash: 90,
+    hp: 110, dmg: 40, rate: 0.8, range: 460, speed: 180, splash: 90,
     line: 'Bursts over a crowd, hurting everything nearby.' },
   { id: 'rime', name: 'RIME', cost: MB(11), color: '#8fe8ff', shape: 'star', role: 'defend',
-    hp: 90, dmg: 12, rate: 2, range: 360, speed: 220, cap: 3, every: 5, slow: 0.55,
+    hp: 90, dmg: 12, rate: 2, range: 360, speed: 220, slow: 0.55,
     line: 'Chills what it hits and slows it right down.' },
   { id: 'hunter', name: 'HUNTER', cost: MB(15), color: '#ff6b8a', shape: 'wing', role: 'attack',
-    hp: 50, dmg: 260, rate: 0, range: 700, speed: 420, cap: 3, every: 3, dive: true, splash: 70,
+    hp: 50, dmg: 260, rate: 0, range: 700, speed: 420, dive: true, splash: 70,
     line: 'Picks a target and dives straight into it.' },
   { id: 'aegis', name: 'AEGIS', cost: MB(20), color: '#e8f0ff', shape: 'ring', role: 'defend',
-    hp: 650, dmg: 10, rate: 2, range: 260, speed: 160, cap: 2, every: 8, grind: 120,
+    hp: 650, dmg: 10, rate: 2, range: 260, speed: 160, grind: 120,
     line: 'A heavy guardian. Grinds down whatever touches it.' },
   { id: 'seraph', name: 'SERAPH', cost: MB(30), color: '#fff2a8', shape: 'cross', role: 'attack',
-    hp: 260, dmg: 55, rate: 3, range: 520, speed: 300, cap: 2, every: 6,
+    hp: 260, dmg: 55, rate: 3, range: 520, speed: 300,
     line: 'The best of them. Fast, far-reaching, hard to bring down.' },
 ];
 export const UNIT_BY_ID = new Map(UNITS.map((u) => [u.id, u]));
@@ -81,6 +135,7 @@ export function freshSquad() {
     auto: true,
     list: [],
     timers: [1, 1],
+    ups: { count: 0, timer: 0, life: 0 },
     beams: [],
     seq: 0,
   };
@@ -99,6 +154,12 @@ export function squadRestore(d) {
     q.assign = [0, 1].map((i) => (q.owned.includes(d.assign[i]) ? d.assign[i] : 'drone'));
   }
   q.auto = d.auto !== false;
+  if (d.ups && typeof d.ups === 'object') {
+    for (const t of SQUAD_UPS) {
+      const n = Math.floor(+d.ups[t.id] || 0);
+      q.ups[t.id] = clamp(n, 0, t.values.length - 1);
+    }
+  }
   return q;
 }
 
@@ -177,12 +238,17 @@ function spawn(world, i) {
   const l = works(world)[i];
   const u = UNIT_BY_ID.get(q.assign[i]) || UNITS[0];
   if (!l) return;
-  q.list.push({
-    id: q.seq++, type: u.id, from: i,
-    x: l.x, y: l.y - l.hh, vx: 0, vy: -120 * CFG.scale,
-    hp: u.hp, cd: rand(0.2, 0.6), t: rand(0, 10), target: null, dead: false,
-    lane: rand(0, 1),
-  });
+  const n = Math.min(sendCount(q), MAX_OUT - outFrom(world, i));
+  const life = unitLife(q);
+  for (let j = 0; j < n; j++) {
+    const off = (j - (n - 1) / 2) * l.hw * 0.7;
+    q.list.push({
+      id: q.seq++, type: u.id, from: i,
+      x: l.x + off, y: l.y - l.hh, vx: off * 1.5, vy: -120 * CFG.scale,
+      hp: u.hp, cd: rand(0.2, 0.6), t: rand(0, 10), age: 0, life, target: null, dead: false,
+      lane: rand(0, 1),
+    });
+  }
   ring(l.x, l.y - l.hh, 2, l.hw * 1.4, 0.35, u.color, 1.6);
 }
 
@@ -266,12 +332,12 @@ export function updateUnits(world, dt) {
   // Sending.
   for (let i = 0; i < 2; i++) {
     if (!q.built[i] || !q.auto) continue;
-    const u = UNIT_BY_ID.get(q.assign[i]) || UNITS[0];
-    if (outFrom(world, i) >= u.cap) { q.timers[i] = Math.min(q.timers[i], u.every); continue; }
+    const every = sendEvery(q);
+    if (outFrom(world, i) >= MAX_OUT) { q.timers[i] = Math.min(q.timers[i], every); continue; }
     q.timers[i] -= dt;
     if (q.timers[i] <= 0) {
       spawn(world, i);
-      q.timers[i] = u.every;
+      q.timers[i] = every;
     }
   }
 
@@ -281,6 +347,17 @@ export function updateUnits(world, dt) {
   live.forEach((m, idx) => {
     const u = UNIT_BY_ID.get(m.type) || UNITS[0];
     m.t += dt;
+    m.age += dt;
+    // Its life is up: it comes apart where it is.
+    if (m.age >= (m.life || UNIT_LIFE)) {
+      m.dead = true;
+      ring(m.x, m.y, 2, R * k * 2.2, 0.3, u.color, 1.4);
+      for (let j = 0; j < 10; j++) {
+        const a = (j / 10) * TAU;
+        spark(m.x, m.y, Math.cos(a) * rand(40, 140), Math.sin(a) * rand(40, 140), u.color, 0.4, 1.6);
+      }
+      return;
+    }
     if (m.target && !legal(world, m.target)) m.target = null;
     if (!m.target || (m.t % 0.5) < dt) m.target = nearest(world, m.x, m.y, u.range * k) || m.target;
 
@@ -462,8 +539,8 @@ export function drawBuildings(ctx, world, mood) {
     ctx.fill();
     ctx.stroke();
     // The send clock: an arc round the door that fills until the next one.
-    const ready = q.auto ? 1 - clamp(q.timers[i] / u.every, 0, 1) : 0;
-    const full = outFrom(world, i) >= u.cap;
+    const ready = q.auto ? 1 - clamp(q.timers[i] / sendEvery(q), 0, 1) : 0;
+    const full = outFrom(world, i) >= MAX_OUT;
     ctx.save();
     ctx.translate(l.x, l.y + l.hh * 0.15);
     ctx.fillStyle = rgba(u.color, q.auto ? 0.9 : 0.35);

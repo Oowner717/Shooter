@@ -322,6 +322,7 @@ export function captureRun(world, game) {
       assign: [...world.squad.assign],
       owned: [...world.squad.owned],
       auto: world.squad.auto !== false,
+      ups: { ...(world.squad.ups || {}) },
     } : undefined,
     // ...and the same for what a boss left. Both are held counts that go
     // down again, which the ledger has no way of recording.

@@ -985,13 +985,17 @@ export const UPGRADES = {
      * rung 10, which is where the ladder starts asking questions worth
      * answering.
      */
-    { id: 'recall', name: 'RECALL', levels: 1, rung: CFG.waves.tier.sheetRung,
+    // Dormant from build 399: both are used from the wave sheet, and the
+    // wave count (rail and sheet) is no longer shown.
+    { id: 'recall', name: 'RECALL', levels: 1, rung: CFG.waves.tier.sheetRung, dormant: true,
       line: 'End the running wave and take what is cleared. One, then a minute.',
       apply: (up, world) => {
         world.director.recall.max = 1;
         world.director.recall.held = 1;
       }, icon: MARK.standing },
-    { id: 'overclock', name: 'OVERCLOCK', levels: 1, rung: CFG.waves.tier.sheetRung,
+    // Dormant from build 399: both are used from the wave sheet, and the
+    // wave count (rail and sheet) is no longer shown.
+    { id: 'overclock', name: 'OVERCLOCK', levels: 1, rung: CFG.waves.tier.sheetRung, dormant: true,
       line: 'The next wave arrives twice as fast and pays double.',
       apply: (up, world) => {
         world.director.overclock.max = 1;

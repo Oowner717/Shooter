@@ -99,18 +99,27 @@ wide field.
 **From era 2, two buildings stand well out either side of the turret** — the
 WEST and EAST WORKS (3.00 MB and 5.00 MB). Before era 2 there is nothing
 there. Each one, once bought, keeps sending the unit assigned to it out onto
-the field, up to that unit's cap, where it hovers in the middle or
+the field every 5 seconds, where it hovers in the middle or
 upper-middle of the field and fights. **UNITS** on the strip opens the units
 screen: buy a building, tap it to select it, then pick what it sends from the
 units you own, or buy another. **SEND** (and the AUTO SEND switch on the
-screen) turns the sending on and off; units already out stay out.
+screen) turns the sending on and off; units already out stay out. **Every unit
+disintegrates 5 seconds after it is sent.**
+
+Three upgrades on the same screen apply to both buildings:
+
+| Upgrade | Levels | Prices |
+|---|---|---|
+| SQUAD SIZE (units per send) | 1 → 2 → 3 | 6 MB, 18 MB |
+| RAPID DEPLOY (seconds between sends) | 5 → 4.25 → 3.6 → 3 | 2.5 MB, 7 MB, 16 MB |
+| LONGER LIFE (seconds a unit lasts) | 5 → 6 → 7 → 8 | 2.5 MB, 7 MB, 16 MB |
 
 | Unit | Price | Role | What it does |
 |---|---|---|---|
 | DRONE | free | attacker | cheap, steady fire |
 | SENTRY | 1.5 MB | defender | tougher, holds the middle |
 | LANCER | 3 MB | attacker | long reach, one heavy shot |
-| GNAT | 4 MB | attacker | tiny and fast, six at a time |
+| GNAT | 4 MB | attacker | tiny, fast, fires quickly |
 | ARCLET | 6 MB | attacker | each shot chains to two more |
 | MORTAR | 8 MB | attacker | splash over a crowd |
 | RIME | 11 MB | defender | slows what it hits |
