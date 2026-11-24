@@ -136,7 +136,7 @@ export const UNDER = {
   // one that answers a crowd rather than a body, and AIRBURST is the decision
   // its fan poses: a fan is mostly gaps, and this is what closes them.
   fan: ['airburst'],
-  lance: [], well: [], prism: [], stasis: [], decoy: [],
+  lance: [], well: [], prism: [], stasis: [], he: [],
   // WARD is the one with real shaping: how far the shell stands, how hard it
   // cuts, how many arcs come off it, and whether it throws as it comes up.
   // It is a STATE rather than an event, which is what gives it four decisions
@@ -231,7 +231,7 @@ const BAND = {
   charge_pulse: 1, shockfront: 1, flinch: 3, charge_fan: 2, airburst: 2,
   // ---- the six bought abilities, and their own ----
   open_lance: 3, charge_lance: 3, open_well: 5, charge_well: 5, open_prism: 5,
-  charge_prism: 5, open_stasis: 3, charge_stasis: 6, open_decoy: 4, charge_decoy: 4,
+  charge_prism: 5, open_stasis: 3, charge_stasis: 6, open_he: 4, charge_he: 4,
   open_ward: 3, charge_ward: 3, standoff: 5, edged: 6, fork: 6, heave: 6,
   deadbolt: 4,
   // ---- the wave ----
@@ -289,7 +289,7 @@ const BRANCH = {
   mines: ['blast', 'snare', 'wire', 'knell', 'thorn', 'lode', 'spall', 'void'],
   // PULSE and HAIL are the two the turret starts with. They are free where the
   // six below them are bought; their extra uses are not.
-  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'decoy', 'ward'],
+  abilities: ['pulse', 'fan', 'lance', 'well', 'prism', 'stasis', 'he', 'ward'],
   turret: [],
 };
 

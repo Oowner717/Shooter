@@ -19144,6 +19144,8 @@ if (MINE_LINE) {
         if (w[list]) w[list].length = 0;
       }
       w.phase = 'staging';
+      // The assists off too: one auto-fired round into the witness is a shove.
+      w.autoAim = false; w.autoFire = false;
       w.director.update = () => {};
       if (buy) {
         g.debugGiveBytes(400000000);
@@ -24684,10 +24686,10 @@ if (MINE_LINE) {
    * only checked for movement would be vacuous on the large screen and would
    * say so nowhere.
    */
-  check('...including the one that is actually a physics body',
-    rows.every((r) => r.decoyTwo.y >= r.decoyTwo.floor - 0.01
-      && r.decoyOne.y !== null && Math.abs(r.decoyOne.y - r.decoyOne.wanted) < 0.01)
-    && small.decoyTwo.bound && !big.decoyTwo.bound,
+  // Build 402: DECOY left the bar for HE, so nothing can summon the one
+  // friendly physics body any more. What is asserted is that it stays gone.
+  check('...and DECOY, the one that was a physics body, is no longer summoned',
+    rows.every((r) => r.decoyTwo.y === null && r.decoyOne.y === null),
     rows.map((r) => `${r.w}: decoy wanted y ${r.decoyTwo.wanted}, floor `
       + `${r.decoyTwo.floor}, stood at ${r.decoyTwo.y} (wall binding `
       + `${r.decoyTwo.bound}); era 1 stood at ${r.decoyOne.y} against `
@@ -45093,6 +45095,41 @@ if (MINE_LINE) {
     && r.perSend === 3 && r.lives && r.restored.join() === '3,3,8' && r.oldSave,
     `${r.rows} upgrade rows, all bought ${r.maxed}; tops ${r.top}, buying past ${r.again}; `
     + `${r.perSend} per send, lasting 8 s ${r.lives}; restored ${r.restored}; old save ${r.oldSave}`);
+}
+
+/*
+ * ---- BUILD 402: HE takes DECOY's slot and upgrades -------------------------
+ */
+{
+  const r = await page.evaluate(async () => {
+    const { ABILITIES } = await import('../src/abilities.js');
+    const { NODE_BY_ID } = await import('../src/tree.js');
+    const g = window.__sim;
+    const w = g.world;
+    g.restart();
+    g.debugClearField();
+    w.director.update = () => {};
+    w.autoAim = false; w.autoFire = false;
+    const out = { ids: ABILITIES.map((a) => a.id).join(',') };
+    out.nodes = ['open_he', 'charge_he'].every((id) => NODE_BY_ID.has(id))
+      && !NODE_BY_ID.has('open_decoy') && !NODE_BY_ID.has('charge_decoy');
+    const s = w.shooter;
+    const e = g.debugSpawn('lurcher', s.x, s.y - 360);
+    e.staged = false; e.spawnIn = 0; e.hp = 100; e.maxHp = 100;
+    w.unlocked.add('he');
+    const i = w.abilities.slots.findIndex((x) => x.def.id === 'he');
+    w.abilities.clearCooldowns();
+    g.useAbility(i);
+    out.hurt = e.dead || e.hp < 100;
+    out.noDecoy = !w.decoy;
+    delete w.director.update;
+    g.restart();
+    return out;
+  });
+  check('HE sits in DECOY\'s slot, takes its upgrades, and hits what it is fired at',
+    r.ids === 'pulse,fan,lance,well,prism,stasis,he,ward' && r.nodes && r.hurt && r.noDecoy,
+    `bar ${r.ids}; open_he/charge_he in the tree and DECOY's gone ${r.nodes}; `
+    + `the target was hit ${r.hurt}; no decoy stood up ${r.noDecoy}`);
 }
 
 // --- report -----------------------------------------------------------------

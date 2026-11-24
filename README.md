@@ -61,7 +61,7 @@ and from era 2, **UNITS** — **UNITS** (opens the units screen) and **SEND**
 
 ```
 [ BOLT ][ AMMO ] | [ AIM ][ FIRE ] | [ UNITS ][ SEND ON ]
-[ PULSE ][ HAIL ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ DECOY ][ WARD ]
+[ PULSE ][ HAIL ][ LANCE ][ WELL ][ PRISM ][ STASIS ][ HE ][ WARD ]
 ```
 
 The round cell shows what is in the barrel; pressing it fans the slots out in
@@ -458,10 +458,12 @@ a caption explains it.
 | ✳ | **WELL** | Singularity — hauls everything into one grinding knot, then collapses | 38 s |
 | ❄ | **STASIS** | Objects freeze for four seconds; your shots do not | 21 s |
 | ▲ | **PRISM** | Fused shell that refracts — wide blast plus beams in every colour | 16 s |
-| ⚲ | **DECOY** | A turret that is not yours, 300 units up-field. Everything walks at it instead | 24 s |
+| ✹ | **HE** | One heavy shell on the biggest threat; a 200-unit blast for 240 where it lands | 20 s |
 | ✷ | **CHORUS** | Ties the field together; whatever kills one hurts the rest | 15 s |
 
-**DECOY** is the one defensive ability. It plants a hollow copy of your turret
+**Build 402 replaced DECOY with HE** (same slot, price and charge upgrade); the paragraph below is kept as history.
+
+**DECOY** was the one defensive ability. It plants a hollow copy of your turret
 up-field; `Enemy.steer` picks it over you, so a scattered field becomes one pile
 somewhere that is not on top of you. It is a static physics body, so things heap
 up against it rather than drifting through, and it takes the collision damage of

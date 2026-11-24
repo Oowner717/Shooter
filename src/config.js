@@ -2,7 +2,7 @@
 // be re-tuned without touching behaviour code.
 
 /** Shown on the title screen and in the debug stats. Must match BUILD in sw.js. */
-export const BUILD = '401';
+export const BUILD = '402';
 
 /**
  * What these bytes actually are, as opposed to what build they claim to be.
@@ -14,7 +14,7 @@ export const BUILD = '401';
  * the game. There is now: the menu shows BUILD and REV together, and two
  * screens showing the same pair are running the same bytes.
  */
-export const REV = '8853b8a';
+export const REV = '92e368d';
 
 /*
  * ---- prices are AUTHORED in the unit they are read in --------------------
@@ -2748,6 +2748,9 @@ export const CFG = {
   // A second turret that is not yours and is not real. Everything that was
   // walking at you walks at it instead, which turns a scattered field into one
   // pile somewhere else — and the pile is not on top of you.
+  // HE, the ability (build 402, DECOY's slot): one shell, one big blast.
+  heAbility: { reach: 620, r: 200, damage: 240, impulse: 950 },
+
   decoy: {
     life: 9,
     /*

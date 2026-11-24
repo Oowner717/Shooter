@@ -109,6 +109,10 @@ function readSlot(key) {
     // Shapes the restore indexes into directly rather than reading defensively.
     if (!d.loadout || !Array.isArray(d.loadout.mines) || !Array.isArray(d.loadout.ammo)) return null;
     if (!Array.isArray(d.taken) || !Array.isArray(d.unlocked)) return null;
+    // Build 402: DECOY became HE. Its unlock and charge carry over by id.
+    const heId = (id) => (id === 'open_decoy' ? 'open_he' : id === 'charge_decoy' ? 'charge_he' : id === 'decoy' ? 'he' : id);
+    d.taken = d.taken.map(heId);
+    d.unlocked = d.unlocked.map(heId);
     return toBytes(d);
   } catch {
     return null;

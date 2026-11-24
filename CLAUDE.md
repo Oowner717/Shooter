@@ -89,6 +89,12 @@ node scripts/regress.mjs 2>&1 | tail -40
 - Build 401: the portal fades out (P.fade, updatePortal) while `world.boss`
   is set, and back in after; throat bodies still draw at full strength.
 
+## Design rulings (build 402)
+
+- DECOY is off the ability bar; HE (id 'he', `CFG.heAbility`) took its slot,
+  price and charge (`open_he`/`charge_he`). save.js maps old decoy ids to
+  he. The Decoy class and `CFG.decoy` stay for old code paths only.
+
 ## Gotchas that have shipped bugs
 
 - Play controls bind on `pointerdown`; tests must dispatch `pointerdown` on

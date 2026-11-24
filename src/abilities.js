@@ -36,6 +36,7 @@ const ICON = {
   // A shell that breaks and leaves in every direction at once.
   prism: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M8.6 3.4 2.6 18.6h12z"/><path d="M13.4 8.4 21.6 5.2M14.8 12.2 22.4 11.6M16.2 15.8l5.6 3.4" opacity=".8"/></svg>',
   // Two turrets. One of them is not there.
+  he: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2M5.6 5.6l2.2 2.2M16.2 16.2l2.2 2.2M18.4 5.6l-2.2 2.2M7.8 16.2l-2.2 2.2"/></svg>',
   decoy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.8 4.6v4.2"/><path d="M2.9 12.4 6.8 8.9l3.9 3.5v5.9H2.9z"/><circle cx="6.8" cy="14.6" r="1.3" fill="currentColor" stroke="none"/><path d="M17.2 4.6v4.2" stroke-dasharray="2.2 1.9"/><path d="M13.3 12.4l3.9-3.5 3.9 3.5v5.9h-7.8z" stroke-dasharray="2.2 1.9" opacity=".85"/></svg>',
   // Wreckage hauled up off the floor and thrown back out the top.
   ward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M12 4.2v3.4M12 16.4v3.4M4.2 12h3.4M16.4 12h3.4" opacity=".75"/><path d="m14.6 9.4 3.1-3.1M6.3 17.7l3.1-3.1" opacity=".4"/></svg>',
@@ -1559,39 +1560,44 @@ export const ABILITIES = [
       audio.ability('stasis');
     },
   },
+  /*
+   * HE (build 402) took DECOY's slot, price and charge. One heavy shell along
+   * the barrel onto the biggest threat (or straight ahead when there is
+   * none), detonating where it lands: a crowd-answer for the bar's seventh
+   * button. DECOY's class is kept in this file for its tests and old saves;
+   * nothing can summon one now, so `world.decoy` stays null.
+   */
   {
-    id: 'decoy',
-    name: 'DECOY',
-    color: '#ff616e',
-    cooldown: 24,
-    icon: ICON.decoy,
-    hint: 'DECOY — a turret that is not yours. They go for it instead.',
+    id: 'he',
+    name: 'HE',
+    color: '#ff5638',
+    cooldown: 20,
+    icon: ICON.he,
+    hint: 'HE — one heavy shell on the biggest threat. Everything near it goes too.',
     run(world) {
-      /*
-       * A second press while one is up ADDS to its clock. It used to call
-       * `expire` on the standing decoy -- which is not a dismissal, it is the
-       * decoy's death: a 260-unit blast at 150 damage with a 900 shove, right
-       * in the middle of the pile the decoy existed to hold. So the ability
-       * whose whole job is keeping the field somewhere that is not on top of
-       * you answered a second press by blowing the field back over you.
-       *
-       * Still one at a time, which was the original comment's point and is
-       * still true; what changed is which one.
-       */
-      if (world.decoy && !world.decoy.dead) { world.decoy.restack(world); return; }
       const s = world.shooter;
-      // A DECOY is the one friendly summon that is a physics body, and it is
-      // the one the wall most obviously has to stop: its whole job is standing
-      // where things are, and past the wall there is nothing to stand among.
-      const top = Math.max(ENTRY_Y + 60, yardHold(world) + CFG.decoy.r);
-      const d = new Decoy(s.x, holdBelow(world, s.x,
-        clamp(s.y - CFG.decoy.ahead, top, s.y - 120), CFG.decoy.r));
-      world.decoy = d;
-      world.effects.push(d);
-      ring(d.x, d.y, 6, 300, 0.5, '#59e0ff', 4);
-      ripple(d.x, d.y, 1.2, 620);
-      shake(7);
-      audio.ability('pulse');
+      const H = CFG.heAbility;
+      const target = bestTarget(world);
+      const a = clampAim(target ? Math.atan2(target.y - s.y, target.x - s.x) : s.aim);
+      s.aim = a;
+      s.targetAim = a;
+      const x0 = s.muzzleX;
+      const y0 = s.muzzleY;
+      const reach = H.reach * CFG.scale;
+      const d = target ? Math.min(Math.hypot(target.x - x0, target.y - y0), reach) : reach;
+      const x = x0 + Math.cos(a) * d;
+      const y = Math.max(ENTRY_Y + 40, y0 + Math.sin(a) * d);
+      world.effects.push(new Beam(x0, y0, x, y, '#ff8a5c'));
+      const r = H.r * CFG.scale;
+      applyBlast(world, { x, y, r, damage: H.damage, impulse: H.impulse, src: 'he' });
+      world.effects.push(new Shock(x, y, r, '#ff5638'));
+      ring(x, y, 8, r, 0.45, '#ffb38a', 4);
+      ripple(x, y, 1.1, r * 2.2);
+      for (let k = 0; k < 26; k++) spark(x, y, spread(520), spread(520), k % 2 ? '#ff5638' : '#ffd0a0', rand(0.3, 0.7), rand(2, 4));
+      s.recoil = 1.8;
+      shake(10);
+      flash(0.16, '#ffcfb0');
+      audio.ability('lance');
     },
   },
   {
