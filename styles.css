@@ -5448,3 +5448,79 @@ body.unitsOpen #quickBar { opacity: 0.35; }
    wave. */
 #waveRail { visibility: hidden; pointer-events: none !important; }
 #waveRail * { pointer-events: none !important; }
+
+/* =====================================================================
+ * Build 400: calmer menus. The idle-shop rules: the wallet and the buy
+ * button are what stand out, each card says one thing, what is not yours
+ * yet is a shape rather than a paragraph, and reference text folds away.
+ * ===================================================================== */
+
+/* UPGRADES: a smaller machine, no section label over the three rows. */
+.rigHero canvas { height: 96px; }
+.shopLab { display: none; }
+.shopSpec {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* AMMO / MINES: owned rows full width, locked ones as small chips. */
+.loadList { flex-direction: row; flex-wrap: wrap; }
+.loadList > .loadRow { flex: 1 1 100%; }
+.loadLockLab {
+  flex: 1 1 100%;
+  margin-top: 8px;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: #7d90a6;
+}
+.loadList > .loadRow.sealed {
+  flex: 0 0 calc((100% - 18px) / 4);
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 4px;
+  text-align: center;
+}
+.loadRow.sealed .loadBody { align-items: center; }
+.loadRow.sealed .loadName { font-size: 11px; letter-spacing: 0.04em; }
+.loadRow.sealed .loadLine,
+.loadRow.sealed .loadState { display: none; }
+
+/* OBJECTS: one row of blanks per section, and a count of the rest. */
+.codexNone { display: none; }
+.codexUnseen .codexCell:nth-child(n + 6) { display: none; }
+.codexUnseen { grid-template-columns: repeat(5, 1fr); }
+.codexUnseen[data-more]::after {
+  content: attr(data-more);
+  grid-column: 1 / -1;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: #7d90a6;
+  padding-top: 2px;
+}
+
+/* SETTINGS: HOW TO PLAY folds the controls away. */
+.menuFold {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0 8px;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  background: rgba(9, 17, 30, 0.7);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+}
+.menuFold i { font-style: normal; transition: transform 0.15s; }
+.menuFold[aria-expanded="true"] i { transform: rotate(90deg); }
+.menuKeys[hidden] { display: none; }
+
+/* UNITS: what you have not bought is a name, a role and a price. */
+#unitSheet .uRow:not(.owned) .uStat,
+#unitSheet .uRow:not(.owned) .uLine { display: none; }

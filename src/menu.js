@@ -1724,6 +1724,9 @@ export class Menu {
       sec.lab.querySelector('em').textContent = `${have}/${sec.entries.length}`;
       sec.none.hidden = have > 0;
       sec.unseen.hidden = have >= sec.entries.length;
+      const rest = sec.entries.length - have - 5;
+      if (rest > 0) sec.unseen.dataset.more = `+${rest} more to find`;
+      else delete sec.unseen.dataset.more;
     }
     for (const e of CODEX) {
       const cell = this.codexCells.get(e.id);
@@ -1822,9 +1825,20 @@ export class Menu {
     }
     p.appendChild(grid);
 
-    p.appendChild(heading('CONTROLS', 'the whole of it'));
+    // Build 400: folded away behind one row. It is reference, not a setting.
+    const fold = document.createElement('button');
+    fold.type = 'button';
+    fold.className = 'menuFold';
+    fold.setAttribute('aria-expanded', 'false');
+    fold.innerHTML = '<span>HOW TO PLAY</span><i>›</i>';
+    p.appendChild(fold);
     const keys = document.createElement('div');
     keys.className = 'menuKeys';
+    keys.hidden = true;
+    fold.addEventListener('click', () => {
+      keys.hidden = !keys.hidden;
+      fold.setAttribute('aria-expanded', String(!keys.hidden));
+    });
     // The only other place these appear is the title screen, which is gone for
     // the rest of the run. Both read the same table.
     for (const [k, body] of CONTROLS) {

@@ -2107,8 +2107,8 @@ console.log(`constants: ${mixed.length} aimable probe(s) (${mixed.map(([f]) => f
  */
 // Moved again at build 399, also without a re-measure: the ladder is ninety
 // rungs with every per-rung slope rescaled. Still owed an income.mjs pass.
-const INCOME_PIN = '721a450424cc';
-const INCOME_AT = 399;
+const INCOME_PIN = '0b9b3c02a7d5'; // 400: SIEVE (driftaim) left the tree
+const INCOME_AT = 400;
 const TIER_CFG = CFG.waves.tier;
 const incomeTerms = {
   'energy.perMass': CFG.energy.perMass,

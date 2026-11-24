@@ -336,7 +336,7 @@ function chainFrom(world, first, hx, hy, jumps) {
          * refusing HOSTILES at `drift` -- because a chain is a spread from
          * where the round landed and not a statement about what to hunt.
          */
-        if (e.harmless && (world.aimMode || 'field') === 'field') continue;
+        if (e.harmless && (world.aimMode || 'all') === 'field') continue;
         const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
         if (d2 < bestD) { bestD = d2; best = e; }
       }

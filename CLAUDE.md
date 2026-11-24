@@ -77,6 +77,16 @@ node scripts/regress.mjs 2>&1 | tail -40
   5), `sendCount(q)` per send; `SQUAD_UPS` in units.js, levels in
   `world.squad.ups`. `MAX_OUT` 12 per works is a guard only.
 
+## Design rulings (build 400)
+
+- SIEVE (driftaim) is gone: AUTO AIM is a toggle off <-> 'all' (grey and
+  hostile) from the start. RIG_MAX 15. 'field'/'drift' still exist in the
+  targeting code for tests only.
+- Menus follow idle-shop rules: wallet and buy button stand out, locked
+  ammo are small chips under LOCKED, codex shows one row of blanks plus a
+  count, CONTROLS fold under HOW TO PLAY, unbought units show name+price.
+  CSS block "Build 400: calmer menus" at the end of styles.css.
+
 ## Gotchas that have shipped bugs
 
 - Play controls bind on `pointerdown`; tests must dispatch `pointerdown` on

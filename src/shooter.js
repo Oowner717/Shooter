@@ -19,7 +19,7 @@ import { fx, spark, ring, shake, ripple, shard as fxShard, ember as fxEmber } fr
  * that can never fill its last socket never lights. scripts/check-build.mjs
  * holds this to the tree now.
  */
-export const RIG_MAX = 17;
+export const RIG_MAX = 15;
 
 /** How wide SALVO throws its three. */
 const SALVO_FAN = 0.09;
@@ -1871,7 +1871,7 @@ export class Shooter {
   rig(world) {
     const taken = world.ledger;
     if (world.rig && world.rigAt === taken.length) return world.rig;
-    const rig = { rate: 0, slew: 0, aimrange: 0, driftaim: 0, pile: 0, casing: 0, insulation: 0 };
+    const rig = { rate: 0, slew: 0, aimrange: 0, pile: 0, casing: 0, insulation: 0 };
     for (const id of taken) if (id in rig) rig[id]++;
     /*
      * ...and how much of the branch is on, as one number.

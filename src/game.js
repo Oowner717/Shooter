@@ -296,7 +296,7 @@ export class Game {
        * Held even while autoAim is off, so switching the assist back on
        * returns it to what it was doing rather than to the default.
        */
-      aimMode: 'field',
+      aimMode: 'all',
       autoFire: false,
       mine: null, // the one kind of mine being laid, or none
 
@@ -731,7 +731,7 @@ export class Game {
     // nothing running on its own, matching what a first-time player is handed
     // — including the first-use captions, which a fresh session should get.
     w.autoAim = false;
-    w.aimMode = 'field';
+    w.aimMode = 'all';
     w.autoFire = false;
     w.mine = null;
     w.round = 'standard';
@@ -985,8 +985,9 @@ export class Game {
      * actually bought, so a file cannot restore into a position the turret
      * cannot reach.
      */
-    const wanted = d.aimMode || (d.aimDrift ? 'drift' : 'field');
-    w.aimMode = this.aimModes().includes(wanted) && wanted !== 'off' ? wanted : 'field';
+    // Build 400: one position, 'all' (SIEVE is gone), whatever was saved.
+    void d.aimDrift;
+    w.aimMode = 'all';
     w.autoFire = !!d.autoFire;
     if (w.narrator) w.narrator.index = d.story || 0;
 
@@ -2300,11 +2301,9 @@ export class Game {
    * which is the automation: both at once, no decision left to make.
    */
   aimModes() {
-    const n = this.world.up.driftAim | 0;
-    const modes = ['off', 'field'];
-    if (n >= 1) modes.push('drift');
-    if (n >= 2) modes.push('all');
-    return modes;
+    // Build 400: SIEVE is gone and the assist takes grey and hostile together
+    // from the start, so AUTO AIM is a plain toggle.
+    return ['off', 'all'];
   }
 
   /**
@@ -2326,7 +2325,7 @@ export class Game {
      */
     if (this.aimModes().length > 2) return this.hud.openAimRow(!this.hud.aimRowOpen());
     const w = this.world;
-    return this.setAim(w.autoAim ? 'off' : 'field');
+    return this.setAim(w.autoAim ? 'off' : 'all');
   }
 
   /** Put the assist in one named position. */
@@ -2339,7 +2338,8 @@ export class Game {
     this.hud.openAimRow(false);
     this.hud.openAmmoRow(false);
     // Each position says its own thing the first time it is reached.
-    const key = !w.autoAim ? 'autoAim' : { drift: 'aimDrift', all: 'aimAll' }[mode] || 'autoAim';
+    // Build 400: ALL is the plain AUTO AIM now, so it says the AUTO AIM line.
+    const key = !w.autoAim ? 'autoAim' : { drift: 'aimDrift' }[mode] || 'autoAim';
     this.announceToggle(key, w.autoAim);
     return true;
   }
@@ -2457,7 +2457,7 @@ export class Game {
   autoTarget() {
     const w = this.world;
     const s = w.shooter;
-    const mode = w.aimMode || 'field';
+    const mode = w.aimMode || 'all';
     const limit = CFG.shooter.aimClamp + 0.04;
     /*
      * Reach, not just bearing. Until build 109 the only test was the cone, so

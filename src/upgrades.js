@@ -910,34 +910,7 @@ export const UPGRADES = {
      * come round to. Base reach is CFG.shooter.aimRange — see the note there
      * for why 400 and what 841 buys.
      */
-    /*
-     * The one part in the branch that changes what the assist is willing to
-     * shoot rather than how well it shoots it.
-     *
-     * DRIFT is the only thing on the field auto aim has ever refused. That is
-     * deliberate -- grey is harmless, the bonus wave is grey and nothing else,
-     * and "the assists are dead weight here, aim it yourself" is the whole
-     * beat of that wave. This sells the other option: a screen across the
-     * array's mouth that lets the grey through as a target, and a third
-     * position on the AUTO AIM button that hunts it and nothing else.
-     *
-     * Two levels, and the second is the automation. The first sells the
-     * CHOICE -- grey instead of the field, which is a trade, because sweeping
-     * salvage and answering a wave are not the same job. The second sells the
-     * end of the choice: both at once, no decision to make, the least manual
-     * the turret ever gets. That is worth paying for twice and worth being
-     * two rungs apart, which is why it is not one level that does both.
-     *
-     * Nothing else in the branch is a mode. This one has to be -- see
-     * Game.aimModes and the row the AUTO AIM cell opens.
-     */
-    { id: 'driftaim', name: 'SIEVE', levels: 2,
-      line: 'A third position on AUTO AIM: hunt DRIFT and nothing else. A sorting screen over the array.',
-      tiers: [null, {
-        name: 'OPEN SIEVE',
-        line: 'A fourth position: grey and hostile together. The turret stops needing to be told which.',
-      }],
-      apply: bump('driftAim', 1), icon: MARK.driftaim },
+    // SIEVE (driftaim) removed in build 400: auto aim takes grey from the start.
     { id: 'aimrange', name: 'ARRAY', levels: 2,
       line: '+45% auto aim range. A flat fin off the back.',
       tiers: [null, { name: 'DEEP ARRAY', line: '+45% again, on top of ARRAY. A second fin, and the sweep covers most of the way up the field.' }],

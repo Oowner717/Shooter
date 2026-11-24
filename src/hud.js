@@ -1155,9 +1155,23 @@ export class Hud {
     const lastAmmo = group === 'ammo' && keys.filter(Boolean).length <= 1;
     els.list.innerHTML = '';
     let sealed = 0;
-    for (const a of ARSENAL.filter((x) => x.group === group)) {
+    // Build 400: owned rows first, the locked ones after as small chips under
+    // one LOCKED label -- an idle shop shows what you can use, and what is
+    // still to come only as a shape.
+    const kinds = ARSENAL.filter((x) => x.group === group);
+    const ordered = [...kinds.filter((x) => world.unlocked.has(x.key)),
+      ...kinds.filter((x) => !world.unlocked.has(x.key))];
+    for (const a of ordered) {
       const owned = world.unlocked.has(a.key);
-      if (!owned) sealed++;
+      if (!owned) {
+        if (!sealed) {
+          const lab = document.createElement('div');
+          lab.className = 'loadLockLab';
+          lab.textContent = `LOCKED · ${kinds.length - ordered.indexOf(a)}`;
+          els.list.appendChild(lab);
+        }
+        sealed++;
+      }
       const on = carried(world.loadout, a.key);
       const stuck = on ? (lastAmmo && group === 'ammo') : full;
       const b = document.createElement('button');
@@ -3062,7 +3076,7 @@ export class Hud {
     this.setToggle('autoAim', world.autoAim);
     const el = this.el.toggles.autoAim;
     if (!el) return;
-    const mode = world.autoAim ? (world.aimMode || 'field') : 'off';
+    const mode = world.autoAim ? (world.aimMode || 'all') : 'off';
     // Re-toned and renamed per position: a control whose fourth position looks
     // like its second is a control nobody can read at a glance.
     el.classList.toggle('drift', mode === 'drift');

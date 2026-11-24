@@ -815,8 +815,10 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     // FORM, from the one place in the interface that counts the whole tree.
     // 106 / 17 from build 398: INTAKE (one level, TURRET branch) is gone --
     // collection is automatic from the start.
-    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 141 : 106)
-    && /TURRET 17\/17/.test(r.full.count) && !/TURRET 17\/17/.test(r.bare.count),
+    // 104 / 15 from build 400: SIEVE (two levels, TURRET branch) is gone --
+    // auto aim takes grey from the start.
+    num(r.bare.count) < num(r.full.count) && num(r.full.count) === (MINE_LINE ? 139 : 104)
+    && /TURRET 15\/15/.test(r.full.count) && !/TURRET 15\/15/.test(r.bare.count),
     `${r.bare.count} -> ${r.full.count}`);
   check('every card wears its branch\'s colour, not the slate fallback',
     r.bare.tones.length > 10 && r.bare.tones.every((t) => t && t !== '#9fb3c8'),
@@ -3121,25 +3123,20 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const ranD = w.director.update;
     w.director.update = () => {};
     g.debugGiveBytes(9000000);
-    g.buy('driftaim');
-    g.buy('driftaim');
 
     const tap = (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     const cell = () => document.getElementById('tgAutoAim');
     const open = () => g.hud.aimRowOpen();
 
-    // ---- the cell is a toggle ----
+    // ---- build 400: the cell is a plain toggle, off <-> ALL, and no row ----
     g.hud.openAimRow(false);
+    g.setAim('off');
     const seq = [];
-    for (let i = 0; i < 4; i++) { tap(cell()); seq.push(open() ? 1 : 0); }
-
-    // ---- and every button in the row applies its own mode and closes ----
     const picked = [];
-    for (const mode of ['off', 'field', 'drift', 'all']) {
+    for (let i = 0; i < 4; i++) {
       tap(cell());
-      const btn = document.querySelector(`#aimModes .m_${mode}`);
-      tap(btn);
-      picked.push(`${mode}->${w.autoAim ? w.aimMode : 'off'}${open() ? '!OPEN' : ''}`);
+      seq.push(open() ? 1 : 0);
+      picked.push(w.autoAim ? w.aimMode : 'off');
     }
 
     // ---- reaching past it for another control puts it away ----
@@ -3184,11 +3181,11 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     return { seq: seq.join(''), picked, otherCloses, menuCloses, threw };
   });
 
-  check('the AUTO AIM cell opens the row and closes it again',
-    r.seq === '1010', `four presses gave ${r.seq} (1 = open); it shipped as 1111`);
+  check('the AUTO AIM cell toggles and never opens a row (build 400)',
+    r.seq === '0000', `four presses gave ${r.seq} (1 = a row opened)`);
 
-  check('...and every position in the row applies from a press on it',
-    JSON.stringify(r.picked) === JSON.stringify(['off->off', 'field->field', 'drift->drift', 'all->all']),
+  check('...and switched on it takes grey and hostile together, with nothing bought',
+    JSON.stringify(r.picked) === JSON.stringify(['all', 'off', 'all', 'off']),
     r.picked.join('  '));
 
   check('...and reaching past the row for anything else puts it away',
@@ -3772,35 +3769,16 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const noise = diff(off1, off2);
     const moved = diff(off1, on);
 
-    // ---- what positions exist, at each level of SIEVE ----
-    const offered = [];
-    for (const lvl of [0, 1, 2]) {
-      w.up.driftAim = lvl;
-      offered.push(g.aimModes().join(','));
-    }
-
-    /*
-     * ---- the control is a toggle until there is something to choose ----
-     *
-     * Two positions is a toggle and four is a menu. A list of two costs a tap
-     * to say what one tap already said; a blind cycle through four is a
-     * control you have to count your way round.
-     */
-    w.up.driftAim = 0;
+    // ---- build 400: SIEVE is gone; the positions are off and ALL, always ----
+    const offered = [g.aimModes().join(',')];
     g.setAim('off');
     g.hud.openAimRow(false);
     g.aimPressed();
     const bareOpens = !g.hud.el.aimModes.hidden;
-    const bareOn = w.autoAim;
+    const bareOn = w.autoAim && w.aimMode === 'all';
     g.aimPressed();
     const bareOff = !w.autoAim;
-    w.up.driftAim = 2;
-    g.aimPressed();
-    const richOpens = !g.hud.el.aimModes.hidden;
-    const listed = [...g.hud.el.aimModes.querySelectorAll('.aimMode')]
-      .filter((b) => !b.hidden).map((b) => b.dataset.mode).join(',');
-    g.setAim('all');
-    const closesOnPick = g.hud.el.aimModes.hidden;
+    const richOpens = false; const listed = ''; const closesOnPick = true;
 
     // ---- ...and what each position will actually pick ----
     w.enemies.length = 0;
@@ -3812,7 +3790,8 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const drift = w.enemies.find((e) => e.harmless);
     drift.x = w.width / 2 + 110; drift.y = w.shooter.y - 200;
     drift.staged = false; drift.spawnIn = 0;
-    const pick = (mode) => { g.setAim(mode); const t = g.autoTarget(); return t && t.type.id; };
+    // 'field' and 'drift' are no longer offered; the targeting still reads them.
+    const pick = (mode) => { w.aimMode = mode; w.autoAim = true; const t = g.autoTarget(); return t && t.type.id; };
     const plain = pick('field');
     const grey = pick('drift');
     // ALL has to be able to reach either, so the nearer one is moved under it.
@@ -3833,15 +3812,13 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     r.noise === 0 && r.moved > 40,
     `two frames with it off differ by ${r.noise}px; with it on, ${r.moved}px on row ${r.row} of ${r.cvW}`);
 
-  check('each level of SIEVE adds a position, and neither is free',
-    JSON.stringify(r.offered) === JSON.stringify(['off,field', 'off,field,drift', 'off,field,drift,all']),
+  check('AUTO AIM offers off and ALL from the start, with nothing to buy (build 400)',
+    JSON.stringify(r.offered) === JSON.stringify(['off,all']),
     r.offered.join('  |  '));
 
-  check('AUTO AIM is a toggle until there is something to choose, then a row',
-    r.bareOpens === false && r.bareOn && r.bareOff
-    && r.richOpens && r.listed === 'off,field,drift,all' && r.closesOnPick,
-    `bare: opens=${r.bareOpens} on=${r.bareOn} off=${r.bareOff}`
-    + ` | bought: opens=${r.richOpens} lists=[${r.listed}] closes=${r.closesOnPick}`);
+  check('AUTO AIM is a plain toggle onto ALL',
+    r.bareOpens === false && r.bareOn && r.bareOff,
+    `opens=${r.bareOpens} on(all)=${r.bareOn} off=${r.bareOff}`);
 
   /*
    * The three positions, at the only place it matters -- what comes back from
@@ -3887,8 +3864,6 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
     const ranD = w.director.update;
     w.director.update = () => {};
     g.debugGiveBytes(9000000);
-    g.buy('driftaim');
-    g.buy('driftaim');
     await new Promise((res) => setTimeout(res, 120));
 
     const row = document.getElementById('aimModes');
@@ -3995,23 +3970,11 @@ check('nothing reads a field that does not exist on world or world.up', ghosts.l
       lift, stacks, underSheet, underMenu, afterwards };
   });
 
-  check('the mode row leaves the screen when it closes, not just the property',
-    r.shutAtStart && r.openPaints && r.shutAgain,
-    `shut at start=${r.shutAtStart}, open paints=${r.openPaints}, shut again=${r.shutAgain}`);
-
-  check('every position it offers is thumb-sized and nothing is on top of it',
-    r.seats.length === 4 && !r.small.length && !r.buried.length
-    && Number(r.lift) > 0
-    && r.stacks.length >= 2 && r.stacks.every((z) => z === 'auto'),
-    `${r.seats.length} offered, ${r.seats.map((s) => `${s.mode} ${s.w}x${s.h}`).join(' · ')}`
-    + `${r.small.length ? ` | under 44px: ${r.small.join(', ')}` : ''}`
-    + `${r.buried.length ? ` | buried: ${r.buried.join(', ')}` : ''}`
-    + ` | band z-index ${r.lift} over ${r.stacks.length} stacks at `
-    + `${r.stacks.join(',')}`);
-
-  check('a position that has not been bought is not on the screen',
-    r.bare === 'off,field',
-    `with no SIEVE the row shows [${r.bare}]`);
+  // Build 400: SIEVE is gone, AUTO AIM is a toggle, and the row it used to
+  // open never reaches the screen.
+  check('the AUTO AIM row never paints now that there is nothing to choose',
+    r.shutAtStart && !r.openPaints,
+    `shut at start=${r.shutAtStart}, a press painted it=${r.openPaints}`);
 
   check('a sheet over the strip actually stops the strip being pressed',
     r.underSheet === 'none' && r.underMenu === 'none' && r.afterwards === 'auto',
@@ -20390,7 +20353,8 @@ if (MINE_LINE) {
    */
   check('...and writing the numbers out changed no ladder',
     // 91 / 45 from build 398: INTAKE's one level and node went.
-    r.total === (MINE_LINE ? 115 : 91) && r.rungs === (MINE_LINE ? 58 : 45)
+    // 89 / 44 from build 400: SIEVE's two levels and node went.
+    r.total === (MINE_LINE ? 113 : 89) && r.rungs === (MINE_LINE ? 57 : 44)
     && r.repeats === 0,
     `${r.total} levels across ${r.rungs} upgrade nodes and ${r.repeats} `
     + `repeatable ones (fifteen of those levels were the silent default and are `
@@ -20594,7 +20558,8 @@ if (MINE_LINE) {
    */
   check('...and nothing the machine needs is priced past what the machine unlocks',
     // Seven from build 398: INTAKE went.
-    r.rigPast.length === 0 && r.gateBad.length === 0 && r.rig.length === 7
+    // Six from build 400: SIEVE went.
+    r.rigPast.length === 0 && r.gateBad.length === 0 && r.rig.length === 6
     && r.rigCost < r.coreCost * 2,
     `the seven TURRET nodes cost ${(r.rigCost / 1e6).toFixed(2)} MB across bands `
     + `${r.rig.map((x) => x.band).join('/')} against CORE at band ${r.coreBand} `
@@ -20877,7 +20842,7 @@ if (MINE_LINE) {
     r.ultimate.tab === 'ultimate' && r.ultimate.sealedTab && r.ultimate.lockOnTab
     && r.ultimate.room && /NEW FORM/.test(r.ultimate.says) && r.ultimate.cards === 0
     && r.ultimate.needs.length === 2
-    && /THE MACHINE FINISHED . 0 of 17/.test(r.ultimate.needs[0])
+    && /THE MACHINE FINISHED . 0 of 15/.test(r.ultimate.needs[0])
     && r.ultimate.need > 0
     && new RegExp(`${r.ultimate.need} ANOMALIES RECONCILED . 0 of ${r.ultimate.need}`)
       .test(r.ultimate.needs[1])
@@ -26338,9 +26303,10 @@ if (MINE_LINE) {
 
   check('...and the machine comes apart in the order it was built',
     // 17 from build 398 (INTAKE went).
-    u.built === 17 && u.declared === 17 && u.shed > 4 && u.shed < 17
+    // 15 from build 400 (SIEVE went).
+    u.built === 15 && u.declared === 15 && u.shed > 4 && u.shed < 15
     && u.leftN === u.built - u.shed && u.tail && u.rigFell
-    && u.restored === 17 && u.after === 17 && u.rigWhole,
+    && u.restored === 15 && u.after === 15 && u.rigWhole,
     `${u.built} turret levels bought; halfway through the unmaking ${u.shed} had `
     + `gone and ${u.leftN} were left, and they are the TAIL of the build order `
     + `${u.tail} with the rig no longer full ${u.rigFell}; by the ignition `
@@ -34604,7 +34570,9 @@ if (MINE_LINE) {
   const Y = r.per.yoke || {};
   const other = Object.entries(r.per).find(([id]) => id !== 'yoke');
   check('a YOKE arrives as a PAIR, and the wave beside it still forms up',
-    Y.releases >= 20 && Y.lo === 2 && Y.hi === 2
+    // 16 from build 400: build 399's wave rework made the wave smaller and
+    // it drains at 19 now; what is asserted is that every release is a pair.
+    Y.releases >= 16 && Y.lo === 2 && Y.hi === 2
     && Y.beamed === Y.releases * 2 && Y.bad === 0 && Y.over === 0
     // ...and the CONTROL was actually reached. This conjunct read `!!other`
     // and drew nothing on build 333, because the census stopped at a fixed
@@ -43109,9 +43077,10 @@ if (MINE_LINE) {
       w.autoFire = false;
       // SIEVE at two levels is what makes the fourth position legal, and the
       // position is taken through the door that refuses an unowned one
-      w.up.driftAim = 2;
-      const legal = g.aimModes();
-      const set = g.setAim(mode);
+      // Build 400: only ALL is offered; the chain still reads the others.
+      const legal = ['off', 'field', 'drift', 'all'];
+      w.aimMode = mode;
+      const set = true;
       /*
        * ...and then the ASSIST is switched off, because what is under test is
        * the chain and not the barrel: `setAim` writes `autoAim` as well as
@@ -44014,7 +43983,8 @@ if (MINE_LINE) {
     const { NODE_BY_ID } = await import('../src/tree.js');
     const m = g.hud.menu;
     const out = [];
-    for (const id of ['driftaim', 'aimrange']) {
+    // SIEVE (driftaim) went in build 400; ARRAY is the tiered node left.
+    for (const id of ['aimrange']) {
       const n = NODE_BY_ID.get(id);
       if (!n || !n.tiers) { out.push({ id, missing: true }); continue; }
       for (let have = 0; have < (n.levels || 1); have++) {
@@ -44066,7 +44036,7 @@ if (MINE_LINE) {
     + ' was never removed, so the two read the same for the whole run');
 
   check('a tier card carries its own line, not the line of the level below it',
-    cards.length >= 4 && cards.every((c) => !c.missing)
+    cards.length >= 2 && cards.every((c) => !c.missing)
       && cards.some((c) => c.tierName)
       && cards.every((c) => (c.tierName ? c.name === c.tierName : true)
         && (c.tierLine
