@@ -308,6 +308,18 @@ export function updatePortal(world, dt) {
   const P = world.portal;
   if (!P) return;
   P.spin += dt;
+  /*
+   * Build 400: during a boss fight the rift FADES OUT entirely, over about
+   * half a second, and comes back the same way after. Sealed at a third of
+   * its light it still sat behind the anomaly and read as clutter -- the
+   * fight is the anomaly and nothing else. A portal re-derived mid-fight
+   * (a rotation) starts at the target, so it never flashes back in.
+   */
+  const want = world.boss ? 0 : 1;
+  if (P.fade == null) P.fade = want;
+  else if (P.fade !== want) {
+    P.fade = want > P.fade ? Math.min(want, P.fade + dt * 2) : Math.max(want, P.fade - dt * 2);
+  }
   if (P.flare > 0) P.flare = Math.max(0, P.flare - dt * 1.4);
   for (let i = P.births.length - 1; i >= 0; i--) {
     const b = P.births[i];
@@ -391,6 +403,11 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   const k = CFG.scale;
   const t = world.time || 0;
   const sealed = !!world.boss;
+  // Build 400: faded out for a boss fight (see updatePortal). The bodies in
+  // the throat are still drawn at full strength -- only the rift fades.
+  const fade = P.fade == null ? (sealed ? 0 : 1) : P.fade;
+  if (fade <= 0.001 && !bodies.length) return;
+  const base = ctx.globalAlpha;
   const accent = mood.accent;
   const bright = mixHex(accent, '#ffffff', 0.5);
   const breath = sealed ? 0 : 0.5 + 0.5 * Math.sin(t * 1.7);
@@ -418,6 +435,7 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   };
 
   ctx.save();
+  ctx.globalAlpha = base * fade;
 
   /* ---- the spill, first, so everything is drawn over it ------------------
    * Light pooling down the field from the rim. It was authored as a WIDENING
@@ -635,6 +653,7 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
   /* ---- what is coming: the ghost pass ------------------------------------ */
   if (bodies.length && drawBody) {
     ctx.save();
+    ctx.globalAlpha = base;
     ctx.beginPath();
     ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, TAU);
     ctx.clip();
@@ -662,6 +681,7 @@ export function drawPortal(ctx, world, mood, bodies = [], drawBody = null) {
      * before the body did.
      */
     ctx.save();
+    ctx.globalAlpha = base;
     ctx.beginPath();
     ctx.rect(-W, P.y, W * 3, H * 3);
     ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, TAU);

@@ -86,6 +86,8 @@ node scripts/regress.mjs 2>&1 | tail -40
   ammo are small chips under LOCKED, codex shows one row of blanks plus a
   count, CONTROLS fold under HOW TO PLAY, unbought units show name+price.
   CSS block "Build 400: calmer menus" at the end of styles.css.
+- Build 401: the portal fades out (P.fade, updatePortal) while `world.boss`
+  is set, and back in after; throat bodies still draw at full strength.
 
 ## Gotchas that have shipped bugs
 
